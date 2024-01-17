@@ -50,7 +50,7 @@ pub fn openbook_v2_register_market(
         if base_c_tier && quote_has_no_deposit_limit {
             require_eq!(oracle_price_band, 19.0);
         } else {
-            require_eq!(oracle_price_band, 0.5);
+            require_eq!(oracle_price_band, 1.0);
         }
     }
 
