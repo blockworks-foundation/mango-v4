@@ -613,6 +613,33 @@ export class MangoAccount {
     return toUiDecimals(maxWithdrawWithBorrow, group.getMintDecimals(mintPk));
   }
 
+  public calculateEquivalentSourceAmount(
+    sourceBank: Bank,
+    targetBank: Bank,
+    targetRemainingDepositLimit: BN,
+  ): BN {
+    const decimalDifference = sourceBank.mintDecimals - targetBank.mintDecimals;
+    let adjustedExchangeRate: number;
+
+    // Adjust the exchange rate based on the decimal difference
+    if (decimalDifference > 0) {
+      // Target has fewer decimals than source
+      adjustedExchangeRate =
+        (targetBank.uiPrice / sourceBank.uiPrice) *
+        Math.pow(10, Math.abs(decimalDifference));
+    } else {
+      // Source has fewer decimals than target
+      adjustedExchangeRate =
+        (sourceBank.uiPrice / targetBank.uiPrice) *
+        Math.pow(10, Math.abs(decimalDifference));
+    }
+
+    // Calculate the equivalent source amount
+    return decimalDifference > 0
+      ? targetRemainingDepositLimit.muln(adjustedExchangeRate)
+      : targetRemainingDepositLimit.divn(adjustedExchangeRate);
+  }
+
   /**
    * The max amount of given source ui token you can swap to a target token.
    * @returns max amount of given source ui token you can swap to a target token, in ui token
@@ -628,8 +655,6 @@ export class MangoAccount {
     }
     const sourceBank = group.getFirstBankByMint(sourceMintPk);
     const targetBank = group.getFirstBankByMint(targetMintPk);
-    const targetDecimals = group.getMintDecimals(targetMintPk);
-    const sourceDecimals = group.getMintDecimals(sourceMintPk);
 
     const targetRemainingDepositLimit =
       group.getRemainingDepositLimitByMint(targetMintPk);
@@ -653,12 +678,11 @@ export class MangoAccount {
     maxSource = maxSource.min(maxWithdrawNative);
 
     if (targetRemainingDepositLimit) {
-      const adjustedExchangeRate =
-        (targetBank.uiPrice / sourceBank.uiPrice) *
-        Math.pow(10, sourceDecimals - targetDecimals);
-
-      const equivalentSourceAmount =
-        targetRemainingDepositLimit.muln(adjustedExchangeRate);
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        sourceBank,
+        targetBank,
+        targetRemainingDepositLimit,
+      );
 
       maxSource = maxSource.min(I80F48.fromI64(equivalentSourceAmount));
     }
@@ -781,6 +805,11 @@ export class MangoAccount {
     const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
+
+    const targetRemainingDepositLimit = group.getRemainingDepositLimitByMint(
+      baseBank.mint,
+    );
+
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
@@ -790,17 +819,28 @@ export class MangoAccount {
       I80F48.fromNumber(2),
     );
     let quoteAmount = nativeAmount.div(quoteBank.price);
-    // If its a bid then the reserved fund and potential loan is in base
-    // also keep some buffer for fees, use taker fees for worst case simulation.
+
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
     const maxWithdrawNative = quoteBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(quoteBank.mint),
       quoteBalance,
     );
     quoteAmount = quoteAmount.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        quoteBank,
+        baseBank,
+        targetRemainingDepositLimit,
+      );
+
+      quoteAmount = quoteAmount.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+
     return toUiDecimals(quoteAmount, quoteBank.mintDecimals);
   }
 
@@ -822,6 +862,11 @@ export class MangoAccount {
     const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
+
+    const targetRemainingDepositLimit = group.getRemainingDepositLimitByMint(
+      quoteBank.mint,
+    );
+
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
@@ -831,17 +876,28 @@ export class MangoAccount {
       I80F48.fromNumber(2),
     );
     let baseAmount = nativeAmount.div(baseBank.price);
-    // If its a ask then the reserved fund and potential loan is in base
-    // also keep some buffer for fees, use taker fees for worst case simulation.
+
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
     const maxWithdrawNative = baseBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(baseBank.mint),
       baseBalance,
     );
     baseAmount = baseAmount.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        baseBank,
+        quoteBank,
+        targetRemainingDepositLimit,
+      );
+
+      baseAmount = baseAmount.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     baseAmount = baseAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+
     return toUiDecimals(baseAmount, baseBank.mintDecimals);
   }
 
