@@ -1951,6 +1951,30 @@
 <a href="#1951" id="1951">1951</a>
 <a href="#1952" id="1952">1952</a>
 <a href="#1953" id="1953">1953</a>
+<a href="#1954" id="1954">1954</a>
+<a href="#1955" id="1955">1955</a>
+<a href="#1956" id="1956">1956</a>
+<a href="#1957" id="1957">1957</a>
+<a href="#1958" id="1958">1958</a>
+<a href="#1959" id="1959">1959</a>
+<a href="#1960" id="1960">1960</a>
+<a href="#1961" id="1961">1961</a>
+<a href="#1962" id="1962">1962</a>
+<a href="#1963" id="1963">1963</a>
+<a href="#1964" id="1964">1964</a>
+<a href="#1965" id="1965">1965</a>
+<a href="#1966" id="1966">1966</a>
+<a href="#1967" id="1967">1967</a>
+<a href="#1968" id="1968">1968</a>
+<a href="#1969" id="1969">1969</a>
+<a href="#1970" id="1970">1970</a>
+<a href="#1971" id="1971">1971</a>
+<a href="#1972" id="1972">1972</a>
+<a href="#1973" id="1973">1973</a>
+<a href="#1974" id="1974">1974</a>
+<a href="#1975" id="1975">1975</a>
+<a href="#1976" id="1976">1976</a>
+<a href="#1977" id="1977">1977</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -1987,6 +2011,7 @@
 <span class="kw">use </span>solana_sdk::transaction::TransactionError;
 
 <span class="kw">use </span><span class="kw">crate</span>::account_fetcher::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 <span class="kw">use </span><span class="kw">crate</span>::context::MangoGroupContext;
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
 <span class="kw">use </span><span class="kw">crate</span>::util::PreparedInstructions;
@@ -2019,6 +2044,9 @@
     </span><span class="kw">pub </span>commitment: CommitmentConfig,
 
     <span class="doccomment">/// Timeout, defaults to 60s
+    ///
+    /// This timeout applies to rpc requests. Note that the timeout for transaction
+    /// confirmation is configured separately in rpc_confirm_transaction_config.
     </span><span class="attr">#[builder(default = <span class="string">&quot;Some(Duration::from_secs(60))&quot;</span>)]
     </span><span class="kw">pub </span>timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
 
@@ -2028,6 +2056,10 @@
     <span class="doccomment">/// Defaults to a preflight check at processed commitment
     </span><span class="attr">#[builder(default = <span class="string">&quot;ClientBuilder::default_rpc_send_transaction_config()&quot;</span>)]
     </span><span class="kw">pub </span>rpc_send_transaction_config: RpcSendTransactionConfig,
+
+    <span class="doccomment">/// Defaults to waiting up to 60s for confirmation
+    </span><span class="attr">#[builder(default = <span class="string">&quot;ClientBuilder::default_rpc_confirm_transaction_config()&quot;</span>)]
+    </span><span class="kw">pub </span>rpc_confirm_transaction_config: RpcConfirmTransactionConfig,
 
     <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v4\&quot;.into()&quot;</span>)]
     </span><span class="kw">pub </span>jupiter_v4_url: String,
@@ -2043,6 +2075,13 @@
     <span class="kw">pub fn </span>default_rpc_send_transaction_config() -&gt; RpcSendTransactionConfig {
         RpcSendTransactionConfig {
             preflight_commitment: <span class="prelude-val">Some</span>(CommitmentLevel::Processed),
+            ..Default::default()
+        }
+    }
+
+    <span class="kw">pub fn </span>default_rpc_confirm_transaction_config() -&gt; RpcConfirmTransactionConfig {
+        RpcConfirmTransactionConfig {
+            timeout: <span class="prelude-val">Some</span>(Duration::from_secs(<span class="number">60</span>)),
             ..Default::default()
         }
     }
@@ -3822,10 +3861,19 @@
     <span class="kw">pub async fn </span>send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>, client: <span class="kw-2">&amp;</span>Client) -&gt; anyhow::Result&lt;Signature&gt; {
         <span class="kw">let </span>rpc = client.rpc_async();
         <span class="kw">let </span>tx = <span class="self">self</span>.transaction(<span class="kw-2">&amp;</span>rpc).<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="comment">// TODO: Wish we could use client.rpc_send_transaction_config here too!
-        </span>rpc.send_and_confirm_transaction(<span class="kw-2">&amp;</span>tx)
+        <span class="kw">let </span>recent_blockhash = tx.message.recent_blockhash();
+        <span class="kw">let </span>signature = rpc
+            .send_transaction_with_config(<span class="kw-2">&amp;</span>tx, client.rpc_send_transaction_config)
             .<span class="kw">await
-            </span>.map_err(prettify_solana_client_error)
+            </span>.map_err(prettify_solana_client_error)<span class="question-mark">?</span>;
+        wait_for_transaction_confirmation(
+            <span class="kw-2">&amp;</span>rpc,
+            <span class="kw-2">&amp;</span>signature,
+            recent_blockhash,
+            <span class="kw-2">&amp;</span>client.rpc_confirm_transaction_config,
+        )
+        .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(signature)
     }
 
     <span class="kw">pub fn </span>transaction_size(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;TransactionSize&gt; {
