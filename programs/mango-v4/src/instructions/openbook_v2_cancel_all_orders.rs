@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use openbook_v2::cpi::accounts::CancelOrder;
+use openbook_v2::state::Side;
 
 use crate::accounts_ix::*;
 use crate::error::*;
@@ -8,7 +9,11 @@ use crate::serum3_cpi::OpenOrdersAmounts;
 use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
 
-pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit: u8) -> Result<()> {
+pub fn openbook_v2_cancel_all_orders(
+    ctx: Context<OpenbookV2CancelOrder>,
+    limit: u8,
+    side_opt: Option<Side>,
+) -> Result<()> {
     //
     // Validation
     //
@@ -39,7 +44,7 @@ pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit:
     //
     let account = ctx.accounts.account.load()?;
     let account_seeds = mango_account_seeds!(account);
-    cpi_cancel_all_orders(ctx.accounts, &[account_seeds], limit)?;
+    cpi_cancel_all_orders(ctx.accounts, &[account_seeds], limit, side_opt)?;
 
     let openbook_market = ctx.accounts.openbook_v2_market.load()?;
     let open_orders = ctx.accounts.open_orders.load()?;
@@ -66,7 +71,12 @@ pub fn openbook_v2_cancel_all_orders(ctx: Context<OpenbookV2CancelOrder>, limit:
     Ok(())
 }
 
-fn cpi_cancel_all_orders(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], limit: u8) -> Result<()> {
+fn cpi_cancel_all_orders(
+    ctx: &OpenbookV2CancelOrder,
+    seeds: &[&[&[u8]]],
+    limit: u8,
+    side_opt: Option<Side>,
+) -> Result<()> {
     let cpi_accounts = CancelOrder {
         signer: ctx.account.to_account_info(),
         open_orders_account: ctx.open_orders.to_account_info(),
@@ -82,5 +92,5 @@ fn cpi_cancel_all_orders(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], limit:
     );
 
     // todo-pan: maybe allow passing side for cu opt
-    openbook_v2::cpi::cancel_all_orders(cpi_ctx, None, limit)
+    openbook_v2::cpi::cancel_all_orders(cpi_ctx, side_opt, limit)
 }

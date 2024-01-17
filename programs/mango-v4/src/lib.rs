@@ -1803,9 +1803,10 @@ pub mod mango_v4 {
     pub fn openbook_v2_cancel_all_orders(
         ctx: Context<OpenbookV2CancelOrder>,
         limit: u8,
+        side_opt: Option<openbook_v2::state::Side>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::openbook_v2_cancel_all_orders(ctx, limit)?;
+        instructions::openbook_v2_cancel_all_orders(ctx, limit, side_opt)?;
         Ok(())
     }
 
