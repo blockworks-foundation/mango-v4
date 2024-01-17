@@ -6,9 +6,11 @@ use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 use openbook_v2::cpi::accounts::SettleFunds;
 
-use super::apply_settle_changes_v2;
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, LoanOriginationFeeInstruction, WithdrawLoanLog};
+use crate::instructions::openbook_v2_place_order::apply_settle_changes;
+use crate::logs::{
+    emit_stack, LoanOriginationFeeInstruction, OpenbookV2OpenOrdersBalanceLog, WithdrawLoanLog,
+};
 
 use crate::accounts_zerocopy::AccountInfoRef;
 
@@ -69,14 +71,19 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     // Charge any open loan origination fees
     //
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let before_oo;
     {
         let open_orders = ctx.accounts.open_orders.load()?;
-        before_oo = OpenOrdersSlim::from_oo_v2(&open_orders);
+        before_oo = OpenOrdersSlim::from_oo_v2(
+            &open_orders,
+            openbook_market_external.base_lot_size,
+            openbook_market_external.quote_lot_size,
+        );
         let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        charge_loan_origination_fees_v2(
+        charge_loan_origination_fees(
             &ctx.accounts.group.key(),
             &ctx.accounts.account.key(),
             openbook_market.market_index,
@@ -103,7 +110,11 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     let after_oo = {
         let open_orders = ctx.accounts.open_orders.load()?;
-        OpenOrdersSlim::from_oo_v2(&open_orders)
+        OpenOrdersSlim::from_oo_v2(
+            &open_orders,
+            openbook_market_external.base_lot_size,
+            openbook_market_external.quote_lot_size,
+        )
     };
 
     ctx.accounts.base_vault.reload()?;
@@ -116,7 +127,7 @@ pub fn openbook_v2_settle_funds<'info>(
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     let group = ctx.accounts.group.load()?;
     let open_orders = ctx.accounts.open_orders.load()?;
-    apply_settle_changes_v2(
+    apply_settle_changes(
         &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
@@ -135,24 +146,24 @@ pub fn openbook_v2_settle_funds<'info>(
         &open_orders,
     )?;
 
-    // emit!(OpenbookV2OpenOrdersBalanceLog {
-    //     mango_group: accounts.group.key(),
-    //     mango_account: accounts.account.key(),
-    //     market_index: serum_market.market_index,
-    //     base_token_index: serum_market.base_token_index,
-    //     quote_token_index: serum_market.quote_token_index,
-    //     base_total: after_oo.native_base_total(),
-    //     base_free: after_oo.native_base_free(),
-    //     quote_total: after_oo.native_quote_total(),
-    //     quote_free: after_oo.native_quote_free(),
-    //     referrer_rebates_accrued: after_oo.native_rebates(),
-    // });
+    emit!(OpenbookV2OpenOrdersBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        market_index: openbook_market.market_index,
+        base_token_index: openbook_market.base_token_index,
+        quote_token_index: openbook_market.quote_token_index,
+        base_total: after_oo.native_base_total(),
+        base_free: after_oo.native_base_free(),
+        quote_total: after_oo.native_quote_total(),
+        quote_free: after_oo.native_quote_free(),
+        referrer_rebates_accrued: after_oo.native_rebates(),
+    });
 
     Ok(())
 }
 
 // Charge fees if the potential borrows are bigger than the funds on the open orders account
-pub fn charge_loan_origination_fees_v2(
+pub fn charge_loan_origination_fees(
     group_pubkey: &Pubkey,
     account_pubkey: &Pubkey,
     market_index: OpenbookV2MarketIndex,
@@ -201,7 +212,7 @@ pub fn charge_loan_origination_fees_v2(
             token_index: base_bank.token_index,
             loan_amount: withdraw_result.loan_amount.to_bits(),
             loan_origination_fee: withdraw_result.loan_origination_fee.to_bits(),
-            instruction: LoanOriginationFeeInstruction::Serum3SettleFunds,
+            instruction: LoanOriginationFeeInstruction::OpenbookV2SettleFunds,
             price: base_oracle_price.map(|p| p.to_bits()),
         });
     }

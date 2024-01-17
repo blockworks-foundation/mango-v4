@@ -408,7 +408,7 @@ pub fn serum3_place_order(
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =
-            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?; // todo-pan: split potential into serum and openbook
+            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?;
         require_msg_typed!(
             balance + potential < 1,
             MangoError::TokenInReduceOnlyMode,

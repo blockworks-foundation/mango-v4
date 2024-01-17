@@ -3,6 +3,9 @@ use anchor_lang::prelude::*;
 use openbook_v2::cpi::accounts::CancelOrder;
 
 use crate::error::*;
+use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::serum3_cpi::OpenOrdersAmounts;
+use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
 
 use crate::accounts_ix::*;
@@ -46,22 +49,26 @@ pub fn openbook_v2_cancel_order(
     let account_seeds = mango_account_seeds!(account);
     cpi_cancel_order(ctx.accounts, &[account_seeds], order_id)?;
 
-    // let oo_ai = &ctx.accounts.open_orders.as_ref();
-    // let open_orders = load_open_orders_ref(oo_ai)?;
-    // let after_oo = OpenOrdersSlim::from_oo(&open_orders);
+    let open_orders = ctx.accounts.open_orders.load()?;
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+    let after_oo = OpenOrdersSlim::from_oo_v2(
+        &open_orders,
+        openbook_market_external.base_lot_size,
+        openbook_market_external.quote_lot_size,
+    );
 
-    // emit!(OpenbookV2OpenOrdersBalanceLog {
-    //     mango_group: ctx.accounts.group.key(),
-    //     mango_account: ctx.accounts.account.key(),
-    //     market_index: serum_market.market_index,
-    //     base_token_index: serum_market.base_token_index,
-    //     quote_token_index: serum_market.quote_token_index,
-    //     base_total: after_oo.native_base_total(),
-    //     base_free: after_oo.native_base_free(),
-    //     quote_total: after_oo.native_quote_total(),
-    //     quote_free: after_oo.native_quote_free(),
-    //     referrer_rebates_accrued: after_oo.native_rebates(),
-    // });
+    emit!(OpenbookV2OpenOrdersBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        market_index: openbook_market.market_index,
+        base_token_index: openbook_market.base_token_index,
+        quote_token_index: openbook_market.quote_token_index,
+        base_total: after_oo.native_base_total(),
+        base_free: after_oo.native_base_free(),
+        quote_total: after_oo.native_quote_total(),
+        quote_free: after_oo.native_quote_free(),
+        referrer_rebates_accrued: after_oo.native_rebates(),
+    });
 
     Ok(())
 }

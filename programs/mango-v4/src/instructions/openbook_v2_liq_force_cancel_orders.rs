@@ -4,8 +4,10 @@ use openbook_v2::cpi::accounts::{CancelOrder, SettleFunds};
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::instructions::apply_settle_changes_v2;
-use crate::instructions::charge_loan_origination_fees_v2;
+use crate::instructions::openbook_v2_place_order::apply_settle_changes;
+use crate::instructions::openbook_v2_settle_funds::charge_loan_origination_fees;
+use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::serum3_cpi::OpenOrdersAmounts;
 use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
 
@@ -75,13 +77,18 @@ pub fn openbook_v2_liq_force_cancel_orders(
     //
     // Charge any open loan origination fees
     //
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let before_oo = {
         let open_orders = ctx.accounts.open_orders.load()?;
-        let before_oo = OpenOrdersSlim::from_oo_v2(&open_orders);
+        let before_oo = OpenOrdersSlim::from_oo_v2(
+            &open_orders,
+            openbook_market_external.base_lot_size,
+            openbook_market_external.quote_lot_size,
+        );
         let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
-        charge_loan_origination_fees_v2(
+        charge_loan_origination_fees(
             &ctx.accounts.group.key(),
             &ctx.accounts.account.key(),
             openbook_market.market_index,
@@ -116,20 +123,24 @@ pub fn openbook_v2_liq_force_cancel_orders(
     let after_oo;
     {
         let open_orders = ctx.accounts.open_orders.load()?;
-        after_oo = OpenOrdersSlim::from_oo_v2(&open_orders);
+        after_oo = OpenOrdersSlim::from_oo_v2(
+            &open_orders,
+            openbook_market_external.base_lot_size,
+            openbook_market_external.quote_lot_size,
+        );
 
-        // emit!(OpenbookV2OpenOrdersBalanceLog {
-        //     mango_group: ctx.accounts.group.key(),
-        //     mango_account: ctx.accounts.account.key(),
-        //     market_index: serum_market.market_index,
-        //     base_token_index: serum_market.base_token_index,
-        //     quote_token_index: serum_market.quote_token_index,
-        //     base_total: after_oo.native_base_total(),
-        //     base_free: after_oo.native_base_free(),
-        //     quote_total: after_oo.native_quote_total(),
-        //     quote_free: after_oo.native_quote_free(),
-        //     referrer_rebates_accrued: after_oo.native_rebates(),
-        // });
+        emit!(OpenbookV2OpenOrdersBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            market_index: openbook_market.market_index,
+            base_token_index: openbook_market.base_token_index,
+            quote_token_index: openbook_market.quote_token_index,
+            base_total: after_oo.native_base_total(),
+            base_free: after_oo.native_base_free(),
+            quote_total: after_oo.native_quote_total(),
+            quote_free: after_oo.native_quote_free(),
+            referrer_rebates_accrued: after_oo.native_rebates(),
+        });
     };
 
     ctx.accounts.base_vault.reload()?;
@@ -142,7 +153,7 @@ pub fn openbook_v2_liq_force_cancel_orders(
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     let group = ctx.accounts.group.load()?;
     let open_orders = ctx.accounts.open_orders.load()?;
-    apply_settle_changes_v2(
+    apply_settle_changes(
         &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),

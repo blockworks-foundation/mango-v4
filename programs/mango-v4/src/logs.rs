@@ -371,6 +371,20 @@ pub struct Serum3OpenOrdersBalanceLogV2 {
     pub referrer_rebates_accrued: u64,
 }
 
+#[event]
+pub struct OpenbookV2OpenOrdersBalanceLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub market_index: u16,
+    pub base_token_index: u16,
+    pub quote_token_index: u16,
+    pub base_total: u64,
+    pub base_free: u64,
+    pub quote_total: u64,
+    pub quote_free: u64,
+    pub referrer_rebates_accrued: u64,
+}
+
 #[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum LoanOriginationFeeInstruction {
@@ -382,6 +396,7 @@ pub enum LoanOriginationFeeInstruction {
     Serum3SettleFunds,
     TokenWithdraw,
     TokenConditionalSwapTrigger,
+    OpenbookV2LiqForceCancelOrders,
     OpenbookV2PlaceOrder,
     OpenbookV2SettleFunds,
 }

@@ -3,6 +3,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::instructions::{apply_vault_difference, OODifference};
+use crate::logs::OpenbookV2OpenOrdersBalanceLog;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 use anchor_lang::prelude::*;
@@ -69,7 +70,7 @@ pub fn openbook_v2_place_order(
     let (_, _, payer_active_index) = account.ensure_token_position(receiver_token_index)?;
     let (_, _, receiver_active_index) = account.ensure_token_position(receiver_token_index)?;
 
-    let (payer_bank, payer_bankoracle) =
+    let (payer_bank, payer_bank_oracle) =
         retriever.bank_and_oracle(&group_key, payer_active_index, payer_token_index)?;
     let (receiver_bank, receiver_bank_oracle) =
         retriever.bank_and_oracle(&group_key, receiver_active_index, receiver_token_index)?;
@@ -99,7 +100,7 @@ pub fn openbook_v2_place_order(
     //
     // Before-order tracking
     //
-
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let before_vault = ctx.accounts.payer_vault.amount;
 
     let before_oo_free_slots;
@@ -110,14 +111,17 @@ pub fn openbook_v2_place_order(
         before_oo_free_slots = MAX_OPEN_ORDERS - open_orders.all_orders_in_use().count();
         before_had_bids = open_orders.position.bids_base_lots != 0;
         before_had_asks = open_orders.position.asks_base_lots != 0;
-        OpenOrdersSlim::from_oo_v2(&open_orders)
+        OpenOrdersSlim::from_oo_v2(
+            &open_orders,
+            openbook_market_external.base_lot_size,
+            openbook_market_external.quote_lot_size,
+        )
     };
 
     // Provide a readable error message in case the vault doesn't have enough tokens
     let base_lot_size;
     let quote_lot_size;
     {
-        let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
         base_lot_size = openbook_market_external.base_lot_size;
         quote_lot_size = openbook_market_external.quote_lot_size;
 
@@ -149,7 +153,11 @@ pub fn openbook_v2_place_order(
     //
     let open_orders = ctx.accounts.open_orders.load()?;
     let after_oo_free_slots = MAX_OPEN_ORDERS - open_orders.all_orders_in_use().count();
-    let after_oo = OpenOrdersSlim::from_oo_v2(&open_orders);
+    let after_oo = OpenOrdersSlim::from_oo_v2(
+        &open_orders,
+        openbook_market_external.base_lot_size,
+        openbook_market_external.quote_lot_size,
+    );
     let oo_difference = OODifference::new(&before_oo, &after_oo);
 
     //
@@ -204,19 +212,18 @@ pub fn openbook_v2_place_order(
         }
     }
 
-    // todo-pan: add logs
-    // emit!(OpenbookV2OpenOrdersBalanceLog {
-    //     mango_group: ctx.accounts.group.key(),
-    //     mango_account: ctx.accounts.account.key(),
-    //     market_index: openbook_market.market_index,
-    //     base_token_index: openbook_market.base_token_index,
-    //     quote_token_index: openbook_market.quote_token_index,
-    //     base_total: after_oo.native_base_total(),
-    //     base_free: after_oo.native_base_free(),
-    //     quote_total: after_oo.native_quote_total(),
-    //     quote_free: after_oo.native_quote_free(),
-    //     referrer_rebates_accrued: after_oo.native_rebates(),
-    // });
+    emit!(OpenbookV2OpenOrdersBalanceLog {
+        mango_group: ctx.accounts.group.key(),
+        mango_account: ctx.accounts.account.key(),
+        market_index: openbook_market.market_index,
+        base_token_index: openbook_market.base_token_index,
+        quote_token_index: openbook_market.quote_token_index,
+        base_total: after_oo.native_base_total(),
+        base_free: after_oo.native_base_free(),
+        quote_total: after_oo.native_quote_total(),
+        quote_free: after_oo.native_quote_free(),
+        referrer_rebates_accrued: after_oo.native_rebates(),
+    });
 
     ctx.accounts.payer_vault.reload()?;
     let after_vault = ctx.accounts.payer_vault.amount;
@@ -230,7 +237,7 @@ pub fn openbook_v2_place_order(
         OpenbookV2Side::Bid => (&mut receiver_bank, &mut payer_bank),
         OpenbookV2Side::Ask => (&mut payer_bank, &mut receiver_bank),
     };
-    update_bank_potential_tokens_v2(openbook, base_bank, quote_bank, &after_oo);
+    update_bank_potential_tokens(openbook, base_bank, quote_bank, &after_oo);
 
     // Track position before withdraw happens
     let before_position_native = account
@@ -342,7 +349,7 @@ pub fn openbook_v2_place_order(
     if receiver_bank.are_deposits_reduce_only() {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =
-            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?; // todo-pan: split potential into serum and openbook
+            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?;
         require_msg_typed!(
             balance + potential < 1,
             MangoError::TokenInReduceOnlyMode,
@@ -362,7 +369,7 @@ pub fn openbook_v2_place_order(
 
 /// Uses the changes in OpenOrders and vaults to adjust the user token position,
 /// collect fees and optionally adjusts the HealthCache.
-pub fn apply_settle_changes_v2(
+pub fn apply_settle_changes(
     group: &Group,
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
@@ -440,7 +447,7 @@ pub fn apply_settle_changes_v2(
     {
         let openbook_orders = account.openbook_v2_orders_mut(openbook_market.market_index)?;
 
-        update_bank_potential_tokens_v2(openbook_orders, base_bank, quote_bank, after_oo);
+        update_bank_potential_tokens(openbook_orders, base_bank, quote_bank, after_oo);
     }
 
     if let Some(health_cache) = health_cache {
@@ -458,7 +465,7 @@ pub fn apply_settle_changes_v2(
     Ok(())
 }
 
-fn update_bank_potential_tokens_v2(
+fn update_bank_potential_tokens(
     openbook_orders: &mut OpenbookV2Orders,
     base_bank: &mut Bank,
     quote_bank: &mut Bank,

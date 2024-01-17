@@ -156,12 +156,19 @@ impl OpenOrdersSlim {
             referrer_rebates_accrued: oo.referrer_rebates_accrued,
         }
     }
-    pub fn from_oo_v2(oo: &OpenOrdersV2) -> Self {
+    pub fn from_oo_v2(oo: &OpenOrdersV2, base_lot_size: i64, quote_lot_size: i64) -> Self {
+        let base_locked_native: u64 = (oo.position.bids_base_lots * base_lot_size)
+            .try_into()
+            .unwrap();
+        let quote_locked_native: u64 = (oo.position.asks_base_lots * quote_lot_size)
+            .try_into()
+            .unwrap();
+
         Self {
             native_coin_free: oo.position.base_free_native,
-            native_coin_total: 0, // can't get locked or total from obv2 oo, not used anyway except for logging
+            native_coin_total: base_locked_native + oo.position.base_free_native,
             native_pc_free: oo.position.quote_free_native,
-            native_pc_total: 0, // we track it in mango so maybe pass the OpenOrdersV2 in as well?
+            native_pc_total: quote_locked_native + oo.position.base_free_native,
             referrer_rebates_accrued: oo.position.referrer_rebates_available,
         }
     }
