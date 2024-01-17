@@ -30,6 +30,12 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
         MangoError::SomeError
     );
 
+    // Validate banks #3
+    let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
+    let mut base_bank = ctx.accounts.base_bank.load_mut()?;
+    require_eq!(quote_bank.token_index, openbook_market.quote_token_index, MangoError::SomeError);
+    require_eq!(base_bank.token_index, openbook_market.base_token_index, MangoError::SomeError);
+
     //
     // close OO
     //
@@ -37,11 +43,12 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     cpi_close_open_orders(ctx.accounts, &[account_seeds])?;
 
     // Reduce the in_use_count on the token positions - they no longer need to be forced open.
-    // We cannot immediately dust tiny positions because we don't have the banks.
-    let (base_position, _) = account.token_position_mut(openbook_market.base_token_index)?;
-    base_position.decrement_in_use();
-    let (quote_position, _) = account.token_position_mut(openbook_market.quote_token_index)?;
-    quote_position.decrement_in_use();
+    // Also dust the position since we have banks now
+    let now_ts: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+    let account_pubkey = ctx.accounts.account.key();
+    account.token_decrement_dust_deactivate(&mut quote_bank, now_ts, account_pubkey)?;
+    account.token_decrement_dust_deactivate(&mut base_bank, now_ts, account_pubkey)?;
+
 
     // Deactivate the open orders account itself
     account.deactivate_openbook_v2_orders(openbook_market.market_index)?;
