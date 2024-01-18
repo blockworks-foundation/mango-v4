@@ -618,15 +618,11 @@ export class MangoAccount {
     targetBank: Bank,
     targetRemainingDepositLimit: BN,
   ): BN {
-    const decimalDifference = sourceBank.mintDecimals - targetBank.mintDecimals;
-    // Calculate the equivalent source amount
-    return decimalDifference > 0
-      ? targetRemainingDepositLimit.mul(
-          new BN(targetBank.price.div(sourceBank.price).toNumber()),
-        )
-      : targetRemainingDepositLimit.div(
-          new BN(sourceBank.price.div(targetBank.price).toNumber()),
-        );
+    return new BN(
+      I80F48.fromI64(targetRemainingDepositLimit)
+        .mul(targetBank.price.div(sourceBank.price))
+        .toNumber(),
+    );
   }
 
   /**

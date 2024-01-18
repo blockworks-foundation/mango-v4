@@ -621,8 +621,8 @@ export class Bank implements BankForHealth {
    * @returns remaining deposit limit for mint, returns null if there is no limit for bank
    */
   public getRemainingDepositLimit(): BN | null {
-    const isNoLimit = this.depositLimit.isZero();
     const nativeDeposits = this.nativeDeposits();
+    const isNoLimit = this.depositLimit.isZero();
 
     const remainingDepositLimit = !isNoLimit
       ? this.depositLimit.sub(new BN(nativeDeposits.toNumber()))

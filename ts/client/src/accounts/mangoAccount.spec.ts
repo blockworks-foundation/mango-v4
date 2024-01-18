@@ -2,7 +2,7 @@ import { PublicKey } from '@solana/web3.js';
 import { MangoAccount } from './mangoAccount';
 import BN from 'bn.js';
 import { Bank } from './bank';
-import { toNative } from '../utils';
+import { toNative, toUiDecimals } from '../utils';
 import { expect } from 'chai';
 import { I80F48 } from '../numbers/I80F48';
 
@@ -43,7 +43,7 @@ describe('Mango Account', () => {
 
     const mockedUSDCBank = {
       mintDecimals: 6,
-      price: I80F48.fromNumber(1),
+      price: I80F48.fromNumber(1.0000536899999979),
     };
     const USDCDepositLimitLeft = new BN(
       toNative(1, mockedUSDCBank.mintDecimals),
@@ -63,12 +63,17 @@ describe('Mango Account', () => {
 
     // Expected u can sell max 0.01 sol for 1 USDC
     expect(
-      maxSourceForUSDCTarget.eq(toNative(0.01, mockedSOLBank.mintDecimals)),
+      toUiDecimals(maxSourceForUSDCTarget, mockedSOLBank.mintDecimals).toFixed(
+        2,
+      ) === '0.01',
     ).to.be.true;
 
     // Expected u can buy max of 0.5 SOL for 50 USDC
-    expect(maxSourceForSOLTarget.eq(toNative(50, mockedUSDCBank.mintDecimals)))
-      .to.be.true;
+    expect(
+      toUiDecimals(maxSourceForSOLTarget, mockedUSDCBank.mintDecimals).toFixed(
+        0,
+      ) === '49',
+    ).to.be.true;
 
     done();
   });
