@@ -623,6 +623,10 @@ export type MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
         }
       ]
     },
@@ -1020,6 +1024,12 @@ export type MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -2266,15 +2276,15 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",
@@ -7137,6 +7147,16 @@ export type MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7161,6 +7181,12 @@ export type MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7422,11 +7448,22 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1968
+                1952
               ]
             }
           }
@@ -10745,6 +10782,9 @@ export type MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -13699,6 +13739,21 @@ export type MangoV4 = {
       "code": 6065,
       "name": "DelegateWithdrawSmall",
       "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
     }
   ]
 };
@@ -14328,6 +14383,10 @@ export const IDL: MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
         }
       ]
     },
@@ -14725,6 +14784,12 @@ export const IDL: MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -15971,15 +16036,15 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",
@@ -20842,6 +20907,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20866,6 +20941,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21127,11 +21208,22 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1968
+                1952
               ]
             }
           }
@@ -24450,6 +24542,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -27404,6 +27499,21 @@ export const IDL: MangoV4 = {
       "code": 6065,
       "name": "DelegateWithdrawSmall",
       "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
     }
   ]
 };

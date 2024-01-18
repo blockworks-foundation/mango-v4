@@ -33,7 +33,8 @@ use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
-
+use crate::account_fetcher::*;
+use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::util::PreparedInstructions;
@@ -67,6 +68,9 @@ pub struct Client {
     pub commitment: CommitmentConfig,
 
     /// Timeout, defaults to 60s
+    ///
+    /// This timeout applies to rpc requests. Note that the timeout for transaction
+    /// confirmation is configured separately in rpc_confirm_transaction_config.
     #[builder(default = "Some(Duration::from_secs(60))")]
     pub timeout: Option<Duration>,
 
@@ -76,6 +80,10 @@ pub struct Client {
     /// Defaults to a preflight check at processed commitment
     #[builder(default = "ClientBuilder::default_rpc_send_transaction_config()")]
     pub rpc_send_transaction_config: RpcSendTransactionConfig,
+
+    /// Defaults to waiting up to 60s for confirmation
+    #[builder(default = "ClientBuilder::default_rpc_confirm_transaction_config()")]
+    pub rpc_confirm_transaction_config: RpcConfirmTransactionConfig,
 
     #[builder(default = "\"https://quote-api.jup.ag/v4\".into()")]
     pub jupiter_v4_url: String,
@@ -95,6 +103,13 @@ impl ClientBuilder {
     pub fn default_rpc_send_transaction_config() -> RpcSendTransactionConfig {
         RpcSendTransactionConfig {
             preflight_commitment: Some(CommitmentLevel::Processed),
+            ..Default::default()
+        }
+    }
+
+    pub fn default_rpc_confirm_transaction_config() -> RpcConfirmTransactionConfig {
+        RpcConfirmTransactionConfig {
+            timeout: Some(Duration::from_secs(60)),
             ..Default::default()
         }
     }
@@ -1955,10 +1970,19 @@ impl TransactionBuilder {
     pub async fn send_and_confirm(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
-        // TODO: Wish we could use client.rpc_send_transaction_config here too!
-        rpc.send_and_confirm_transaction(&tx)
+        let recent_blockhash = tx.message.recent_blockhash();
+        let signature = rpc
+            .send_transaction_with_config(&tx, client.rpc_send_transaction_config)
             .await
-            .map_err(prettify_solana_client_error)
+            .map_err(prettify_solana_client_error)?;
+        wait_for_transaction_confirmation(
+            &rpc,
+            &signature,
+            recent_blockhash,
+            &client.rpc_confirm_transaction_config,
+        )
+        .await?;
+        Ok(signature)
     }
 
     pub fn transaction_size(&self) -> anyhow::Result<TransactionSize> {
