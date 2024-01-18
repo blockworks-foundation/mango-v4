@@ -3,11 +3,17 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
+import {
+  OPENBOOK_PROGRAM_ID,
+  RUST_I64_MAX,
+  RUST_I64_MIN,
+  USDC_MINT,
+} from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
   U64_MAX_BN,
   roundTo5,
+  toNative,
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
@@ -607,6 +613,18 @@ export class MangoAccount {
     return toUiDecimals(maxWithdrawWithBorrow, group.getMintDecimals(mintPk));
   }
 
+  public calculateEquivalentSourceAmount(
+    sourceBank: Bank,
+    targetBank: Bank,
+    targetRemainingDepositLimit: BN,
+  ): BN {
+    return new BN(
+      I80F48.fromI64(targetRemainingDepositLimit)
+        .mul(targetBank.price.div(sourceBank.price))
+        .toNumber(),
+    );
+  }
+
   /**
    * The max amount of given source ui token you can swap to a target token.
    * @returns max amount of given source ui token you can swap to a target token, in ui token
@@ -622,6 +640,9 @@ export class MangoAccount {
     }
     const sourceBank = group.getFirstBankByMint(sourceMintPk);
     const targetBank = group.getFirstBankByMint(targetMintPk);
+
+    const targetRemainingDepositLimit = targetBank.getRemainingDepositLimit();
+
     const hc = HealthCache.fromMangoAccount(group, this);
     let maxSource = hc.getMaxSwapSource(
       sourceBank,
@@ -637,7 +658,19 @@ export class MangoAccount {
       group.getTokenVaultBalanceByMint(sourceBank.mint),
       sourceBalance,
     );
+
     maxSource = maxSource.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        sourceBank,
+        targetBank,
+        targetRemainingDepositLimit,
+      );
+
+      maxSource = maxSource.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
@@ -756,6 +789,9 @@ export class MangoAccount {
     const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
+
+    const targetRemainingDepositLimit = baseBank.getRemainingDepositLimit();
+
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
@@ -765,17 +801,28 @@ export class MangoAccount {
       I80F48.fromNumber(2),
     );
     let quoteAmount = nativeAmount.div(quoteBank.price);
-    // If its a bid then the reserved fund and potential loan is in base
-    // also keep some buffer for fees, use taker fees for worst case simulation.
+
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
     const maxWithdrawNative = quoteBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(quoteBank.mint),
       quoteBalance,
     );
     quoteAmount = quoteAmount.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        quoteBank,
+        baseBank,
+        targetRemainingDepositLimit,
+      );
+
+      quoteAmount = quoteAmount.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     quoteAmount = quoteAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+
     return toUiDecimals(quoteAmount, quoteBank.mintDecimals);
   }
 
@@ -797,6 +844,9 @@ export class MangoAccount {
     const quoteBank = group.getFirstBankByTokenIndex(
       serum3Market.quoteTokenIndex,
     );
+
+    const targetRemainingDepositLimit = quoteBank.getRemainingDepositLimit();
+
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
@@ -806,17 +856,28 @@ export class MangoAccount {
       I80F48.fromNumber(2),
     );
     let baseAmount = nativeAmount.div(baseBank.price);
-    // If its a ask then the reserved fund and potential loan is in base
-    // also keep some buffer for fees, use taker fees for worst case simulation.
+
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
     const maxWithdrawNative = baseBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(baseBank.mint),
       baseBalance,
     );
     baseAmount = baseAmount.min(maxWithdrawNative);
+
+    if (targetRemainingDepositLimit) {
+      const equivalentSourceAmount = this.calculateEquivalentSourceAmount(
+        baseBank,
+        quoteBank,
+        targetRemainingDepositLimit,
+      );
+
+      baseAmount = baseAmount.min(I80F48.fromI64(equivalentSourceAmount));
+    }
+
     baseAmount = baseAmount.div(
       ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
     );
+
     return toUiDecimals(baseAmount, baseBank.mintDecimals);
   }
 

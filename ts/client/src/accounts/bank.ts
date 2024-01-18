@@ -4,6 +4,7 @@ import { PublicKey } from '@solana/web3.js';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
+import { USDC_MINT } from '../constants';
 
 export type TokenIndex = number & As<'token-index'>;
 
@@ -612,6 +613,26 @@ export class Bank implements BankForHealth {
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();
     return Math.max(timeToNextBorrowLimitWindowStartsTs, 0);
+  }
+
+  /**
+   *
+   * @param mintPk
+   * @returns remaining deposit limit for mint, returns null if there is no limit for bank
+   */
+  public getRemainingDepositLimit(): BN | null {
+    const nativeDeposits = this.nativeDeposits();
+    const isNoLimit = this.depositLimit.isZero();
+
+    const remainingDepositLimit = !isNoLimit
+      ? this.depositLimit.sub(new BN(nativeDeposits.toNumber()))
+      : null;
+
+    return remainingDepositLimit
+      ? remainingDepositLimit.isNeg()
+        ? new BN(0)
+        : remainingDepositLimit
+      : null;
   }
 }
 
