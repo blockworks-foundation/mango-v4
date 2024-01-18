@@ -4,6 +4,7 @@ import BN from 'bn.js';
 import { Bank } from './bank';
 import { toNative } from '../utils';
 import { expect } from 'chai';
+import { I80F48 } from '../numbers/I80F48';
 
 describe('Mango Account', () => {
   const mangoAccount = new MangoAccount(
@@ -34,7 +35,7 @@ describe('Mango Account', () => {
   it('test calculateEquivalentSourceAmount', (done) => {
     const mockedSOLBank = {
       mintDecimals: 9,
-      uiPrice: 100,
+      price: I80F48.fromNumber(0.09870201707999726),
     };
     const SOLDepositLimitLeft = new BN(
       toNative(0.5, mockedSOLBank.mintDecimals),
@@ -42,7 +43,7 @@ describe('Mango Account', () => {
 
     const mockedUSDCBank = {
       mintDecimals: 6,
-      uiPrice: 1,
+      price: I80F48.fromNumber(1),
     };
     const USDCDepositLimitLeft = new BN(
       toNative(1, mockedUSDCBank.mintDecimals),

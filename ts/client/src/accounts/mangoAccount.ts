@@ -619,25 +619,14 @@ export class MangoAccount {
     targetRemainingDepositLimit: BN,
   ): BN {
     const decimalDifference = sourceBank.mintDecimals - targetBank.mintDecimals;
-    let adjustedExchangeRate: number;
-
-    // Adjust the exchange rate based on the decimal difference
-    if (decimalDifference > 0) {
-      // Target has fewer decimals than source
-      adjustedExchangeRate =
-        (targetBank.uiPrice / sourceBank.uiPrice) *
-        Math.pow(10, Math.abs(decimalDifference));
-    } else {
-      // Source has fewer decimals than target
-      adjustedExchangeRate =
-        (sourceBank.uiPrice / targetBank.uiPrice) *
-        Math.pow(10, Math.abs(decimalDifference));
-    }
-
     // Calculate the equivalent source amount
     return decimalDifference > 0
-      ? targetRemainingDepositLimit.muln(adjustedExchangeRate)
-      : targetRemainingDepositLimit.divn(adjustedExchangeRate);
+      ? targetRemainingDepositLimit.mul(
+          new BN(targetBank.price.div(sourceBank.price).toNumber()),
+        )
+      : targetRemainingDepositLimit.div(
+          new BN(sourceBank.price.div(targetBank.price).toNumber()),
+        );
   }
 
   /**
@@ -656,8 +645,7 @@ export class MangoAccount {
     const sourceBank = group.getFirstBankByMint(sourceMintPk);
     const targetBank = group.getFirstBankByMint(targetMintPk);
 
-    const targetRemainingDepositLimit =
-      group.getRemainingDepositLimitByMint(targetMintPk);
+    const targetRemainingDepositLimit = targetBank.getRemainingDepositLimit();
 
     const hc = HealthCache.fromMangoAccount(group, this);
     let maxSource = hc.getMaxSwapSource(
@@ -806,9 +794,7 @@ export class MangoAccount {
       serum3Market.quoteTokenIndex,
     );
 
-    const targetRemainingDepositLimit = group.getRemainingDepositLimitByMint(
-      baseBank.mint,
-    );
+    const targetRemainingDepositLimit = baseBank.getRemainingDepositLimit();
 
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
@@ -863,9 +849,7 @@ export class MangoAccount {
       serum3Market.quoteTokenIndex,
     );
 
-    const targetRemainingDepositLimit = group.getRemainingDepositLimitByMint(
-      quoteBank.mint,
-    );
+    const targetRemainingDepositLimit = quoteBank.getRemainingDepositLimit();
 
     const hc = HealthCache.fromMangoAccount(group, this);
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
