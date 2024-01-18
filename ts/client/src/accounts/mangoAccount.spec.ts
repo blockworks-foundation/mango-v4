@@ -60,12 +60,12 @@ describe('Mango Account', () => {
       SOLDepositLimitLeft,
     );
 
-    // Expected: 1 USDC can buy 0.01 SOL
+    // Expected u can sell max 0.01 sol for 1 USDC
     expect(
       maxSourceForUSDCTarget.eq(toNative(0.01, mockedSOLBank.mintDecimals)),
     ).to.be.true;
 
-    // Expected: 0.5 SOL can be converted to 50 USDC
+    // Expected u can buy max of 0.5 SOL for 50 USDC
     expect(maxSourceForSOLTarget.eq(toNative(50, mockedUSDCBank.mintDecimals)))
       .to.be.true;
 
