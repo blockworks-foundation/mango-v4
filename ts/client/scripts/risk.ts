@@ -12,7 +12,7 @@ async function buildClient(): Promise<MangoClient> {
   const clientKeypair = new Keypair();
 
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(MB_CLUSTER_URL!, options);
+  const connection = new Connection("https://mango.rpcpool.com/ca46d2212c7b54985835344809c8", options);
 
   const clientWallet = new Wallet(clientKeypair);
   const clientProvider = new AnchorProvider(connection, clientWallet, options);
@@ -30,14 +30,14 @@ async function buildClient(): Promise<MangoClient> {
 async function main(): Promise<void> {
   const client = await buildClient();
   const group = await client.getGroup(new PublicKey(GROUP_PK));
-  try {
-    console.log(JSON.stringify(await getRiskStats(client, group), null, 2));
-    console.log(
-      JSON.stringify(await getLiquidationBatches(client, group), null, 2),
-    );
-  } catch (error) {
-    console.log(error);
-  }
+  // try {
+  //   console.log(JSON.stringify(await getRiskStats(client, group), null, 2));
+  //   console.log(
+  //     JSON.stringify(await getLiquidationBatches(client, group), null, 2),
+  //   );
+  // } catch (error) {
+  //   console.log(error);
+  // }
 }
 
 main();

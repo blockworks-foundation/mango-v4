@@ -418,7 +418,7 @@ export class MangoClient {
       case 'api':
         return await Id.fromApi(groupPk);
       case 'get-program-accounts':
-        return undefined;
+        return await Id.fromGetProgramAccounts(groupPk, this.program);
       case 'static':
         return Id.fromIdsByPk(groupPk);
     }
