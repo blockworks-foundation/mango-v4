@@ -155,11 +155,7 @@ impl<'a> LiquidateHelper<'a> {
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let mut health_cache = self
-                .client
-                .health_cache(&liqor, self.account_fetcher)
-                .await
-                .expect("always ok");
+            let mut health_cache = self.client.health_cache(&liqor).await.expect("always ok");
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
@@ -591,7 +587,7 @@ pub async fn maybe_liquidate_account(
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
     let health_cache = mango_client
-        .health_cache(&account, account_fetcher)
+        .health_cache(&account)
         .await
         .context("creating health cache 1")?;
     let maint_health = health_cache.health(HealthType::Maint);
@@ -610,7 +606,7 @@ pub async fn maybe_liquidate_account(
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
     let health_cache = mango_client
-        .health_cache(&account, account_fetcher)
+        .health_cache(&account)
         .await
         .context("creating health cache 2")?;
     if !health_cache.is_liquidatable() {

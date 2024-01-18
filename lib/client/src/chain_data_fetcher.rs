@@ -248,14 +248,9 @@ impl crate::AccountFetcher for AccountFetcher {
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
         let chain_data = self.chain_data.read().unwrap();
-        Ok(chain_data
-            .iter_accounts()
-            .filter_map(|(pk, data)| {
-                if !keys.contains(pk) {
-                    return None;
-                }
-                Some((*pk, data.account.clone()))
-            })
+        Ok(keys
+            .iter()
+            .map(|pk| (*pk, chain_data.account(pk).unwrap().account.clone()))
             .collect::<Vec<_>>())
     }
 

@@ -23,6 +23,13 @@ use mango_v4::state::{
     PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
+use crate::account_fetcher::*;
+use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
+use crate::context::MangoGroupContext;
+use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
+use crate::health_cache;
+use crate::util::PreparedInstructions;
+use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_config::RpcSendTransactionConfig;
@@ -33,13 +40,6 @@ use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
-use crate::account_fetcher::*;
-use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
-use crate::context::MangoGroupContext;
-use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::util::PreparedInstructions;
-use crate::{account_fetcher::*, health_cache};
-use crate::{jupiter, util};
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -415,12 +415,11 @@ impl MangoClient {
     pub async fn health_cache(
         &self,
         mango_account: &MangoAccountValue,
-        fetcher: &dyn AccountFetcher,
     ) -> anyhow::Result<HealthCache> {
         health_cache::new(
             &self.context,
             &self.client.fallback_oracle_config,
-            &*fetcher,
+            &*self.account_fetcher,
             mango_account,
         )
         .await

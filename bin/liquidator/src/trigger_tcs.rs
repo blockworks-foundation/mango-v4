@@ -665,10 +665,9 @@ impl Context {
         liqee_old: &MangoAccountValue,
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
-        let fetcher = self.account_fetcher.as_ref();
         let health_cache = self
             .mango_client
-            .health_cache(liqee_old, fetcher)
+            .health_cache(liqee_old)
             .await
             .context("creating health cache 1")?;
         if health_cache.is_liquidatable() {
@@ -689,7 +688,7 @@ impl Context {
 
         let health_cache = self
             .mango_client
-            .health_cache(&liqee, fetcher)
+            .health_cache(&liqee)
             .await
             .context("creating health cache 2")?;
         if health_cache.is_liquidatable() {

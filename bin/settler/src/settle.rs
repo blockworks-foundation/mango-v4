@@ -114,7 +114,7 @@ impl SettlementState {
             }
 
             let health_cache = mango_client
-                .health_cache(&account, account_fetcher)
+                .health_cache(&account)
                 .await
                 .context("creating health cache")?;
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
