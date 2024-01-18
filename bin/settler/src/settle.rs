@@ -6,8 +6,7 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
-    TransactionBuilder,
+    chain_data, health_cache, MangoClient, PreparedInstructions, TransactionBuilder,
 };
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;

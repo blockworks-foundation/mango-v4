@@ -93,6 +93,9 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
+    #[clap(long, env, value_delimiter = ';')]
+    override_send_transaction_url: Option<Vec<String>>,
+
     #[clap(long, env)]
     liqor_mango_account: Pubkey,
 
@@ -217,6 +220,7 @@ async fn main() -> anyhow::Result<()> {
             // Liquidation and tcs triggers set their own budgets, this is a default for other tx
             compute_budget_per_instruction: Some(250_000),
         })
+        .override_send_transaction_urls(cli.override_send_transaction_url)
         .build()
         .unwrap();
 
