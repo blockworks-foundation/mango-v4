@@ -12,8 +12,9 @@ use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
 use fixed::types::I80F48;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
+use tracing::*;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
@@ -101,12 +102,6 @@ pub struct ClientConfig {
     pub override_send_transaction_urls: Option<Vec<String>>,
 }
 
-pub struct Client {
-    config: ClientConfig,
-    rpc_async: RpcClientAsync,
-    override_send_transaction_rpc_asyncs: Option<Vec<RpcClientAsync>>,
-}
-
 impl ClientBuilder {
     pub fn build(&self) -> Result<Client, ClientBuilderError> {
         let config = self.build_config()?;
@@ -126,6 +121,11 @@ impl ClientBuilder {
             ..Default::default()
         }
     }
+}
+pub struct Client {
+    config: ClientConfig,
+    rpc_async: RpcClientAsync,
+    send_transaction_rpc_asyncs: Vec<RpcClientAsync>,
 }
 
 impl Client {
@@ -158,20 +158,19 @@ impl Client {
                 config.timeout,
                 config.commitment,
             ),
-            override_send_transaction_rpc_asyncs: config
+            send_transaction_rpc_asyncs: config
                 .override_send_transaction_urls
-                .as_ref()
-                .map(|urls| {
-                    urls.iter()
-                        .map(|url| {
-                            RpcClientAsync::new_with_timeout_and_commitment(
-                                url.clone(),
-                                config.timeout,
-                                config.commitment,
-                            )
-                        })
-                        .collect_vec()
-                }),
+                .clone()
+                .unwrap_or_else(|| vec![config.cluster.url().to_string()])
+                .into_iter()
+                .map(|url| {
+                    RpcClientAsync::new_with_timeout_and_commitment(
+                        url,
+                        config.timeout,
+                        config.commitment,
+                    )
+                })
+                .collect_vec(),
             config,
         }
     }
@@ -210,14 +209,36 @@ impl Client {
             .clone()
     }
 
+    /// Sends a transaction via the configured cluster (or all override_send_transaction_urls).
+    ///
+    /// Returns the tx signature if at least one send returned ok.
+    /// Note that a success does not mean that the transaction is confirmed.
     pub async fn send_transaction(
         &self,
         tx: &impl SerializableTransaction,
     ) -> anyhow::Result<Signature> {
-        let rpc = self.rpc_async();
-        rpc.send_transaction_with_config(tx, self.config.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error)
+        let futures = self.send_transaction_rpc_asyncs.iter().map(|rpc| {
+            rpc.send_transaction_with_config(tx, self.config.rpc_send_transaction_config)
+                .map_err(prettify_solana_client_error)
+        });
+        let mut results = futures::future::join_all(futures).await;
+
+        // If all fail, return the first
+        let successful_sends = results.iter().filter(|r| r.is_ok()).count();
+        if successful_sends == 0 {
+            results.remove(0)?;
+        }
+
+        // Otherwise just log errors
+        for (result, rpc) in results.iter().zip(self.send_transaction_rpc_asyncs.iter()) {
+            if let Err(err) = result {
+                info!(
+                    rpc = rpc.url(),
+                    successful_sends, "one of the transaction sends failed: {err:?}",
+                )
+            }
+        }
+        return Ok(*tx.get_signature());
     }
 }
 
@@ -1793,7 +1814,7 @@ impl MangoClient {
                 match MangoGroupContext::new_from_rpc(&rpc_async, mango_client.group()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        tracing::warn!("could not fetch context to check for changes: {e:?}");
+                        warn!("could not fetch context to check for changes: {e:?}");
                         continue;
                     }
                 };
@@ -1933,9 +1954,7 @@ impl TransactionBuilder {
     pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
-        rpc.send_transaction_with_config(&tx, client.config.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error)
+        client.send_transaction(&tx).await
     }
 
     pub async fn simulate(&self, client: &Client) -> anyhow::Result<SimulateTransactionResponse> {
@@ -1948,10 +1967,7 @@ impl TransactionBuilder {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         let recent_blockhash = tx.message.recent_blockhash();
-        let signature = rpc
-            .send_transaction_with_config(&tx, client.config.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error)?;
+        let signature = client.send_transaction(&tx).await?;
         wait_for_transaction_confirmation(
             &rpc,
             &signature,

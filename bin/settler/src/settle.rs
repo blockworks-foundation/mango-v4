@@ -286,19 +286,7 @@ impl<'a> SettleBatchProcessor<'a> {
         let tx = self.transaction()?;
         self.instructions.clear();
 
-        let send_result = self
-            .mango_client
-            .client
-            .rpc_async()
-            .send_transaction_with_config(
-                &tx,
-                self.mango_client
-                    .client
-                    .config()
-                    .rpc_send_transaction_config,
-            )
-            .await
-            .map_err(prettify_solana_client_error);
+        let send_result = self.mango_client.client.send_transaction(&tx).await;
 
         if let Err(err) = send_result {
             info!("error while sending settle batch: {}", err);
