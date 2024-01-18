@@ -51,8 +51,8 @@ pub fn openbook_v2_cancel_all_orders(
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let after_oo = OpenOrdersSlim::from_oo_v2(
         &open_orders,
-        openbook_market_external.base_lot_size,
-        openbook_market_external.quote_lot_size,
+        openbook_market_external.base_lot_size.try_into().unwrap(),
+        openbook_market_external.quote_lot_size.try_into().unwrap(),
     );
 
     emit!(OpenbookV2OpenOrdersBalanceLog {
@@ -91,6 +91,5 @@ fn cpi_cancel_all_orders(
         seeds,
     );
 
-    // todo-pan: maybe allow passing side for cu opt
     openbook_v2::cpi::cancel_all_orders(cpi_ctx, side_opt, limit)
 }

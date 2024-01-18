@@ -33,8 +33,16 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     // Validate banks #3
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
-    require_eq!(quote_bank.token_index, openbook_market.quote_token_index, MangoError::SomeError);
-    require_eq!(base_bank.token_index, openbook_market.base_token_index, MangoError::SomeError);
+    require_eq!(
+        quote_bank.token_index,
+        openbook_market.quote_token_index,
+        MangoError::SomeError
+    );
+    require_eq!(
+        base_bank.token_index,
+        openbook_market.base_token_index,
+        MangoError::SomeError
+    );
 
     //
     // close OO
@@ -48,7 +56,6 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     let account_pubkey = ctx.accounts.account.key();
     account.token_decrement_dust_deactivate(&mut quote_bank, now_ts, account_pubkey)?;
     account.token_decrement_dust_deactivate(&mut base_bank, now_ts, account_pubkey)?;
-
 
     // Deactivate the open orders account itself
     account.deactivate_openbook_v2_orders(openbook_market.market_index)?;
@@ -83,7 +90,7 @@ fn cpi_close_open_orders(ctx: &OpenbookV2CloseOpenOrders, seeds: &[&[&[u8]]]) ->
             sol_destination: ctx.authority.to_account_info(),
             token_program: ctx.token_program.to_account_info(),
         };
-    
+
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.openbook_v2_program.to_account_info(),
             cpi_accounts,

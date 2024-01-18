@@ -156,19 +156,17 @@ impl OpenOrdersSlim {
             referrer_rebates_accrued: oo.referrer_rebates_accrued,
         }
     }
-    pub fn from_oo_v2(oo: &OpenOrdersV2, base_lot_size: i64, quote_lot_size: i64) -> Self {
-        let base_locked_native: u64 = (oo.position.bids_base_lots * base_lot_size)
-            .try_into()
-            .unwrap();
-        let quote_locked_native: u64 = (oo.position.asks_base_lots * quote_lot_size)
-            .try_into()
-            .unwrap();
+    pub fn from_oo_v2(oo: &OpenOrdersV2, base_lot_size: u64, quote_lot_size: u64) -> Self {
+        let bids_base_lots: u64 = oo.position.bids_base_lots.try_into().unwrap();
+        let asks_base_lots: u64 = oo.position.asks_base_lots.try_into().unwrap();
+        let base_locked_native = bids_base_lots * base_lot_size;
+        let quote_locked_native = asks_base_lots * quote_lot_size;
 
         Self {
             native_coin_free: oo.position.base_free_native,
             native_coin_total: base_locked_native + oo.position.base_free_native,
             native_pc_free: oo.position.quote_free_native,
-            native_pc_total: quote_locked_native + oo.position.base_free_native,
+            native_pc_total: quote_locked_native + oo.position.quote_free_native,
             referrer_rebates_accrued: oo.position.referrer_rebates_available,
         }
     }

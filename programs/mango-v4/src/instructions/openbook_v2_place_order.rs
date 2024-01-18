@@ -67,7 +67,7 @@ pub fn openbook_v2_place_order(
     let mut account = ctx.accounts.account.load_full_mut()?;
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
 
-    let (_, _, payer_active_index) = account.ensure_token_position(receiver_token_index)?;
+    let (_, _, payer_active_index) = account.ensure_token_position(payer_token_index)?;
     let (_, _, receiver_active_index) = account.ensure_token_position(receiver_token_index)?;
 
     let (payer_bank, payer_bank_oracle) =
@@ -101,6 +101,8 @@ pub fn openbook_v2_place_order(
     //
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let before_vault = ctx.accounts.payer_vault.amount;
+    let base_lot_size: u64 = openbook_market_external.base_lot_size.try_into().unwrap();
+    let quote_lot_size: u64 = openbook_market_external.quote_lot_size.try_into().unwrap();
 
     let before_oo_free_slots;
     let before_had_bids;
@@ -110,36 +112,28 @@ pub fn openbook_v2_place_order(
         before_oo_free_slots = MAX_OPEN_ORDERS - open_orders.all_orders_in_use().count();
         before_had_bids = open_orders.position.bids_base_lots != 0;
         before_had_asks = open_orders.position.asks_base_lots != 0;
-        OpenOrdersSlim::from_oo_v2(
-            &open_orders,
-            openbook_market_external.base_lot_size,
-            openbook_market_external.quote_lot_size,
-        )
+        OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size)
     };
 
     // Provide a readable error message in case the vault doesn't have enough tokens
-    let base_lot_size;
-    let quote_lot_size;
-    {
-        base_lot_size = openbook_market_external.base_lot_size;
-        quote_lot_size = openbook_market_external.quote_lot_size;
-        let max_base_lots: u64 = order.max_base_lots.try_into().unwrap();
-        let max_quote_lots: u64 = order.max_quote_lots_including_fees.try_into().unwrap();
+    let max_base_lots: u64 = order.max_base_lots.try_into().unwrap();
+    let max_quote_lots: u64 = order.max_quote_lots_including_fees.try_into().unwrap();
 
-        let needed_amount = match order.side {
-            OpenbookV2Side::Ask => {
-                (max_base_lots * base_lot_size as u64).saturating_sub(before_oo.native_base_free())
-            }
-            OpenbookV2Side::Bid => max_quote_lots.saturating_sub(before_oo.native_quote_free()),
-        };
-        if before_vault < needed_amount {
-            return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
-                format!(
-                    "bank vault does not have enough tokens, need {} but have {}",
-                    needed_amount, before_vault
-                )
-            });
+    let needed_amount = match order.side {
+        OpenbookV2Side::Ask => {
+            (max_base_lots * base_lot_size).saturating_sub(before_oo.native_base_free())
         }
+        OpenbookV2Side::Bid => {
+            (max_quote_lots * quote_lot_size).saturating_sub(before_oo.native_quote_free())
+        }
+    };
+    if before_vault < needed_amount {
+        return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
+            format!(
+                "bank vault does not have enough tokens, need {} but have {}",
+                needed_amount, before_vault
+            )
+        });
     }
 
     //
@@ -153,11 +147,7 @@ pub fn openbook_v2_place_order(
     //
     let open_orders = ctx.accounts.open_orders.load()?;
     let after_oo_free_slots = MAX_OPEN_ORDERS - open_orders.all_orders_in_use().count();
-    let after_oo = OpenOrdersSlim::from_oo_v2(
-        &open_orders,
-        openbook_market_external.base_lot_size,
-        openbook_market_external.quote_lot_size,
-    );
+    let after_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
     let oo_difference = OODifference::new(&before_oo, &after_oo);
 
     //

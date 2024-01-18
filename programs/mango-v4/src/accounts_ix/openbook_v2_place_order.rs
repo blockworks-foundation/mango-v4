@@ -58,7 +58,7 @@ pub struct OpenbookV2PlaceOrder<'info> {
     /// CHECK: Validated by the openbook_v2 cpi call
     pub market_vault_signer: UncheckedAccount<'info>,
 
-    /// The bank that pays for the order
+    /// The bank that pays for the order. Bank oracle also expected in remaining_accounts
     // token_index and payer_bank.vault == payer_vault is validated inline at #3
     #[account(mut, has_one = group)]
     pub payer_bank: AccountLoader<'info, Bank>,
@@ -66,8 +66,8 @@ pub struct OpenbookV2PlaceOrder<'info> {
     #[account(mut)]
     pub payer_vault: Box<Account<'info, TokenAccount>>,
 
-    /// The bank that receives the funds upon settlement
-    // token_index and payer_bank.vault == payer_vault is validated inline at #3
+    /// The bank that receives the funds upon settlement. Bank oracle also expected in remaining_accounts
+    // token_index is validated inline at #3
     #[account(mut, has_one = group)]
     pub receiver_bank: AccountLoader<'info, Bank>,
 

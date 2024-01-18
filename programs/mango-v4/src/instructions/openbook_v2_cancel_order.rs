@@ -53,8 +53,8 @@ pub fn openbook_v2_cancel_order(
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let after_oo = OpenOrdersSlim::from_oo_v2(
         &open_orders,
-        openbook_market_external.base_lot_size,
-        openbook_market_external.quote_lot_size,
+        openbook_market_external.base_lot_size.try_into().unwrap(),
+        openbook_market_external.quote_lot_size.try_into().unwrap(),
     );
 
     emit!(OpenbookV2OpenOrdersBalanceLog {

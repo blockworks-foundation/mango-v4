@@ -72,14 +72,12 @@ pub fn openbook_v2_settle_funds<'info>(
     // Charge any open loan origination fees
     //
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+    let base_lot_size: u64 = openbook_market_external.base_lot_size.try_into().unwrap();
+    let quote_lot_size: u64 = openbook_market_external.quote_lot_size.try_into().unwrap();
     let before_oo;
     {
         let open_orders = ctx.accounts.open_orders.load()?;
-        before_oo = OpenOrdersSlim::from_oo_v2(
-            &open_orders,
-            openbook_market_external.base_lot_size,
-            openbook_market_external.quote_lot_size,
-        );
+        before_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
         let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
@@ -110,11 +108,7 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     let after_oo = {
         let open_orders = ctx.accounts.open_orders.load()?;
-        OpenOrdersSlim::from_oo_v2(
-            &open_orders,
-            openbook_market_external.base_lot_size,
-            openbook_market_external.quote_lot_size,
-        )
+        OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size)
     };
 
     ctx.accounts.base_vault.reload()?;

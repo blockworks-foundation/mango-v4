@@ -3,7 +3,10 @@ use anchor_spl::token::Token;
 
 use crate::error::MangoError;
 use crate::state::*;
-use openbook_v2::{program::OpenbookV2, state::{Market, OpenOrdersIndexer}};
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersIndexer},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CloseOpenOrders<'info> {
