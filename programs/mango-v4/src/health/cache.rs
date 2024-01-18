@@ -23,8 +23,8 @@ use crate::error::*;
 use crate::i80f48::LowPrecisionDivision;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::{
-    Bank, MangoAccountRef, OpenbookV2Orders, PerpMarket, PerpMarketIndex, PerpPosition,
-    Serum3MarketIndex, Serum3Orders, TokenIndex,
+    Bank, MangoAccountRef, OpenbookV2MarketIndex, OpenbookV2Orders, PerpMarket, PerpMarketIndex,
+    PerpPosition, Serum3MarketIndex, Serum3Orders, TokenIndex,
 };
 
 use super::*;
@@ -252,7 +252,8 @@ pub struct SpotInfo {
     pub base_info_index: usize,
     pub quote_info_index: usize,
 
-    pub market_index: Serum3MarketIndex,
+    pub serum3_market_index: Option<Serum3MarketIndex>,
+    pub openbook_v2_market_index: Option<OpenbookV2MarketIndex>,
 
     /// The open orders account has no free or reserved funds
     pub has_zero_funds: bool,
@@ -281,7 +282,8 @@ impl SpotInfo {
             reserved_quote_as_base_highest_bid,
             base_info_index,
             quote_info_index,
-            market_index: serum_account.market_index,
+            serum3_market_index: Some(serum_account.market_index),
+            openbook_v2_market_index: None,
             has_zero_funds: open_orders.native_base_total() == 0
                 && open_orders.native_quote_total() == 0
                 && open_orders.native_rebates() == 0,
@@ -310,7 +312,8 @@ impl SpotInfo {
             reserved_quote_as_base_highest_bid,
             base_info_index,
             quote_info_index,
-            market_index: open_orders.market_index,
+            serum3_market_index: None,
+            openbook_v2_market_index: Some(open_orders.market_index),
             has_zero_funds: open_orders_account.position.is_empty(),
         }
     }
@@ -403,11 +406,6 @@ impl SpotInfo {
                                      balance: &TokenBalance,
                                      max_reserved: &TokenMaxReserved,
                                      market_reserved: I80F48| {
-            println!("computing hgealth effect {}", token_info.token_index);
-            println!(
-                "spot_and_perp {} max_spot_reserved {}",
-                balance.spot_and_perp, max_reserved.max_spot_reserved
-            );
             // This balance includes all possible reserved funds from markets that relate to the
             // token, including this market itself: `market_reserved` is already included in `max_spot_reserved`.
             let max_balance = balance.spot_and_perp + max_reserved.max_spot_reserved;
@@ -422,16 +420,11 @@ impl SpotInfo {
             } else {
                 (max_balance, market_reserved - max_balance)
             };
-            println!("asset_part {} liab_part {}", asset_part, liab_part);
 
             let asset_weight = token_info.asset_weight(health_type);
             let liab_weight = token_info.liab_weight(health_type);
             let asset_price = token_info.prices.asset(health_type);
             let liab_price = token_info.prices.liab(health_type);
-            println!(
-                "asset weight {} asset price {} liab_weight {} liab_price {}",
-                asset_weight, asset_price, liab_weight, liab_price
-            );
             asset_part * asset_weight * asset_price + liab_part * liab_weight * liab_price
         };
 
@@ -447,7 +440,6 @@ impl SpotInfo {
             &token_max_reserved[self.quote_info_index],
             market_reserved.all_reserved_as_quote,
         );
-        println!("health base {} health quote {}", health_base, health_quote);
         health_base.min(health_quote)
     }
 }
@@ -908,7 +900,7 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.market_index == serum_account.market_index)
+            .position(|m| m.serum3_market_index == Some(serum_account.market_index))
             .ok_or_else(|| error_msg!("serum3 market {} not found", serum_account.market_index))?;
 
         let spot_info = &self.spot_infos[spot_info_index];
@@ -945,7 +937,7 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.market_index == open_orders.market_index)
+            .position(|m| m.openbook_v2_market_index == Some(open_orders.market_index))
             .ok_or_else(|| {
                 error_msg!("openbook v2 market {} not found", open_orders.market_index)
             })?;
@@ -1189,12 +1181,6 @@ impl HealthCache {
     ) {
         for (token_info, token_balance) in self.token_infos.iter().zip(token_balances.iter()) {
             let contrib = token_info.health_contribution(health_type, token_balance.spot_and_perp);
-            msg!(
-                "token info {} balance {} contribution {}",
-                token_info.token_index,
-                token_balance.spot_and_perp,
-                contrib
-            );
             action(contrib);
         }
 
@@ -1206,11 +1192,6 @@ impl HealthCache {
                 &token_balances,
                 &token_max_reserved,
                 reserved,
-            );
-            msg!(
-                "spot info {} contribution {}",
-                spot_info.market_index,
-                contrib
             );
             action(contrib);
         }
