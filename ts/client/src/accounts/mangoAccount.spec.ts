@@ -68,7 +68,7 @@ describe('Mango Account', () => {
       ) === '0.01',
     ).to.be.true;
 
-    // Expected u can buy max of 0.5 SOL for 50 USDC
+    // Expected u can buy max of 0.49 SOL for 49 USDC
     expect(
       toUiDecimals(maxSourceForSOLTarget, mockedUSDCBank.mintDecimals).toFixed(
         0,
