@@ -367,6 +367,7 @@ async function registerSerum3Markets() {
     group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
     0,
     'SOL/USDC',
+    0,
   );
 }
 

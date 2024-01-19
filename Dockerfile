@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1.2
 # Base image containing all binaries, deployed to ghcr.io/blockworks-foundation/mango-v4:latest
-FROM rust:1.69.0-bullseye as base
+FROM rust:1.70.0-bullseye as base
 RUN cargo install cargo-chef --locked
 RUN rustup component add rustfmt
 RUN apt-get update && apt-get -y install clang cmake

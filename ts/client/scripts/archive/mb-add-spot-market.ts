@@ -44,6 +44,7 @@ async function addSpotMarket() {
     group.getFirstBankByMint(new PublicKey(usdc_mint)),
     1, // market index
     'ETH/USDC',
+    0,
   );
 
   console.log('Tx Successful:', signature);

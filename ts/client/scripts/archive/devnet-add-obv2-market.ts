@@ -43,6 +43,7 @@ async function addSpotMarket() {
     group.getFirstBankByMint(quoteMint),
     1,
     'SOL/USDC',
+    0,
   )
   console.log('Tx Successful:', signature);
 

@@ -1390,7 +1390,7 @@ export class OpenbookV2Orders {
   ) {}
 
   public isActive(): boolean {
-    return this.marketIndex !== OpenbookV2Orders.OopenbookV2MarketIndexUnset;
+    return this.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset;
   }
 }
 

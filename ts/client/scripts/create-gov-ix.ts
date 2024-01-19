@@ -203,7 +203,7 @@ async function serum3Register(): Promise<void> {
   const group = await client.getGroup(new PublicKey(GROUP_PK));
 
   const ix = await client.program.methods
-    .serum3RegisterMarket(3, 'ETH (Portal)/USDC')
+    .serum3RegisterMarket(3, 'ETH (Portal)/USDC', 0)
     .accounts({
       group: group.publicKey,
       admin: group.admin,

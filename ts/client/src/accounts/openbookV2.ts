@@ -64,12 +64,29 @@ export class OpenbookV2Market {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
 
-  public async findOoPda(
+  public findOoIndexerPda(
     programId: PublicKey,
     mangoAccount: PublicKey,
-  ): Promise<PublicKey> {
+  ): PublicKey {
     // todo-pan: use indexer here
-    const [openOrderPublicKey] = await PublicKey.findProgramAddress(
+    const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('Serum3OO'),
+        mangoAccount.toBuffer(),
+        this.publicKey.toBuffer(),
+      ],
+      programId,
+    );
+
+    return openOrderPublicKey;
+  }
+
+  public findOoPda(
+    programId: PublicKey,
+    mangoAccount: PublicKey,
+  ): PublicKey {
+    // todo-pan: use indexer here
+    const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
       [
         Buffer.from('Serum3OO'),
         mangoAccount.toBuffer(),
@@ -268,4 +285,18 @@ export async function generateOpenbookV2MarketExternalVaultSignerAddress(
     ],
     OPENBOOK_PROGRAM_ID[cluster],
   );
+}
+
+export function priceNumberToLots(price: number, market: MarketAccount): BN {
+  return new BN(Math.round((price *
+    Math.pow(10, market.quoteDecimals) *
+    market.baseLotSize.toNumber()) /
+    (Math.pow(10, market.quoteDecimals) *
+        market.quoteLotSize.toNumber())))
+}
+
+export function baseSizeNumberToLots(size: number, market: MarketAccount): BN {
+  const native = new BN(Math.round(size * Math.pow(10, market.baseDecimals)));
+  // rounds down to the nearest lot size
+  return native.div(market.baseLotSize);
 }

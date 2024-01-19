@@ -163,6 +163,7 @@ async function main(): Promise<void> {
       group.getFirstBankByMint(insuranceMint),
       0,
       'SOL/USDC',
+      0,
     );
     await group.reloadAll(client);
     const serum3Market = group.getSerum3MarketByExternalMarket(
