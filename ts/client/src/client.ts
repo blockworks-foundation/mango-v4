@@ -2513,6 +2513,7 @@ export class MangoClient {
     settlePnlLimitFactor: number,
     settlePnlLimitWindowSize: number,
     positivePnlLiquidationFee: number,
+    platformLiquidationFee: number,
   ): Promise<MangoSignatureStatus> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -2554,6 +2555,7 @@ export class MangoClient {
         settlePnlLimitFactor,
         new BN(settlePnlLimitWindowSize),
         positivePnlLiquidationFee,
+        platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -2649,6 +2651,7 @@ export class MangoClient {
         params.positivePnlLiquidationFee,
         params.name,
         params.forceClose,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,

@@ -841,6 +841,7 @@ pub mod mango_v4 {
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
+        platform_liquidation_fee: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_create_market(
@@ -872,6 +873,7 @@ pub mod mango_v4 {
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
+            platform_liquidation_fee,
         )?;
         Ok(())
     }
@@ -909,6 +911,7 @@ pub mod mango_v4 {
         positive_pnl_liquidation_fee_opt: Option<f32>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
+        platform_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -943,6 +946,7 @@ pub mod mango_v4 {
             positive_pnl_liquidation_fee_opt,
             name_opt,
             force_close_opt,
+            platform_liquidation_fee_opt,
         )?;
         Ok(())
     }

@@ -52,6 +52,8 @@ export class PerpMarket {
   public maintOverallAssetWeight: I80F48;
   public initOverallAssetWeight: I80F48;
   public positivePnlLiquidationFee: I80F48;
+  public platformLiquidationFee: I80F48;
+  public accruedLiquidationFees: I80F48;
 
   public _price: I80F48;
   public _uiPrice: number;
@@ -112,6 +114,9 @@ export class PerpMarket {
       maintOverallAssetWeight: I80F48Dto;
       initOverallAssetWeight: I80F48Dto;
       positivePnlLiquidationFee: I80F48Dto;
+      feesWithdrawn: BN;
+      platformLiquidationFee: I80F48Dto;
+      accruedLiquidationFees: I80F48Dto;
     },
   ): PerpMarket {
     return new PerpMarket(
@@ -159,6 +164,9 @@ export class PerpMarket {
       obj.maintOverallAssetWeight,
       obj.initOverallAssetWeight,
       obj.positivePnlLiquidationFee,
+      obj.feesWithdrawn,
+      obj.platformLiquidationFee,
+      obj.accruedLiquidationFees,
     );
   }
 
@@ -207,6 +215,9 @@ export class PerpMarket {
     maintOverallAssetWeight: I80F48Dto,
     initOverallAssetWeight: I80F48Dto,
     positivePnlLiquidationFee: I80F48Dto,
+    public feesWithdrawn: BN,
+    platformLiquidationFee: I80F48Dto,
+    accruedLiquidationFees: I80F48Dto,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -229,6 +240,8 @@ export class PerpMarket {
     this.maintOverallAssetWeight = I80F48.from(maintOverallAssetWeight);
     this.initOverallAssetWeight = I80F48.from(initOverallAssetWeight);
     this.positivePnlLiquidationFee = I80F48.from(positivePnlLiquidationFee);
+    this.platformLiquidationFee = I80F48.from(platformLiquidationFee);
+    this.accruedLiquidationFees = I80F48.from(accruedLiquidationFees);
 
     this.priceLotsToUiConverter = new Big(10)
       .pow(baseDecimals - QUOTE_DECIMALS)

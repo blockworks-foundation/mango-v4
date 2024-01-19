@@ -189,8 +189,17 @@ pub struct PerpMarket {
     // This ensures that fees_settled is strictly increasing for stats gathering purposes
     pub fees_withdrawn: u64,
 
+    /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    pub platform_liquidation_fee: I80F48,
+
+    /// Platform fees that were accrued during liquidation (in native tokens)
+    ///
+    /// These fees are also added to fees_accrued, this is just for bookkeeping the total
+    /// liquidation fees that happened. So never decreases (different to fees_accrued).
+    pub accrued_liquidation_fees: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1880],
+    pub reserved: [u8; 1848],
 }
 
 const_assert_eq!(
@@ -227,7 +236,8 @@ const_assert_eq!(
         + 7
         + 3 * 16
         + 8
-        + 1880
+        + 2 * 16
+        + 1848
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -525,7 +535,9 @@ impl PerpMarket {
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
             fees_withdrawn: 0,
-            reserved: [0; 1880],
+            platform_liquidation_fee: I80F48::ZERO,
+            accrued_liquidation_fees: I80F48::ZERO,
+            reserved: [0; 1848],
         }
     }
 }
