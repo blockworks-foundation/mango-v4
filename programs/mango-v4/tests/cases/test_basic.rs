@@ -369,9 +369,9 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     for _ in 0..10 {
         new_bytes.extend_from_slice(&bytemuck::bytes_of(&PerpPosition::default()));
     }
-    // remove the 64 reserved bytes at the end
+    // remove the 56 reserved bytes at the end
     new_bytes
-        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 64]);
+        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 56]);
 
     account_raw.data = new_bytes.clone();
     account_raw.lamports = 1_000_000_000; // 1 SOL is enough

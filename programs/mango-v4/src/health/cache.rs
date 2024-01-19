@@ -1445,26 +1445,6 @@ mod tests {
     use serum_dex::state::OpenOrders;
     use std::str::FromStr;
 
-    fn make_test_account() -> MangoAccountValue {
-        let default_account = MangoAccount::default_for_tests();
-        let mut bytes = AnchorSerialize::try_to_vec(&default_account).unwrap();
-        let expected_space = MangoAccount::space(3, 5, 4, 6, 0, 5);
-        bytes.extend(vec![0u8; expected_space - bytes.len()]);
-        let mut account = MangoAccountValue::from_bytes(&bytes).unwrap();
-        account
-            .resize_dynamic_content(
-                account.header.token_count,
-                account.header.serum3_count,
-                account.header.perp_count,
-                account.header.perp_oo_count,
-                account.header.token_conditional_swap_count,
-                5,
-            )
-            .unwrap();
-
-        account
-    }
-
     #[test]
     fn test_precision() {
         // I80F48 can only represent until 1/2^48
@@ -1500,7 +1480,8 @@ mod tests {
     // Run a health test that includes all the side values (like referrer_rebates_accrued)
     #[test]
     fn test_health0() {
-        let mut account = make_test_account();
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
 
         let group = Pubkey::new_unique();
 

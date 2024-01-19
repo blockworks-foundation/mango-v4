@@ -1996,11 +1996,11 @@ impl Default for AccountCreateInstruction {
         AccountCreateInstruction {
             account_num: 0,
             token_count: 8,
-            serum3_count: 4,
+            serum3_count: 2,
             perp_count: 4,
             perp_oo_count: 16,
             token_conditional_swap_count: 1,
-            openbook_v2_count: 4,
+            openbook_v2_count: 2,
             group: Default::default(),
             owner: Default::default(),
             payer: Default::default(),

@@ -2128,7 +2128,7 @@ mod tests {
         let account_bytes = AnchorSerialize::try_to_vec(&account).unwrap();
         assert_eq!(
             8 + account_bytes.len(),
-            MangoAccount::space(8, 8, 4, 8, 0, 0)
+            MangoAccount::space(8, 8, 4, 8, 12, 5)
         );
 
         let account2 = MangoAccountValue::from_bytes(&account_bytes).unwrap();
@@ -2545,6 +2545,7 @@ mod tests {
         account
             .perp_open_orders
             .resize(header.perp_oo_count(), PerpOpenOrder::default());
+        account.openbook_v2.resize(header.openbook_v2_count(), OpenbookV2Orders::default());
         let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
 
         // The MangoAccount struct is missing some dynamic fields, add space for them
@@ -2841,7 +2842,7 @@ mod tests {
                 perp_count: 4,
                 perp_oo_count: 8,
                 token_conditional_swap_count: 4,
-                openbook_v2_count: 4,
+                openbook_v2_count: 2,
             };
             let mut account = make_resize_test_account(&header);
 
@@ -2897,11 +2898,11 @@ mod tests {
 
             let target = MangoAccountDynamicHeader {
                 token_count: rng.gen_range(active.token_count..6),
-                serum3_count: rng.gen_range(active.serum3_count..7),
+                serum3_count: rng.gen_range(active.serum3_count..6),
                 perp_count: rng.gen_range(active.perp_count..6),
                 perp_oo_count: rng.gen_range(active.perp_oo_count..16),
-                token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..8),
-                openbook_v2_count: rng.gen_range(active.openbook_v2_count..7),
+                token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..6),
+                openbook_v2_count: rng.gen_range(active.openbook_v2_count..4),
             };
 
             let target_size = target.account_size();

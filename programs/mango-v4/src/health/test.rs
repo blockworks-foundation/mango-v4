@@ -70,7 +70,7 @@ impl TestAccount<OpenOrdersAccount> {
     pub fn new_zeroed() -> Self {
         let mut bytes = vec![0u8; 8 + size_of::<OpenOrdersAccount>()];
         bytes[0..8].copy_from_slice(&openbook_v2::state::OpenOrdersAccount::discriminator());
-        Self::new(bytes, Pubkey::new_unique())
+        Self::new(bytes, openbook_v2::ID)
     }
 
     pub fn data(&mut self) -> &mut OpenOrdersAccount {
