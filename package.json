@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "^0.2.16",
-    "@coral-xyz/anchor": "^0.28.1-beta.2",
+    "@coral-xyz/anchor": "^0.29.0",
     "@openbook-dex/openbook-v2": "^0.1.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
@@ -80,7 +80,7 @@
     "node-kraken-api": "^2.2.2"
   },
   "resolutions": {
-    "@coral-xyz/anchor": "^0.28.1-beta.2",
+    "@coral-xyz/anchor": "^0.29.0",
     "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
     "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11"
   },
