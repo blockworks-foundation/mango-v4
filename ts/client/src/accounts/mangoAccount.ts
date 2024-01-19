@@ -167,9 +167,11 @@ export class MangoAccount {
   }
 
   async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
-    const openbookClient = new OpenBookV2Client(new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
-      commitment: client.connection.commitment,
-    })) // readonly client for deserializing accounts
+    const openbookClient = new OpenBookV2Client(
+      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
+        commitment: client.connection.commitment,
+      }),
+    ); // readonly client for deserializing accounts
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return this;
     const ais =
@@ -184,7 +186,11 @@ export class MangoAccount {
               `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
             );
           }
-          const oo = openbookClient.program.account.openOrdersAccount.coder.accounts.decode('OpenOrdersAccount', ai.data)
+          const oo =
+            openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+              'OpenOrdersAccount',
+              ai.data,
+            );
           return [openbookV2Active[i].marketIndex, oo];
         }),
       ),
@@ -209,7 +215,9 @@ export class MangoAccount {
     );
   }
 
-  loadOpenbookV2OpenOrders(openbookV2OosMapByOo: Map<string, OpenOrdersAccount>): void {
+  loadOpenbookV2OpenOrders(
+    openbookV2OosMapByOo: Map<string, OpenOrdersAccount>,
+  ): void {
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return;
     this.openbookV2OosMapByMarketIndex = new Map(
@@ -292,7 +300,9 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
-  public getOpenbookV2Account(marketIndex: MarketIndex): OpenbookV2Orders | undefined {
+  public getOpenbookV2Account(
+    marketIndex: MarketIndex,
+  ): OpenbookV2Orders | undefined {
     return this.openbookV2.find((sa) => sa.marketIndex == marketIndex);
   }
 
@@ -375,7 +385,9 @@ export class MangoAccount {
       for (const openbookV2Market of Array.from(
         group.openbookV2MarketsMapByMarketIndex.values(),
       )) {
-        const oo = this.openbookV2OosMapByMarketIndex.get(openbookV2Market.marketIndex);
+        const oo = this.openbookV2OosMapByMarketIndex.get(
+          openbookV2Market.marketIndex,
+        );
         if (openbookV2Market.baseTokenIndex == bank.tokenIndex && oo) {
           bal.add(I80F48.fromI64(oo.position.baseFreeNative));
         }

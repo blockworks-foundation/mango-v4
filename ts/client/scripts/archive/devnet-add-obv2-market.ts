@@ -9,7 +9,10 @@ dotenv.config();
 
 async function addSpotMarket() {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection('https://mango.devnet.rpcpool.com', options);
+  const connection = new Connection(
+    'https://mango.devnet.rpcpool.com',
+    options,
+  );
 
   // admin
   const admin = Keypair.fromSecretKey(
@@ -31,10 +34,14 @@ async function addSpotMarket() {
   const group = await client.getGroup(new PublicKey(groupPk));
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
-  const baseMint = new PublicKey("So11111111111111111111111111111111111111112");
-  const quoteMint = new PublicKey("8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN"); //devnet usdc
+  const baseMint = new PublicKey('So11111111111111111111111111111111111111112');
+  const quoteMint = new PublicKey(
+    '8FRFC6MoGGkMFQwngccyu69VnYbzykGeez7ignHVAFSN',
+  ); //devnet usdc
 
-  const marketPubkey = new PublicKey('85o8dcTxhuV5N3LFkF1pKoCBsXhdekgdQeJ8zGEgnBwP')
+  const marketPubkey = new PublicKey(
+    '85o8dcTxhuV5N3LFkF1pKoCBsXhdekgdQeJ8zGEgnBwP',
+  );
 
   const signature = await client.openbookV2RegisterMarket(
     group,
@@ -44,7 +51,7 @@ async function addSpotMarket() {
     1,
     'SOL/USDC',
     0,
-  )
+  );
   console.log('Tx Successful:', signature);
 
   process.exit();

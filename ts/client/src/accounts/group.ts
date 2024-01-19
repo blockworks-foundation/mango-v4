@@ -1,6 +1,10 @@
 import { AnchorProvider, BorshAccountsCoder, Wallet } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
-import { MarketAccount, BookSideAccount, OpenBookV2Client } from '@openbook-dex/openbook-v2';
+import {
+  MarketAccount,
+  BookSideAccount,
+  OpenBookV2Client,
+} from '@openbook-dex/openbook-v2';
 import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
@@ -17,7 +21,13 @@ import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
-import { EmptyWallet, buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import {
+  EmptyWallet,
+  buildFetch,
+  toNative,
+  toNativeI80F48,
+  toUiDecimals,
+} from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   OracleProvider,
@@ -399,11 +409,14 @@ export class Group {
     client: MangoClient,
     ids?: Id,
   ): Promise<void> {
-    
     const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(client.connection, new EmptyWallet(Keypair.generate()), {
-        commitment: client.connection.commitment,
-      }),
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
     ); // readonly client for deserializing accounts
     let markets: MarketAccount[] = [];
     const externalMarketIds = ids?.getOpenbookV2ExternalMarkets();
@@ -794,7 +807,9 @@ export class Group {
     return market;
   }
 
-  public getOpenbookV2ExternalMarket(externalMarketPk: PublicKey): MarketAccount {
+  public getOpenbookV2ExternalMarket(
+    externalMarketPk: PublicKey,
+  ): MarketAccount {
     const market = this.openbookV2ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     );
@@ -826,7 +841,8 @@ export class Group {
     client: MangoClient,
     externalMarketPk: PublicKey,
   ): Promise<BookSideAccount> {
-    const openbookV2Market = this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+    const openbookV2Market =
+      this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
     return await openbookV2Market.loadBids(client, this);
   }
 
@@ -834,7 +850,8 @@ export class Group {
     client: MangoClient,
     externalMarketPk: PublicKey,
   ): Promise<BookSideAccount> {
-    const openbookV2Market = this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+    const openbookV2Market =
+      this.getOpenbookV2MarketByExternalMarket(externalMarketPk);
     return await openbookV2Market.loadAsks(client, this);
   }
 

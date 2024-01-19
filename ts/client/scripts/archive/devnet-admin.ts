@@ -172,7 +172,7 @@ async function main() {
       group.getFirstBankByMint(usdcDevnetMint),
       0,
       'SOL/USDC',
-      0
+      0,
     );
     await group.reloadAll(client);
     const serum3Market = group.getSerum3MarketByExternalMarket(

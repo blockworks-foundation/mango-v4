@@ -217,16 +217,16 @@ export class EmptyWallet implements Wallet {
   async signTransaction<T extends Transaction | VersionedTransaction>(
     tx: T,
   ): Promise<T> {
-    return tx
+    return tx;
   }
   async signAllTransactions<T extends Transaction | VersionedTransaction>(
     txs: T[],
   ): Promise<T[]> {
-    return txs
+    return txs;
   }
 
   get publicKey(): PublicKey {
-    return this.payer.publicKey
+    return this.payer.publicKey;
   }
 }
 

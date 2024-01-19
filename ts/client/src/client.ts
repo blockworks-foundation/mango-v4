@@ -2966,9 +2966,15 @@ export class MangoClient {
 
     const [payerTokenIndex, receiverTokenIndex] = ((): TokenIndex[] => {
       if (side == OpenbookV2Side.bid) {
-        return [openbookV2Market.quoteTokenIndex, openbookV2Market.baseTokenIndex];
+        return [
+          openbookV2Market.quoteTokenIndex,
+          openbookV2Market.baseTokenIndex,
+        ];
       } else {
-        return [openbookV2Market.baseTokenIndex, openbookV2Market.quoteTokenIndex];
+        return [
+          openbookV2Market.baseTokenIndex,
+          openbookV2Market.quoteTokenIndex,
+        ];
       }
     })();
 

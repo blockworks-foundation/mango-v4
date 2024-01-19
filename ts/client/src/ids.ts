@@ -82,7 +82,9 @@ export class Id {
     return Array.from(
       this.openbookV2Markets
         .filter((openbookV2Market) => openbookV2Market.active)
-        .map((openbookV2Market) => new PublicKey(openbookV2Market.marketExternal)),
+        .map(
+          (openbookV2Market) => new PublicKey(openbookV2Market.marketExternal),
+        ),
     );
   }
 

@@ -81,10 +81,7 @@ export class OpenbookV2Market {
     return openOrderPublicKey;
   }
 
-  public findOoPda(
-    programId: PublicKey,
-    mangoAccount: PublicKey,
-  ): PublicKey {
+  public findOoPda(programId: PublicKey, mangoAccount: PublicKey): PublicKey {
     // todo-pan: use indexer here
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
       [
@@ -288,11 +285,14 @@ export async function generateOpenbookV2MarketExternalVaultSignerAddress(
 }
 
 export function priceNumberToLots(price: number, market: MarketAccount): BN {
-  return new BN(Math.round((price *
-    Math.pow(10, market.quoteDecimals) *
-    market.baseLotSize.toNumber()) /
-    (Math.pow(10, market.quoteDecimals) *
-        market.quoteLotSize.toNumber())))
+  return new BN(
+    Math.round(
+      (price *
+        Math.pow(10, market.quoteDecimals) *
+        market.baseLotSize.toNumber()) /
+        (Math.pow(10, market.quoteDecimals) * market.quoteLotSize.toNumber()),
+    ),
+  );
 }
 
 export function baseSizeNumberToLots(size: number, market: MarketAccount): BN {
