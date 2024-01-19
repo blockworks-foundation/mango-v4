@@ -1,7 +1,7 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::{emit_stack, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLog};
+use crate::logs::{emit_stack, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLogV2};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -62,12 +62,18 @@ pub fn token_force_close_borrows_with_token(
             MangoError::TokenInReduceOnlyMode
         );
 
+        let fee_factor_liqor =
+            (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
+        let fee_factor_total =
+            (I80F48::ONE + liab_bank.liquidation_fee + liab_bank.platform_liquidation_fee)
+                * (I80F48::ONE + asset_bank.liquidation_fee + asset_bank.platform_liquidation_fee);
+
         // account constraint #3
         // only allow combination of asset and liab token,
         // where liqee's health would be guaranteed to not decrease
         require_gte!(
             liab_bank.init_liab_weight,
-            asset_bank.init_liab_weight * (I80F48::ONE + liab_bank.liquidation_fee),
+            asset_bank.init_liab_weight * fee_factor_total,
             MangoError::SomeError
         );
 
@@ -95,10 +101,13 @@ pub fn token_force_close_borrows_with_token(
             .max(I80F48::ZERO);
 
         // The amount of asset native tokens we will give up for them
-        let fee_factor =
-            (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
-        let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
-        let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
+        let asset_transfer_base = liab_transfer * liab_oracle_price / asset_oracle_price;
+        let asset_transfer_to_liqor = asset_transfer_base * fee_factor_liqor;
+        let asset_transfer_from_liqee = asset_transfer_base * fee_factor_total;
+
+        let asset_liquidation_fee = asset_transfer_from_liqee - asset_transfer_to_liqor;
+        asset_bank.collected_fees_native += asset_liquidation_fee;
+        asset_bank.collected_liquidation_fees += asset_liquidation_fee;
 
         // Apply the balance changes to the liqor and liqee accounts
         let liqee_liab_active =
@@ -113,13 +122,13 @@ pub fn token_force_close_borrows_with_token(
         let (liqor_asset_position, liqor_asset_raw_index, _) =
             liqor.ensure_token_position(asset_token_index)?;
         let liqor_asset_active =
-            asset_bank.deposit(liqor_asset_position, asset_transfer, now_ts)?;
+            asset_bank.deposit(liqor_asset_position, asset_transfer_to_liqor, now_ts)?;
         let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
 
         let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
         let liqee_asset_active = asset_bank.withdraw_without_fee_with_dusting(
             liqee_asset_position,
-            asset_transfer,
+            asset_transfer_from_liqee,
             now_ts,
         )?;
         let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
@@ -128,7 +137,7 @@ pub fn token_force_close_borrows_with_token(
         msg!(
             "Force closed {} liab for {} asset",
             liab_transfer,
-            asset_transfer
+            asset_transfer_from_liqee,
         );
 
         // liqee asset
@@ -168,17 +177,19 @@ pub fn token_force_close_borrows_with_token(
             borrow_index: liab_bank.borrow_index.to_bits(),
         });
 
-        emit_stack(TokenForceCloseBorrowsWithTokenLog {
+        emit_stack(TokenForceCloseBorrowsWithTokenLogV2 {
             mango_group: liqee.fixed.group,
             liqee: liqee_key,
             liqor: liqor_key,
             asset_token_index: asset_token_index,
             liab_token_index: liab_token_index,
-            asset_transfer: asset_transfer.to_bits(),
+            asset_transfer_from_liqee: asset_transfer_from_liqee.to_bits(),
+            asset_transfer_to_liqor: asset_transfer_to_liqor.to_bits(),
+            asset_liquidation_fee: asset_liquidation_fee.to_bits(),
             liab_transfer: liab_transfer.to_bits(),
             asset_price: asset_oracle_price.to_bits(),
             liab_price: liab_oracle_price.to_bits(),
-            fee_factor: fee_factor.to_bits(),
+            fee_factor: fee_factor_total.to_bits(),
         });
 
         // liqor should never have a borrow

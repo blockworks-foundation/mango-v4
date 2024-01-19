@@ -112,6 +112,7 @@ impl<'a> GroupWithTokensConfig {
                     min_vault_to_deposits_ratio: 0.2,
                     net_borrow_limit_per_window_quote: 1_000_000_000_000,
                     net_borrow_limit_window_size_ts: 24 * 60 * 60,
+                    platform_liquidation_fee: 0.0,
                 },
             )
             .await
