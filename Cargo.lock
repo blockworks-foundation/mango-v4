@@ -3451,6 +3451,7 @@ dependencies = [
  "solana-client",
  "solana-rpc",
  "solana-sdk",
+ "solana-transaction-status",
  "spl-associated-token-account 1.1.3",
  "thiserror",
  "tokio",

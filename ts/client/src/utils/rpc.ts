@@ -3,7 +3,10 @@ import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 import { u8 } from '@solana/buffer-layout';
 import {
   AddressLookupTableAccount,
+  Commitment,
   ComputeBudgetProgram,
+  Connection,
+  Keypair,
   MessageV0,
   RpcResponseAndContext,
   SignatureResult,
@@ -14,6 +17,7 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
+import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
 
 export interface MangoSignatureStatus {
@@ -24,12 +28,47 @@ export interface MangoSignatureStatus {
   slot: number;
 }
 
+export interface MangoSignature {
+  signature: TransactionSignature;
+}
+
+export type SendTransactionOpts = Partial<{
+  preflightCommitment: Commitment;
+  latestBlockhash: Readonly<{
+    blockhash: string;
+    lastValidBlockHeight: number;
+  }>;
+  prioritizationFee: number;
+  estimateFee: boolean;
+  additionalSigners: Keypair[];
+  postSendTxCallback: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback: ({ txid }: { txid: string }) => void;
+  txConfirmationCommitment: Commitment;
+  confirmInBackground: boolean;
+  alts: AddressLookupTableAccount[];
+  multipleConnections: Connection[];
+}>;
+
+export function sendTransaction(
+  provider: AnchorProvider,
+  ixs: TransactionInstruction[],
+  alts: AddressLookupTableAccount[],
+  opts?: { confirmInBackground: true } & SendTransactionOpts,
+): Promise<MangoSignature>;
+
+export function sendTransaction(
+  provider: AnchorProvider,
+  ixs: TransactionInstruction[],
+  alts: AddressLookupTableAccount[],
+  opts?: SendTransactionOpts,
+): Promise<MangoSignatureStatus>;
+
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
-  opts: any = {},
-): Promise<MangoSignatureStatus> {
+  opts: SendTransactionOpts = {},
+): Promise<MangoSignatureStatus | MangoSignature> {
   const connection = provider.connection;
   const latestBlockhash =
     opts.latestBlockhash ??
@@ -94,9 +133,22 @@ export async function sendTransaction(
     vtx.sign([(payer as any).payer as Signer]);
   }
 
-  const signature = await connection.sendRawTransaction(vtx.serialize(), {
-    skipPreflight: true, // mergedOpts.skipPreflight,
-  });
+  // if configured, send the transaction using multiple connections
+  let signature: string;
+  if (opts?.multipleConnections?.length ?? 0 > 0) {
+    const allConnections = [connection, ...opts.multipleConnections!];
+    signature = await Promise.any(
+      allConnections.map((c) => {
+        return c.sendRawTransaction(vtx.serialize(), {
+          skipPreflight: true, // mergedOpts.skipPreflight,
+        });
+      }),
+    );
+  } else {
+    signature = await connection.sendRawTransaction(vtx.serialize(), {
+      skipPreflight: true, // mergedOpts.skipPreflight,
+    });
+  }
 
   if (opts.postSendTxCallback) {
     try {
@@ -106,6 +158,28 @@ export async function sendTransaction(
     }
   }
 
+  if (!opts.confirmInBackground) {
+    return await confirmTransaction(
+      connection,
+      opts,
+      latestBlockhash,
+      signature,
+    );
+  } else {
+    confirmTransaction(connection, opts, latestBlockhash, signature);
+    return { signature };
+  }
+}
+
+const confirmTransaction = async (
+  connection: Connection,
+  opts: Partial<SendTransactionOpts> = {},
+  latestBlockhash: Readonly<{
+    blockhash: string;
+    lastValidBlockHeight: number;
+  }>,
+  signature: string,
+): Promise<MangoSignatureStatus> => {
   const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
   if (
@@ -134,9 +208,15 @@ export async function sendTransaction(
       message: `${JSON.stringify(status)}`,
     });
   }
-
+  if (opts.postTxConfirmationCallback) {
+    try {
+      opts.postTxConfirmationCallback({ txid: signature });
+    } catch (e) {
+      console.warn(`postTxConfirmationCallback error ${e}`);
+    }
+  }
   return { signature, slot: status.context.slot, ...signatureResult };
-}
+};
 
 export const createComputeBudgetIx = (
   microLamports: number,
@@ -147,7 +227,7 @@ export const createComputeBudgetIx = (
   return computeBudgetIx;
 };
 
-class MangoError extends Error {
+export class MangoError extends Error {
   message: string;
   txid: string;
 

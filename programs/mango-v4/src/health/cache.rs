@@ -621,7 +621,7 @@ impl PerpInfo {
 #[allow(unused)]
 #[derive(Clone, Debug)]
 pub struct HealthCache {
-    pub(crate) token_infos: Vec<TokenInfo>,
+    pub token_infos: Vec<TokenInfo>,
     pub(crate) spot_infos: Vec<SpotInfo>,
     pub(crate) perp_infos: Vec<PerpInfo>,
     #[allow(unused)]

@@ -373,7 +373,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let group_context = Arc::new(
         MangoGroupContext::new_from_rpc(
-            &client.rpc_async(),
+            client.rpc_async(),
             Pubkey::from_str(&config.mango_group).unwrap(),
         )
         .await?,
@@ -571,7 +571,7 @@ async fn main() -> anyhow::Result<()> {
     // keepalive
     {
         tokio::spawn(async move {
-            let mut write_interval = time::interval(time::Duration::from_secs(30));
+            let mut write_interval = mango_v4_client::delay_interval(time::Duration::from_secs(30));
 
             loop {
                 write_interval.tick().await;

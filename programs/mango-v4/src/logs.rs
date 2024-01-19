@@ -345,6 +345,22 @@ pub struct TokenLiqWithTokenLog {
 }
 
 #[event]
+pub struct TokenLiqWithTokenLogV2 {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub asset_token_index: u16,
+    pub liab_token_index: u16,
+    pub asset_transfer_from_liqee: i128, // I80F48
+    pub asset_transfer_to_liqor: i128,   // I80F48
+    pub asset_liquidation_fee: i128,     // I80F48
+    pub liab_transfer: i128,             // I80F48
+    pub asset_price: i128,               // I80F48
+    pub liab_price: i128,                // I80F48
+    pub bankruptcy: bool,
+}
+
+#[event]
 pub struct Serum3OpenOrdersBalanceLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
@@ -620,6 +636,23 @@ pub struct TokenForceCloseBorrowsWithTokenLog {
     pub asset_price: i128,
     pub liab_price: i128,
     pub fee_factor: i128,
+}
+
+#[event]
+pub struct TokenForceCloseBorrowsWithTokenLogV2 {
+    pub mango_group: Pubkey,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub asset_token_index: u16,
+    pub liab_token_index: u16,
+    pub asset_transfer_from_liqee: i128, // I80F48
+    pub asset_transfer_to_liqor: i128,   // I80F48
+    pub asset_liquidation_fee: i128,     // I80F48
+    pub liab_transfer: i128,             // I80F48
+    pub asset_price: i128,               // I80F48
+    pub liab_price: i128,                // I80F48
+    /// including liqor and platform liquidation fees
+    pub fee_factor: i128, // I80F48
 }
 
 #[event]

@@ -155,6 +155,8 @@ pub mod mango_v4 {
         interest_target_utilization: f32,
         group_insurance_fund: bool,
         deposit_limit: u64,
+        zero_util_rate: f32,
+        platform_liquidation_fee: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -186,6 +188,8 @@ pub mod mango_v4 {
             interest_target_utilization,
             group_insurance_fund,
             deposit_limit,
+            zero_util_rate,
+            platform_liquidation_fee,
         )?;
         Ok(())
     }
@@ -239,6 +243,8 @@ pub mod mango_v4 {
         maint_weight_shift_abort: bool,
         set_fallback_oracle: bool,
         deposit_limit_opt: Option<u64>,
+        zero_util_rate_opt: Option<f32>,
+        platform_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -279,6 +285,8 @@ pub mod mango_v4 {
             maint_weight_shift_abort,
             set_fallback_oracle,
             deposit_limit_opt,
+            zero_util_rate_opt,
+            platform_liquidation_fee_opt,
         )?;
         Ok(())
     }

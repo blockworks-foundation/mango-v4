@@ -134,7 +134,7 @@ export async function getPriceImpactForLiqor(
           // Max liab of a particular token that would be liquidated to bring health above 0
           mangoAccountsWithHealth.reduce((sum, a) => {
             // How much would health increase for every unit liab moved to liqor
-            // liabprice * (liabweight - (1+fee)*assetweight)
+            // liabprice * (liabweight - (1+liabfees)*(1+assetfees)*assetweight)
             // Choose the most valuable asset the user has
             const assetBank = Array.from(group.banksMapByTokenIndex.values())
               .flat()
@@ -152,12 +152,16 @@ export async function getPriceImpactForLiqor(
                   ? prev
                   : curr,
               );
-            const tokenLiabHealthContrib = bank.price.mul(
-              bank.initLiabWeight.sub(
+            const feeFactor = ONE_I80F48()
+              .add(bank.liquidationFee)
+              .add(bank.platformLiquidationFee)
+              .mul(
                 ONE_I80F48()
-                  .add(bank.liquidationFee)
-                  .mul(assetBank.initAssetWeight),
-              ),
+                  .add(assetBank.liquidationFee)
+                  .add(assetBank.platformLiquidationFee),
+              );
+            const tokenLiabHealthContrib = bank.price.mul(
+              bank.initLiabWeight.sub(feeFactor.mul(assetBank.initAssetWeight)),
             );
             // Abs liab/borrow
             const maxTokenLiab = a.account
@@ -439,16 +443,39 @@ export async function getRiskStats(
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
   } catch (error) {
-    liqors = [];
+    liqors = [new PublicKey('2T1taZuQwy7izxvjbAeiVjDhCEFYjWhLuv4U36XD1rL1')];
+    liqors = [new PublicKey('Dr1wLHRKQSir4UgGphZ29ZcPhGvJrdDnrLTDgbz73bDs')];
+    liqors = [new PublicKey('BNTDZJQrjNkjFxYAMCdKH2ShSM6Uwc28aAgit7ytVQJc')];
+    liqors = [new PublicKey('BmAXMP5yUeagSsJa1PPMNyzRR5x2J4nJPrNrUGryCsnD')];
   }
 
   // Get known mms
-  const mms = [
-    new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
-    new PublicKey('DA5G4mUdFmQXyKuFqvGGZGBzPAPYDYQsdjmiEJAYzUXQ'),
-    new PublicKey('BGYWnqfaauCeebFQXEfYuDCktiVG8pqpprrsD4qfqL53'),
-    new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
-  ];
+  let mms: PublicKey[];
+  try {
+    mms = (
+      await (
+        await (
+          await buildFetch()
+        )(
+          `https://api.mngo.cloud/data/v4/stats/perp-makers-over_period?over-period=1WEEK`,
+          {
+            mode: 'cors',
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          },
+        )
+      ).json()
+    ).map((data) => new PublicKey(data['liqor']));
+  } catch (error) {
+    mms = [
+      new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
+      new PublicKey('4hXPGTmR6dKNNqjLYdfDRSrTaa1Wt2GZoZnQ9hAJEeev'),
+      new PublicKey('BGYWnqfaauCeebFQXEfYuDCktiVG8pqpprrsD4qfqL53'),
+      new PublicKey('F1SZxEDxxCSLVjEBbMEjDYqajWRJQRCZBwPQnmcVvTLV'),
+    ];
+  }
 
   // Get all mango accounts
   const mangoAccounts = await client.getAllMangoAccounts(group, true);

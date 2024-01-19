@@ -43,6 +43,8 @@ pub fn serum3_register_market(
     );
 
     if is_fast_listing {
+        // Safety parameters have fixed values when fast listing is used.
+
         // C tier tokens (no borrows, no asset weight) allow wider bands if the quote token has
         // no deposit limits
         let base_c_tier =
@@ -52,7 +54,7 @@ pub fn serum3_register_market(
         if base_c_tier && quote_has_no_deposit_limit {
             require_eq!(oracle_price_band, 19.0);
         } else {
-            require_eq!(oracle_price_band, 0.5);
+            require_eq!(oracle_price_band, 1.0);
         }
     }
 

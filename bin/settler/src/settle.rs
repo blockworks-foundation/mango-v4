@@ -6,8 +6,7 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
-    TransactionBuilder,
+    chain_data, health_cache, MangoClient, PreparedInstructions, TransactionBuilder,
 };
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -273,7 +272,7 @@ impl<'a> SettleBatchProcessor<'a> {
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: client.transaction_builder_config,
+            config: client.config().transaction_builder_config,
         }
         .transaction_with_blockhash(self.blockhash)
     }
@@ -286,13 +285,7 @@ impl<'a> SettleBatchProcessor<'a> {
         let tx = self.transaction()?;
         self.instructions.clear();
 
-        let send_result = self
-            .mango_client
-            .client
-            .rpc_async()
-            .send_transaction_with_config(&tx, self.mango_client.client.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error);
+        let send_result = self.mango_client.client.send_transaction(&tx).await;
 
         if let Err(err) = send_result {
             info!("error while sending settle batch: {}", err);

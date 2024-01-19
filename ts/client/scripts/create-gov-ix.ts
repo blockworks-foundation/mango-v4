@@ -2,26 +2,22 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from '@project-serum/anchor';
 import { serializeInstructionToBase64 } from '@solana/spl-governance';
 import {
-  AccountMeta,
   Connection,
   Keypair,
   PublicKey,
-  SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { TokenIndex } from '../src/accounts/bank';
 import { PerpMarketIndex } from '../src/accounts/perp';
 import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import {
   NullPerpEditParams,
-  NullTokenEditParams,
   TrueIxGateParams,
   buildIxGate,
 } from '../src/clientIxParamBuilder';
-import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../src/constants';
+import { MANGO_V4_ID } from '../src/constants';
 import { bpsToDecimal, percentageToDecimal, toNative } from '../src/utils';
 
 const { MB_CLUSTER_URL, MB_PAYER_KEYPAIR } = process.env;
@@ -197,32 +193,32 @@ async function groupEdit(): Promise<void> {
 //   console.log(serializeInstructionToBase64(ix));
 // }
 
-async function serum3Register(): Promise<void> {
-  const client = await buildClient();
+// async function serum3Register(): Promise<void> {
+//   const client = await buildClient();
 
-  const group = await client.getGroup(new PublicKey(GROUP_PK));
+//   const group = await client.getGroup(new PublicKey(GROUP_PK));
 
-  const ix = await client.program.methods
-    .serum3RegisterMarket(3, 'ETH (Portal)/USDC', 0)
-    .accounts({
-      group: group.publicKey,
-      admin: group.admin,
-      serumProgram: OPENBOOK_PROGRAM_ID['mainnet-beta'],
-      serumMarketExternal: new PublicKey(
-        'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4',
-      ),
-      baseBank: group.getFirstBankByMint(
-        new PublicKey('7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'),
-      ).publicKey,
-      quoteBank: group.getFirstBankByMint(
-        new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
-      ).publicKey,
-      payer: (client.program.provider as AnchorProvider).wallet.publicKey,
-    })
-    .instruction();
+//   const ix = await client.program.methods
+//     .serum3RegisterMarket(3, 'ETH (Portal)/USDC',)
+//     .accounts({
+//       group: group.publicKey,
+//       admin: group.admin,
+//       serumProgram: OPENBOOK_PROGRAM_ID['mainnet-beta'],
+//       serumMarketExternal: new PublicKey(
+//         'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4',
+//       ),
+//       baseBank: group.getFirstBankByMint(
+//         new PublicKey('7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs'),
+//       ).publicKey,
+//       quoteBank: group.getFirstBankByMint(
+//         new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'),
+//       ).publicKey,
+//       payer: (client.program.provider as AnchorProvider).wallet.publicKey,
+//     })
+//     .instruction();
 
-  console.log(serializeInstructionToBase64(ix));
-}
+//   console.log(serializeInstructionToBase64(ix));
+// }
 
 async function perpCreate(): Promise<void> {
   const client = await buildClient();

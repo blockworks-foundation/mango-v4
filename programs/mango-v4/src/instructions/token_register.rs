@@ -42,6 +42,8 @@ pub fn token_register(
     interest_target_utilization: f32,
     group_insurance_fund: bool,
     deposit_limit: u64,
+    zero_util_rate: f32,
+    platform_liquidation_fee: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -123,7 +125,10 @@ pub fn token_register(
         maint_weight_shift_liab_target: I80F48::ZERO,
         fallback_oracle: ctx.accounts.fallback_oracle.key(),
         deposit_limit,
-        reserved: [0; 1960],
+        zero_util_rate: I80F48::from_num(zero_util_rate),
+        platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
+        collected_liquidation_fees: I80F48::ZERO,
+        reserved: [0; 1920],
     };
 
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;

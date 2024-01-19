@@ -20,9 +20,9 @@ import {
 import { Builder } from '../../src/builder';
 import { MangoClient } from '../../src/client';
 import {
+  DefaultTokenRegisterParams,
   NullPerpEditParams,
   NullTokenEditParams,
-  DefaultTokenRegisterParams,
 } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID, OPENBOOK_PROGRAM_ID } from '../../src/constants';
 import { buildVersionedTx, toNative } from '../../src/utils';
@@ -367,7 +367,7 @@ async function registerSerum3Markets() {
     group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
     0,
     'SOL/USDC',
-    0,
+    0.5,
   );
 }
 

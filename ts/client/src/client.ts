@@ -1,6 +1,7 @@
 import {
   AnchorProvider,
   BN,
+  Instruction,
   Program,
   Provider,
   Wallet,
@@ -26,6 +27,7 @@ import {
   SYSVAR_RENT_PUBKEY,
   SystemProgram,
   TransactionInstruction,
+  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import chunk from 'lodash/chunk';
@@ -92,7 +94,12 @@ import {
   toNative,
   toNativeSellPerBuyTokenPrice,
 } from './utils';
-import { MangoSignatureStatus, sendTransaction } from './utils/rpc';
+import {
+  MangoSignature,
+  MangoSignatureStatus,
+  SendTransactionOpts,
+  sendTransaction,
+} from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
 import {
   OpenbookV2Market,
@@ -120,6 +127,7 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 export type MangoClientOptions = {
   idsSource?: IdsSource;
   postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
   prioritizationFee?: number;
   estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
@@ -130,13 +138,14 @@ export type MangoClientOptions = {
 
 export class MangoClient {
   private idsSource: IdsSource;
-  private postSendTxCallback?: ({ txid }) => void;
+  private postSendTxCallback?: ({ txid }: { txid: string }) => void;
+  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
   private prioritizationFee: number;
   private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
-  private multipleProviders: AnchorProvider[] = [];
+  multipleConnections: Connection[] = [];
 
   constructor(
     public program: Program<MangoV4>,
@@ -148,6 +157,7 @@ export class MangoClient {
     this.prioritizationFee = opts?.prioritizationFee || 0;
     this.estimateFee = opts?.estimateFee || false;
     this.postSendTxCallback = opts?.postSendTxCallback;
+    this.postTxConfirmationCallback = opts?.postTxConfirmationCallback;
     this.openbookFeesToDao = opts?.openbookFeesToDao ?? true;
     this.prependedGlobalAdditionalInstructions =
       opts.prependedGlobalAdditionalInstructions ?? [];
@@ -157,16 +167,7 @@ export class MangoClient {
       'processed';
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
-    this.multipleProviders = opts?.multipleConnections
-      ? opts.multipleConnections.map(
-          (c) =>
-            new AnchorProvider(
-              c,
-              new Wallet(new Keypair()),
-              (program.provider as AnchorProvider).opts,
-            ),
-        )
-      : [];
+    this.multipleConnections = opts?.multipleConnections ?? [];
   }
 
   /// Convenience accessors
@@ -178,61 +179,40 @@ export class MangoClient {
     return (this.program.provider as AnchorProvider).wallet.publicKey;
   }
 
+  public async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    opts?: SendTransactionOpts,
+  ): Promise<MangoSignatureStatus>;
+
+  public async sendAndConfirmTransaction(
+    ixs: TransactionInstruction[],
+    opts?: { confirmInBackground: true } & SendTransactionOpts,
+  ): Promise<MangoSignature>;
+
   /// Transactions
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
-    opts: any = {},
+    opts: SendTransactionOpts = {},
   ): Promise<MangoSignatureStatus> {
     let prioritizationFee: number;
     if (opts.prioritizationFee) {
       prioritizationFee = opts.prioritizationFee;
-    } else if (this.estimateFee) {
+    } else if (this.estimateFee || opts.estimateFee) {
       prioritizationFee = await this.estimatePrioritizationFee(ixs);
     } else {
       prioritizationFee = this.prioritizationFee;
     }
-    const providers = [
-      this.program.provider as AnchorProvider,
-      ...this.multipleProviders,
-    ];
-    const status = await Promise.race(
-      providers.map((p) =>
-        sendTransaction(
-          p,
-          [...this.prependedGlobalAdditionalInstructions, ...ixs],
-          opts.alts ?? [],
-          {
-            postSendTxCallback: this.postSendTxCallback,
-            prioritizationFee,
-            txConfirmationCommitment: this.txConfirmationCommitment,
-            ...opts,
-          },
-        ),
-      ),
-    );
-    return status;
-  }
 
-  public async sendAndConfirmTransactionSingle(
-    ixs: TransactionInstruction[],
-    opts: any = {},
-  ): Promise<MangoSignatureStatus> {
-    let prioritizationFee: number;
-    if (opts.prioritizationFee) {
-      prioritizationFee = opts.prioritizationFee;
-    } else if (this.estimateFee) {
-      prioritizationFee = await this.estimatePrioritizationFee(ixs);
-    } else {
-      prioritizationFee = this.prioritizationFee;
-    }
     const status = await sendTransaction(
       this.program.provider as AnchorProvider,
       [...this.prependedGlobalAdditionalInstructions, ...ixs],
       opts.alts ?? [],
       {
         postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
         prioritizationFee,
         txConfirmationCommitment: this.txConfirmationCommitment,
+        multipleConnections: this.multipleConnections,
         ...opts,
       },
     );
@@ -242,8 +222,20 @@ export class MangoClient {
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
-    opts: any = {},
-  ): Promise<MangoSignatureStatus> {
+    opts?: SendTransactionOpts,
+  ): Promise<MangoSignatureStatus>;
+
+  public async sendAndConfirmTransactionForGroup(
+    group: Group,
+    ixs: TransactionInstruction[],
+    opts?: { confirmInBackground: true } & SendTransactionOpts,
+  ): Promise<MangoSignature>;
+
+  public async sendAndConfirmTransactionForGroup(
+    group: Group,
+    ixs: TransactionInstruction[],
+    opts: SendTransactionOpts = {},
+  ): Promise<MangoSignatureStatus | MangoSignature> {
     return await this.sendAndConfirmTransaction(ixs, {
       alts: group.addressLookupTablesList,
       ...opts,
@@ -477,6 +469,8 @@ export class MangoClient {
         params.interestTargetUtilization,
         params.groupInsuranceFund,
         params.depositLimit,
+        params.zeroUtilRate,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -561,6 +555,8 @@ export class MangoClient {
         params.maintWeightShiftAbort ?? false,
         params.setFallbackOracle ?? false,
         params.depositLimit,
+        params.zeroUtilRate,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -1461,7 +1457,7 @@ export class MangoClient {
     mintPk: PublicKey,
     amount: number,
     reduceOnly = false,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<MangoSignature> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1480,7 +1476,7 @@ export class MangoClient {
     nativeAmount: BN,
     reduceOnly = false,
     intoExisting = false,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<MangoSignature> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const walletPk = this.walletPk;
@@ -1772,6 +1768,28 @@ export class MangoClient {
     ]);
   }
 
+  public async serum3EditMarketIx(
+    group: Group,
+    serum3MarketIndex: MarketIndex,
+    admin: PublicKey,
+    reduceOnly: boolean | null,
+    forceClose: boolean | null,
+    name: string | null,
+    oraclePriceBand: number | null,
+  ): Promise<TransactionInstruction> {
+    const serum3Market =
+      group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
+    const ix = await this.program.methods
+      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
+      .accounts({
+        group: group.publicKey,
+        admin: admin,
+        market: serum3Market?.publicKey,
+      })
+      .instruction();
+    return ix;
+  }
+
   public async serum3EditMarket(
     group: Group,
     serum3MarketIndex: MarketIndex,
@@ -1780,16 +1798,16 @@ export class MangoClient {
     name: string | null,
     oraclePriceBand: number | null,
   ): Promise<MangoSignatureStatus> {
-    const serum3Market =
-      group.serum3MarketsMapByMarketIndex.get(serum3MarketIndex);
-    const ix = await this.program.methods
-      .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
-      .accounts({
-        group: group.publicKey,
-        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
-        market: serum3Market?.publicKey,
-      })
-      .instruction();
+    const admin = (this.program.provider as AnchorProvider).wallet.publicKey;
+    const ix = await this.serum3EditMarketIx(
+      group,
+      serum3MarketIndex,
+      admin,
+      reduceOnly,
+      forceClose,
+      name,
+      oraclePriceBand,
+    );
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
@@ -1958,6 +1976,7 @@ export class MangoClient {
       group.addressLookupTablesList,
       {
         postSendTxCallback: this.postSendTxCallback,
+        postTxConfirmationCallback: this.postTxConfirmationCallback,
       },
     );
   }
@@ -3586,7 +3605,7 @@ export class MangoClient {
       group,
       [hrix1, ...ixs, hrix2],
       {
-        prioritizationFee: true,
+        estimateFee: true,
       },
     );
   }
@@ -4071,7 +4090,7 @@ export class MangoClient {
         ...ixs2,
       ],
       {
-        prioritizationFee: true,
+        estimateFee: true,
       },
     );
   }

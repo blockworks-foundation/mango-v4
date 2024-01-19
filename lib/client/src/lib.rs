@@ -8,6 +8,7 @@ pub mod account_update_stream;
 pub mod chain_data;
 mod chain_data_fetcher;
 mod client;
+pub mod confirm_transaction;
 mod context;
 pub mod error_tracking;
 pub mod gpa;

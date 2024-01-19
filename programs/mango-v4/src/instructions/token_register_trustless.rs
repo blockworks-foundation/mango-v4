@@ -71,7 +71,8 @@ pub fn token_register_trustless(
         init_asset_weight: I80F48::from_num(0),
         maint_liab_weight: I80F48::from_num(1.4), // 2.5x
         init_liab_weight: I80F48::from_num(1.8),  // 1.25x
-        liquidation_fee: I80F48::from_num(0.2),
+        liquidation_fee: I80F48::from_num(0.05),
+        platform_liquidation_fee: I80F48::from_num(0.05),
         dust: I80F48::ZERO,
         flash_loan_token_account_initial: u64::MAX,
         flash_loan_approved_amount: 0,
@@ -105,7 +106,9 @@ pub fn token_register_trustless(
         maint_weight_shift_liab_target: I80F48::ZERO,
         fallback_oracle: ctx.accounts.fallback_oracle.key(),
         deposit_limit: 0,
-        reserved: [0; 1960],
+        zero_util_rate: I80F48::ZERO,
+        collected_liquidation_fees: I80F48::ZERO,
+        reserved: [0; 1920],
     };
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)

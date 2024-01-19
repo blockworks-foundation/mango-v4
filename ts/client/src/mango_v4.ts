@@ -623,6 +623,14 @@ export type MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -1020,6 +1028,18 @@ export type MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -7193,6 +7213,16 @@ export type MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7217,12 +7247,24 @@ export type MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7265,6 +7307,15 @@ export type MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7486,11 +7537,42 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1960
+                1920
               ]
             }
           }
@@ -12178,6 +12260,71 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -13123,6 +13270,71 @@ export type MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
@@ -14703,6 +14915,14 @@ export const IDL: MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -15100,6 +15320,18 @@ export const IDL: MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -21273,6 +21505,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21297,12 +21539,24 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21345,6 +21599,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21566,11 +21829,42 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1960
+                1920
               ]
             }
           }
@@ -26258,6 +26552,71 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -27203,6 +27562,71 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
