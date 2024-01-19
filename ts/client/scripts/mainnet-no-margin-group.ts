@@ -172,6 +172,7 @@ async function registerSerum3Market(): Promise<void> {
     group.getFirstBankByTokenIndex(0 as TokenIndex),
     0,
     'SOL/USDC',
+    0,
   );
 }
 

@@ -198,6 +198,7 @@ async function main(): Promise<void> {
       group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
       1,
       'SOL/USDC',
+      0,
     );
   } catch (error) {
     console.log(error);

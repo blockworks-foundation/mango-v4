@@ -1,6 +1,5 @@
-import { Idl } from '@coral-xyz/anchor';
+import { Idl, IdlError } from '@coral-xyz/anchor';
 import {
-  IdlEnumVariant,
   IdlField,
   IdlType,
   IdlTypeDef,
@@ -292,31 +291,36 @@ function fieldOffset(fields: IdlField[], field: IdlField, idl: Idl): number {
 // The following code is essentially copied from anchor's common.ts
 //
 
-export function accountSize(idl: Idl, idlAccount: IdlTypeDef): number {
-  if (idlAccount.type.kind === 'enum') {
-    const variantSizes = idlAccount.type.variants.map(
-      (variant: IdlEnumVariant) => {
-        if (variant.fields === undefined) {
+export function accountSize(idl: Idl, idlAccount: IdlTypeDef) {
+  switch (idlAccount.type.kind) {
+    case 'struct': {
+      return idlAccount.type.fields
+        .map((f) => typeSize(idl, f.type))
+        .reduce((acc, size) => acc + size, 0);
+    }
+
+    case 'enum': {
+      const variantSizes = idlAccount.type.variants.map((variant) => {
+        if (!variant.fields) {
           return 0;
         }
         return variant.fields
           .map((f: IdlField | IdlType) => {
             if (!(typeof f === 'object' && 'name' in f)) {
-              throw new Error('Tuple enum variants not yet implemented.');
+              return typeSize(idl, f);
             }
             return typeSize(idl, f.type);
           })
-          .reduce((a: number, b: number) => a + b);
-      },
-    );
-    return Math.max(...variantSizes) + 1;
+          .reduce((acc, size) => acc + size, 0);
+      });
+
+      return Math.max(...variantSizes) + 1;
+    }
+
+    case 'alias': {
+      return typeSize(idl, idlAccount.type.value);
+    }
   }
-  if (idlAccount.type.fields === undefined) {
-    return 0;
-  }
-  return idlAccount.type.fields
-    .map((f) => typeSize(idl, f.type))
-    .reduce((a, b) => a + b, 0);
 }
 
 function typeSize(idl: Idl, ty: IdlType): number {
@@ -359,7 +363,7 @@ function typeSize(idl: Idl, ty: IdlType): number {
       return 32;
     default:
       if ('vec' in ty) {
-        return 4;
+        return 1;
       }
       if ('option' in ty) {
         return 1 + typeSize(idl, ty.option);
@@ -370,15 +374,15 @@ function typeSize(idl: Idl, ty: IdlType): number {
       if ('defined' in ty) {
         const filtered = idl.types?.filter((t) => t.name === ty.defined) ?? [];
         if (filtered.length !== 1) {
-          throw new Error(`Type not found: ${JSON.stringify(ty)}`);
+          throw new IdlError(`Type not found: ${JSON.stringify(ty)}`);
         }
-        const typeDef = filtered[0];
+        let typeDef = filtered[0];
 
         return accountSize(idl, typeDef);
       }
       if ('array' in ty) {
-        const arrayTy = ty.array[0];
-        const arraySize = ty.array[1];
+        let arrayTy = ty.array[0];
+        let arraySize = ty.array[1];
         return typeSize(idl, arrayTy) * arraySize;
       }
       throw new Error(`Invalid type ${JSON.stringify(ty)}`);
