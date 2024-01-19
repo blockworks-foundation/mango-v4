@@ -52,6 +52,7 @@ pub fn token_edit(
     set_fallback_oracle: bool,
     deposit_limit_opt: Option<u64>,
     zero_util_rate: Option<f32>,
+    platform_liquidation_fee: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -471,6 +472,16 @@ pub fn token_edit(
                 zero_util_rate
             );
             bank.zero_util_rate = I80F48::from_num(zero_util_rate);
+            require_group_admin = true;
+        }
+
+        if let Some(platform_liquidation_fee) = platform_liquidation_fee {
+            msg!(
+                "Platform liquidation fee old {:?}, new {:?}",
+                bank.platform_liquidation_fee,
+                platform_liquidation_fee
+            );
+            bank.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
             require_group_admin = true;
         }
     }

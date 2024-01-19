@@ -627,6 +627,10 @@ export type MangoV4 = {
         {
           "name": "zeroUtilRate",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -1028,6 +1032,12 @@ export type MangoV4 = {
         },
         {
           "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -7193,6 +7203,12 @@ export type MangoV4 = {
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7235,6 +7251,15 @@ export type MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7459,11 +7484,31 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1952
+                1920
               ]
             }
           }
@@ -11963,6 +12008,71 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -12813,6 +12923,71 @@ export type MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
@@ -14387,6 +14562,10 @@ export const IDL: MangoV4 = {
         {
           "name": "zeroUtilRate",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -14788,6 +14967,12 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
           "type": {
             "option": "f32"
           }
@@ -20953,6 +21138,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20995,6 +21186,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -21219,11 +21419,31 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1952
+                1920
               ]
             }
           }
@@ -25723,6 +25943,71 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -26573,6 +26858,71 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
