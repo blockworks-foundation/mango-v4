@@ -2632,12 +2632,13 @@ export class MangoClient {
     reduceOnly: boolean | null,
     forceClose: boolean | null,
     name: string | null,
+    oraclePriceBand: number | null,
   ): Promise<MangoSignatureStatus> {
     const openbookV2Market = group.openbookV2MarketsMapByMarketIndex.get(
       openbookV2MarketIndex,
     );
     const ix = await this.program.methods
-      .openbookV2EditMarket(reduceOnly, forceClose, name)
+      .openbookV2EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -2963,15 +2964,16 @@ export class MangoClient {
       ),
     );
 
-    const payerTokenIndex = ((): TokenIndex => {
+    const [payerTokenIndex, receiverTokenIndex] = ((): TokenIndex[] => {
       if (side == OpenbookV2Side.bid) {
-        return openbookV2Market.quoteTokenIndex;
+        return [openbookV2Market.quoteTokenIndex, openbookV2Market.baseTokenIndex];
       } else {
-        return openbookV2Market.baseTokenIndex;
+        return [openbookV2Market.baseTokenIndex, openbookV2Market.quoteTokenIndex];
       }
     })();
 
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
+    const receiverBank = group.getFirstBankByTokenIndex(receiverTokenIndex);
     const ix = await this.program.methods
       .openbookV2PlaceOrder(
         side,
@@ -3003,9 +3005,9 @@ export class MangoClient {
             ? openbookV2MarketExternal.marketQuoteVault
             : openbookV2MarketExternal.marketBaseVault,
         marketVaultSigner: openbookV2MarketExternalVaultSigner,
-        bank: payerBank.publicKey,
-        vault: payerBank.vault,
-        oracle: payerBank.oracle,
+        payerBank: payerBank.publicKey,
+        payerVault: payerBank.vault,
+        receiverBank: receiverBank.publicKey,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(
@@ -3060,6 +3062,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
+    side?: OpenbookV2Side,
     limit?: number,
   ): Promise<TransactionInstruction> {
     const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
@@ -3071,7 +3074,7 @@ export class MangoClient {
     )!;
 
     return await this.program.methods
-      .openbookV2CancelAllOrders(limit ? limit : 10)
+      .openbookV2CancelAllOrders(limit ? limit : 10, side ? side : null)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
@@ -3093,6 +3096,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
+    side?: OpenbookV2Side,
     limit?: number,
   ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransactionForGroup(group, [
@@ -3100,6 +3104,7 @@ export class MangoClient {
         group,
         mangoAccount,
         externalMarketPk,
+        side,
         limit,
       ),
     ]);
