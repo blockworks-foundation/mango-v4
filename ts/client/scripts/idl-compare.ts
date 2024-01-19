@@ -1,9 +1,5 @@
 import { Idl, IdlError } from '@coral-xyz/anchor';
-import {
-  IdlField,
-  IdlType,
-  IdlTypeDef,
-} from '@coral-xyz/anchor/dist/cjs/idl';
+import { IdlField, IdlType, IdlTypeDef } from '@coral-xyz/anchor/dist/cjs/idl';
 import fs from 'fs';
 
 const ignoredIx = ['tokenRegister', 'groupEdit', 'tokenEdit'];
