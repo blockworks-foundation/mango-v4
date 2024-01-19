@@ -3,6 +3,8 @@ import {
   OpenBookV2Client,
   BookSideAccount,
   MarketAccount,
+  baseLotsToUi,
+  priceLotsToUi,
 } from '@openbook-dex/openbook-v2';
 import { Cluster, Keypair, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -195,14 +197,18 @@ export class OpenbookV2Market {
     let acc = 0;
     let selectedOrder;
     const orderSize = size;
-    // todo-pan: implement getL2, maybe PR to openbook-client
-    // for (const order of ob.getL2(size * 2 /* TODO Fix random constant */)) {
-    //   acc += order[1];
-    //   if (acc >= orderSize) {
-    //     selectedOrder = order;
-    //     break;
-    //   }
-    // }
+
+    const openbookMarketExternal = group.getOpenbookV2ExternalMarket(
+      this.openbookMarketExternal,
+    );
+
+    for (const order of this.getL2(client, openbookMarketExternal, ob)) {
+      acc += order[1];
+      if (acc >= orderSize) {
+        selectedOrder = order;
+        break;
+      }
+    }
 
     if (!selectedOrder) {
       throw new Error(
@@ -217,9 +223,38 @@ export class OpenbookV2Market {
     }
   }
 
+  public getL2(
+    client: MangoClient,
+    marketAccount: MarketAccount,
+    bidsAccount?: BookSideAccount,
+    asksAccount?: BookSideAccount,
+  ): [number, number][] {
+    const openbookClient = new OpenBookV2Client(
+      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
+        commitment: client.connection.commitment,
+      }),
+    ); // readonly client for deserializing accounts
+    const bidNodes = bidsAccount
+      ? openbookClient.getLeafNodes(bidsAccount)
+      : [];
+    const askNodes = asksAccount
+      ? openbookClient.getLeafNodes(asksAccount)
+      : [];
+    const levels: [number, number][] = [];
+
+    for (const node of bidNodes.concat(askNodes)) {
+      const priceLots = node.key.shrn(64);
+      levels.push([
+        priceLotsToUi(marketAccount, priceLots),
+        baseLotsToUi(marketAccount, node.quantity),
+      ]);
+    }
+    return levels;
+  }
+
   public async logOb(client: MangoClient, group: Group): Promise<string> {
     // todo-pan
-    let res = ``;
+    const res = ``;
     // res += `  ${this.name} OrderBook`;
     // let orders = await this?.loadAsks(client, group);
     // for (const order of orders!.items(true)) {
