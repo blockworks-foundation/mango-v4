@@ -128,7 +128,7 @@ pub fn token_register(
         zero_util_rate: I80F48::from_num(zero_util_rate),
         platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
         collected_liquidation_fees: I80F48::ZERO,
-        reserved: [0; 1920],
+        reserved: [0; 1912],
     };
 
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;

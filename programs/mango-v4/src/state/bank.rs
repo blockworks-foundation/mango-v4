@@ -222,7 +222,7 @@ pub struct Bank {
     pub collected_liquidation_fees: I80F48,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1920],
+    pub reserved: [u8; 1912],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -261,7 +261,7 @@ const_assert_eq!(
         + 32
         + 8
         + 16 * 3
-        + 1920
+        + 1912
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -369,7 +369,7 @@ impl Bank {
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
-            reserved: [0; 1920],
+            reserved: [0; 1912],
         }
     }
 

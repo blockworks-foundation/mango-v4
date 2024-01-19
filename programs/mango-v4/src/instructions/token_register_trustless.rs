@@ -108,7 +108,7 @@ pub fn token_register_trustless(
         deposit_limit: 0,
         zero_util_rate: I80F48::ZERO,
         collected_liquidation_fees: I80F48::ZERO,
-        reserved: [0; 1920],
+        reserved: [0; 1912],
     };
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
