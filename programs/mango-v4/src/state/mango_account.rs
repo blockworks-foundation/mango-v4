@@ -2545,7 +2545,9 @@ mod tests {
         account
             .perp_open_orders
             .resize(header.perp_oo_count(), PerpOpenOrder::default());
-        account.openbook_v2.resize(header.openbook_v2_count(), OpenbookV2Orders::default());
+        account
+            .openbook_v2
+            .resize(header.openbook_v2_count(), OpenbookV2Orders::default());
         let mut bytes = AnchorSerialize::try_to_vec(&account).unwrap();
 
         // The MangoAccount struct is missing some dynamic fields, add space for them
