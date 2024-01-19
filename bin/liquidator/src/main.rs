@@ -93,6 +93,9 @@ struct Cli {
     #[clap(short, long, env)]
     rpc_url: String,
 
+    #[clap(long, env, value_delimiter = ';')]
+    override_send_transaction_url: Option<Vec<String>>,
+
     #[clap(long, env)]
     liqor_mango_account: Pubkey,
 
@@ -207,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
         .cluster(cluster.clone())
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
-        .timeout(Some(rpc_timeout))
+        .timeout(rpc_timeout)
         .jupiter_v4_url(cli.jupiter_v4_url)
         .jupiter_v6_url(cli.jupiter_v6_url)
         .jupiter_token(cli.jupiter_token)
@@ -217,6 +220,7 @@ async fn main() -> anyhow::Result<()> {
             // Liquidation and tcs triggers set their own budgets, this is a default for other tx
             compute_budget_per_instruction: Some(250_000),
         })
+        .override_send_transaction_urls(cli.override_send_transaction_url)
         .build()
         .unwrap();
 
@@ -225,7 +229,7 @@ async fn main() -> anyhow::Result<()> {
     // Reading accounts from chain_data
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
+        rpc: client.new_rpc_async(),
     });
 
     let mango_account = account_fetcher
@@ -238,7 +242,7 @@ async fn main() -> anyhow::Result<()> {
         warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
     }
 
-    let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens

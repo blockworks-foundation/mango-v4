@@ -133,16 +133,16 @@ enum Command {
 impl Rpc {
     fn client(&self, override_fee_payer: Option<&str>) -> anyhow::Result<Client> {
         let fee_payer = keypair_from_cli(override_fee_payer.unwrap_or(&self.fee_payer));
-        Ok(Client::new(
-            anchor_client::Cluster::from_str(&self.url)?,
-            solana_sdk::commitment_config::CommitmentConfig::confirmed(),
-            Arc::new(fee_payer),
-            None,
-            TransactionBuilderConfig {
+        Ok(Client::builder()
+            .cluster(anchor_client::Cluster::from_str(&self.url)?)
+            .commitment(solana_sdk::commitment_config::CommitmentConfig::confirmed())
+            .fee_payer(Some(Arc::new(fee_payer)))
+            .transaction_builder_config(TransactionBuilderConfig {
                 prioritization_micro_lamports: Some(5),
                 compute_budget_per_instruction: Some(250_000),
-            },
-        ))
+            })
+            .build()
+            .unwrap())
     }
 }
 
