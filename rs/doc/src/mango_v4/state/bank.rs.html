@@ -1749,6 +1749,25 @@
 <a href="#1749" id="1749">1749</a>
 <a href="#1750" id="1750">1750</a>
 <a href="#1751" id="1751">1751</a>
+<a href="#1752" id="1752">1752</a>
+<a href="#1753" id="1753">1753</a>
+<a href="#1754" id="1754">1754</a>
+<a href="#1755" id="1755">1755</a>
+<a href="#1756" id="1756">1756</a>
+<a href="#1757" id="1757">1757</a>
+<a href="#1758" id="1758">1758</a>
+<a href="#1759" id="1759">1759</a>
+<a href="#1760" id="1760">1760</a>
+<a href="#1761" id="1761">1761</a>
+<a href="#1762" id="1762">1762</a>
+<a href="#1763" id="1763">1763</a>
+<a href="#1764" id="1764">1764</a>
+<a href="#1765" id="1765">1765</a>
+<a href="#1766" id="1766">1766</a>
+<a href="#1767" id="1767">1767</a>
+<a href="#1768" id="1768">1768</a>
+<a href="#1769" id="1769">1769</a>
+<a href="#1770" id="1770">1770</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1830,8 +1849,12 @@
     /// which is &gt;=1.
     </span><span class="kw">pub </span>max_rate: I80F48,
 
-    <span class="comment">// TODO: add ix/logic to regular send this to DAO
+    <span class="doccomment">/// Fees collected over the lifetime of the bank
+    ///
+    /// See fees_withdrawn for how much of the fees was withdrawn.
+    /// See collected_liquidation_fees for the (included) subtotal for liquidation related fees.
     </span><span class="kw">pub </span>collected_fees_native: I80F48,
+
     <span class="kw">pub </span>loan_origination_fee_rate: I80F48,
     <span class="kw">pub </span>loan_fee_rate: I80F48,
 
@@ -1843,9 +1866,13 @@
     <span class="kw">pub </span>maint_liab_weight: I80F48,
     <span class="kw">pub </span>init_liab_weight: I80F48,
 
-    <span class="comment">// a fraction of the price, like 0.05 for a 5% fee during liquidation
-    //
-    // Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    <span class="doccomment">/// Liquidation fee that goes to the liqor.
+    ///
+    /// Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    ///
+    /// A fraction of the price, like 0.05 for a 5% fee during liquidation.
+    ///
+    /// See also platform_liquidation_fee.
     </span><span class="kw">pub </span>liquidation_fee: I80F48,
 
     <span class="comment">// Collection of all fractions-of-native-tokens that got rounded away
@@ -1952,8 +1979,16 @@
     /// See util0, rate0, util1, rate1, max_rate
     </span><span class="kw">pub </span>zero_util_rate: I80F48,
 
+    <span class="doccomment">/// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    </span><span class="kw">pub </span>platform_liquidation_fee: I80F48,
+
+    <span class="doccomment">/// Fees that were collected during liquidation (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    </span><span class="kw">pub </span>collected_liquidation_fees: I80F48,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1952</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1920</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -1990,8 +2025,8 @@
         </span>+ <span class="number">16 </span>* <span class="number">3
         </span>+ <span class="number">32
         </span>+ <span class="number">8
-        </span>+ <span class="number">16
-        </span>+ <span class="number">1952
+        </span>+ <span class="number">16 </span>* <span class="number">3
+        </span>+ <span class="number">1920
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -2034,6 +2069,7 @@
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
+            collected_liquidation_fees: I80F48::ZERO,
             fees_withdrawn: <span class="number">0</span>,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: <span class="number">0</span>,
@@ -2096,7 +2132,8 @@
             fallback_oracle: existing_bank.oracle,
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
-            reserved: [<span class="number">0</span>; <span class="number">1952</span>],
+            platform_liquidation_fee: existing_bank.platform_liquidation_fee,
+            reserved: [<span class="number">0</span>; <span class="number">1920</span>],
         }
     }
 
@@ -2128,6 +2165,7 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_asset_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_liab_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.zero_util_rate, I80F48::ZERO);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.platform_liquidation_fee, <span class="number">0.0</span>);
         <span class="prelude-val">Ok</span>(())
     }
 

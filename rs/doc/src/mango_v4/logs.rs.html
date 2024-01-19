@@ -731,6 +731,39 @@
 <a href="#731" id="731">731</a>
 <a href="#732" id="732">732</a>
 <a href="#733" id="733">733</a>
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -1078,6 +1111,22 @@
 }
 
 <span class="attr">#[event]
+</span><span class="kw">pub struct </span>TokenLiqWithTokenLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>liqee: Pubkey,
+    <span class="kw">pub </span>liqor: Pubkey,
+    <span class="kw">pub </span>asset_token_index: u16,
+    <span class="kw">pub </span>liab_token_index: u16,
+    <span class="kw">pub </span>asset_transfer_from_liqee: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_transfer_to_liqor: i128,   <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_liquidation_fee: i128,     <span class="comment">// I80F48
+    </span><span class="kw">pub </span>liab_transfer: i128,             <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_price: i128,               <span class="comment">// I80F48
+    </span><span class="kw">pub </span>liab_price: i128,                <span class="comment">// I80F48
+    </span><span class="kw">pub </span>bankruptcy: bool,
+}
+
+<span class="attr">#[event]
 </span><span class="kw">pub struct </span>Serum3OpenOrdersBalanceLog {
     <span class="kw">pub </span>mango_group: Pubkey,
     <span class="kw">pub </span>mango_account: Pubkey,
@@ -1326,6 +1375,23 @@
     <span class="kw">pub </span>liab_price: i128,
     <span class="kw">pub </span>fee_factor: i128,
 }
+
+<span class="attr">#[event]
+</span><span class="kw">pub struct </span>TokenForceCloseBorrowsWithTokenLogV2 {
+    <span class="kw">pub </span>mango_group: Pubkey,
+    <span class="kw">pub </span>liqor: Pubkey,
+    <span class="kw">pub </span>liqee: Pubkey,
+    <span class="kw">pub </span>asset_token_index: u16,
+    <span class="kw">pub </span>liab_token_index: u16,
+    <span class="kw">pub </span>asset_transfer_from_liqee: i128, <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_transfer_to_liqor: i128,   <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_liquidation_fee: i128,     <span class="comment">// I80F48
+    </span><span class="kw">pub </span>liab_transfer: i128,             <span class="comment">// I80F48
+    </span><span class="kw">pub </span>asset_price: i128,               <span class="comment">// I80F48
+    </span><span class="kw">pub </span>liab_price: i128,                <span class="comment">// I80F48
+    </span><span class="doccomment">/// including liqor and platform liquidation fees
+    </span><span class="kw">pub </span>fee_factor: i128, <span class="comment">// I80F48
+</span>}
 
 <span class="attr">#[event]
 </span><span class="kw">pub struct </span>TokenConditionalSwapCreateLog {
