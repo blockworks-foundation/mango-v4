@@ -5,9 +5,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
-use mango_v4_client::{
-    chain_data, prettify_solana_client_error, health_cache, MangoClient, PreparedInstructions, TransactionBuilder,
-};
+use mango_v4_client::{chain_data, MangoClient, PreparedInstructions, TransactionBuilder};
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Signature;

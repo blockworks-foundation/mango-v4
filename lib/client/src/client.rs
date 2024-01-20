@@ -458,7 +458,7 @@ impl MangoClient {
         let fallback_contexts = self
             .context
             .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
+                &self.client.config.fallback_oracle_config,
                 &*self.account_fetcher,
             )
             .await?;
@@ -481,7 +481,7 @@ impl MangoClient {
         let fallback_contexts = self
             .context
             .derive_fallback_oracle_keys(
-                &self.client.fallback_oracle_config,
+                &self.client.config.fallback_oracle_config,
                 &*self.account_fetcher,
             )
             .await?;
@@ -502,7 +502,7 @@ impl MangoClient {
     ) -> anyhow::Result<HealthCache> {
         health_cache::new(
             &self.context,
-            &self.client.fallback_oracle_config,
+            &self.client.config.fallback_oracle_config,
             &*self.account_fetcher,
             mango_account,
         )

@@ -104,7 +104,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .cluster(cluster)
                 .commitment(commitment)
                 .fee_payer(Some(owner.clone()))
-                .timeout(Some(Duration::from_secs(cli.timeout)))
+                .timeout(Duration::from_secs(cli.timeout))
                 .transaction_builder_config(TransactionBuilderConfig {
                     prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                         .then_some(cli.prioritization_micro_lamports),
