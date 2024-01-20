@@ -357,7 +357,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let group_context = Arc::new(
         MangoGroupContext::new_from_rpc(
-            &client.rpc_async(),
+            client.rpc_async(),
             Pubkey::from_str(&config.mango_group).unwrap(),
         )
         .await?,

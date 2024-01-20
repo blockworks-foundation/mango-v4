@@ -12,8 +12,9 @@ use anchor_spl::associated_token::get_associated_token_address;
 use anchor_spl::token::Token;
 
 use fixed::types::I80F48;
-use futures::{stream, StreamExt, TryStreamExt};
+use futures::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
+use tracing::*;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
@@ -32,6 +33,7 @@ use crate::util::PreparedInstructions;
 use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
+use solana_client::rpc_client::SerializableTransaction;
 use solana_client::rpc_config::RpcSendTransactionConfig;
 use solana_client::rpc_response::RpcSimulateTransactionResult;
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
@@ -52,7 +54,8 @@ pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
 #[derive(Clone, Debug, Builder)]
-pub struct Client {
+#[builder(name = "ClientBuilder", build_fn(name = "build_config"))]
+pub struct ClientConfig {
     /// RPC url
     ///
     /// Defaults to Cluster::Mainnet, using the public crowded mainnet-beta rpc endpoint.
@@ -71,8 +74,8 @@ pub struct Client {
     ///
     /// This timeout applies to rpc requests. Note that the timeout for transaction
     /// confirmation is configured separately in rpc_confirm_transaction_config.
-    #[builder(default = "Some(Duration::from_secs(60))")]
-    pub timeout: Option<Duration>,
+    #[builder(default = "Duration::from_secs(60)")]
+    pub timeout: Duration,
 
     #[builder(default)]
     pub transaction_builder_config: TransactionBuilderConfig,
@@ -97,9 +100,19 @@ pub struct Client {
     /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
     #[builder(default = "FallbackOracleConfig::Dynamic")]
     pub fallback_oracle_config: FallbackOracleConfig,
+
+    /// If set, don't use `cluster` for sending transactions and send to all
+    /// addresses configured here instead.
+    #[builder(default = "None")]
+    pub override_send_transaction_urls: Option<Vec<String>>,
 }
 
 impl ClientBuilder {
+    pub fn build(&self) -> Result<Client, ClientBuilderError> {
+        let config = self.build_config()?;
+        Ok(Client::new_from_config(config))
+    }
+
     pub fn default_rpc_send_transaction_config() -> RpcSendTransactionConfig {
         RpcSendTransactionConfig {
             preflight_commitment: Some(CommitmentLevel::Processed),
@@ -113,6 +126,11 @@ impl ClientBuilder {
             ..Default::default()
         }
     }
+}
+pub struct Client {
+    config: ClientConfig,
+    rpc_async: RpcClientAsync,
+    send_transaction_rpc_asyncs: Vec<RpcClientAsync>,
 }
 
 impl Client {
@@ -132,19 +150,52 @@ impl Client {
             .cluster(cluster)
             .commitment(commitment)
             .fee_payer(Some(fee_payer))
-            .timeout(timeout)
+            .timeout(timeout.unwrap_or(Duration::from_secs(30)))
             .transaction_builder_config(transaction_builder_config)
             .build()
             .unwrap()
     }
 
-    pub fn rpc_async(&self) -> RpcClientAsync {
-        let url = self.cluster.url().to_string();
-        if let Some(timeout) = self.timeout.as_ref() {
-            RpcClientAsync::new_with_timeout_and_commitment(url, *timeout, self.commitment)
-        } else {
-            RpcClientAsync::new_with_commitment(url, self.commitment)
+    pub fn new_from_config(config: ClientConfig) -> Self {
+        Self {
+            rpc_async: RpcClientAsync::new_with_timeout_and_commitment(
+                config.cluster.url().to_string(),
+                config.timeout,
+                config.commitment,
+            ),
+            send_transaction_rpc_asyncs: config
+                .override_send_transaction_urls
+                .clone()
+                .unwrap_or_else(|| vec![config.cluster.url().to_string()])
+                .into_iter()
+                .map(|url| {
+                    RpcClientAsync::new_with_timeout_and_commitment(
+                        url,
+                        config.timeout,
+                        config.commitment,
+                    )
+                })
+                .collect_vec(),
+            config,
         }
+    }
+
+    pub fn config(&self) -> &ClientConfig {
+        &self.config
+    }
+
+    pub fn rpc_async(&self) -> &RpcClientAsync {
+        &self.rpc_async
+    }
+
+    /// Sometimes clients don't want to borrow the Client instance and just pass on RpcClientAsync
+    pub fn new_rpc_async(&self) -> RpcClientAsync {
+        let url = self.config.cluster.url().to_string();
+        RpcClientAsync::new_with_timeout_and_commitment(
+            url,
+            self.config.timeout,
+            self.config.commitment,
+        )
     }
 
     // TODO: this function here is awkward, since it (intentionally) doesn't use MangoClient::account_fetcher
@@ -152,14 +203,47 @@ impl Client {
         &self,
         address: &Pubkey,
     ) -> anyhow::Result<T> {
-        fetch_anchor_account(&self.rpc_async(), address).await
+        fetch_anchor_account(self.rpc_async(), address).await
     }
 
     pub fn fee_payer(&self) -> Arc<Keypair> {
-        self.fee_payer
+        self.config
+            .fee_payer
             .as_ref()
             .expect("fee payer must be set")
             .clone()
+    }
+
+    /// Sends a transaction via the configured cluster (or all override_send_transaction_urls).
+    ///
+    /// Returns the tx signature if at least one send returned ok.
+    /// Note that a success does not mean that the transaction is confirmed.
+    pub async fn send_transaction(
+        &self,
+        tx: &impl SerializableTransaction,
+    ) -> anyhow::Result<Signature> {
+        let futures = self.send_transaction_rpc_asyncs.iter().map(|rpc| {
+            rpc.send_transaction_with_config(tx, self.config.rpc_send_transaction_config)
+                .map_err(prettify_solana_client_error)
+        });
+        let mut results = futures::future::join_all(futures).await;
+
+        // If all fail, return the first
+        let successful_sends = results.iter().filter(|r| r.is_ok()).count();
+        if successful_sends == 0 {
+            results.remove(0)?;
+        }
+
+        // Otherwise just log errors
+        for (result, rpc) in results.iter().zip(self.send_transaction_rpc_asyncs.iter()) {
+            if let Err(err) = result {
+                info!(
+                    rpc = rpc.url(),
+                    successful_sends, "one of the transaction sends failed: {err:?}",
+                )
+            }
+        }
+        return Ok(*tx.get_signature());
     }
 }
 
@@ -198,7 +282,7 @@ impl MangoClient {
         group: Pubkey,
         owner: &Keypair,
     ) -> anyhow::Result<Vec<(Pubkey, MangoAccountValue)>> {
-        fetch_mango_accounts(&client.rpc_async(), mango_v4::ID, group, owner.pubkey()).await
+        fetch_mango_accounts(client.rpc_async(), mango_v4::ID, group, owner.pubkey()).await
     }
 
     pub async fn find_or_create_account(
@@ -292,7 +376,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: payer.pubkey(),
             signers: vec![owner, payer],
-            config: client.transaction_builder_config,
+            config: client.config.transaction_builder_config,
         }
         .send_and_confirm(&client)
         .await?;
@@ -306,7 +390,7 @@ impl MangoClient {
         account: Pubkey,
         owner: Arc<Keypair>,
     ) -> anyhow::Result<Self> {
-        let rpc = client.rpc_async();
+        let rpc = client.new_rpc_async();
         let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
             rpc,
         })));
@@ -1747,7 +1831,7 @@ impl MangoClient {
             address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: fee_payer.pubkey(),
             signers: vec![self.owner.clone(), fee_payer],
-            config: self.client.transaction_builder_config,
+            config: self.client.config.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
@@ -1763,7 +1847,7 @@ impl MangoClient {
             address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: self.client.transaction_builder_config,
+            config: self.client.config.transaction_builder_config,
         }
         .send_and_confirm(&self.client)
         .await
@@ -1779,7 +1863,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: self.client.transaction_builder_config,
+            config: self.client.config.transaction_builder_config,
         }
         .simulate(&self.client)
         .await
@@ -1798,7 +1882,7 @@ impl MangoClient {
                 match MangoGroupContext::new_from_rpc(&rpc_async, mango_client.group()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        tracing::warn!("could not fetch context to check for changes: {e:?}");
+                        warn!("could not fetch context to check for changes: {e:?}");
                         continue;
                     }
                 };
@@ -1860,9 +1944,9 @@ impl Default for FallbackOracleConfig {
 
 #[derive(Copy, Clone, Debug, Default)]
 pub struct TransactionBuilderConfig {
-    // adds a SetComputeUnitPrice instruction in front if none exists
+    /// adds a SetComputeUnitPrice instruction in front if none exists
     pub prioritization_micro_lamports: Option<u64>,
-    // adds a SetComputeUnitBudget instruction if none exists
+    /// adds a SetComputeUnitBudget instruction if none exists
     pub compute_budget_per_instruction: Option<u32>,
 }
 
@@ -1955,9 +2039,7 @@ impl TransactionBuilder {
     pub async fn send(&self, client: &Client) -> anyhow::Result<Signature> {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
-        rpc.send_transaction_with_config(&tx, client.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error)
+        client.send_transaction(&tx).await
     }
 
     pub async fn simulate(&self, client: &Client) -> anyhow::Result<SimulateTransactionResponse> {
@@ -1970,15 +2052,12 @@ impl TransactionBuilder {
         let rpc = client.rpc_async();
         let tx = self.transaction(&rpc).await?;
         let recent_blockhash = tx.message.recent_blockhash();
-        let signature = rpc
-            .send_transaction_with_config(&tx, client.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error)?;
+        let signature = client.send_transaction(&tx).await?;
         wait_for_transaction_confirmation(
             &rpc,
             &signature,
             recent_blockhash,
-            &client.rpc_confirm_transaction_config,
+            &client.config.rpc_confirm_transaction_config,
         )
         .await?;
         Ok(signature)

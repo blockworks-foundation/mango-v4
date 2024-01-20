@@ -1012,6 +1012,7 @@ pub struct TokenRegisterInstruction {
     pub maint_liab_weight: f32,
     pub init_liab_weight: f32,
     pub liquidation_fee: f32,
+    pub platform_liquidation_fee: f32,
 
     pub min_vault_to_deposits_ratio: f64,
     pub net_borrow_limit_per_window_quote: i64,
@@ -1075,6 +1076,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             group_insurance_fund: true,
             deposit_limit: 0,
             zero_util_rate: 0.0,
+            platform_liquidation_fee: self.platform_liquidation_fee,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1321,6 +1323,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         set_fallback_oracle: false,
         deposit_limit_opt: None,
         zero_util_rate_opt: None,
+        platform_liquidation_fee_opt: None,
     }
 }
 

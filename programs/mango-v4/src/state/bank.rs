@@ -79,8 +79,12 @@ pub struct Bank {
     /// which is >=1.
     pub max_rate: I80F48,
 
-    // TODO: add ix/logic to regular send this to DAO
+    /// Fees collected over the lifetime of the bank
+    ///
+    /// See fees_withdrawn for how much of the fees was withdrawn.
+    /// See collected_liquidation_fees for the (included) subtotal for liquidation related fees.
     pub collected_fees_native: I80F48,
+
     pub loan_origination_fee_rate: I80F48,
     pub loan_fee_rate: I80F48,
 
@@ -92,9 +96,13 @@ pub struct Bank {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
-    // a fraction of the price, like 0.05 for a 5% fee during liquidation
-    //
-    // Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    /// Liquidation fee that goes to the liqor.
+    ///
+    /// Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    ///
+    /// A fraction of the price, like 0.05 for a 5% fee during liquidation.
+    ///
+    /// See also platform_liquidation_fee.
     pub liquidation_fee: I80F48,
 
     // Collection of all fractions-of-native-tokens that got rounded away
@@ -201,8 +209,16 @@ pub struct Bank {
     /// See util0, rate0, util1, rate1, max_rate
     pub zero_util_rate: I80F48,
 
+    /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    pub platform_liquidation_fee: I80F48,
+
+    /// Fees that were collected during liquidation (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    pub collected_liquidation_fees: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1952],
+    pub reserved: [u8; 1920],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -239,8 +255,8 @@ const_assert_eq!(
         + 16 * 3
         + 32
         + 8
-        + 16
-        + 1952
+        + 16 * 3
+        + 1920
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -283,6 +299,7 @@ impl Bank {
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
+            collected_liquidation_fees: I80F48::ZERO,
             fees_withdrawn: 0,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
@@ -345,7 +362,8 @@ impl Bank {
             fallback_oracle: existing_bank.oracle,
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
-            reserved: [0; 1952],
+            platform_liquidation_fee: existing_bank.platform_liquidation_fee,
+            reserved: [0; 1920],
         }
     }
 
@@ -377,6 +395,7 @@ impl Bank {
         require_gte!(self.maint_weight_shift_asset_target, 0.0);
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
         require_gte!(self.zero_util_rate, I80F48::ZERO);
+        require_gte!(self.platform_liquidation_fee, 0.0);
         Ok(())
     }
 

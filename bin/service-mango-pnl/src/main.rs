@@ -272,7 +272,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let group_context = Arc::new(
         MangoGroupContext::new_from_rpc(
-            &client.rpc_async(),
+            client.rpc_async(),
             Pubkey::from_str(&config.pnl.mango_group).unwrap(),
         )
         .await?,
@@ -280,7 +280,7 @@ async fn main() -> anyhow::Result<()> {
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
+        rpc: client.new_rpc_async(),
     });
 
     let metrics_tx = metrics::start(config.metrics, "pnl".into());

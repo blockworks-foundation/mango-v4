@@ -459,6 +459,7 @@ export class MangoClient {
         params.groupInsuranceFund,
         params.depositLimit,
         params.zeroUtilRate,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -544,6 +545,7 @@ export class MangoClient {
         params.setFallbackOracle ?? false,
         params.depositLimit,
         params.zeroUtilRate,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,

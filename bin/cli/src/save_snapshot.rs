@@ -23,10 +23,10 @@ pub async fn save_snapshot(
     }
     fs::create_dir_all(out_path).unwrap();
 
-    let rpc_url = client.cluster.url().to_string();
-    let ws_url = client.cluster.ws_url().to_string();
+    let rpc_url = client.config().cluster.url().to_string();
+    let ws_url = client.config().cluster.ws_url().to_string();
 
-    let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let oracles_and_vaults = group_context
         .tokens

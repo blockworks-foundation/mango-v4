@@ -194,15 +194,15 @@ impl<'a> JupiterV6<'a> {
                 ),
             ),
         ];
-        let client = &self.mango_client.client;
-        if !client.jupiter_token.is_empty() {
-            query_args.push(("token", client.jupiter_token.clone()));
+        let config = self.mango_client.client.config();
+        if !config.jupiter_token.is_empty() {
+            query_args.push(("token", config.jupiter_token.clone()));
         }
 
         let response = self
             .mango_client
             .http_client
-            .get(format!("{}/quote", client.jupiter_v6_url))
+            .get(format!("{}/quote", config.jupiter_v6_url))
             .query(&query_args)
             .send()
             .await
@@ -269,15 +269,15 @@ impl<'a> JupiterV6<'a> {
             .context("building health accounts")?;
 
         let mut query_args = vec![];
-        let client = &self.mango_client.client;
-        if !client.jupiter_token.is_empty() {
-            query_args.push(("token", client.jupiter_token.clone()));
+        let config = self.mango_client.client.config();
+        if !config.jupiter_token.is_empty() {
+            query_args.push(("token", config.jupiter_token.clone()));
         }
 
         let swap_response = self
             .mango_client
             .http_client
-            .post(format!("{}/swap-instructions", client.jupiter_v6_url))
+            .post(format!("{}/swap-instructions", config.jupiter_v6_url))
             .query(&query_args)
             .json(&SwapRequest {
                 user_public_key: owner.to_string(),
@@ -388,7 +388,7 @@ impl<'a> JupiterV6<'a> {
             address_lookup_tables,
             payer,
             signers: vec![self.mango_client.owner.clone()],
-            config: self.mango_client.client.transaction_builder_config,
+            config: self.mango_client.client.config().transaction_builder_config,
         })
     }
 
