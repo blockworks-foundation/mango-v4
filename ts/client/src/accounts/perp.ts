@@ -430,7 +430,7 @@ export class PerpMarket {
   /**
    *
    * Returns instantaneous funding rate for the day. How is it actually applied - funding is
-   * continously applied on every interaction to a perp position. The rate is further multiplied
+   * continuously applied on every interaction to a perp position. The rate is further multiplied
    * by the time elapsed since it was last applied (capped to max. 1hr).
    *
    * @param bids
