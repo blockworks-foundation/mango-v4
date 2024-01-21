@@ -731,7 +731,7 @@ impl Bank {
         })
     }
 
-    // withdraw the loan origination fee for a borrow that happenend earlier
+    // withdraw the loan origination fee for a borrow that happened earlier
     pub fn withdraw_loan_origination_fee(
         &mut self,
         position: &mut TokenPosition,
@@ -1051,7 +1051,7 @@ impl Bank {
         )
     }
 
-    /// calcualtor function that can be used to compute an interest
+    /// calculator function that can be used to compute an interest
     /// rate based on the given parameters
     #[inline(always)]
     pub fn interest_rate_curve_calculator(
