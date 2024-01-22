@@ -573,7 +573,7 @@ export class MangoAccount {
       existingPositionHealthContrib,
     );
     let maxBorrowNative = initHealthWithoutExistingPosition
-      .div(tokenBank.initLiabWeight)
+      .div(tokenBank.scaledInitLiabWeight(tokenBank.price))
       .div(tokenBank.price);
 
     // Cap maxBorrow to maintain minVaultToDepositsRatio on the bank
