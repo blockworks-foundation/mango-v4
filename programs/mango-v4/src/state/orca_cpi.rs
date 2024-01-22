@@ -23,7 +23,7 @@ pub const ORCA_WHIRLPOOL_LEN: usize = 653;
 pub const ORCA_WHIRLPOOL_DISCRIMINATOR: [u8; 8] = [63, 149, 209, 12, 225, 128, 99, 9];
 
 pub const RAYDIUM_POOL_LEN: usize = 1544;
-pub const RAYDIUM_POOL_DISCRIMINATOR: [u8; 8] = [63, 149, 209, 12, 225, 128, 99, 9]; // TODO
+pub const RAYDIUM_POOL_DISCRIMINATOR: [u8; 8] = [247, 237, 227, 245, 215, 195, 222, 70];
 
 pub struct CLMMPoolState {
     // Q64.64
@@ -128,11 +128,10 @@ pub fn load_raydium_pool_state(acc_info: &impl KeyedAccountReader) -> Result<CLM
         MangoError::InvalidCLMMOracle
     );
 
-    // TODO
-    let price_bytes: &[u8; 16] = &data[65..81].try_into().unwrap();
+    let price_bytes: &[u8; 16] = &data[253..269].try_into().unwrap();
     let sqrt_price = u128::from_le_bytes(*price_bytes);
-    let a: &[u8; 32] = &(&data[101..133]).try_into().unwrap();
-    let b: &[u8; 32] = &(&data[181..213]).try_into().unwrap();
+    let a: &[u8; 32] = &(&data[73..105]).try_into().unwrap();
+    let b: &[u8; 32] = &(&data[105..137]).try_into().unwrap();
     let mint_a = Pubkey::from(*a);
     let mint_b = Pubkey::from(*b);
 
