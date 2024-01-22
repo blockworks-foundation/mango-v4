@@ -178,6 +178,8 @@ const_assert_eq!(size_of::<StubOracle>() % 8, 0);
 
 pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<OracleType> {
     let data = acc_info.data();
+    msg!("owner: {:?}", acc_info.owner());
+    msg!("ray: {:?}", raydium_mainnet::ID);
 
     if u32::from_le_bytes(data[0..4].try_into().unwrap()) == pyth_sdk_solana::state::MAGIC {
         return Ok(OracleType::Pyth);
@@ -524,7 +526,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_clmm_price() -> Result<()> {
+    pub fn test_orca_price() -> Result<()> {
         // add ability to find fixtures
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/test");
@@ -582,6 +584,67 @@ mod tests {
         // 63.006792786538313 * 1.00000758274099 (but in native/native)
         assert!(orca.price == I80F48::from_num(0.06300727055072872));
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_raydium_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![
+            (
+                "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+                OracleType::RaydiumCLMM,
+                raydium_mainnet::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+                OracleType::Pyth,
+                Pubkey::default(),
+                6,
+            ),
+        ];
+
+        let clmm_file = format!("resources/test/{}.bin", fixtures[0].0);
+        let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+        let data = RefCell::new(&mut clmm_data[..]);
+        let ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[0].0).unwrap(),
+            owner: &fixtures[0].2,
+            data: data.borrow(),
+        };
+
+        let pyth_file = format!("resources/test/{}.bin", fixtures[1].0);
+        let mut pyth_data = read_file(find_file(&pyth_file).unwrap());
+        let pyth_data_cell = RefCell::new(&mut pyth_data[..]);
+        let usdc_ai = &AccountInfoRef {
+            key: &Pubkey::from_str(fixtures[1].0).unwrap(),
+            owner: &fixtures[1].2,
+            data: pyth_data_cell.borrow(),
+        };
+        let base_decimals = fixtures[0].3;
+        let usdc_decimals = fixtures[1].3;
+
+        let usdc_ais = OracleAccountInfos {
+            oracle: usdc_ai,
+            fallback_opt: None,
+            usd_opt: None,
+            sol_opt: None,
+        };
+        let raydium_ais = OracleAccountInfos {
+            oracle: ai,
+            fallback_opt: None,
+            usd_opt: Some(usdc_ai),
+            sol_opt: None,
+        };
+        let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
+        let raydium = oracle_state_unchecked(&raydium_ais, base_decimals).unwrap();
+        assert!(usdc.price == I80F48::from_num(1.00000758274099));
+        // 83.551469620431 * 1.00000758274099 (but in native/native)
+        assert!(raydium.price == I80F48::from_num(0.083552103169584));
         Ok(())
     }
 
