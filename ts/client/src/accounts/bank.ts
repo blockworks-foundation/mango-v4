@@ -4,7 +4,6 @@ import { PublicKey } from '@solana/web3.js';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
-import { USDC_MINT } from '../constants';
 
 export type TokenIndex = number & As<'token-index'>;
 
@@ -386,7 +385,9 @@ export class Bank implements BankForHealth {
   }
 
   scaledInitAssetWeight(price: I80F48): I80F48 {
-    const depositsQuote = this.nativeDeposits().mul(price);
+    const depositsQuote = this.nativeDeposits()
+      .add(I80F48.fromU64(this.potentialSerumTokens))
+      .mul(price);
     if (
       this.depositWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
