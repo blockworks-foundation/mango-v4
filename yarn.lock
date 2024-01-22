@@ -30,18 +30,18 @@
   dependencies:
     regenerator-runtime "^0.14.0"
 
-"@blockworks-foundation/mango-v4-settings@^0.2.16":
-  version "0.2.16"
-  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mango-v4-settings/-/mango-v4-settings-0.2.16.tgz#63f03c13d1677461ea42d3b1e9171042830c6cdc"
-  integrity sha512-9GCRZkVqTQsEUkqx/488pmSWM8I74Ght5AEzMPsuS5XlRGWIDjytWoBE0Y9wFVPrnRw2THTj0ZQft+vDwCYDCA==
+"@blockworks-foundation/mango-v4-settings@0.4.10":
+  version "0.4.10"
+  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mango-v4-settings/-/mango-v4-settings-0.4.10.tgz#7a30db53c81abea56c2dd83e928259246e3b4e7d"
+  integrity sha512-J4RhfhcNmBn0CeqjN4mlaou+vPW9NGpWlbkx1+ZczsJw6r5tIkQ82MDqKMKvyIgn457krRVdJ9+gLmHEln4QfA==
   dependencies:
     bn.js "^5.2.1"
     eslint-config-prettier "^9.0.0"
 
-"@blockworks-foundation/mangolana@0.0.13":
-  version "0.0.13"
-  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.0.13.tgz#82a9b0846e69068de6216d20fcdcd60375d14e1e"
-  integrity sha512-/QPMHjtPpAYaDPbQVLolp5Lq4cCd77b8gBumws97L3J0DfvsKpZVYeAA0fNmSX6qq+pKqCgCywDjJeYhJ01PsQ==
+"@blockworks-foundation/mangolana@0.0.14":
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.0.14.tgz#f2a0e164f2cbe6e0a0db4fc10267e81ef5d2f7ec"
+  integrity sha512-KuA2+GdeKoHCBmx2HZnVb8IPomUP1w0ZiwQ1F10SLIypYfrylvPa+HSK2ak/+nzZCb8erS9Oub45UPV7cOh5ng==
   dependencies:
     "@solana/web3.js" "^1.88.0"
     bs58 "^5.0.0"
