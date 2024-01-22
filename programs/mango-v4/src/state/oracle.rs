@@ -3,7 +3,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
-use fixed::types::{I80F48, U64F64};
+use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
@@ -14,7 +14,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::load_whirlpool_state;
 
-use super::orca_mainnet_whirlpool;
+use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -117,6 +117,7 @@ pub enum OracleType {
     SwitchboardV1,
     SwitchboardV2,
     OrcaCLMM,
+    RaydiumCLMM,
 }
 
 pub struct OracleState {
@@ -195,6 +196,8 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         return Ok(OracleType::SwitchboardV1);
     } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
         return Ok(OracleType::OrcaCLMM);
+    } else if acc_info.owner() == &raydium_mainnet::ID {
+        return Ok(OracleType::RaydiumCLMM);
     }
 
     Err(MangoError::UnknownOracleType.into())
@@ -253,7 +256,7 @@ fn pyth_get_price(
     }
 }
 
-fn get_pyth_state(
+pub fn get_pyth_state(
     acc_info: &(impl KeyedAccountReader + ?Sized),
     base_decimals: u8,
 ) -> Result<OracleState> {
@@ -405,55 +408,29 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
         }
         OracleType::OrcaCLMM => {
             let whirlpool = load_whirlpool_state(oracle_info)?;
-
-            let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
-                    && whirlpool.token_mint_b != usdc_mint_mainnet::ID);
-            let quote_state = if inverted {
-                quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
-            } else {
-                quote_state_unchecked(acc_infos, &whirlpool.token_mint_b)?
-            };
-
-            let clmm_price = if inverted {
-                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price).to_num::<f64>();
-                let inverted_price = sqrt_price * sqrt_price;
-                I80F48::from_num(1.0f64 / inverted_price)
-            } else {
-                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
-                I80F48::from_num(sqrt_price * sqrt_price)
-            };
-
-            let price = clmm_price * quote_state.price;
+            let clmm_price = whirlpool.get_clmm_price();
+            let quote_oracle_state = whirlpool.quote_state_unchecked(acc_infos)?;
+            let price = clmm_price * quote_oracle_state.price;
             OracleState {
                 price,
-                last_update_slot: quote_state.last_update_slot,
-                deviation: quote_state.deviation,
+                last_update_slot: quote_oracle_state.last_update_slot,
+                deviation: quote_oracle_state.deviation,
                 oracle_type: OracleType::OrcaCLMM,
             }
         }
+        OracleType::RaydiumCLMM => {
+            let whirlpool = load_raydium_pool_state(oracle_info)?;
+            let clmm_price = whirlpool.get_clmm_price();
+            let quote_oracle_state = whirlpool.quote_state_unchecked(acc_infos)?;
+            let price = clmm_price * quote_oracle_state.price;
+            OracleState {
+                price,
+                last_update_slot: quote_oracle_state.last_update_slot,
+                deviation: quote_oracle_state.deviation,
+                oracle_type: OracleType::RaydiumCLMM,
+            }
+        }
     })
-}
-
-fn quote_state_unchecked<T: KeyedAccountReader>(
-    acc_infos: &OracleAccountInfos<T>,
-    quote_mint: &Pubkey,
-) -> Result<OracleState> {
-    if quote_mint == &usdc_mint_mainnet::ID {
-        let usd_feed = acc_infos
-            .usd_opt
-            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
-        let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
-        return Ok(usd_state);
-    } else if quote_mint == &sol_mint_mainnet::ID {
-        let sol_feed = acc_infos
-            .sol_opt
-            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
-        let sol_state = get_pyth_state(sol_feed, SOL_DECIMALS as u8)?;
-        return Ok(sol_state);
-    } else {
-        return Err(MangoError::MissingFeedForCLMMOracle.into());
-    }
 }
 
 pub fn oracle_log_context(
