@@ -11,9 +11,8 @@ use anchor_lang::AccountDeserialize;
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
-use solana_sdk::hash::hashv;
 use solana_sdk::hash::Hash;
-use solana_sdk::hash::HASH_BYTES;
+use solana_sdk::hash::Hasher;
 use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
@@ -307,12 +306,11 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
 
             let self_copy = self.clone();
             missing_keys.sort();
-            let job_key = missing_keys
-                .clone()
-                .into_iter()
-                .fold(Hash::from([0u8; HASH_BYTES]), |acc, key| {
-                    hashv(&[&acc.to_bytes(), &key.to_bytes()])
-                });
+            let mut hasher = Hasher::default();
+            for key in missing_keys.iter() {
+                hasher.hash(key.as_ref());
+            }
+            let job_key = hasher.result();
             cache
                 .multiple_accounts_jobs
                 .run_coalesced(job_key.clone(), async move {
