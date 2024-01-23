@@ -643,8 +643,6 @@
 <a href="#643" id="643">643</a>
 <a href="#644" id="644">644</a>
 <a href="#645" id="645">645</a>
-<a href="#646" id="646">646</a>
-<a href="#647" id="647">647</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -729,7 +727,7 @@
 }
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq, Eq)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>OracleConfig {
     <span class="kw">pub </span>conf_filter: I80F48,
@@ -741,7 +739,7 @@
 <span class="macro">const_assert_eq!</span>(size_of::&lt;OracleConfig&gt;(), <span class="number">96</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;OracleConfig&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 
-<span class="attr">#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+<span class="attr">#[derive(AnchorDeserialize, AnchorSerialize, Debug, Default)]
 </span><span class="kw">pub struct </span>OracleConfigParams {
     <span class="kw">pub </span>conf_filter: f32,
     <span class="kw">pub </span>max_staleness_slots: <span class="prelude-ty">Option</span>&lt;u32&gt;,
@@ -925,7 +923,7 @@
 </span><span class="kw">pub struct </span>OracleAccountInfos&lt;<span class="lifetime">&#39;a</span>, T: KeyedAccountReader&gt; {
     <span class="kw">pub </span>oracle: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T,
     <span class="kw">pub </span>fallback_opt: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T&gt;,
-    <span class="kw">pub </span>usd_opt: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T&gt;,
+    <span class="kw">pub </span>usdc_opt: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T&gt;,
     <span class="kw">pub </span>sol_opt: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>T&gt;,
 }
 
@@ -934,7 +932,7 @@
         OracleAccountInfos {
             oracle: acc_reader,
             fallback_opt: <span class="prelude-val">None</span>,
-            usd_opt: <span class="prelude-val">None</span>,
+            usdc_opt: <span class="prelude-val">None</span>,
             sol_opt: <span class="prelude-val">None</span>,
         }
     }
@@ -1053,9 +1051,7 @@
         OracleType::OrcaCLMM =&gt; {
             <span class="kw">let </span>whirlpool = load_whirlpool_state(oracle_info)<span class="question-mark">?</span>;
 
-            <span class="kw">let </span>inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
-                    &amp;&amp; whirlpool.token_mint_b != usdc_mint_mainnet::ID);
+            <span class="kw">let </span>inverted = whirlpool.is_inverted();
             <span class="kw">let </span>quote_state = <span class="kw">if </span>inverted {
                 quote_state_unchecked(acc_infos, <span class="kw-2">&amp;</span>whirlpool.token_mint_a)<span class="question-mark">?
             </span>} <span class="kw">else </span>{
@@ -1088,7 +1084,7 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;OracleState&gt; {
     <span class="kw">if </span>quote_mint == <span class="kw-2">&amp;</span>usdc_mint_mainnet::ID {
         <span class="kw">let </span>usd_feed = acc_infos
-            .usd_opt
+            .usdc_opt
             .ok_or_else(|| <span class="macro">error!</span>(MangoError::MissingFeedForCLMMOracle))<span class="question-mark">?</span>;
         <span class="kw">let </span>usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS <span class="kw">as </span>u8)<span class="question-mark">?</span>;
         <span class="kw">return </span><span class="prelude-val">Ok</span>(usd_state);
@@ -1237,13 +1233,13 @@
         <span class="kw">let </span>usdc_ais = OracleAccountInfos {
             oracle: usdc_ai,
             fallback_opt: <span class="prelude-val">None</span>,
-            usd_opt: <span class="prelude-val">None</span>,
+            usdc_opt: <span class="prelude-val">None</span>,
             sol_opt: <span class="prelude-val">None</span>,
         };
         <span class="kw">let </span>orca_ais = OracleAccountInfos {
             oracle: ai,
             fallback_opt: <span class="prelude-val">None</span>,
-            usd_opt: <span class="prelude-val">Some</span>(usdc_ai),
+            usdc_opt: <span class="prelude-val">Some</span>(usdc_ai),
             sol_opt: <span class="prelude-val">None</span>,
         };
         <span class="kw">let </span>usdc = oracle_state_unchecked(<span class="kw-2">&amp;</span>usdc_ais, usdc_decimals).unwrap();
@@ -1282,7 +1278,7 @@
             <span class="kw">let </span>oracle_infos = OracleAccountInfos {
                 oracle: ai,
                 fallback_opt: <span class="prelude-val">None</span>,
-                usd_opt: <span class="prelude-val">None</span>,
+                usdc_opt: <span class="prelude-val">None</span>,
                 sol_opt: <span class="prelude-val">None</span>,
             };
             <span class="macro">assert!</span>(oracle_state_unchecked(<span class="kw-2">&amp;</span>oracle_infos, base_decimals)

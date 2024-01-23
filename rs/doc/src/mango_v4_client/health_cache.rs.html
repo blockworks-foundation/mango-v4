@@ -78,25 +78,54 @@
 <a href="#78" id="78">78</a>
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
-</pre><pre class="rust"><code><span class="kw">use crate</span>::{AccountFetcher, MangoGroupContext};
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{AccountFetcher, FallbackOracleConfig, MangoGroupContext};
 <span class="kw">use </span>anyhow::Context;
 <span class="kw">use </span>futures::{stream, StreamExt, TryStreamExt};
 <span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::health::{FixedOrderAccountRetriever, HealthCache};
-<span class="kw">use </span>mango_v4::state::MangoAccountValue;
+<span class="kw">use </span>mango_v4::state::{pyth_mainnet_sol_oracle, pyth_mainnet_usdc_oracle, MangoAccountValue};
 
+<span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::time::{SystemTime, UNIX_EPOCH};
 
 <span class="kw">pub async fn </span>new(
     context: <span class="kw-2">&amp;</span>MangoGroupContext,
-    account_fetcher: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountFetcher,
+    fallback_config: <span class="kw-2">&amp;</span>FallbackOracleConfig,
+    account_fetcher: <span class="kw-2">&amp;</span><span class="kw">dyn </span>AccountFetcher,
     account: <span class="kw-2">&amp;</span>MangoAccountValue,
 ) -&gt; anyhow::Result&lt;HealthCache&gt; {
     <span class="kw">let </span>active_token_len = account.active_token_positions().count();
     <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
 
-    <span class="kw">let </span>(metas, _health_cu) =
-        context.derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
+    <span class="kw">let </span>fallback_keys = context
+        .derive_fallback_oracle_keys(fallback_config, account_fetcher)
+        .<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>(metas, _health_cu) = context.derive_health_check_remaining_account_metas(
+        account,
+        <span class="macro">vec!</span>[],
+        <span class="macro">vec!</span>[],
+        <span class="macro">vec!</span>[],
+        fallback_keys,
+    )<span class="question-mark">?</span>;
     <span class="kw">let </span>accounts: anyhow::Result&lt;Vec&lt;KeyedAccountSharedData&gt;&gt; = stream::iter(metas.iter())
         .then(|meta| <span class="kw">async </span>{
             <span class="prelude-val">Ok</span>(KeyedAccountSharedData::new(
@@ -114,9 +143,13 @@
         begin_perp: active_token_len * <span class="number">2</span>,
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
-        begin_fallback_oracles: metas.len(), <span class="comment">// TODO: add support for fallback oracle accounts
-        </span>usd_oracle_index: <span class="prelude-val">None</span>,
-        sol_oracle_index: <span class="prelude-val">None</span>,
+        begin_fallback_oracles: metas.len(),
+        usdc_oracle_index: metas
+            .iter()
+            .position(|m| m.pubkey == pyth_mainnet_usdc_oracle::ID),
+        sol_oracle_index: metas
+            .iter()
+            .position(|m| m.pubkey == pyth_mainnet_sol_oracle::ID),
     };
     <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
     mango_v4::health::new_health_cache(<span class="kw-2">&amp;</span>account.borrow(), <span class="kw-2">&amp;</span>retriever, now_ts)
@@ -131,8 +164,13 @@
     <span class="kw">let </span>active_token_len = account.active_token_positions().count();
     <span class="kw">let </span>active_perp_len = account.active_perp_positions().count();
 
-    <span class="kw">let </span>(metas, _health_cu) =
-        context.derive_health_check_remaining_account_metas(account, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])<span class="question-mark">?</span>;
+    <span class="kw">let </span>(metas, _health_cu) = context.derive_health_check_remaining_account_metas(
+        account,
+        <span class="macro">vec!</span>[],
+        <span class="macro">vec!</span>[],
+        <span class="macro">vec!</span>[],
+        HashMap::new(),
+    )<span class="question-mark">?</span>;
     <span class="kw">let </span>accounts = metas
         .iter()
         .map(|meta| {
@@ -150,8 +188,8 @@
         begin_perp: active_token_len * <span class="number">2</span>,
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">None</span>,
-        begin_fallback_oracles: metas.len(), <span class="comment">// TODO: add support for fallback oracle accounts
-        </span>usd_oracle_index: <span class="prelude-val">None</span>,
+        begin_fallback_oracles: metas.len(),
+        usdc_oracle_index: <span class="prelude-val">None</span>,
         sol_oracle_index: <span class="prelude-val">None</span>,
     };
     <span class="kw">let </span>now_ts = SystemTime::now().duration_since(UNIX_EPOCH)<span class="question-mark">?</span>.as_secs();
