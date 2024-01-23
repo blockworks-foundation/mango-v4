@@ -5,9 +5,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
 use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
-use mango_v4_client::{
-    chain_data, health_cache, MangoClient, PreparedInstructions, TransactionBuilder,
-};
+use mango_v4_client::{chain_data, MangoClient, PreparedInstructions, TransactionBuilder};
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Signature;
@@ -113,7 +111,8 @@ impl SettlementState {
                 continue;
             }
 
-            let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+            let health_cache = mango_client
+                .health_cache(&account)
                 .await
                 .context("creating health cache")?;
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
@@ -304,11 +303,14 @@ impl<'a> SettleBatchProcessor<'a> {
     ) -> anyhow::Result<Option<Signature>> {
         let a_value = self.account_fetcher.fetch_mango_account(&account_a)?;
         let b_value = self.account_fetcher.fetch_mango_account(&account_b)?;
-        let new_ixs = self.mango_client.perp_settle_pnl_instruction(
-            self.perp_market_index,
-            (&account_a, &a_value),
-            (&account_b, &b_value),
-        )?;
+        let new_ixs = self
+            .mango_client
+            .perp_settle_pnl_instruction(
+                self.perp_market_index,
+                (&account_a, &a_value),
+                (&account_b, &b_value),
+            )
+            .await?;
         let previous = self.instructions.clone();
         self.instructions.append(new_ixs.clone());
 

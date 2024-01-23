@@ -18,11 +18,19 @@ use tracing::*;
 
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
+use mango_v4::health::HealthCache;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
     PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
+use crate::account_fetcher::*;
+use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
+use crate::context::MangoGroupContext;
+use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
+use crate::health_cache;
+use crate::util::PreparedInstructions;
+use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
@@ -34,13 +42,6 @@ use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::hash::Hash;
 use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
-
-use crate::account_fetcher::*;
-use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
-use crate::context::MangoGroupContext;
-use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::util::PreparedInstructions;
-use crate::{jupiter, util};
 
 use anyhow::Context;
 use solana_sdk::account::ReadableAccount;
@@ -95,6 +96,10 @@ pub struct ClientConfig {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
+
+    /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
+    #[builder(default = "FallbackOracleConfig::Dynamic")]
+    pub fallback_oracle_config: FallbackOracleConfig,
 
     /// If set, don't use `cluster` for sending transactions and send to all
     /// addresses configured here instead.
@@ -445,33 +450,63 @@ impl MangoClient {
 
     pub async fn derive_health_check_remaining_account_metas(
         &self,
+        account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
-        let account = self.mango_account().await?;
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.config.fallback_oracle_config,
+                &*self.account_fetcher,
+            )
+            .await?;
         self.context.derive_health_check_remaining_account_metas(
             &account,
             affected_tokens,
             writable_banks,
             affected_perp_markets,
+            fallback_contexts,
         )
     }
 
-    pub async fn derive_liquidation_health_check_remaining_account_metas(
+    pub async fn derive_health_check_remaining_account_metas_two_accounts(
         &self,
-        liqee: &MangoAccountValue,
+        account_1: &MangoAccountValue,
+        account_2: &MangoAccountValue,
         affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
-        let account = self.mango_account().await?;
+        let fallback_contexts = self
+            .context
+            .derive_fallback_oracle_keys(
+                &self.client.config.fallback_oracle_config,
+                &*self.account_fetcher,
+            )
+            .await?;
+
         self.context
             .derive_health_check_remaining_account_metas_two_accounts(
-                &account,
-                liqee,
+                account_1,
+                account_2,
                 affected_tokens,
                 writable_banks,
+                fallback_contexts,
             )
+    }
+
+    pub async fn health_cache(
+        &self,
+        mango_account: &MangoAccountValue,
+    ) -> anyhow::Result<HealthCache> {
+        health_cache::new(
+            &self.context,
+            &self.client.config.fallback_oracle_config,
+            &*self.account_fetcher,
+            mango_account,
+        )
+        .await
     }
 
     pub async fn token_deposit(
@@ -482,9 +517,15 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
+        let mango_account = &self.mango_account().await?;
 
         let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![token_index], vec![], vec![])
+            .derive_health_check_remaining_account_metas(
+                mango_account,
+                vec![token_index],
+                vec![],
+                vec![],
+            )
             .await?;
 
         let ixs = PreparedInstructions::from_single(
@@ -521,7 +562,7 @@ impl MangoClient {
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
-    pub fn token_withdraw_instructions(
+    pub async fn token_withdraw_instructions(
         &self,
         account: &MangoAccountValue,
         mint: Pubkey,
@@ -531,13 +572,9 @@ impl MangoClient {
         let token = self.context.token_by_mint(&mint)?;
         let token_index = token.token_index;
 
-        let (health_check_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
-                account,
-                vec![token_index],
-                vec![],
-                vec![],
-            )?;
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(account, vec![token_index], vec![], vec![])
+            .await?;
 
         let ixs = PreparedInstructions::from_vec(
             vec![
@@ -587,7 +624,9 @@ impl MangoClient {
         allow_borrow: bool,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self.token_withdraw_instructions(&account, mint, amount, allow_borrow)?;
+        let ixs = self
+            .token_withdraw_instructions(&account, mint, amount, allow_borrow)
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -667,7 +706,7 @@ impl MangoClient {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn serum3_place_order_instruction(
+    pub async fn serum3_place_order_instruction(
         &self,
         account: &MangoAccountValue,
         market_index: Serum3MarketIndex,
@@ -689,8 +728,8 @@ impl MangoClient {
             .open_orders;
 
         let (health_check_metas, health_cu) = self
-            .context
-            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])?;
+            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])
+            .await?;
 
         let payer_token = match side {
             Serum3Side::Bid => &quote,
@@ -762,18 +801,20 @@ impl MangoClient {
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
         let market_index = self.context.serum3_market_index(name);
-        let ixs = self.serum3_place_order_instruction(
-            &account,
-            market_index,
-            side,
-            limit_price,
-            max_base_qty,
-            max_native_quote_qty_including_fees,
-            self_trade_behavior,
-            order_type,
-            client_order_id,
-            limit,
-        )?;
+        let ixs = self
+            .serum3_place_order_instruction(
+                &account,
+                market_index,
+                side,
+                limit_price,
+                max_base_qty,
+                max_native_quote_qty_including_fees,
+                self_trade_behavior,
+                order_type,
+                client_order_id,
+                limit,
+            )
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -899,10 +940,9 @@ impl MangoClient {
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
-
         let (health_remaining_ams, health_cu) = self
-            .context
             .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .await
             .unwrap();
 
         let limit = 5;
@@ -990,7 +1030,7 @@ impl MangoClient {
     //
 
     #[allow(clippy::too_many_arguments)]
-    pub fn perp_place_order_instruction(
+    pub async fn perp_place_order_instruction(
         &self,
         account: &MangoAccountValue,
         market_index: PerpMarketIndex,
@@ -1006,13 +1046,14 @@ impl MangoClient {
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
-        let (health_remaining_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 vec![],
                 vec![],
                 vec![market_index],
-            )?;
+            )
+            .await?;
 
         let ixs = PreparedInstructions::from_single(
             Instruction {
@@ -1072,20 +1113,22 @@ impl MangoClient {
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self.perp_place_order_instruction(
-            &account,
-            market_index,
-            side,
-            price_lots,
-            max_base_lots,
-            max_quote_lots,
-            client_order_id,
-            order_type,
-            reduce_only,
-            expiry_timestamp,
-            limit,
-            self_trade_behavior,
-        )?;
+        let ixs = self
+            .perp_place_order_instruction(
+                &account,
+                market_index,
+                side,
+                price_lots,
+                max_base_lots,
+                max_quote_lots,
+                client_order_id,
+                order_type,
+                reduce_only,
+                expiry_timestamp,
+                limit,
+                self_trade_behavior,
+            )
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
@@ -1127,9 +1170,10 @@ impl MangoClient {
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
         let perp = self.context.perp(market_index);
+        let mango_account = &self.mango_account().await?;
 
         let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![], vec![], vec![])
+            .derive_health_check_remaining_account_metas(mango_account, vec![], vec![], vec![])
             .await?;
 
         let ixs = PreparedInstructions::from_single(
@@ -1157,7 +1201,7 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
-    pub fn perp_settle_pnl_instruction(
+    pub async fn perp_settle_pnl_instruction(
         &self,
         market_index: PerpMarketIndex,
         account_a: (&Pubkey, &MangoAccountValue),
@@ -1167,13 +1211,13 @@ impl MangoClient {
         let settlement_token = self.context.token(perp.settle_token_index);
 
         let (health_remaining_ams, health_cu) = self
-            .context
             .derive_health_check_remaining_account_metas_two_accounts(
                 account_a.1,
                 account_b.1,
                 &[],
                 &[],
             )
+            .await
             .unwrap();
 
         let ixs = PreparedInstructions::from_single(
@@ -1210,7 +1254,9 @@ impl MangoClient {
         account_a: (&Pubkey, &MangoAccountValue),
         account_b: (&Pubkey, &MangoAccountValue),
     ) -> anyhow::Result<Signature> {
-        let ixs = self.perp_settle_pnl_instruction(market_index, account_a, account_b)?;
+        let ixs = self
+            .perp_settle_pnl_instruction(market_index, account_a, account_b)
+            .await?;
         self.send_and_confirm_permissionless_tx(ixs.to_instructions())
             .await
     }
@@ -1223,8 +1269,8 @@ impl MangoClient {
         let perp = self.context.perp(market_index);
 
         let (health_remaining_ams, health_cu) = self
-            .context
             .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .await
             .unwrap();
 
         let limit = 5;
@@ -1265,9 +1311,15 @@ impl MangoClient {
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
+        let mango_account = &self.mango_account().await?;
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(liqee.1, &[], &[])
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
+                liqee.1,
+                &[],
+                &[],
+            )
             .await
             .unwrap();
 
@@ -1316,12 +1368,14 @@ impl MangoClient {
         )
         .await?;
 
+        let mango_account = &self.mango_account().await?;
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
         let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[INSURANCE_TOKEN_INDEX],
                 &[],
@@ -1375,8 +1429,10 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[],
                 &[asset_token_index, liab_token_index],
@@ -1417,6 +1473,7 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let quote_token_index = 0;
 
         let quote_info = self.context.token(quote_token_index);
@@ -1429,7 +1486,8 @@ impl MangoClient {
             .collect::<Vec<_>>();
 
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &[INSURANCE_TOKEN_INDEX],
                 &[quote_token_index, liab_token_index],
@@ -1483,6 +1541,7 @@ impl MangoClient {
         min_taker_price: f32,
         extra_affected_tokens: &[TokenIndex],
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (tcs_index, tcs) = liqee
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
@@ -1493,7 +1552,8 @@ impl MangoClient {
             .copied()
             .collect_vec();
         let (health_remaining_ams, health_cu) = self
-            .derive_liquidation_health_check_remaining_account_metas(
+            .derive_health_check_remaining_account_metas_two_accounts(
+                mango_account,
                 liqee.1,
                 &affected_tokens,
                 &[tcs.buy_token_index, tcs.sell_token_index],
@@ -1538,13 +1598,19 @@ impl MangoClient {
         account: (&Pubkey, &MangoAccountValue),
         token_conditional_swap_id: u64,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mango_account = &self.mango_account().await?;
         let (tcs_index, tcs) = account
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
         let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
         let (health_remaining_ams, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![], affected_tokens, vec![])
+            .derive_health_check_remaining_account_metas(
+                mango_account,
+                vec![],
+                affected_tokens,
+                vec![],
+            )
             .await
             .unwrap();
 
@@ -1578,20 +1644,21 @@ impl MangoClient {
 
     // health region
 
-    pub fn health_region_begin_instruction(
+    pub async fn health_region_begin_instruction(
         &self,
         account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
-        let (health_remaining_metas, _health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, _health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
-            )?;
+            )
+            .await?;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -1617,20 +1684,21 @@ impl MangoClient {
         ))
     }
 
-    pub fn health_region_end_instruction(
+    pub async fn health_region_end_instruction(
         &self,
         account: &MangoAccountValue,
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
     ) -> anyhow::Result<PreparedInstructions> {
-        let (health_remaining_metas, health_cu) =
-            self.context.derive_health_check_remaining_account_metas(
+        let (health_remaining_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
                 writable_banks,
                 affected_perp_markets,
-            )?;
+            )
+            .await?;
 
         let ix = Instruction {
             program_id: mango_v4::id(),
@@ -1854,6 +1922,23 @@ impl TransactionSize {
             accounts: MAX_ACCOUNTS_PER_TRANSACTION,
             length: solana_sdk::packet::PACKET_DATA_SIZE,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FallbackOracleConfig {
+    /// No fallback oracles
+    Never,
+    /// Only provided fallback oracles are used
+    Fixed(Vec<Pubkey>),
+    /// The account_fetcher checks for stale oracles and uses fallbacks only for stale oracles
+    Dynamic,
+    /// Every possible fallback oracle (may cause serious issues with the 64 accounts-per-tx limit)
+    All,
+}
+impl Default for FallbackOracleConfig {
+    fn default() -> Self {
+        FallbackOracleConfig::Dynamic
     }
 }
 
