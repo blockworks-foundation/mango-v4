@@ -21,7 +21,8 @@ use fixed::types::I80F48;
 use mango_feeds_connector::metrics::*;
 use mango_v4::state::{MangoAccount, MangoAccountValue, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, AccountFetcher, Client, MangoGroupContext, TransactionBuilderConfig,
+    chain_data, health_cache, AccountFetcher, Client, FallbackOracleConfig, MangoGroupContext,
+    TransactionBuilderConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::{account::ReadableAccount, signature::Keypair};
@@ -52,7 +53,13 @@ async fn compute_pnl(
     account_fetcher: Arc<impl AccountFetcher>,
     account: &MangoAccountValue,
 ) -> anyhow::Result<Vec<(PerpMarketIndex, I80F48)>> {
-    let health_cache = health_cache::new(&context, account_fetcher.as_ref(), account).await?;
+    let health_cache = health_cache::new(
+        &context,
+        &FallbackOracleConfig::Dynamic,
+        account_fetcher.as_ref(),
+        account,
+    )
+    .await?;
 
     let pnls = account
         .active_perp_positions()

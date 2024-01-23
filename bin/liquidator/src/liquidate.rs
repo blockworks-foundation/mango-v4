@@ -4,7 +4,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{chain_data, health_cache, MangoClient};
+use mango_v4_client::{chain_data, MangoClient};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -155,10 +155,7 @@ impl<'a> LiquidateHelper<'a> {
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let mut health_cache =
-                health_cache::new(&self.client.context, self.account_fetcher, &liqor)
-                    .await
-                    .context("health cache")?;
+            let mut health_cache = self.client.health_cache(&liqor).await.expect("always ok");
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
@@ -589,7 +586,8 @@ pub async fn maybe_liquidate_account(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+    let health_cache = mango_client
+        .health_cache(&account)
         .await
         .context("creating health cache 1")?;
     let maint_health = health_cache.health(HealthType::Maint);
@@ -607,7 +605,8 @@ pub async fn maybe_liquidate_account(
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+    let health_cache = mango_client
+        .health_cache(&account)
         .await
         .context("creating health cache 2")?;
     if !health_cache.is_liquidatable() {

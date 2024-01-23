@@ -11,9 +11,13 @@ use anchor_lang::AccountDeserialize;
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::{AccountSharedData, ReadableAccount};
+use solana_sdk::hash::Hash;
+use solana_sdk::hash::Hasher;
 use solana_sdk::pubkey::Pubkey;
 
 use mango_v4::state::MangoAccountValue;
+
+use crate::gpa;
 
 #[async_trait::async_trait]
 pub trait AccountFetcher: Sync + Send {
@@ -29,6 +33,13 @@ pub trait AccountFetcher: Sync + Send {
         program: &Pubkey,
         discriminator: [u8; 8],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
+
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>>;
+
+    async fn get_slot(&self) -> anyhow::Result<u64>;
 }
 
 // Can't be in the trait, since then it would no longer be object-safe...
@@ -100,6 +111,17 @@ impl AccountFetcher for RpcAccountFetcher {
             .map(|(pk, acc)| (pk, acc.into()))
             .collect::<Vec<_>>())
     }
+
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        gpa::fetch_multiple_accounts(&self.rpc, keys).await
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        Ok(self.rpc.get_slot().await?)
+    }
 }
 
 struct CoalescedAsyncJob<Key, Output> {
@@ -138,6 +160,8 @@ struct AccountCache {
     keys_for_program_and_discriminator: HashMap<(Pubkey, [u8; 8]), Vec<Pubkey>>,
 
     account_jobs: CoalescedAsyncJob<Pubkey, anyhow::Result<AccountSharedData>>,
+    multiple_accounts_jobs:
+        CoalescedAsyncJob<Hash, anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
     program_accounts_jobs:
         CoalescedAsyncJob<(Pubkey, [u8; 8]), anyhow::Result<Vec<(Pubkey, AccountSharedData)>>>,
 }
@@ -260,5 +284,63 @@ impl<T: AccountFetcher + 'static> AccountFetcher for CachedAccountFetcher<T> {
                 err
             )),
         }
+    }
+
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        let fetch_job = {
+            let mut cache = self.cache.lock().unwrap();
+            let mut missing_keys: Vec<Pubkey> = keys
+                .iter()
+                .filter(|k| !cache.accounts.contains_key(k))
+                .cloned()
+                .collect();
+            if missing_keys.len() == 0 {
+                return Ok(keys
+                    .iter()
+                    .map(|pk| (*pk, cache.accounts.get(&pk).unwrap().clone()))
+                    .collect::<Vec<_>>());
+            }
+
+            let self_copy = self.clone();
+            missing_keys.sort();
+            let mut hasher = Hasher::default();
+            for key in missing_keys.iter() {
+                hasher.hash(key.as_ref());
+            }
+            let job_key = hasher.result();
+            cache
+                .multiple_accounts_jobs
+                .run_coalesced(job_key.clone(), async move {
+                    let result = self_copy
+                        .fetcher
+                        .fetch_multiple_accounts(&missing_keys)
+                        .await;
+                    let mut cache = self_copy.cache.lock().unwrap();
+                    cache.multiple_accounts_jobs.remove(&job_key);
+
+                    if let Ok(results) = result.as_ref() {
+                        for (key, account) in results {
+                            cache.accounts.insert(*key, account.clone());
+                        }
+                    }
+                    result
+                })
+        };
+
+        match fetch_job.get().await {
+            Ok(v) => Ok(v.clone()),
+            // Can't clone the stored error, so need to stringize it
+            Err(err) => Err(anyhow::format_err!(
+                "fetch error in CachedAccountFetcher: {:?}",
+                err
+            )),
+        }
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        self.fetcher.get_slot().await
     }
 }
