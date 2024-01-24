@@ -626,7 +626,9 @@ export class Bank implements BankForHealth {
     const isNoLimit = this.depositLimit.isZero();
 
     const remainingDepositLimit = !isNoLimit
-      ? this.depositLimit.sub(new BN(nativeDeposits.toNumber()))
+      ? this.depositLimit
+          .sub(new BN(nativeDeposits.toNumber()))
+          .sub(this.potentialSerumTokens)
       : null;
 
     return remainingDepositLimit
