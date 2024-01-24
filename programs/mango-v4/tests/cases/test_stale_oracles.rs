@@ -321,7 +321,7 @@ async fn test_fallback_oracle_withdraw() -> Result<(), TransportError> {
 }
 
 #[tokio::test]
-async fn test_clmm_fallback_oracle() -> Result<(), TransportError> {
+async fn test_orca_fallback_oracle() -> Result<(), TransportError> {
     // add ability to find fixtures
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     d.push("resources/test");
@@ -340,10 +340,15 @@ async fn test_clmm_fallback_oracle() -> Result<(), TransportError> {
             "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
             "FsJ3A3u2vn5cTVofAjvy6y5kwABJAqYWpe4975bi2epH",
         ),
+        (
+            "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+        ),
     ];
 
     let fallback_oracle = Pubkey::from_str(fixtures[0].0).unwrap();
     let pyth_usd_oracle = Pubkey::from_str(fixtures[1].0).unwrap();
+    let wrong_fallback_oracle = Pubkey::from_str(fixtures[2].0).unwrap();
 
     // setup pyth and clmm accounts
     for fixture in fixtures {
@@ -359,7 +364,7 @@ async fn test_clmm_fallback_oracle() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..3];
+    let mints = &context.mints[0..4];
     let payer_token_accounts = &context.users[1].token_accounts[0..3];
 
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
@@ -488,6 +493,41 @@ async fn test_clmm_fallback_oracle() -> Result<(), TransportError> {
         solana,
         token_withdraw_ix.clone(),
         vec![fallback_oracle_meta.clone()]
+    )
+    .await
+    .unwrap()
+    .result
+    .is_err());
+
+
+    // add wrong_fallback_oracle for a different token
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: mints[3].pubkey,
+            fallback_oracle: wrong_fallback_oracle,
+            options: mango_v4::instruction::TokenEdit {
+                set_fallback_oracle: true,
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+
+    // Send txn with a the wrong fallback oracle
+    let wrong_fallback_meta = AccountMeta {
+        pubkey: wrong_fallback_oracle,
+        is_writable: false,
+        is_signer: false,
+    };
+    assert!(send_tx_with_extra_accounts(
+        solana,
+        token_withdraw_ix.clone(),
+        vec![wrong_fallback_meta.clone()]
     )
     .await
     .unwrap()
