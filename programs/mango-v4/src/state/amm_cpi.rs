@@ -68,7 +68,7 @@ impl CLMMPoolState {
     ) -> Result<OracleState> {
         if quote_mint == &usdc_mint_mainnet::ID {
             let usd_feed = acc_infos
-                .usd_opt
+                .usdc_opt
                 .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
             let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
             return Ok(usd_state);
