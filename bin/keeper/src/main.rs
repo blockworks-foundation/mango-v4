@@ -7,7 +7,9 @@ use std::time::Duration;
 use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
-use mango_v4_client::{keypair_from_cli, Client, MangoClient, TransactionBuilderConfig};
+use mango_v4_client::{
+    keypair_from_cli, Client, FallbackOracleConfig, MangoClient, TransactionBuilderConfig,
+};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use tokio::time;
@@ -98,19 +100,21 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mango_client = Arc::new(
         MangoClient::new_for_existing_account(
-            Client::new(
-                cluster,
-                commitment,
-                owner.clone(),
-                Some(Duration::from_secs(cli.timeout)),
-                TransactionBuilderConfig {
+            Client::builder()
+                .cluster(cluster)
+                .commitment(commitment)
+                .fee_payer(Some(owner.clone()))
+                .timeout(Duration::from_secs(cli.timeout))
+                .transaction_builder_config(TransactionBuilderConfig {
                     prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
                         .then_some(cli.prioritization_micro_lamports),
                     compute_budget_per_instruction: None,
-                },
-            ),
+                })
+                .fallback_oracle_config(FallbackOracleConfig::Never)
+                .build()
+                .unwrap(),
             cli.mango_account,
-            owner.clone(),
+            owner,
         )
         .await?,
     );
