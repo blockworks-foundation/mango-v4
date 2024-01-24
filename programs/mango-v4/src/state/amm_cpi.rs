@@ -5,8 +5,8 @@ use solana_program::pubkey::Pubkey;
 use crate::{accounts_zerocopy::KeyedAccountReader, error::MangoError};
 
 use super::{
-    get_pyth_state, sol_mint_mainnet, usdc_mint_mainnet, OracleAccountInfos, OracleState,
-    QUOTE_DECIMALS, SOL_DECIMALS,
+    get_pyth_state, pyth_mainnet_sol_oracle, pyth_mainnet_usdc_oracle, sol_mint_mainnet,
+    usdc_mint_mainnet, OracleAccountInfos, OracleState, QUOTE_DECIMALS, SOL_DECIMALS,
 };
 
 pub mod orca_mainnet_whirlpool {
@@ -78,6 +78,22 @@ impl CLMMPoolState {
                 .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
             let sol_state = get_pyth_state(sol_feed, SOL_DECIMALS as u8)?;
             return Ok(sol_state);
+        } else {
+            return Err(MangoError::MissingFeedForCLMMOracle.into());
+        }
+    }
+
+    pub fn get_quote_oracle(&self) -> Result<Pubkey> {
+        let mint = if self.is_inverted() {
+            self.token_mint_a
+        } else {
+            self.token_mint_b
+        };
+
+        if mint == usdc_mint_mainnet::ID {
+            return Ok(pyth_mainnet_usdc_oracle::ID);
+        } else if mint == sol_mint_mainnet::ID {
+            return Ok(pyth_mainnet_sol_oracle::ID);
         } else {
             return Err(MangoError::MissingFeedForCLMMOracle.into());
         }
