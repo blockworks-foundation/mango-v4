@@ -12,7 +12,7 @@ use switchboard_v2::AggregatorAccountData;
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
-use crate::state::load_whirlpool_state;
+use crate::state::load_orca_pool_state;
 
 use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
@@ -208,18 +208,19 @@ pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Res
         return Ok(());
     };
     let oracle_type = determine_oracle_type(acc_info)?;
-    if oracle_type == OracleType::OrcaCLMM {
-        let whirlpool = load_whirlpool_state(acc_info)?;
+    let valid_oracle = match oracle_type {
+        OracleType::OrcaCLMM => {
+            let whirlpool = load_orca_pool_state(acc_info)?;
+            whirlpool.has_quote_token()
+        }
+        OracleType::RaydiumCLMM => {
+            let pool = load_raydium_pool_state(acc_info)?;
+            pool.has_quote_token()
+        }
+        _ => true,
+    };
 
-        let has_usdc_token = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-            || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
-        let has_sol_token = whirlpool.token_mint_a == sol_mint_mainnet::ID
-            || whirlpool.token_mint_b == sol_mint_mainnet::ID;
-        require!(
-            has_usdc_token || has_sol_token,
-            MangoError::InvalidCLMMOracle
-        );
-    }
+    require!(valid_oracle, MangoError::UnexpectedOracle);
     Ok(())
 }
 
@@ -407,7 +408,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::OrcaCLMM => {
-            let whirlpool = load_whirlpool_state(oracle_info)?;
+            let whirlpool = load_orca_pool_state(oracle_info)?;
             let clmm_price = whirlpool.get_clmm_price();
             let quote_oracle_state = whirlpool.quote_state_unchecked(acc_infos)?;
             let price = clmm_price * quote_oracle_state.price;
@@ -645,6 +646,49 @@ mod tests {
                 .is_anchor_error_with_code(6068));
         }
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_valid_fallbacks() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let usdc_fixture = (
+            "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+            OracleType::Pyth,
+            Pubkey::default(),
+            6,
+        );
+
+        let clmm_fixtures = vec![
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+                OracleType::RaydiumCLMM,
+                raydium_mainnet::ID,
+                9, // SOL/USDC pool
+            ),
+        ];
+
+        for fixture in clmm_fixtures {
+            let clmm_file = format!("resources/test/{}.bin", fixture.0);
+            let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+            let data = RefCell::new(&mut clmm_data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+
+            check_is_valid_fallback_oracle(ai)?;
+        }
         Ok(())
     }
 }

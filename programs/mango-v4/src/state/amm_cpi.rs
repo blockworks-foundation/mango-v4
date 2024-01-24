@@ -98,9 +98,18 @@ impl CLMMPoolState {
             return Err(MangoError::MissingFeedForCLMMOracle.into());
         }
     }
+
+    pub fn has_quote_token(&self) -> bool {
+        let has_usdc_token = self.token_mint_a == usdc_mint_mainnet::ID
+            || self.token_mint_b == usdc_mint_mainnet::ID;
+        let has_sol_token =
+            self.token_mint_a == sol_mint_mainnet::ID || self.token_mint_b == sol_mint_mainnet::ID;
+
+        has_usdc_token || has_sol_token
+    }
 }
 
-pub fn load_whirlpool_state(acc_info: &impl KeyedAccountReader) -> Result<CLMMPoolState> {
+pub fn load_orca_pool_state(acc_info: &impl KeyedAccountReader) -> Result<CLMMPoolState> {
     let data = &acc_info.data();
     require!(
         data[0..8] == ORCA_WHIRLPOOL_DISCRIMINATOR[..],
