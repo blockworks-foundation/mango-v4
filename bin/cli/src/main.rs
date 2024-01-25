@@ -1,10 +1,22 @@
+use chrono::*;
 use clap::{Args, Parser, Subcommand};
+use itertools::Itertools;
 use mango_v4_client::{
-    keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
+    delay_interval, keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilder,
+    TransactionBuilderConfig,
 };
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::compute_budget::ComputeBudgetInstruction;
 use solana_sdk::pubkey::Pubkey;
+use solana_sdk::signature::Signature;
+use solana_sdk::signer::Signer;
+use solana_sdk::transaction::VersionedTransaction;
+use solana_transaction_status::TransactionConfirmationStatus;
+use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 mod save_snapshot;
 mod test_oracles;
@@ -128,6 +140,10 @@ enum Command {
         #[clap(short, long)]
         output: String,
     },
+    TxSendingTest {
+        #[clap(flatten)]
+        rpc: Rpc,
+    },
 }
 
 impl Rpc {
@@ -245,7 +261,223 @@ async fn main() -> Result<(), anyhow::Error> {
             let client = rpc.client(None)?;
             save_snapshot::save_snapshot(mango_group, client, output).await?
         }
+        Command::TxSendingTest { rpc } => {
+            let client = rpc.client(None)?;
+            tx_sending_test(client).await?;
+        }
     };
+
+    Ok(())
+}
+
+#[derive(Clone)]
+struct InFlightTx {
+    sent_at: DateTime<Utc>,
+    sent_at_slot: u64,
+    kind: String,
+}
+
+async fn tx_sending_test(client: Client) -> anyhow::Result<()> {
+    let client = Arc::new(client);
+    let in_flight_tx = Arc::new(RwLock::new(HashMap::default()));
+
+    tokio::spawn(confirm_tx(client.clone(), in_flight_tx.clone()));
+
+    let mut interval = delay_interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+
+        let _ = send_tx_inner(&client, &in_flight_tx).await?;
+    }
+}
+
+async fn confirm_tx(
+    client: Arc<Client>,
+    in_flight_tx: Arc<RwLock<HashMap<Signature, InFlightTx>>>,
+) -> anyhow::Result<()> {
+    let rpc = client.rpc_async();
+    let mut interval = delay_interval(Duration::from_secs(5));
+    loop {
+        interval.tick().await;
+        let _ = confirm_tx_inner(rpc, &in_flight_tx).await?;
+    }
+}
+
+async fn confirm_tx_inner(
+    rpc: &RpcClient,
+    in_flight_tx: &RwLock<HashMap<Signature, InFlightTx>>,
+) -> anyhow::Result<()> {
+    let max_confirmation_seconds = 120;
+
+    let in_flight = in_flight_tx.read().unwrap().clone();
+    let signatures = in_flight.keys().copied().collect_vec();
+
+    let statuses = rpc.get_signature_statuses(&signatures).await?;
+
+    let mut results = vec![];
+
+    let now = Utc::now();
+    for (status, signature) in statuses.value.iter().zip(signatures.iter()) {
+        let data = in_flight.get(signature).unwrap();
+
+        if let Some(status) = status {
+            if status.confirmation_status() == TransactionConfirmationStatus::Finalized {
+                let bt = Utc
+                    .timestamp_opt(
+                        rpc.get_block_time(status.slot).await?.try_into().unwrap(),
+                        0,
+                    )
+                    .unwrap();
+                results.push((
+                    *signature,
+                    Some((bt.signed_duration_since(data.sent_at), status.slot)),
+                ));
+            }
+            continue;
+        }
+
+        if now.signed_duration_since(data.sent_at).num_seconds() > max_confirmation_seconds {
+            results.push((*signature, None));
+        }
+    }
+
+    // log if confirmed, then
+    for (signature, result) in results.iter() {
+        let data = in_flight.get(signature).unwrap();
+        let sent_at = data.sent_at;
+        let sent_at_slot = data.sent_at_slot;
+        let kind = &data.kind;
+
+        let (conf_time, slot) = result
+            .map(|(conf_time, slot)| (conf_time.num_milliseconds(), slot as i64))
+            .unwrap_or((max_confirmation_seconds * 1000, -1));
+        let slot_duration = if slot != -1 {
+            slot - sent_at_slot as i64
+        } else {
+            -1
+        };
+        println!(
+            "{sent_at},{sent_at_slot},{kind},{signature},true,{slot},{slot_duration},{conf_time}"
+        );
+    }
+
+    // remove
+    let mut lock = in_flight_tx.write().unwrap();
+    for (signature, _) in results {
+        lock.remove(&signature);
+    }
+
+    Ok(())
+}
+
+async fn send_tx_inner(
+    client: &Client,
+    in_flight_tx: &RwLock<HashMap<Signature, InFlightTx>>,
+) -> anyhow::Result<()> {
+    let rpc = client.rpc_async();
+    let blockhash = rpc
+        .get_latest_blockhash_with_commitment(CommitmentConfig::finalized())
+        .await?
+        .0;
+
+    let fee_payer = client.fee_payer().pubkey();
+
+    // simple transfer only touching the fee payer
+    let ix = solana_sdk::system_instruction::transfer(&fee_payer, &fee_payer, 0);
+    let builder = TransactionBuilder {
+        instructions: vec![ix],
+        address_lookup_tables: vec![],
+        signers: vec![client.fee_payer()],
+        payer: fee_payer,
+        config: TransactionBuilderConfig {
+            prioritization_micro_lamports: None,
+            compute_budget_per_instruction: None,
+        },
+    };
+    let tx = builder.transaction_with_blockhash(blockhash)?;
+    send_one_tx(client, tx, "transfer".into(), in_flight_tx).await?;
+
+    // transfer that write locks a bunch of mango banks
+    let strpk = |s| Pubkey::from_str(s).unwrap();
+
+    let tx = make_tx_with_locks(
+        client,
+        blockhash,
+        &[
+            strpk("J6MsZiJUU6bjKSCkbfQsiHkd8gvJoddG2hsdSFsZQEZV"), // usdc bank
+            strpk("FqEhSJSP3ao8RwRSekaAQ9sNQBSANhfb6EPtxQBByyh5"), // sol bank
+            strpk("3k87hyqCaFR2G4SVwsLNMyPmR1mFN6uo7dUytzKQYu9d"), // usdt bank
+        ],
+        Some(600000),
+    )?;
+    send_one_tx(client, tx, "major-banks".into(), in_flight_tx).await?;
+
+    let tx = make_tx_with_locks(
+        client,
+        blockhash,
+        &[
+            strpk("Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD"), // usdc oracle
+            strpk("H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG"), // sol oracle
+            strpk("3vxLXJqLqF3JG5TCbYycbKWRBbCJQLxQmBGCkyqEEefL"), // usdt oracle
+        ],
+        Some(600000),
+    )?;
+    send_one_tx(client, tx, "major-oracles".into(), in_flight_tx).await?;
+
+    Ok(())
+}
+
+fn make_tx_with_locks(
+    client: &Client,
+    blockhash: solana_sdk::hash::Hash,
+    locks: &[Pubkey],
+    cu: Option<u32>,
+) -> anyhow::Result<VersionedTransaction> {
+    let fee_payer = client.fee_payer().pubkey();
+    let mut instructions = locks
+        .iter()
+        .map(|acc| solana_sdk::system_instruction::transfer(&fee_payer, acc, 0))
+        .collect_vec();
+    if let Some(cu) = cu {
+        instructions.insert(0, ComputeBudgetInstruction::set_compute_unit_limit(cu));
+    }
+    let builder = TransactionBuilder {
+        instructions,
+        address_lookup_tables: vec![],
+        signers: vec![client.fee_payer()],
+        payer: fee_payer,
+        config: TransactionBuilderConfig {
+            prioritization_micro_lamports: None,
+            compute_budget_per_instruction: None,
+        },
+    };
+    let tx = builder.transaction_with_blockhash(blockhash)?;
+    Ok(tx)
+}
+
+async fn send_one_tx(
+    client: &Client,
+    tx: VersionedTransaction,
+    kind: String,
+    in_flight_tx: &RwLock<HashMap<Signature, InFlightTx>>,
+) -> anyhow::Result<()> {
+    let signature = client.send_transaction(&tx).await?;
+    let now = Utc::now();
+
+    let slot = client
+        .rpc_async()
+        .get_slot_with_commitment(CommitmentConfig::processed())
+        .await?;
+
+    let mut lock = in_flight_tx.write().unwrap();
+    lock.insert(
+        signature,
+        InFlightTx {
+            sent_at: now,
+            sent_at_slot: slot,
+            kind,
+        },
+    );
 
     Ok(())
 }
