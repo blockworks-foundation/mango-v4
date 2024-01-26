@@ -39,6 +39,7 @@ pub fn perp_edit_market(
     positive_pnl_liquidation_fee_opt: Option<f32>,
     name_opt: Option<String>,
     force_close_opt: Option<bool>,
+    platform_liquidation_fee_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -342,6 +343,16 @@ pub fn perp_edit_market(
             u8::from(force_close)
         );
         perp_market.force_close = u8::from(force_close);
+        require_group_admin = true;
+    };
+
+    if let Some(platform_liquidation_fee) = platform_liquidation_fee_opt {
+        msg!(
+            "Platform liquidation fee: old - {:?}, new - {:?}",
+            perp_market.platform_liquidation_fee,
+            platform_liquidation_fee
+        );
+        perp_market.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
         require_group_admin = true;
     };
 

@@ -185,6 +185,7 @@ export interface PerpEditParams {
   positivePnlLiquidationFee: number | null;
   name: string | null;
   forceClose: boolean | null;
+  platformLiquidationFee: number | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -218,6 +219,7 @@ export const NullPerpEditParams: PerpEditParams = {
   positivePnlLiquidationFee: null,
   name: null,
   forceClose: null,
+  platformLiquidationFee: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate

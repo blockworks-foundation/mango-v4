@@ -3953,6 +3953,10 @@ export type MangoV4 = {
         {
           "name": "positivePnlLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -4166,6 +4170,12 @@ export type MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -7495,7 +7505,7 @@ export type MangoV4 = {
           {
             "name": "collectedLiquidationFees",
             "docs": [
-              "Fees that were collected during liquidation (in native tokens)",
+              "Platform fees that were collected during liquidation (in native tokens)",
               "",
               "See also collected_fees_native and fees_withdrawn."
             ],
@@ -8563,11 +8573,32 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -12573,6 +12604,66 @@ export type MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },
@@ -17888,6 +17979,10 @@ export const IDL: MangoV4 = {
         {
           "name": "positivePnlLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -18101,6 +18196,12 @@ export const IDL: MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -21430,7 +21531,7 @@ export const IDL: MangoV4 = {
           {
             "name": "collectedLiquidationFees",
             "docs": [
-              "Fees that were collected during liquidation (in native tokens)",
+              "Platform fees that were collected during liquidation (in native tokens)",
               "",
               "See also collected_fees_native and fees_withdrawn."
             ],
@@ -22498,11 +22599,32 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -26508,6 +26630,66 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },
