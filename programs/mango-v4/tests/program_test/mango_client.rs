@@ -3294,6 +3294,7 @@ pub struct PerpCreateMarketInstruction {
     pub settle_fee_fraction_low_health: f32,
     pub settle_pnl_limit_factor: f32,
     pub settle_pnl_limit_window_size_ts: u64,
+    pub platform_liquidation_fee: f32,
 }
 impl PerpCreateMarketInstruction {
     pub async fn with_new_book_and_queue(
@@ -3356,6 +3357,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
             settle_pnl_limit_factor: self.settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts: self.settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee: self.positive_pnl_liquidation_fee,
+            platform_liquidation_fee: self.platform_liquidation_fee,
         };
 
         let perp_market = Pubkey::find_program_address(
@@ -3421,6 +3423,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         positive_pnl_liquidation_fee_opt: None,
         name_opt: None,
         force_close_opt: None,
+        platform_liquidation_fee_opt: None,
     }
 }
 

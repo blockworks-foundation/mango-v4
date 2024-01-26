@@ -212,7 +212,7 @@ pub struct Bank {
     /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
     pub platform_liquidation_fee: I80F48,
 
-    /// Fees that were collected during liquidation (in native tokens)
+    /// Platform fees that were collected during liquidation (in native tokens)
     ///
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,

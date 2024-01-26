@@ -513,6 +513,21 @@ pub struct PerpLiqBaseOrPositivePnlLog {
 }
 
 #[event]
+pub struct PerpLiqBaseOrPositivePnlLogV2 {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer_liqee: i64,
+    pub quote_transfer_liqee: i128,
+    pub quote_transfer_liqor: i128,
+    pub quote_platform_fee: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
 pub struct PerpLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
