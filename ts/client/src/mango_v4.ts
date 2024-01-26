@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.21.1",
+  "version": "0.21.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -2268,15 +2268,15 @@ export type MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",
@@ -13529,7 +13529,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.21.1",
+  "version": "0.21.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -15798,15 +15798,15 @@ export const IDL: MangoV4 = {
         {
           "name": "group",
           "isMut": true,
-          "isSigner": false,
-          "relations": [
-            "admin"
-          ]
+          "isSigner": false
         },
         {
           "name": "admin",
           "isMut": false,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "group admin or fast listing admin, checked at #1"
+          ]
         },
         {
           "name": "serumProgram",

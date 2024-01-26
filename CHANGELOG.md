@@ -4,12 +4,16 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.21.2, 2024-1-
+
+- Allow fast-listing of Openbook v1 markets (#839, #841)
+
+## mainnet
+
 ### v0.21.1, 2024-1-
 
 - Prevent withdraw operations from bringing token utilization over 100%.
 - Prevent extreme interest rates for tokens with borrows but near zero deposits.
-
-## mainnet
 
 ### v0.21.0, 2023-12-13
 
