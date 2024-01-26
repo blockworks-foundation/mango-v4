@@ -425,6 +425,7 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
+    fallbackOraclePk: PublicKey,
     tokenIndex: number,
     name: string,
     params: TokenRegisterParams,
@@ -466,6 +467,7 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mint: mintPk,
         oracle: oraclePk,
+        fallbackOracle: fallbackOraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
         rent: SYSVAR_RENT_PUBKEY,
       })
@@ -719,16 +721,20 @@ export class MangoClient {
     mintPk: PublicKey,
     price: number,
   ): Promise<MangoSignatureStatus> {
+    const stubOracle = Keypair.generate();
     const ix = await this.program.methods
       .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        oracle: stubOracle.publicKey,
         mint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+    return await this.sendAndConfirmTransactionForGroup(group, [ix], {
+      additionalSigners: [stubOracle],
+    });
   }
 
   public async stubOracleClose(
