@@ -1750,6 +1750,10 @@
 <a href="#1750" id="1750">1750</a>
 <a href="#1751" id="1751">1751</a>
 <a href="#1752" id="1752">1752</a>
+<a href="#1753" id="1753">1753</a>
+<a href="#1754" id="1754">1754</a>
+<a href="#1755" id="1755">1755</a>
+<a href="#1756" id="1756">1756</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -2593,6 +2597,7 @@
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
+        platform_liquidation_fee: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::perp_create_market(
@@ -2624,6 +2629,7 @@
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
+            platform_liquidation_fee,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -2661,6 +2667,7 @@
         positive_pnl_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
         force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        platform_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::perp_edit_market(
@@ -2695,6 +2702,7 @@
             positive_pnl_liquidation_fee_opt,
             name_opt,
             force_close_opt,
+            platform_liquidation_fee_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }

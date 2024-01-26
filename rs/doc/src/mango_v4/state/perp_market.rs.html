@@ -529,6 +529,18 @@
 <a href="#529" id="529">529</a>
 <a href="#530" id="530">530</a>
 <a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -720,8 +732,17 @@
     // This ensures that fees_settled is strictly increasing for stats gathering purposes
     </span><span class="kw">pub </span>fees_withdrawn: u64,
 
+    <span class="doccomment">/// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    </span><span class="kw">pub </span>platform_liquidation_fee: I80F48,
+
+    <span class="doccomment">/// Platform fees that were accrued during liquidation (in native tokens)
+    ///
+    /// These fees are also added to fees_accrued, this is just for bookkeeping the total
+    /// liquidation fees that happened. So never decreases (different to fees_accrued).
+    </span><span class="kw">pub </span>accrued_liquidation_fees: I80F48,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1880</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1848</span>],
 }
 
 <span class="macro">const_assert_eq!</span>(
@@ -758,7 +779,8 @@
         </span>+ <span class="number">7
         </span>+ <span class="number">3 </span>* <span class="number">16
         </span>+ <span class="number">8
-        </span>+ <span class="number">1880
+        </span>+ <span class="number">2 </span>* <span class="number">16
+        </span>+ <span class="number">1848
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpMarket&gt;(), <span class="number">2808</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;PerpMarket&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -1056,7 +1078,9 @@
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
             fees_withdrawn: <span class="number">0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">1880</span>],
+            platform_liquidation_fee: I80F48::ZERO,
+            accrued_liquidation_fees: I80F48::ZERO,
+            reserved: [<span class="number">0</span>; <span class="number">1848</span>],
         }
     }
 }
