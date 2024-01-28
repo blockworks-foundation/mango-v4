@@ -234,6 +234,12 @@ export function deepClone<T>(obj: T, hash = new WeakMap()): T {
     obj.forEach((value, key) => {
       result.set(deepClone(key, hash), deepClone(value, hash));
     });
+  } else if (obj instanceof Set) {
+    result = new Set();
+    hash.set(obj, result);
+    for (const item of obj) {
+      result.add(deepClone(item, hash));
+    }
   } else if (Array.isArray(obj)) {
     result = [];
     hash.set(obj, result);
