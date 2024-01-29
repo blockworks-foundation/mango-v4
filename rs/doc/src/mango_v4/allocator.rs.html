@@ -75,9 +75,22 @@
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
 <a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(dead_code)]
 
 </span><span class="kw">use </span>std::alloc::{GlobalAlloc, Layout};
+
+<span class="doccomment">/// The end of the region where heap space may be reserved for the program.
+///
+/// The actual size of the heap is currently not available at runtime.
+</span><span class="kw">pub const </span>HEAP_END_ADDRESS: usize = <span class="number">0x400000000</span>;
 
 <span class="attr">#[cfg(not(feature = <span class="string">&quot;no-entrypoint&quot;</span>))]
 #[global_allocator]
@@ -124,6 +137,9 @@
         <span class="comment">// Update allocator state
         </span><span class="kw">let </span>end = begin.checked_add(layout.size()).unwrap();
         <span class="kw-2">*</span>pos_ptr = end;
+
+        <span class="comment">// Ensure huge allocations can&#39;t escape the dedicated heap memory region
+        </span><span class="macro">assert!</span>(end &lt; HEAP_END_ADDRESS);
 
         <span class="comment">// Write a byte to trigger heap overflow errors early
         </span><span class="kw">let </span>end_ptr = end <span class="kw">as </span><span class="kw-2">*mut </span>u8;
