@@ -133,6 +133,11 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             owner_ata,
             MangoError::DelegateWithdrawOnlyToOwnerAta
         );
+        require_keys_eq!(
+            ctx.accounts.token_account.owner,
+            account.fixed.owner,
+            MangoError::DelegateWithdrawOnlyToOwnerAta
+        );
 
         // Delegates must close the token position
         require!(
