@@ -931,12 +931,12 @@ impl MangoClient {
         Ok(orders)
     }
 
-    pub async fn serum3_liq_force_cancel_orders(
+    pub async fn serum3_liq_force_cancel_orders_instruction(
         &self,
         liqee: (&Pubkey, &MangoAccountValue),
         market_index: Serum3MarketIndex,
         open_orders: &Pubkey,
-    ) -> anyhow::Result<Signature> {
+    ) -> anyhow::Result<PreparedInstructions> {
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
@@ -946,7 +946,7 @@ impl MangoClient {
             .unwrap();
 
         let limit = 5;
-        let ixs = PreparedInstructions::from_single(
+        let ix = PreparedInstructions::from_single(
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
@@ -982,6 +982,18 @@ impl MangoClient {
             self.instruction_cu(health_cu)
                 + self.context.compute_estimates.cu_per_serum3_order_cancel * limit as u32,
         );
+        Ok(ix)
+    }
+
+    pub async fn serum3_liq_force_cancel_orders(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        market_index: Serum3MarketIndex,
+        open_orders: &Pubkey,
+    ) -> anyhow::Result<Signature> {
+        let ixs = self
+            .serum3_liq_force_cancel_orders_instruction(liqee, market_index, open_orders)
+            .await?;
         self.send_and_confirm_permissionless_tx(ixs.to_instructions())
             .await
     }
@@ -1825,32 +1837,35 @@ impl MangoClient {
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<Signature> {
-        let fee_payer = self.client.fee_payer();
-        TransactionBuilder {
+        let mut tx_builder = TransactionBuilder {
             instructions,
-            address_lookup_tables: self.mango_address_lookup_tables().await?,
-            payer: fee_payer.pubkey(),
-            signers: vec![self.owner.clone(), fee_payer],
-            config: self.client.config.transaction_builder_config,
-        }
-        .send_and_confirm(&self.client)
-        .await
+            ..self.transaction_builder().await?
+        };
+        tx_builder.signers.push(self.owner.clone());
+        tx_builder.send_and_confirm(&self.client).await
     }
 
     pub async fn send_and_confirm_permissionless_tx(
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<Signature> {
-        let fee_payer = self.client.fee_payer();
         TransactionBuilder {
             instructions,
+            ..self.transaction_builder().await?
+        }
+        .send_and_confirm(&self.client)
+        .await
+    }
+
+    pub async fn transaction_builder(&self) -> anyhow::Result<TransactionBuilder> {
+        let fee_payer = self.client.fee_payer();
+        Ok(TransactionBuilder {
+            instructions: vec![],
             address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
             config: self.client.config.transaction_builder_config,
-        }
-        .send_and_confirm(&self.client)
-        .await
+        })
     }
 
     pub async fn simulate(
