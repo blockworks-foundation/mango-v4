@@ -2,6 +2,11 @@
 
 use std::alloc::{GlobalAlloc, Layout};
 
+/// The end of the region where heap space may be reserved for the program.
+///
+/// The actual size of the heap is currently not available at runtime.
+pub const HEAP_END_ADDRESS: usize = 0x400000000;
+
 #[cfg(not(feature = "no-entrypoint"))]
 #[global_allocator]
 pub static ALLOCATOR: BumpAllocator = BumpAllocator {};
@@ -47,6 +52,9 @@ unsafe impl GlobalAlloc for BumpAllocator {
         // Update allocator state
         let end = begin.checked_add(layout.size()).unwrap();
         *pos_ptr = end;
+
+        // Ensure huge allocations can't escape the dedicated heap memory region
+        assert!(end < HEAP_END_ADDRESS);
 
         // Write a byte to trigger heap overflow errors early
         let end_ptr = end as *mut u8;
