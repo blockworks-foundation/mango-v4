@@ -9,6 +9,7 @@ use futures_util::{
     future::{self, Ready},
     pin_mut, SinkExt, StreamExt, TryStreamExt,
 };
+use itertools::Itertools;
 use log::*;
 use mango_feeds_connector::{
     grpc_plugin_source, metrics,
@@ -611,7 +612,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let use_geyser = true;
     let all_queue_pks = [perp_queue_pks.clone()].concat();
-    let relevant_pubkeys = all_queue_pks.iter().map(|m| m.1).collect();
+    let relevant_pubkeys = all_queue_pks.iter().map(|m| m.1).collect_vec();
     info!("{} event queue pubkeys", relevant_pubkeys.len());
     let filter_config = FilterConfig {
         entity_filter: EntityFilter::FilterByAccountIds(relevant_pubkeys),
