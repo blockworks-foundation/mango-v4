@@ -2139,6 +2139,21 @@
 <a href="#2139" id="2139">2139</a>
 <a href="#2140" id="2140">2140</a>
 <a href="#2141" id="2141">2141</a>
+<a href="#2142" id="2142">2142</a>
+<a href="#2143" id="2143">2143</a>
+<a href="#2144" id="2144">2144</a>
+<a href="#2145" id="2145">2145</a>
+<a href="#2146" id="2146">2146</a>
+<a href="#2147" id="2147">2147</a>
+<a href="#2148" id="2148">2148</a>
+<a href="#2149" id="2149">2149</a>
+<a href="#2150" id="2150">2150</a>
+<a href="#2151" id="2151">2151</a>
+<a href="#2152" id="2152">2152</a>
+<a href="#2153" id="2153">2153</a>
+<a href="#2154" id="2154">2154</a>
+<a href="#2155" id="2155">2155</a>
+<a href="#2156" id="2156">2156</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -3072,12 +3087,12 @@
         <span class="prelude-val">Ok</span>(orders)
     }
 
-    <span class="kw">pub async fn </span>serum3_liq_force_cancel_orders(
+    <span class="kw">pub async fn </span>serum3_liq_force_cancel_orders_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
         market_index: Serum3MarketIndex,
         open_orders: <span class="kw-2">&amp;</span>Pubkey,
-    ) -&gt; anyhow::Result&lt;Signature&gt; {
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
         <span class="kw">let </span>s3 = <span class="self">self</span>.context.serum3(market_index);
         <span class="kw">let </span>base = <span class="self">self</span>.context.serum3_base_token(market_index);
         <span class="kw">let </span>quote = <span class="self">self</span>.context.serum3_quote_token(market_index);
@@ -3087,7 +3102,7 @@
             </span>.unwrap();
 
         <span class="kw">let </span>limit = <span class="number">5</span>;
-        <span class="kw">let </span>ixs = PreparedInstructions::from_single(
+        <span class="kw">let </span>ix = PreparedInstructions::from_single(
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
@@ -3123,6 +3138,18 @@
             <span class="self">self</span>.instruction_cu(health_cu)
                 + <span class="self">self</span>.context.compute_estimates.cu_per_serum3_order_cancel * limit <span class="kw">as </span>u32,
         );
+        <span class="prelude-val">Ok</span>(ix)
+    }
+
+    <span class="kw">pub async fn </span>serum3_liq_force_cancel_orders(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        liqee: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
+        market_index: Serum3MarketIndex,
+        open_orders: <span class="kw-2">&amp;</span>Pubkey,
+    ) -&gt; anyhow::Result&lt;Signature&gt; {
+        <span class="kw">let </span>ixs = <span class="self">self
+            </span>.serum3_liq_force_cancel_orders_instruction(liqee, market_index, open_orders)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="self">self</span>.send_and_confirm_permissionless_tx(ixs.to_instructions())
             .<span class="kw">await
     </span>}
@@ -3966,33 +3993,36 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         instructions: Vec&lt;Instruction&gt;,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
-        TransactionBuilder {
+        <span class="kw">let </span><span class="kw-2">mut </span>tx_builder = TransactionBuilder {
             instructions,
-            address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
-            payer: fee_payer.pubkey(),
-            signers: <span class="macro">vec!</span>[<span class="self">self</span>.owner.clone(), fee_payer],
-            config: <span class="self">self</span>.client.config.transaction_builder_config,
-        }
-        .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
-        .<span class="kw">await
+            ..<span class="self">self</span>.transaction_builder().<span class="kw">await</span><span class="question-mark">?
+        </span>};
+        tx_builder.signers.push(<span class="self">self</span>.owner.clone());
+        tx_builder.send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client).<span class="kw">await
     </span>}
 
     <span class="kw">pub async fn </span>send_and_confirm_permissionless_tx(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         instructions: Vec&lt;Instruction&gt;,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
         TransactionBuilder {
             instructions,
+            ..<span class="self">self</span>.transaction_builder().<span class="kw">await</span><span class="question-mark">?
+        </span>}
+        .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
+        .<span class="kw">await
+    </span>}
+
+    <span class="kw">pub async fn </span>transaction_builder(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;TransactionBuilder&gt; {
+        <span class="kw">let </span>fee_payer = <span class="self">self</span>.client.fee_payer();
+        <span class="prelude-val">Ok</span>(TransactionBuilder {
+            instructions: <span class="macro">vec!</span>[],
             address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
             payer: fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[fee_payer],
             config: <span class="self">self</span>.client.config.transaction_builder_config,
-        }
-        .send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
-        .<span class="kw">await
-    </span>}
+        })
+    }
 
     <span class="kw">pub async fn </span>simulate(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
