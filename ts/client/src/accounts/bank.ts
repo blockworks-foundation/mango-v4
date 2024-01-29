@@ -142,6 +142,7 @@ export class Bank implements BankForHealth {
       maintWeightShiftDurationInv: I80F48Dto;
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
+      fallbackOracle: PublicKey;
       depositLimit: BN;
       zeroUtilRate: I80F48Dto;
       platformLiquidationFee: I80F48Dto;
@@ -205,6 +206,7 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftDurationInv,
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
+      obj.fallbackOracle,
       obj.depositLimit,
       obj.zeroUtilRate,
       obj.platformLiquidationFee,
@@ -269,6 +271,7 @@ export class Bank implements BankForHealth {
     maintWeightShiftDurationInv: I80F48Dto,
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
+    public fallbackOracle: PublicKey,
     public depositLimit: BN,
     zeroUtilRate: I80F48Dto,
     platformLiquidationFee: I80F48Dto,
