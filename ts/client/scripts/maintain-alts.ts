@@ -155,7 +155,7 @@ async function run(): Promise<void> {
         .map((perpMarket) => [perpMarket.publicKey, perpMarket.oracle])
         .flat(),
     );
-    // Well known addressess
+    // Well known addresses
     await extendTable(
       client,
       group,

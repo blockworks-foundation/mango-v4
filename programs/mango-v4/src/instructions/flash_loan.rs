@@ -337,7 +337,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         // Create the token position now, so we can compute the pre-health with fixed order health accounts
         let (_, raw_token_index, _) = account.ensure_token_position(bank.token_index)?;
 
-        // Transfer any excess over the inital balance of the token account back
+        // Transfer any excess over the initial balance of the token account back
         // into the vault. Compute the total change in the vault balance.
         let mut change = -I80F48::from(bank.flash_loan_approved_amount);
         if token_account.amount > bank.flash_loan_token_account_initial {
