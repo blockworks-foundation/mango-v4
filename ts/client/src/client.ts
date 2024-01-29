@@ -544,7 +544,7 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
-        params.setFallbackOracle ?? false,
+        params.fallbackOracle !== null, // setFallbackOracle
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
@@ -552,6 +552,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         oracle: params.oracle ?? bank.oracle,
+        fallbackOracle: params.fallbackOracle ?? bank.fallbackOracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
