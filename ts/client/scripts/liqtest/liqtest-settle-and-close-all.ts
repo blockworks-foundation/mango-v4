@@ -57,6 +57,9 @@ async function main() {
         `closing serum orders on: ${account} for market ${serumMarket.name}`,
       );
       await client.serum3CancelAllOrders(group, account, serumExternal, 10);
+      try {
+        await client.serum3ConsumeEvents(group, serumExternal);
+      } catch (e) {}
       await client.serum3SettleFunds(group, account, serumExternal);
       await client.serum3CloseOpenOrders(group, account, serumExternal);
     }

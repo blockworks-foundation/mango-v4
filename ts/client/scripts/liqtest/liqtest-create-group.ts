@@ -29,6 +29,7 @@ const MAINNET_MINTS = new Map([
   ['ETH', MINTS[1]],
   ['SOL', MINTS[2]],
   ['MNGO', MINTS[3]],
+  ['MSOL', MINTS[4]],
 ]);
 
 const STUB_PRICES = new Map([
@@ -36,13 +37,7 @@ const STUB_PRICES = new Map([
   ['ETH', 1200.0], // eth and usdc both have 6 decimals
   ['SOL', 0.015], // sol has 9 decimals, equivalent to $15 per SOL
   ['MNGO', 0.02],
-]);
-
-// External markets are matched with those in https://github.com/blockworks-foundation/mango-client-v3/blob/main/src/ids.json
-// and verified to have best liquidity for pair on https://openserum.io/
-const MAINNET_SERUM3_MARKETS = new Map([
-  ['ETH/USDC', SERUM_MARKETS[0]],
-  ['SOL/USDC', SERUM_MARKETS[1]],
+  ['MSOL', 0.017],
 ]);
 
 const MIN_VAULT_TO_DEPOSITS_RATIO = 0.2;
@@ -90,11 +85,13 @@ async function main(): Promise<void> {
   for (const [name, mint] of MAINNET_MINTS) {
     console.log(`Creating stub oracle for ${name}...`);
     const mintPk = new PublicKey(mint);
-    try {
-      const price = STUB_PRICES.get(name)!;
-      await client.stubOracleCreate(group, mintPk, price);
-    } catch (error) {
-      console.log(error);
+    if ((await client.getStubOracle(group, mintPk)).length == 0) {
+      try {
+        const price = STUB_PRICES.get(name)!;
+        await client.stubOracleCreate(group, mintPk, price);
+      } catch (error) {
+        console.log(error);
+      }
     }
     const oracle = (await client.getStubOracle(group, mintPk))[0];
     console.log(`...created stub oracle ${oracle.publicKey}`);
@@ -114,22 +111,32 @@ async function main(): Promise<void> {
     maxRate: 1.5,
   };
 
+  const noFallbackOracle = PublicKey.default;
+
   // register token 0
   console.log(`Registering USDC...`);
   const usdcMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
   const usdcOracle = oracles.get('USDC');
   try {
-    await client.tokenRegister(group, usdcMint, usdcOracle, 0, 'USDC', {
-      ...DefaultTokenRegisterParams,
-      loanOriginationFeeRate: 0,
-      loanFeeRate: 0.0001,
-      initAssetWeight: 1,
-      maintAssetWeight: 1,
-      initLiabWeight: 1,
-      maintLiabWeight: 1,
-      liquidationFee: 0,
-      netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
-    });
+    await client.tokenRegister(
+      group,
+      usdcMint,
+      usdcOracle,
+      noFallbackOracle,
+      0,
+      'USDC',
+      {
+        ...DefaultTokenRegisterParams,
+        loanOriginationFeeRate: 0,
+        loanFeeRate: 0.0001,
+        initAssetWeight: 1,
+        maintAssetWeight: 1,
+        initLiabWeight: 1,
+        maintLiabWeight: 1,
+        liquidationFee: 0,
+        netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+      },
+    );
     await group.reloadAll(client);
   } catch (error) {
     console.log(error);
@@ -140,17 +147,25 @@ async function main(): Promise<void> {
   const ethMint = new PublicKey(MAINNET_MINTS.get('ETH')!);
   const ethOracle = oracles.get('ETH');
   try {
-    await client.tokenRegister(group, ethMint, ethOracle, 1, 'ETH', {
-      ...DefaultTokenRegisterParams,
-      loanOriginationFeeRate: 0,
-      loanFeeRate: 0.0001,
-      maintAssetWeight: 0.9,
-      initAssetWeight: 0.8,
-      maintLiabWeight: 1.1,
-      initLiabWeight: 1.2,
-      liquidationFee: 0.05,
-      netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
-    });
+    await client.tokenRegister(
+      group,
+      ethMint,
+      ethOracle,
+      noFallbackOracle,
+      1,
+      'ETH',
+      {
+        ...DefaultTokenRegisterParams,
+        loanOriginationFeeRate: 0,
+        loanFeeRate: 0.0001,
+        maintAssetWeight: 0.9,
+        initAssetWeight: 0.8,
+        maintLiabWeight: 1.1,
+        initLiabWeight: 1.2,
+        liquidationFee: 0.05,
+        netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+      },
+    );
     await group.reloadAll(client);
   } catch (error) {
     console.log(error);
@@ -165,6 +180,7 @@ async function main(): Promise<void> {
       group,
       solMint,
       solOracle,
+      noFallbackOracle,
       2, // tokenIndex
       'SOL',
       {
@@ -184,27 +200,72 @@ async function main(): Promise<void> {
     console.log(error);
   }
 
+  const genericBanks = ['MNGO', 'MSOL'];
+  let nextTokenIndex = 3;
+  for (let name of genericBanks) {
+    console.log(`Registering ${name}...`);
+    const mint = new PublicKey(MAINNET_MINTS.get(name)!);
+    const oracle = oracles.get(name);
+    try {
+      await client.tokenRegister(
+        group,
+        mint,
+        oracle,
+        noFallbackOracle,
+        nextTokenIndex,
+        name,
+        {
+          ...DefaultTokenRegisterParams,
+          loanOriginationFeeRate: 0,
+          loanFeeRate: 0.0001,
+          maintAssetWeight: 0.9,
+          initAssetWeight: 0.8,
+          maintLiabWeight: 1.1,
+          initLiabWeight: 1.2,
+          liquidationFee: 0.05,
+          netBorrowLimitPerWindowQuote: NET_BORROWS_LIMIT_NATIVE,
+        },
+      );
+      nextTokenIndex += 1;
+      await group.reloadAll(client);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   // log tokens/banks
   for (const bank of await group.banksMapByMint.values()) {
     console.log(`${bank.toString()}`);
   }
 
-  console.log('Registering SOL/USDC serum market...');
-  try {
-    await client.serum3RegisterMarket(
-      group,
-      new PublicKey(MAINNET_SERUM3_MARKETS.get('SOL/USDC')!),
-      group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('SOL')!)),
-      group.getFirstBankByMint(new PublicKey(MAINNET_MINTS.get('USDC')!)),
-      1,
-      'SOL/USDC',
-      0,
-    );
-  } catch (error) {
-    console.log(error);
+  let nextSerumMarketIndex = 0;
+  for (let [name, mint] of MAINNET_MINTS) {
+    if (name == 'USDC') {
+      continue;
+    }
+
+    console.log(`Registering ${name}/USDC serum market...`);
+    try {
+      await client.serum3RegisterMarket(
+        group,
+        new PublicKey(SERUM_MARKETS[nextSerumMarketIndex]),
+        group.getFirstBankByMint(new PublicKey(mint)),
+        group.getFirstBankByMint(usdcMint),
+        nextSerumMarketIndex,
+        `${name}/USDC`,
+        0,
+      );
+      nextSerumMarketIndex += 1;
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   console.log('Registering MNGO-PERP market...');
+  if (!group.banksMapByMint.get(usdcMint.toString())) {
+    console.log('stopping, no USDC bank');
+    return;
+  }
   const mngoOracle = oracles.get('MNGO');
   try {
     await client.perpCreateMarket(
@@ -237,6 +298,7 @@ async function main(): Promise<void> {
       -1.0,
       2 * 60 * 60,
       0.025,
+      0.0,
     );
   } catch (error) {
     console.log(error);

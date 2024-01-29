@@ -336,6 +336,7 @@ async fn main() -> anyhow::Result<()> {
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
+        max_cu_per_transaction: 1_000_000,
         // TODO: config
         refresh_timeout: Duration::from_secs(30),
     };
