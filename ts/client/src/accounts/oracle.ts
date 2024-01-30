@@ -94,7 +94,8 @@ export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
 ): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
-  const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
+  const price =
+    program.decodeLatestAggregatorValue(accountInfo).toNumber() ?? 0;
   const lastUpdatedSlot = program
     .decodeAggregator(accountInfo)
     .latestConfirmedRound!.roundOpenSlot!.toNumber();
