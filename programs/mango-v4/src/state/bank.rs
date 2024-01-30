@@ -6,7 +6,6 @@ use crate::state::{oracle, StablePriceModel};
 use crate::util;
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
 use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
@@ -98,7 +97,8 @@ pub struct Bank {
 
     pub bank_num: u32,
 
-    /// Min fraction of deposits that must remain in the vault when borrowing.
+    /// The maximum utilization allowed when borrowing is 1-this value
+    /// WARNING: Outdated name, kept for IDL compatibility
     pub min_vault_to_deposits_ratio: f64,
 
     /// Size in seconds of a net borrows window
@@ -395,26 +395,33 @@ impl Bank {
         }
     }
 
+    pub fn enforce_borrows_lte_deposits(&self) -> Result<()> {
+        self.enforce_max_utilization(I80F48::ONE)
+    }
+
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
-    pub fn enforce_min_vault_to_deposits_ratio(&self, vault_ai: &AccountInfo) -> Result<()> {
-        require_keys_eq!(self.vault, vault_ai.key());
+    pub fn enforce_max_utilization_on_borrow(&self) -> Result<()> {
+        self.enforce_max_utilization(
+            I80F48::ONE - I80F48::from_num(self.min_vault_to_deposits_ratio),
+        )
+    }
 
-        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
-        let vault_amount = vault.amount as f64;
-
+    /// Prevent borrowing away the full bank vault.
+    /// Keep some in reserve to satisfy non-borrow withdraws.
+    fn enforce_max_utilization(&self, max_utilization: I80F48) -> Result<()> {
         let bank_native_deposits = self.native_deposits();
-        if bank_native_deposits != I80F48::ZERO {
-            let bank_native_deposits: f64 = bank_native_deposits.to_num();
-            if vault_amount < self.min_vault_to_deposits_ratio * bank_native_deposits {
-                return err!(MangoError::BankBorrowLimitReached).with_context(|| {
+        let bank_native_borrows = self.native_borrows();
+
+        if bank_native_borrows > max_utilization * bank_native_deposits {
+            return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
-                    "vault_amount ({:?}) below min_vault_to_deposits_ratio * bank_native_deposits ({:?})",
-                    vault_amount, self.min_vault_to_deposits_ratio * bank_native_deposits,
+                    "deposits {}, borrows {}, max utilization {}",
+                    bank_native_deposits, bank_native_borrows, max_utilization,
                 )
             });
-            }
-        }
+        };
+
         Ok(())
     }
 
@@ -925,12 +932,8 @@ impl Bank {
         let native_total_deposits = self.deposit_index * indexed_total_deposits;
         let native_total_borrows = self.borrow_index * indexed_total_borrows;
 
-        // This will be >= 0, but can also be > 1
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            native_total_borrows / native_total_deposits
-        };
+        let instantaneous_utilization =
+            Self::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         let borrow_rate = self.compute_interest_rate(instantaneous_utilization);
 
@@ -964,6 +967,23 @@ impl Bank {
         ))
     }
 
+    /// Current utilization, clamped to 0..1
+    ///
+    /// Above 100% utilization can happen natually when utilization is 100% and interest is paid out,
+    /// increasing borrows more than deposits.
+    fn instantaneous_utilization(
+        native_total_deposits: I80F48,
+        native_total_borrows: I80F48,
+    ) -> I80F48 {
+        if native_total_deposits == I80F48::ZERO {
+            I80F48::ZERO
+        } else {
+            (native_total_borrows / native_total_deposits)
+                .max(I80F48::ZERO)
+                .min(I80F48::ONE)
+        }
+    }
+
     /// returns the current interest rate in APR
     #[inline(always)]
     pub fn compute_interest_rate(&self, utilization: I80F48) -> I80F48 {
@@ -990,6 +1010,9 @@ impl Bank {
         max_rate: I80F48,
         scaling: f64,
     ) -> I80F48 {
+        // Clamp to avoid negative or extremely high interest
+        let utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
+
         let v = if utilization <= util0 {
             let slope = rate0 / util0;
             slope * utilization
@@ -1024,11 +1047,8 @@ impl Bank {
 
         let native_total_deposits = self.deposit_index * indexed_total_deposits;
         let native_total_borrows = self.borrow_index * indexed_total_borrows;
-        let instantaneous_utilization = if native_total_deposits == I80F48::ZERO {
-            I80F48::ZERO
-        } else {
-            native_total_borrows / native_total_deposits
-        };
+        let instantaneous_utilization =
+            Self::instantaneous_utilization(native_total_deposits, native_total_borrows);
 
         // Compute a time-weighted average since bank_rate_last_updated.
         let previous_avg_time =
@@ -1048,7 +1068,8 @@ impl Bank {
         let target_util = self.interest_target_utilization as f64;
 
         // use avg_utilization and not instantaneous_utilization so that rates cannot be manipulated easily
-        let avg_util = self.avg_utilization.to_num::<f64>();
+        // also clamp to avoid unusually quick interest rate curve changes
+        let avg_util = self.avg_utilization.to_num::<f64>().max(0.0).min(1.0);
 
         // move rates up when utilization is above optimal utilization, and vice versa
         // util factor is between -1 (avg util = 0) and +1 (avg util = 100%)

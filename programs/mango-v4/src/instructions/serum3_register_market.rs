@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::error::MangoError;
+use crate::error::*;
 use crate::serum3_cpi::{load_market_state, pubkey_from_u64_array};
 use crate::state::*;
 use crate::util::fill_from_str;
@@ -14,7 +14,18 @@ pub fn serum3_register_market(
     name: String,
     oracle_price_band: f32,
 ) -> Result<()> {
-    // TODO: must guard against accidentally using the same market_index twice!
+    let is_fast_listing;
+    let group = ctx.accounts.group.load()?;
+    // checking the admin account (#1)
+    if ctx.accounts.admin.key() == group.admin {
+        is_fast_listing = false;
+    } else if ctx.accounts.admin.key() == group.fast_listing_admin {
+        is_fast_listing = true;
+    } else {
+        return Err(error_msg!(
+            "admin must be the group admin or group fast listing admin"
+        ));
+    }
 
     let base_bank = ctx.accounts.base_bank.load()?;
     let quote_bank = ctx.accounts.quote_bank.load()?;
@@ -30,6 +41,22 @@ pub fn serum3_register_market(
         pubkey_from_u64_array(market_external.coin_mint) == base_bank.mint,
         MangoError::SomeError
     );
+
+    if is_fast_listing {
+        // Safety parameters have fixed values when fast listing is used.
+
+        // C tier tokens (no borrows, no asset weight) allow wider bands if the quote token has
+        // no deposit limits
+        let base_c_tier =
+            base_bank.are_borrows_reduce_only() && base_bank.maint_asset_weight.is_zero();
+        let quote_has_no_deposit_limit = quote_bank.deposit_weight_scale_start_quote == f64::MAX
+            && quote_bank.deposit_limit == 0;
+        if base_c_tier && quote_has_no_deposit_limit {
+            require_eq!(oracle_price_band, 19.0);
+        } else {
+            require_eq!(oracle_price_band, 1.0);
+        }
+    }
 
     let mut serum_market = ctx.accounts.serum_market.load_init()?;
     *serum_market = Serum3Market {

@@ -340,8 +340,10 @@ pub fn serum3_place_order(
             MangoError::TokenInReduceOnlyMode,
             "the payer tokens cannot be borrowed"
         );
-        payer_bank.enforce_min_vault_to_deposits_ratio((*ctx.accounts.payer_vault).as_ref())?;
+        payer_bank.enforce_max_utilization_on_borrow()?;
         payer_bank.check_net_borrows(payer_bank_oracle)?;
+    } else {
+        payer_bank.enforce_borrows_lte_deposits()?;
     }
 
     // Limit order price bands: If the order ends up on the book, ensure

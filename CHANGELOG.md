@@ -4,7 +4,20 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.21.0, 2023-12-
+### v0.21.2, 2024-1-
+
+- Allow fast-listing of Openbook v1 markets (#839, #841)
+
+## mainnet
+
+### v0.21.1, 2024-1-
+
+- Prevent withdraw operations from bringing token utilization over 100%.
+- Prevent extreme interest rates for tokens with borrows but near zero deposits.
+
+### v0.21.0, 2023-12-13
+
+Deployment: Dec 13, 2023 at 09:02:46 Central European Standard Time, https://explorer.solana.com/tx/47BBFEugtHYciK5jHVzVtXawc7oyXKzX8o5V4ERXX3Cb7AZqmr8w6uDrFPRpyJRDccRWtuno8g2micqaFoSLC1EL
 
 - Introduce deposit limits (#806)
 
@@ -52,8 +65,6 @@ Update this for each program release and mainnet deployment.
 - Disable TokenAddBank instruction, which was unused (#803)
 - Significantly reduce program heap use (#787, #785)
 - Reduce compute use of OpenBook health computations (#750)
-
-## mainnet
 
 ### v0.20.0, 2023-11-8
 
