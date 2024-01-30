@@ -74,9 +74,10 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         group,
                         event_queue
                     );
+                    // ### TODO: fix this by using a return value
                     let before_pnl = maker_taker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
                     maker_taker.execute_perp_maker(
                         perp_market_index,
                         &mut perp_market,
@@ -92,7 +93,7 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     );
                     let after_pnl = maker_taker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
                     let closed_pnl = after_pnl - before_pnl;
                     (closed_pnl, closed_pnl)
                 } else {
@@ -101,10 +102,10 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
 
                     let maker_before_pnl = maker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
                     let taker_before_pnl = taker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
 
                     maker.execute_perp_maker(perp_market_index, &mut perp_market, fill, &group)?;
                     taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
@@ -122,10 +123,10 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                     );
                     let maker_after_pnl = maker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
                     let taker_after_pnl = taker
                         .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
+                        .deprecated_realized_trade_pnl_native;
 
                     let maker_closed_pnl = maker_after_pnl - maker_before_pnl;
                     let taker_closed_pnl = taker_after_pnl - taker_before_pnl;

@@ -230,12 +230,12 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
         0.1
     ));
     assert!(assert_equal(
-        liqee_data.perps[0].realized_trade_pnl_native,
+        liqee_data.perps[0].realized_pnl_for_position_native,
         liqee_amount - 1000.0,
         0.1
     ));
     // stable price is 1.0, so 0.2 * 1000
-    assert_eq!(liqee_data.perps[0].settle_pnl_limit_realized_trade, -201);
+    assert_eq!(liqee_data.perps[0].recurring_settle_pnl_allowance, 201);
     assert!(assert_equal(
         perp_market_after.fees_accrued - perp_market_before.fees_accrued,
         liqor_amount - liqee_amount,
@@ -521,7 +521,7 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: liqee_quote_deposits_before as u64 - 100,
+            amount: liqee_quote_deposits_before as u64 - 200,
             allow_borrow: false,
             account: account_1,
             owner,
@@ -572,9 +572,9 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
         0.1
     ));
     assert!(assert_equal(
-        liqor_data.tokens[0].native(&settle_bank),
-        liqor_before.tokens[0].native(&settle_bank).to_num::<f64>()
-            - liqee_settle_limit_before as f64 * 100.0, // 100 is base lot size
+        liqor_data.tokens[1].native(&settle_bank),
+        liqor_before.tokens[1].native(&settle_bank).to_num::<f64>()
+            - liqee_settle_limit_before as f64,
         0.1
     ));
 

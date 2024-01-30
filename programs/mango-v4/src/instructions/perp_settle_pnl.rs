@@ -143,8 +143,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_max_settle,
     );
 
-    a_perp_position.record_settle(settlement);
-    b_perp_position.record_settle(-settlement);
+    a_perp_position.record_settle(settlement, &perp_market);
+    b_perp_position.record_settle(-settlement, &perp_market);
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account_a.key(),
