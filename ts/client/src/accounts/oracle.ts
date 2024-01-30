@@ -105,6 +105,7 @@ export function parseSwitchboardOracleV2(
 
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
   } catch (e) {
+    console.log('Unable to parse Switchboard Oracle V2', e);
     return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
   }
 }
