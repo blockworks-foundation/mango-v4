@@ -94,17 +94,19 @@ export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
 ): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
-  const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
-  const lastUpdatedSlot = program
-    .decodeAggregator(accountInfo)
-    .latestConfirmedRound!.roundOpenSlot!.toNumber();
-  const stdDeviation = switchboardDecimalToBig(
-    program.decodeAggregator(accountInfo).latestConfirmedRound.stdDeviation,
-  );
+  try {
+    const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
+    const lastUpdatedSlot = program
+      .decodeAggregator(accountInfo)
+      .latestConfirmedRound!.roundOpenSlot!.toNumber();
+    const stdDeviation = switchboardDecimalToBig(
+      program.decodeAggregator(accountInfo).latestConfirmedRound.stdDeviation,
+    );
 
-  if (!price || !lastUpdatedSlot)
-    throw new Error('Unable to parse Switchboard Oracle V2');
-  return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
+    return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
+  } catch (e) {
+    return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+  }
 }
 
 /**
