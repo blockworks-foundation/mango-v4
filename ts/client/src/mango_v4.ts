@@ -6659,9 +6659,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "priceLots",
@@ -6763,9 +6761,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "side",
-          "type": {
-            "defined": "openbook_v2::state::Side"
-          }
+          "type": "u8"
         },
         {
           "name": "orderId",
