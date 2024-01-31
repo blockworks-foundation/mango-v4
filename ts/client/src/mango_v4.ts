@@ -6660,7 +6660,7 @@ export type MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "Side"
+            "defined": "openbook_v2::state::Side"
           }
         },
         {
@@ -6682,7 +6682,7 @@ export type MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "PlaceOrderType"
+            "defined": "openbook_v2::state::PlaceOrderType"
           }
         },
         {
@@ -6764,7 +6764,7 @@ export type MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "Side"
+            "defined": "openbook_v2::state::Side"
           }
         },
         {
@@ -7086,7 +7086,7 @@ export type MangoV4 = {
           "name": "sideOpt",
           "type": {
             "option": {
-              "defined": "Side"
+              "defined": "openbook_v2::state::Side"
             }
           }
         }
@@ -20989,7 +20989,7 @@ export const IDL: MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "Side"
+            "defined": "openbook_v2::state::Side"
           }
         },
         {
@@ -21011,7 +21011,7 @@ export const IDL: MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "PlaceOrderType"
+            "defined": "openbook_v2::state::PlaceOrderType"
           }
         },
         {
@@ -21093,7 +21093,7 @@ export const IDL: MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "Side"
+            "defined": "openbook_v2::state::Side"
           }
         },
         {
@@ -21415,7 +21415,7 @@ export const IDL: MangoV4 = {
           "name": "sideOpt",
           "type": {
             "option": {
-              "defined": "Side"
+              "defined": "openbook_v2::state::Side"
             }
           }
         }
