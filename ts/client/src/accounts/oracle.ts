@@ -106,7 +106,8 @@ export function parseSwitchboardOracleV2(
     );
 
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
-    //if oracle is badly configured or never published decodeLatestAggregate will throw.
+    //if oracle is badly configured or didn't publish price at least once
+    //decodeLatestAggregatorValue can throw (0 switchboard rounds).
   } catch (e) {
     console.log(`Unable to parse Switchboard Oracle V2: ${oracle}`, e);
     return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
