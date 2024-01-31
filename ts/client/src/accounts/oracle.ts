@@ -93,8 +93,10 @@ export function switchboardDecimalToBig(sbDecimal: {
 export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
+  oracle: PublicKey,
 ): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
   try {
+    //
     const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
     const lastUpdatedSlot = program
       .decodeAggregator(accountInfo)
@@ -104,8 +106,9 @@ export function parseSwitchboardOracleV2(
     );
 
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
+    //if oracle is badly configured or never published decodeLatestAggregate will throw.
   } catch (e) {
-    console.log('Unable to parse Switchboard Oracle V2', e);
+    console.log(`Unable to parse Switchboard Oracle V2: ${oracle}`, e);
     return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
   }
 }
@@ -116,6 +119,7 @@ export function parseSwitchboardOracleV2(
  * @returns ui price
  */
 export async function parseSwitchboardOracle(
+  oracle: PublicKey,
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
 ): Promise<{ price: number; lastUpdatedSlot: number; uiDeviation: number }> {
@@ -123,14 +127,14 @@ export async function parseSwitchboardOracle(
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
     }
-    return parseSwitchboardOracleV2(sbv2DevnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2DevnetProgram, accountInfo, oracle);
   }
 
   if (accountInfo.owner.equals(SwitchboardProgram.mainnetPid)) {
     if (!sbv2MainnetProgram) {
       sbv2MainnetProgram = await SwitchboardProgram.loadMainnet(connection);
     }
-    return parseSwitchboardOracleV2(sbv2MainnetProgram, accountInfo);
+    return parseSwitchboardOracleV2(sbv2MainnetProgram, accountInfo, oracle);
   }
 
   if (

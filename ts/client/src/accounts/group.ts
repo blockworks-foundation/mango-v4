@@ -499,6 +499,7 @@ export class Group {
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
+        oracle,
         ai,
         client.program.provider.connection,
       );
