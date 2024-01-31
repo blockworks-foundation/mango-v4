@@ -1084,6 +1084,7 @@ export class MangoClient {
       'mangoAccount',
       undefined,
     );
+    console.log('here', this.program.programId.toBase58());
 
     const accounts = await Promise.all(
       (
