@@ -10687,6 +10687,20 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "openbook_v2::state::Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
       "name": "HealthType",
       "docs": [
         "There are three types of health:",
@@ -11095,6 +11109,29 @@ export type MangoV4 = {
     },
     {
       "name": "PlaceOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "Market"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "openbook_v2::state::PlaceOrderType",
       "type": {
         "kind": "enum",
         "variants": [
@@ -24979,6 +25016,20 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "openbook_v2::state::Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
+          }
+        ]
+      }
+    },
+    {
       "name": "HealthType",
       "docs": [
         "There are three types of health:",
@@ -25387,6 +25438,29 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "PlaceOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "Market"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "openbook_v2::state::PlaceOrderType",
       "type": {
         "kind": "enum",
         "variants": [
