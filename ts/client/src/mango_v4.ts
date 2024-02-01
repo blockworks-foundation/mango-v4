@@ -11408,18 +11408,6 @@ export type MangoV4 = {
       }
     },
     {
-      "name": "MangoAccountValue",
-      "docs": [
-        "Fully owned MangoAccount, useful for tests"
-      ],
-      "type": {
-        "kind": "alias",
-        "value": {
-          "defined": "DynamicAccount<MangoAccountDynamicHeader,MangoAccountFixed,Vec<u8>>"
-        }
-      }
-    },
-    {
       "name": "OpenbookV2MarketIndex",
       "type": {
         "kind": "alias",
@@ -25768,18 +25756,6 @@ export const IDL: MangoV4 = {
       "type": {
         "kind": "alias",
         "value": "u16"
-      }
-    },
-    {
-      "name": "MangoAccountValue",
-      "docs": [
-        "Fully owned MangoAccount, useful for tests"
-      ],
-      "type": {
-        "kind": "alias",
-        "value": {
-          "defined": "DynamicAccount<MangoAccountDynamicHeader,MangoAccountFixed,Vec<u8>>"
-        }
       }
     },
     {
