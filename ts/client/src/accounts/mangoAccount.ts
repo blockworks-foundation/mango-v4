@@ -1325,9 +1325,9 @@ export class PerpPosition {
       dto.takerVolume,
       dto.perpSpotTransfers,
       dto.avgEntryPricePerBaseLot,
-      I80F48.from(dto.realizedTradePnlNative),
-      I80F48.from(dto.realizedOtherPnlNative),
-      dto.settlePnlLimitRealizedTrade,
+      I80F48.from(dto.deprecatedRealizedTradePnlNative),
+      I80F48.from(dto.oneshotSettlePnlAllowance),
+      dto.recurringSettlePnlAllowance,
       I80F48.from(dto.realizedPnlForPositionNative),
     );
   }
@@ -1380,9 +1380,9 @@ export class PerpPosition {
     public takerVolume: BN,
     public perpSpotTransfers: BN,
     public avgEntryPricePerBaseLot: number,
-    public realizedTradePnlNative: I80F48,
-    public realizedOtherPnlNative: I80F48,
-    public settlePnlLimitRealizedTrade: BN,
+    public deprecatedRealizedTradePnlNative: I80F48,
+    public oneshotSettlePnlAllowance: I80F48,
+    public recurringSettlePnlAllowance: BN,
     public realizedPnlForPositionNative: I80F48,
   ) {}
 
@@ -1636,28 +1636,25 @@ export class PerpPosition {
       .mul(baseNative)
       .toNumber();
     const unrealized = new BN(perpMarket.settlePnlLimitFactor * positionValue);
+
+    let maxPnl = unrealized.add(this.recurringSettlePnlAllowance.abs());
+    let minPnl = maxPnl.neg();
+
+    const oneshot = this.oneshotSettlePnlAllowance;
+    if (!oneshot.isNeg()) {
+      maxPnl = maxPnl.add(new BN(oneshot.ceil().toNumber()));
+    } else {
+      minPnl = minPnl.add(new BN(oneshot.floor().toNumber()));
+    }
+
     const used = new BN(
       this.settlePnlLimitSettledInCurrentWindowNative.toNumber(),
     );
 
-    let minPnl = unrealized.neg().sub(used);
-    let maxPnl = unrealized.sub(used);
+    const availableMin = BN.min(minPnl.sub(used), new BN(0));
+    const availableMax = BN.max(maxPnl.sub(used), new BN(0));
 
-    const realizedTrade = this.settlePnlLimitRealizedTrade;
-    if (realizedTrade.gte(new BN(0))) {
-      maxPnl = maxPnl.add(realizedTrade);
-    } else {
-      minPnl = minPnl.add(realizedTrade);
-    }
-
-    const realizedOther = new BN(this.realizedOtherPnlNative.toNumber());
-    if (realizedOther.gte(new BN(0))) {
-      maxPnl = maxPnl.add(realizedOther);
-    } else {
-      minPnl = minPnl.add(realizedOther);
-    }
-
-    return [BN.min(minPnl, new BN(0)), BN.max(maxPnl, new BN(0))];
+    return [availableMin, availableMax];
   }
 
   public applyPnlSettleLimit(pnl: I80F48, perpMarket: PerpMarket): I80F48 {
@@ -1782,8 +1779,10 @@ export class PerpPosition {
           this.getNotionalValueUi(perpMarket!).toString() +
           ', cumulative pnl over position lifetime ui - ' +
           this.cumulativePnlOverPositionLifetimeUi(perpMarket!).toString() +
-          ', realized other pnl native ui - ' +
-          toUiDecimalsForQuote(this.realizedOtherPnlNative) +
+          ', oneshot settleable native ui - ' +
+          toUiDecimalsForQuote(this.oneshotSettlePnlAllowance) +
+          ', recurring settleable native ui - ' +
+          toUiDecimalsForQuote(this.recurringSettlePnlAllowance) +
           ', cumulative long funding ui - ' +
           toUiDecimalsForQuote(this.cumulativeLongFunding) +
           ', cumulative short funding ui - ' +
@@ -1812,9 +1811,9 @@ export class PerpPositionDto {
     public takerVolume: BN,
     public perpSpotTransfers: BN,
     public avgEntryPricePerBaseLot: number,
-    public realizedTradePnlNative: I80F48Dto,
-    public realizedOtherPnlNative: I80F48Dto,
-    public settlePnlLimitRealizedTrade: BN,
+    public deprecatedRealizedTradePnlNative: I80F48Dto,
+    public oneshotSettlePnlAllowance: I80F48Dto,
+    public recurringSettlePnlAllowance: BN,
     public realizedPnlForPositionNative: I80F48Dto,
   ) {}
 }
