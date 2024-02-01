@@ -4101,6 +4101,10 @@ export type MangoV4 = {
         {
           "name": "positivePnlLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -4314,6 +4318,12 @@ export type MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -7551,7 +7561,7 @@ export type MangoV4 = {
           {
             "name": "collectedLiquidationFees",
             "docs": [
-              "Fees that were collected during liquidation (in native tokens)",
+              "Platform fees that were collected during liquidation (in native tokens)",
               "",
               "See also collected_fees_native and fees_withdrawn."
             ],
@@ -8649,11 +8659,32 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -9499,36 +9530,44 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "realizedTradePnlNative",
+            "name": "deprecatedRealizedTradePnlNative",
             "docs": [
-              "Amount of pnl that was realized by bringing the base position closer to 0.",
-              "",
-              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
-              "Settling pnl reduces this value once other_pnl below is exhausted."
+              "Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "realizedOtherPnlNative",
+            "name": "oneshotSettlePnlAllowance",
             "docs": [
-              "Amount of pnl realized from fees, funding and liquidation.",
+              "Amount of pnl that can be settled once.",
               "",
-              "This type of realized pnl is always settleable.",
-              "Settling pnl reduces this value first."
+              "- The value is signed: a negative number means negative pnl can be settled.",
+              "- A settlement in the right direction will decrease this amount.",
+              "",
+              "Typically added for fees, funding and liquidation."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "settlePnlLimitRealizedTrade",
+            "name": "recurringSettlePnlAllowance",
             "docs": [
-              "Settle limit contribution from realized pnl.",
+              "Amount of pnl that can be settled in each settle window.",
               "",
-              "Every time pnl is realized, this is increased by a fraction of the stable",
-              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+              "- Unsigned, the settlement can happen in both directions. Value is >= 0.",
+              "- Previously stored a similar value that was signed, so in migration cases",
+              "this value can be negative and should be .abs()ed.",
+              "- If this value exceeds the current stable-upnl, it should be decreased,",
+              "see apply_recurring_settle_pnl_allowance_constraint()",
+              "",
+              "When the base position is reduced, the settle limit contribution from the reduced",
+              "base position is materialized into this value. When the base position increases,",
+              "some of the allowance is taken away.",
+              "",
+              "This also gets increased when a liquidator takes over pnl."
             ],
             "type": "i64"
           },
@@ -12979,6 +13018,66 @@ export type MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },
@@ -18452,6 +18551,10 @@ export const IDL: MangoV4 = {
         {
           "name": "positivePnlLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
         }
       ]
     },
@@ -18665,6 +18768,12 @@ export const IDL: MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -21902,7 +22011,7 @@ export const IDL: MangoV4 = {
           {
             "name": "collectedLiquidationFees",
             "docs": [
-              "Fees that were collected during liquidation (in native tokens)",
+              "Platform fees that were collected during liquidation (in native tokens)",
               "",
               "See also collected_fees_native and fees_withdrawn."
             ],
@@ -23000,11 +23109,32 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -23850,36 +23980,44 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "realizedTradePnlNative",
+            "name": "deprecatedRealizedTradePnlNative",
             "docs": [
-              "Amount of pnl that was realized by bringing the base position closer to 0.",
-              "",
-              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
-              "Settling pnl reduces this value once other_pnl below is exhausted."
+              "Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "realizedOtherPnlNative",
+            "name": "oneshotSettlePnlAllowance",
             "docs": [
-              "Amount of pnl realized from fees, funding and liquidation.",
+              "Amount of pnl that can be settled once.",
               "",
-              "This type of realized pnl is always settleable.",
-              "Settling pnl reduces this value first."
+              "- The value is signed: a negative number means negative pnl can be settled.",
+              "- A settlement in the right direction will decrease this amount.",
+              "",
+              "Typically added for fees, funding and liquidation."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "settlePnlLimitRealizedTrade",
+            "name": "recurringSettlePnlAllowance",
             "docs": [
-              "Settle limit contribution from realized pnl.",
+              "Amount of pnl that can be settled in each settle window.",
               "",
-              "Every time pnl is realized, this is increased by a fraction of the stable",
-              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+              "- Unsigned, the settlement can happen in both directions. Value is >= 0.",
+              "- Previously stored a similar value that was signed, so in migration cases",
+              "this value can be negative and should be .abs()ed.",
+              "- If this value exceeds the current stable-upnl, it should be decreased,",
+              "see apply_recurring_settle_pnl_allowance_constraint()",
+              "",
+              "When the base position is reduced, the settle limit contribution from the reduced",
+              "base position is materialized into this value. When the base position increases,",
+              "some of the allowance is taken away.",
+              "",
+              "This also gets increased when a liquidator takes over pnl."
             ],
             "type": "i64"
           },
@@ -27330,6 +27468,66 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },

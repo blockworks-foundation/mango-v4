@@ -267,7 +267,7 @@ pub(crate) fn liquidation_action(
             .max(I80F48::ZERO);
         if settlement > 0 {
             liqor_perp_position.record_liquidation_quote_change(-settlement);
-            liqee_perp_position.record_settle(-settlement);
+            liqee_perp_position.record_settle(-settlement, &perp_market);
 
             // Update the accounts' perp_spot_transfer statistics.
             let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
@@ -380,7 +380,7 @@ pub(crate) fn liquidation_action(
 
             // transfer perp quote loss from the liqee to the liqor
             let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
-            liqee_perp_position.record_settle(-insurance_liab_transfer);
+            liqee_perp_position.record_settle(-insurance_liab_transfer, &perp_market);
             liqor_perp_position.record_liquidation_quote_change(-insurance_liab_transfer);
 
             msg!(
@@ -399,7 +399,7 @@ pub(crate) fn liquidation_action(
             (perp_market.long_funding, perp_market.short_funding);
         if insurance_fund_exhausted && remaining_liab > 0 {
             perp_market.socialize_loss(-remaining_liab)?;
-            liqee_perp_position.record_settle(-remaining_liab);
+            liqee_perp_position.record_settle(-remaining_liab, &perp_market);
             socialized_loss = remaining_liab;
             msg!("socialized loss: {}", socialized_loss);
         }
@@ -760,7 +760,7 @@ mod tests {
             {
                 let p = perp_p(&mut setup.liqee);
                 p.quote_position_native = I80F48::from_num(init_perp);
-                p.settle_pnl_limit_realized_trade = -settle_limit;
+                p.recurring_settle_pnl_allowance = (settle_limit as i64).abs();
 
                 let settle_bank = setup.settle_bank.data();
                 settle_bank

@@ -212,7 +212,7 @@ pub struct Bank {
     /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
     pub platform_liquidation_fee: I80F48,
 
-    /// Fees that were collected during liquidation (in native tokens)
+    /// Platform fees that were collected during liquidation (in native tokens)
     ///
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
@@ -737,7 +737,7 @@ impl Bank {
         })
     }
 
-    // withdraw the loan origination fee for a borrow that happenend earlier
+    // withdraw the loan origination fee for a borrow that happened earlier
     pub fn withdraw_loan_origination_fee(
         &mut self,
         position: &mut TokenPosition,
@@ -1060,7 +1060,7 @@ impl Bank {
         )
     }
 
-    /// calcualtor function that can be used to compute an interest
+    /// calculator function that can be used to compute an interest
     /// rate based on the given parameters
     #[inline(always)]
     pub fn interest_rate_curve_calculator(

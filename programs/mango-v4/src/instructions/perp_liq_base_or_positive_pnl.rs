@@ -8,7 +8,7 @@ use crate::health::*;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLog, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLogV2, TokenBalanceLog};
 
 /// This instruction deals with increasing health by:
 /// - reducing the liqee's base position
@@ -94,18 +94,24 @@ pub fn perp_liq_base_or_positive_pnl(
     //
     // Perform the liquidation
     //
-    let (base_transfer, quote_transfer, pnl_transfer, pnl_settle_limit_transfer) =
-        liquidation_action(
-            &mut perp_market,
-            &mut settle_bank,
-            &mut liqor.borrow_mut(),
-            &mut liqee.borrow_mut(),
-            &mut liqee_health_cache,
-            liqee_liq_end_health,
-            now_ts,
-            max_base_transfer,
-            max_pnl_transfer,
-        )?;
+    let (
+        base_transfer,
+        quote_transfer_liqee,
+        quote_transfer_liqor,
+        platform_fee,
+        pnl_transfer,
+        pnl_settle_limit_transfer,
+    ) = liquidation_action(
+        &mut perp_market,
+        &mut settle_bank,
+        &mut liqor.borrow_mut(),
+        &mut liqee.borrow_mut(),
+        &mut liqee_health_cache,
+        liqee_liq_end_health,
+        now_ts,
+        max_base_transfer,
+        max_pnl_transfer,
+    )?;
 
     //
     // Log changes
@@ -152,13 +158,15 @@ pub fn perp_liq_base_or_positive_pnl(
     }
 
     if base_transfer != 0 || pnl_transfer != 0 {
-        emit_stack(PerpLiqBaseOrPositivePnlLog {
+        emit_stack(PerpLiqBaseOrPositivePnlLogV2 {
             mango_group: ctx.accounts.group.key(),
             perp_market_index: perp_market.perp_market_index,
             liqor: ctx.accounts.liqor.key(),
             liqee: ctx.accounts.liqee.key(),
-            base_transfer,
-            quote_transfer: quote_transfer.to_bits(),
+            base_transfer_liqee: base_transfer,
+            quote_transfer_liqee: quote_transfer_liqee.to_bits(),
+            quote_transfer_liqor: quote_transfer_liqor.to_bits(),
+            quote_platform_fee: platform_fee.to_bits(),
             pnl_transfer: pnl_transfer.to_bits(),
             pnl_settle_limit_transfer: pnl_settle_limit_transfer.to_bits(),
             price: oracle_price.to_bits(),
@@ -207,7 +215,7 @@ pub(crate) fn liquidation_action(
     now_ts: u64,
     max_base_transfer: i64,
     max_pnl_transfer: u64,
-) -> Result<(i64, I80F48, I80F48, I80F48)> {
+) -> Result<(i64, I80F48, I80F48, I80F48, I80F48, I80F48)> {
     let liq_end_type = HealthType::LiquidationEnd;
 
     let perp_market_index = perp_market.perp_market_index;
@@ -279,7 +287,8 @@ pub(crate) fn liquidation_action(
     let direction: i64;
 
     // Either 1+fee or 1-fee, depending on direction.
-    let base_fee_factor;
+    let base_fee_factor_liqor;
+    let base_fee_factor_all;
 
     if liqee_base_lots > 0 {
         require_msg!(
@@ -288,11 +297,12 @@ pub(crate) fn liquidation_action(
         );
 
         // the health_unsettled_pnl gets reduced by `base * base_price * perp_init_asset_weight`
-        // and increased by `base * base_price * (1 - liq_fee)`
+        // and increased by `base * base_price * (1 - liq_fees)`
         direction = -1;
-        base_fee_factor = I80F48::ONE - perp_market.base_liquidation_fee;
+        base_fee_factor_liqor = I80F48::ONE - perp_market.base_liquidation_fee;
+        base_fee_factor_all = base_fee_factor_liqor - perp_market.platform_liquidation_fee;
         uhupnl_per_lot =
-            oracle_price_per_lot * (-perp_market.init_base_asset_weight + base_fee_factor);
+            oracle_price_per_lot * (-perp_market.init_base_asset_weight + base_fee_factor_all);
     } else {
         // liqee_base_lots <= 0
         require_msg!(
@@ -301,11 +311,12 @@ pub(crate) fn liquidation_action(
         );
 
         // health gets increased by `base * base_price * perp_init_liab_weight`
-        // and reduced by `base * base_price * (1 + liq_fee)`
+        // and reduced by `base * base_price * (1 + liq_fees)`
         direction = 1;
-        base_fee_factor = I80F48::ONE + perp_market.base_liquidation_fee;
+        base_fee_factor_liqor = I80F48::ONE + perp_market.base_liquidation_fee;
+        base_fee_factor_all = base_fee_factor_liqor + perp_market.platform_liquidation_fee;
         uhupnl_per_lot =
-            oracle_price_per_lot * (perp_market.init_base_liab_weight - base_fee_factor);
+            oracle_price_per_lot * (perp_market.init_base_liab_weight - base_fee_factor_all);
     };
     assert!(uhupnl_per_lot > 0);
 
@@ -537,16 +548,27 @@ pub(crate) fn liquidation_action(
     //
     assert!(base_reduction <= liqee_base_lots.abs());
     let base_transfer = direction * base_reduction;
-    let quote_transfer = -I80F48::from(base_transfer) * oracle_price_per_lot * base_fee_factor;
+    let quote_transfer_base = -I80F48::from(base_transfer) * oracle_price_per_lot;
+    let quote_transfer_liqee = quote_transfer_base * base_fee_factor_all;
+    let quote_transfer_liqor = -quote_transfer_base * base_fee_factor_liqor;
     if base_transfer != 0 {
         msg!(
             "transfering: {} base lots and {} quote",
             base_transfer,
-            quote_transfer
+            quote_transfer_liqee
         );
-        liqee_perp_position.record_trade(perp_market, base_transfer, quote_transfer);
-        liqor_perp_position.record_trade(perp_market, -base_transfer, -quote_transfer);
+        liqee_perp_position.record_trade(perp_market, base_transfer, quote_transfer_liqee);
+        liqor_perp_position.record_trade(perp_market, -base_transfer, quote_transfer_liqor);
     }
+
+    // We know that this is positive:
+    // liq a long: base_transfer < 0, quote_transfer_base > 0, base_fee_factor < 1
+    //   and -q_t_liqor >= q_t_liqee (both sides positive; take more from the liqor than we give to the liqee)
+    // liq a short: base_transfer > 0, quote_transfer_base < 0, base_fee_factor > 1
+    //   and -q_t_liqor >= q_t_liqee (both sides negative; we take more from the liqee than we give to the liqor)
+    let platform_fee = (-quote_transfer_liqor - quote_transfer_liqee).max(I80F48::ZERO);
+    perp_market.fees_accrued += platform_fee;
+    perp_market.accrued_liquidation_fees += platform_fee;
 
     //
     // Let the liqor take over positive pnl until the account health is positive,
@@ -576,7 +598,7 @@ pub(crate) fn liquidation_action(
         let token_transfer = pnl_transfer * spot_gain_per_settled;
 
         liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
-        liqee_perp_position.record_settle(pnl_transfer);
+        liqee_perp_position.record_settle(pnl_transfer, &perp_market);
 
         // Update the accounts' perp_spot_transfer statistics.
         let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
@@ -607,7 +629,14 @@ pub(crate) fn liquidation_action(
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
     liqee_health_cache.recompute_perp_info(liqee_perp_position, &perp_market)?;
 
-    Ok((base_transfer, quote_transfer, pnl_transfer, limit_transfer))
+    Ok((
+        base_transfer,
+        quote_transfer_liqee,
+        quote_transfer_liqor,
+        platform_fee,
+        pnl_transfer,
+        limit_transfer,
+    ))
 }
 
 #[cfg(test)]
@@ -998,7 +1027,7 @@ mod tests {
                     init_liqee_base,
                     I80F48::from_num(init_liqee_quote),
                 );
-                p.realized_other_pnl_native = p
+                p.oneshot_settle_pnl_allowance = p
                     .unsettled_pnl(setup.perp_market.data(), I80F48::ONE)
                     .unwrap();
 
@@ -1043,7 +1072,7 @@ mod tests {
             // The settle limit taken over matches the quote pos when removing the
             // quote gains from giving away base lots
             assert_eq_f!(
-                I80F48::from_num(liqor_perp.settle_pnl_limit_realized_trade),
+                I80F48::from_num(liqor_perp.recurring_settle_pnl_allowance),
                 liqor_perp.quote_position_native.to_num::<f64>()
                     + liqor_perp.base_position_lots as f64,
                 1.1

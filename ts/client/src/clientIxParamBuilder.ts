@@ -107,7 +107,7 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
-  setFallbackOracle: boolean | null;
+  fallbackOracle: PublicKey | null;
   depositLimit: BN | null;
   zeroUtilRate: number | null;
   platformLiquidationFee: number | null;
@@ -148,7 +148,7 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
-  setFallbackOracle: null,
+  fallbackOracle: null,
   depositLimit: null,
   zeroUtilRate: null,
   platformLiquidationFee: null,
@@ -185,6 +185,7 @@ export interface PerpEditParams {
   positivePnlLiquidationFee: number | null;
   name: string | null;
   forceClose: boolean | null;
+  platformLiquidationFee: number | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -218,6 +219,7 @@ export const NullPerpEditParams: PerpEditParams = {
   positivePnlLiquidationFee: null,
   name: null,
   forceClose: null,
+  platformLiquidationFee: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate

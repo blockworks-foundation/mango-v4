@@ -436,6 +436,7 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
+    fallbackOraclePk: PublicKey,
     tokenIndex: number,
     name: string,
     params: TokenRegisterParams,
@@ -477,6 +478,7 @@ export class MangoClient {
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mint: mintPk,
         oracle: oraclePk,
+        fallbackOracle: fallbackOraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
         rent: SYSVAR_RENT_PUBKEY,
       })
@@ -553,7 +555,7 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
-        params.setFallbackOracle ?? false,
+        params.fallbackOracle !== null, // setFallbackOracle
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
@@ -561,6 +563,7 @@ export class MangoClient {
       .accounts({
         group: group.publicKey,
         oracle: params.oracle ?? bank.oracle,
+        fallbackOracle: params.fallbackOracle ?? bank.fallbackOracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -730,16 +733,20 @@ export class MangoClient {
     mintPk: PublicKey,
     price: number,
   ): Promise<MangoSignatureStatus> {
+    const stubOracle = Keypair.generate();
     const ix = await this.program.methods
       .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        oracle: stubOracle.publicKey,
         mint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+    return await this.sendAndConfirmTransactionForGroup(group, [ix], {
+      additionalSigners: [stubOracle],
+    });
   }
 
   public async stubOracleClose(
@@ -3314,6 +3321,7 @@ export class MangoClient {
     settlePnlLimitFactor: number,
     settlePnlLimitWindowSize: number,
     positivePnlLiquidationFee: number,
+    platformLiquidationFee: number,
   ): Promise<MangoSignatureStatus> {
     const bids = new Keypair();
     const asks = new Keypair();
@@ -3355,6 +3363,7 @@ export class MangoClient {
         settlePnlLimitFactor,
         new BN(settlePnlLimitWindowSize),
         positivePnlLiquidationFee,
+        platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,
@@ -3450,6 +3459,7 @@ export class MangoClient {
         params.positivePnlLiquidationFee,
         params.name,
         params.forceClose,
+        params.platformLiquidationFee,
       )
       .accounts({
         group: group.publicKey,

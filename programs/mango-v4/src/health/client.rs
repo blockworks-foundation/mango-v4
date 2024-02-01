@@ -1462,27 +1462,49 @@ mod tests {
             I80F48::ZERO
         );
 
-        let find_max_borrow = |c: &HealthCache, ratio: f64| {
-            let max_borrow = c
-                .max_borrow_for_health_ratio(&account, bank0_data, I80F48::from_num(ratio))
-                .unwrap();
-            // compute the health ratio we'd get when executing the trade
-            let actual_ratio = {
-                let mut c = c.clone();
-                c.token_infos[0].balance_spot -= max_borrow;
-                c.health_ratio(HealthType::Init).to_num::<f64>()
-            };
-            // the ratio for borrowing one native token extra
-            let plus_ratio = {
-                let mut c = c.clone();
-                c.token_infos[0].balance_spot -= max_borrow + I80F48::ONE;
-                c.health_ratio(HealthType::Init).to_num::<f64>()
-            };
-            (max_borrow, actual_ratio, plus_ratio)
+        let now_ts = system_epoch_secs();
+
+        let cache_after_borrow = |account: &MangoAccountValue,
+                                  c: &HealthCache,
+                                  bank: &Bank,
+                                  amount: I80F48|
+         -> Result<HealthCache> {
+            let mut position = account.token_position(bank.token_index)?.clone();
+
+            let mut bank = bank.clone();
+            bank.withdraw_with_fee(&mut position, amount, now_ts)?;
+            bank.check_net_borrows(c.token_info(bank.token_index)?.prices.oracle)?;
+
+            let mut resulting_cache = c.clone();
+            resulting_cache.adjust_token_balance(&bank, -amount)?;
+
+            Ok(resulting_cache)
         };
-        let check_max_borrow = |c: &HealthCache, ratio: f64| -> f64 {
+
+        let find_max_borrow =
+            |account: &MangoAccountValue, c: &HealthCache, ratio: f64, bank: &Bank| {
+                let max_borrow = c
+                    .max_borrow_for_health_ratio(account, bank, I80F48::from_num(ratio))
+                    .unwrap();
+                // compute the health ratio we'd get when executing the trade
+                let actual_ratio = {
+                    let c = cache_after_borrow(account, c, bank, max_borrow).unwrap();
+                    c.health_ratio(HealthType::Init).to_num::<f64>()
+                };
+                // the ratio for borrowing one native token extra
+                let plus_ratio = {
+                    let c = cache_after_borrow(account, c, bank, max_borrow + I80F48::ONE).unwrap();
+                    c.health_ratio(HealthType::Init).to_num::<f64>()
+                };
+                (max_borrow, actual_ratio, plus_ratio)
+            };
+        let check_max_borrow = |account: &MangoAccountValue,
+                                c: &HealthCache,
+                                ratio: f64,
+                                bank: &Bank|
+         -> f64 {
             let initial_ratio = c.health_ratio(HealthType::Init).to_num::<f64>();
-            let (max_borrow, actual_ratio, plus_ratio) = find_max_borrow(c, ratio);
+            let (max_borrow, actual_ratio, plus_ratio) = find_max_borrow(account, c, ratio, bank);
             println!(
                     "checking target ratio {ratio}: initial ratio: {initial_ratio}, actual ratio: {actual_ratio}, plus ratio: {plus_ratio}, borrow: {max_borrow}",
                 );
@@ -1497,30 +1519,66 @@ mod tests {
         {
             let mut health_cache = health_cache.clone();
             health_cache.token_infos[0].balance_spot = I80F48::from_num(100.0);
-            assert_eq!(check_max_borrow(&health_cache, 50.0), 100.0);
+            assert_eq!(
+                check_max_borrow(&account, &health_cache, 50.0, bank0_data),
+                100.0
+            );
         }
         {
             let mut health_cache = health_cache.clone();
             health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0); // price 2, so 2*50*0.8 = 80 health
-            check_max_borrow(&health_cache, 100.0);
-            check_max_borrow(&health_cache, 50.0);
-            check_max_borrow(&health_cache, 0.0);
+            check_max_borrow(&account, &health_cache, 100.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 50.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 0.0, bank0_data);
         }
         {
             let mut health_cache = health_cache.clone();
             health_cache.token_infos[0].balance_spot = I80F48::from_num(50.0);
             health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
-            check_max_borrow(&health_cache, 100.0);
-            check_max_borrow(&health_cache, 50.0);
-            check_max_borrow(&health_cache, 0.0);
+            check_max_borrow(&account, &health_cache, 100.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 50.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 0.0, bank0_data);
         }
         {
             let mut health_cache = health_cache.clone();
             health_cache.token_infos[0].balance_spot = I80F48::from_num(-50.0);
             health_cache.token_infos[1].balance_spot = I80F48::from_num(50.0);
-            check_max_borrow(&health_cache, 100.0);
-            check_max_borrow(&health_cache, 50.0);
-            check_max_borrow(&health_cache, 0.0);
+            check_max_borrow(&account, &health_cache, 100.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 50.0, bank0_data);
+            check_max_borrow(&account, &health_cache, 0.0, bank0_data);
+        }
+
+        // A test that includes init weight scaling
+        {
+            let mut account = account.clone();
+            let mut bank0 = bank0_data.clone();
+            let mut health_cache = health_cache.clone();
+            let tok0_deposits = I80F48::from_num(500.0);
+            health_cache.token_infos[0].balance_spot = tok0_deposits;
+            health_cache.token_infos[1].balance_spot = I80F48::from_num(-100.0); // 2 * 100 * 1.2 = 240 liab
+
+            // This test case needs the bank to know about the deposits
+            let position = account.token_position_mut(bank0.token_index).unwrap().0;
+            bank0.deposit(position, tok0_deposits, now_ts).unwrap();
+
+            // Set up scaling such that token0 health contrib is 500 * 1.0 * 1.0 * (600 / (500 + 300)) = 375
+            bank0.deposit_weight_scale_start_quote = 600.0;
+            bank0.potential_serum_tokens = 300;
+            health_cache.token_infos[0].init_scaled_asset_weight =
+                bank0.scaled_init_asset_weight(I80F48::ONE);
+
+            check_max_borrow(&account, &health_cache, 100.0, &bank0);
+            check_max_borrow(&account, &health_cache, 50.0, &bank0);
+
+            let max_borrow = check_max_borrow(&account, &health_cache, 0.0, &bank0);
+            // that borrow leaves 240 tokens in the account and <600 total in bank
+            assert!((260.0 - max_borrow).abs() < 0.3);
+
+            bank0.deposit_weight_scale_start_quote = 500.0;
+            let max_borrow = check_max_borrow(&account, &health_cache, 0.0, &bank0);
+            // 500 - 222.6 = 277.4 remaining token 0 deposits
+            // 277.4 * 500 / (277.4 + 300) = 240.2 (compensating the -240 liab)
+            assert!((222.6 - max_borrow).abs() < 0.3);
         }
     }
 

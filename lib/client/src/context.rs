@@ -4,15 +4,20 @@ use anchor_client::ClientError;
 
 use anchor_lang::__private::bytemuck;
 
-use mango_v4::state::{
-    Group, MangoAccountValue, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+use mango_v4::{
+    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
+    state::{
+        determine_oracle_type, load_whirlpool_state, oracle_state_unchecked, Group,
+        MangoAccountValue, OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType,
+        PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+    },
 };
 
 use fixed::types::I80F48;
 use futures::{stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 
-use crate::gpa::*;
+use crate::{gpa::*, AccountFetcher, FallbackOracleConfig};
 
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::account::Account;
@@ -28,9 +33,10 @@ pub struct TokenContext {
     pub oracle: Pubkey,
     pub banks: [Pubkey; MAX_BANKS],
     pub vaults: [Pubkey; MAX_BANKS],
-    pub fallback_oracle: Pubkey,
+    pub fallback_context: FallbackOracleContext,
     pub mint_info_address: Pubkey,
     pub decimals: u8,
+    pub oracle_config: OracleConfig,
 }
 
 impl TokenContext {
@@ -53,6 +59,18 @@ impl TokenContext {
             .position(|&b| b == Pubkey::default())
             .unwrap_or(MAX_BANKS);
         &self.banks[..n_banks]
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct FallbackOracleContext {
+    pub key: Pubkey,
+    // only used for CLMM fallback oracles, otherwise Pubkey::default
+    pub quote_key: Pubkey,
+}
+impl FallbackOracleContext {
+    pub fn keys(&self) -> Vec<Pubkey> {
+        vec![self.key, self.quote_key]
     }
 }
 
@@ -101,6 +119,7 @@ pub struct ComputeEstimates {
     pub cu_per_serum3_order_cancel: u32,
     pub cu_per_perp_order_match: u32,
     pub cu_per_perp_order_cancel: u32,
+    pub cu_per_oracle_fallback: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -118,25 +137,36 @@ impl Default for ComputeEstimates {
             cu_per_perp_order_match: 7_000,
             // measured around 3.5k, see test_perp_compute
             cu_per_perp_order_cancel: 7_000,
+            // measured around 2k, see test_health_compute_tokens_fallback_oracles
+            cu_per_oracle_fallback: 2000,
         }
     }
 }
 
 impl ComputeEstimates {
-    pub fn health_for_counts(&self, tokens: usize, perps: usize, serums: usize) -> u32 {
+    pub fn health_for_counts(
+        &self,
+        tokens: usize,
+        perps: usize,
+        serums: usize,
+        fallbacks: usize,
+    ) -> u32 {
         let tokens: u32 = tokens.try_into().unwrap();
         let perps: u32 = perps.try_into().unwrap();
         let serums: u32 = serums.try_into().unwrap();
+        let fallbacks: u32 = fallbacks.try_into().unwrap();
         tokens * self.health_cu_per_token
             + perps * self.health_cu_per_perp
             + serums * self.health_cu_per_serum
+            + fallbacks * self.cu_per_oracle_fallback
     }
 
-    pub fn health_for_account(&self, account: &MangoAccountValue) -> u32 {
+    pub fn health_for_account(&self, account: &MangoAccountValue, num_fallbacks: usize) -> u32 {
         self.health_for_counts(
             account.active_token_positions().count(),
             account.active_perp_positions().count(),
             account.active_serum3_orders().count(),
+            num_fallbacks,
         )
     }
 }
@@ -227,8 +257,12 @@ impl MangoGroupContext {
                         decimals: u8::MAX,
                         banks: mi.banks,
                         vaults: mi.vaults,
-                        fallback_oracle: mi.fallback_oracle,
                         oracle: mi.oracle,
+                        fallback_context: FallbackOracleContext {
+                            key: mi.fallback_oracle,
+                            quote_key: Pubkey::default(),
+                        },
+                        oracle_config: OracleConfigParams::default().to_oracle_config(),
                         group: mi.group,
                         mint: mi.mint,
                     },
@@ -236,14 +270,23 @@ impl MangoGroupContext {
             })
             .collect::<HashMap<_, _>>();
 
-        // reading the banks is only needed for the token names and decimals
+        // reading the banks is only needed for the token names, decimals and oracle configs
         // FUTURE: either store the names on MintInfo as well, or maybe don't store them at all
         //         because they are in metaplex?
         let bank_tuples = fetch_banks(rpc, program, group).await?;
-        for (_, bank) in bank_tuples {
+        let fallback_keys: Vec<Pubkey> = bank_tuples
+            .iter()
+            .map(|tup| tup.1.fallback_oracle)
+            .collect();
+        let fallback_oracle_accounts = fetch_multiple_accounts(rpc, &fallback_keys[..]).await?;
+        for (index, (_, bank)) in bank_tuples.iter().enumerate() {
             let token = tokens.get_mut(&bank.token_index).unwrap();
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
+            token.oracle_config = bank.oracle_config;
+            let (key, acc_info) = fallback_oracle_accounts[index].clone();
+            token.fallback_context.quote_key =
+                get_fallback_quote_key(&KeyedAccountSharedData::new(key, acc_info));
         }
         assert!(tokens.values().all(|t| t.decimals != u8::MAX));
 
@@ -357,6 +400,7 @@ impl MangoGroupContext {
         affected_tokens: Vec<TokenIndex>,
         writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
+        fallback_contexts: HashMap<Pubkey, FallbackOracleContext>,
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         let mut account = account.clone();
         for affected_token_index in affected_tokens.iter().chain(writable_banks.iter()) {
@@ -370,6 +414,7 @@ impl MangoGroupContext {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
+        let mut fallbacks = vec![];
         for position in account.active_token_positions() {
             let token = self.token(position.token_index);
             banks.push((
@@ -377,6 +422,9 @@ impl MangoGroupContext {
                 writable_banks.iter().any(|&ti| ti == position.token_index),
             ));
             oracles.push(token.oracle);
+            if let Some(fallback_context) = fallback_contexts.get(&token.oracle) {
+                fallbacks.extend(fallback_context.keys());
+            }
         }
 
         let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
@@ -386,6 +434,14 @@ impl MangoGroupContext {
         let perp_oracles = account
             .active_perp_positions()
             .map(|&pa| self.perp(pa.market_index).oracle);
+        // FUTURE: implement fallback oracles for perps
+
+        let fallback_oracles: Vec<Pubkey> = fallbacks
+            .into_iter()
+            .unique()
+            .filter(|key| !oracles.contains(key) && key != &Pubkey::default())
+            .collect();
+        let fallbacks_len = fallback_oracles.len();
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
@@ -404,9 +460,12 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
-        let cu = self.compute_estimates.health_for_account(&account);
+        let cu = self
+            .compute_estimates
+            .health_for_account(&account, fallbacks_len);
 
         Ok((accounts, cu))
     }
@@ -417,10 +476,12 @@ impl MangoGroupContext {
         account2: &MangoAccountValue,
         affected_tokens: &[TokenIndex],
         writable_banks: &[TokenIndex],
+        fallback_contexts: HashMap<Pubkey, FallbackOracleContext>,
     ) -> anyhow::Result<(Vec<AccountMeta>, u32)> {
         // figure out all the banks/oracles that need to be passed for the health check
         let mut banks = vec![];
         let mut oracles = vec![];
+        let mut fallbacks = vec![];
 
         let token_indexes = account2
             .active_token_positions()
@@ -434,6 +495,9 @@ impl MangoGroupContext {
             let writable_bank = writable_banks.iter().contains(&token_index);
             banks.push((token.first_bank(), writable_bank));
             oracles.push(token.oracle);
+            if let Some(fallback_context) = fallback_contexts.get(&token.oracle) {
+                fallbacks.extend(fallback_context.keys());
+            }
         }
 
         let serum_oos = account2
@@ -452,6 +516,14 @@ impl MangoGroupContext {
         let perp_oracles = perp_market_indexes
             .iter()
             .map(|&index| self.perp(index).oracle);
+        // FUTURE: implement fallback oracles for perps
+
+        let fallback_oracles: Vec<Pubkey> = fallbacks
+            .into_iter()
+            .unique()
+            .filter(|key| !oracles.contains(key) && key != &Pubkey::default())
+            .collect();
+        let fallbacks_len = fallback_oracles.len();
 
         let to_account_meta = |pubkey| AccountMeta {
             pubkey,
@@ -470,6 +542,7 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
         // Since health is likely to be computed separately for both accounts, we don't use the
@@ -490,10 +563,12 @@ impl MangoGroupContext {
             account1_token_count,
             account1.active_perp_positions().count(),
             account1.active_serum3_orders().count(),
+            fallbacks_len,
         ) + self.compute_estimates.health_for_counts(
             account2_token_count,
             account2.active_perp_positions().count(),
             account2.active_serum3_orders().count(),
+            fallbacks_len,
         );
 
         Ok((accounts, cu))
@@ -554,6 +629,61 @@ impl MangoGroupContext {
         let new_perp_markets = fetch_perp_markets(rpc, mango_v4::id(), self.group).await?;
         Ok(new_perp_markets.len() > self.perp_markets.len())
     }
+
+    /// Returns a map of oracle pubkey -> FallbackOracleContext
+    pub async fn derive_fallback_oracle_keys(
+        &self,
+        fallback_oracle_config: &FallbackOracleConfig,
+        account_fetcher: &dyn AccountFetcher,
+    ) -> anyhow::Result<HashMap<Pubkey, FallbackOracleContext>> {
+        // FUTURE: implement for perp oracles as well
+        let fallbacks_by_oracle = match fallback_oracle_config {
+            FallbackOracleConfig::Never => HashMap::new(),
+            FallbackOracleConfig::Fixed(keys) => self
+                .tokens
+                .iter()
+                .filter(|token| {
+                    token.1.fallback_context.key != Pubkey::default()
+                        && keys.contains(&token.1.fallback_context.key)
+                })
+                .map(|t| (t.1.oracle, t.1.fallback_context.clone()))
+                .collect(),
+            FallbackOracleConfig::All => self
+                .tokens
+                .iter()
+                .filter(|token| token.1.fallback_context.key != Pubkey::default())
+                .map(|t| (t.1.oracle, t.1.fallback_context.clone()))
+                .collect(),
+            FallbackOracleConfig::Dynamic => {
+                let tokens_by_oracle: HashMap<Pubkey, &TokenContext> =
+                    self.tokens.iter().map(|t| (t.1.oracle, t.1)).collect();
+                let oracle_keys: Vec<Pubkey> =
+                    tokens_by_oracle.values().map(|b| b.oracle).collect();
+                let oracle_accounts = account_fetcher
+                    .fetch_multiple_accounts(&oracle_keys)
+                    .await?;
+                let now_slot = account_fetcher.get_slot().await?;
+
+                let mut stale_oracles_with_fallbacks = vec![];
+                for (key, acc) in oracle_accounts {
+                    let token = tokens_by_oracle.get(&key).unwrap();
+                    let state = oracle_state_unchecked(
+                        &OracleAccountInfos::from_reader(&KeyedAccountSharedData::new(key, acc)),
+                        token.decimals,
+                    )?;
+                    let oracle_is_valid = state
+                        .check_confidence_and_maybe_staleness(&token.oracle_config, Some(now_slot));
+                    if oracle_is_valid.is_err() && token.fallback_context.key != Pubkey::default() {
+                        stale_oracles_with_fallbacks
+                            .push((token.oracle, token.fallback_context.clone()));
+                    }
+                }
+                stale_oracles_with_fallbacks.into_iter().collect()
+            }
+        };
+
+        Ok(fallbacks_by_oracle)
+    }
 }
 
 fn from_serum_style_pubkey(d: [u64; 4]) -> Pubkey {
@@ -566,4 +696,23 @@ async fn fetch_raw_account(rpc: &RpcClientAsync, address: Pubkey) -> Result<Acco
         .await?
         .value
         .ok_or(ClientError::AccountNotFound)
+}
+
+/// Fetch the quote key for a fallback oracle account info.
+/// Returns Pubkey::default if no quote key is found or there are any
+/// errors occur when trying to fetch the quote oracle.
+/// This function will only return a non-default key when a CLMM oracle is used
+fn get_fallback_quote_key(acc_info: &impl KeyedAccountReader) -> Pubkey {
+    let maybe_key = match determine_oracle_type(acc_info).ok() {
+        Some(oracle_type) => match oracle_type {
+            OracleType::OrcaCLMM => match load_whirlpool_state(acc_info).ok() {
+                Some(whirlpool) => whirlpool.get_quote_oracle().ok(),
+                None => None,
+            },
+            _ => None,
+        },
+        None => None,
+    };
+
+    maybe_key.unwrap_or_else(|| Pubkey::default())
 }

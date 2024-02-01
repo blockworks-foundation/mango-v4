@@ -228,6 +228,7 @@ impl<'a> JupiterV4<'a> {
             .collect::<Vec<_>>();
 
         let owner = self.mango_client.owner();
+        let account = &self.mango_client.mango_account().await?;
 
         let token_ams = [source_token.mint, target_token.mint]
             .into_iter()
@@ -252,6 +253,7 @@ impl<'a> JupiterV4<'a> {
         let (health_ams, _health_cu) = self
             .mango_client
             .derive_health_check_remaining_account_metas(
+                account,
                 vec![source_token.token_index, target_token.token_index],
                 vec![source_token.token_index, target_token.token_index],
                 vec![],

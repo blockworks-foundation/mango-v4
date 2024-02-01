@@ -4,7 +4,7 @@ use std::time::Duration;
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
 use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
-use mango_v4_client::{chain_data, health_cache, MangoClient};
+use mango_v4_client::{chain_data, MangoClient, PreparedInstructions};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
@@ -19,6 +19,10 @@ pub struct Config {
     pub min_health_ratio: f64,
     pub refresh_timeout: Duration,
     pub compute_limit_for_liq_ix: u32,
+
+    /// If we cram multiple ix into a transaction, don't exceed this level
+    /// of expected-cu.
+    pub max_cu_per_transaction: u32,
 }
 
 struct LiquidateHelper<'a> {
@@ -46,7 +50,7 @@ impl<'a> LiquidateHelper<'a> {
                 Ok((*orders, *open_orders))
             })
             .try_collect();
-        let serum_force_cancels = serum_oos?
+        let mut serum_force_cancels = serum_oos?
             .into_iter()
             .filter_map(|(orders, open_orders)| {
                 let can_force_cancel = open_orders.native_coin_total > 0
@@ -62,18 +66,42 @@ impl<'a> LiquidateHelper<'a> {
         if serum_force_cancels.is_empty() {
             return Ok(None);
         }
-        // Cancel all orders on a random serum market
-        let serum_orders = serum_force_cancels.choose(&mut rand::thread_rng()).unwrap();
-        let txsig = self
-            .client
-            .serum3_liq_force_cancel_orders(
-                (self.pubkey, self.liqee),
-                serum_orders.market_index,
-                &serum_orders.open_orders,
-            )
-            .await?;
+        serum_force_cancels.shuffle(&mut rand::thread_rng());
+
+        let mut ixs = PreparedInstructions::new();
+        let mut cancelled_markets = vec![];
+        let mut tx_builder = self.client.transaction_builder().await?;
+
+        for force_cancel in serum_force_cancels {
+            let mut new_ixs = ixs.clone();
+            new_ixs.append(
+                self.client
+                    .serum3_liq_force_cancel_orders_instruction(
+                        (self.pubkey, self.liqee),
+                        force_cancel.market_index,
+                        &force_cancel.open_orders,
+                    )
+                    .await?,
+            );
+
+            let exceeds_cu_limit = new_ixs.cu > self.config.max_cu_per_transaction;
+            let exceeds_size_limit = {
+                tx_builder.instructions = new_ixs.clone().to_instructions();
+                !tx_builder.transaction_size()?.is_ok()
+            };
+            if exceeds_cu_limit || exceeds_size_limit {
+                break;
+            }
+
+            ixs = new_ixs;
+            cancelled_markets.push(force_cancel.market_index);
+        }
+
+        tx_builder.instructions = ixs.to_instructions();
+
+        let txsig = tx_builder.send_and_confirm(&self.client.client).await?;
         info!(
-            market_index = serum_orders.market_index,
+            market_indexes = ?cancelled_markets,
             %txsig,
             "Force cancelled serum orders",
         );
@@ -155,10 +183,7 @@ impl<'a> LiquidateHelper<'a> {
                 .await
                 .context("getting liquidator account")?;
             liqor.ensure_perp_position(*perp_market_index, QUOTE_TOKEN_INDEX)?;
-            let mut health_cache =
-                health_cache::new(&self.client.context, self.account_fetcher, &liqor)
-                    .await
-                    .context("health cache")?;
+            let mut health_cache = self.client.health_cache(&liqor).await.expect("always ok");
             let quote_bank = self
                 .client
                 .first_bank(QUOTE_TOKEN_INDEX)
@@ -589,7 +614,8 @@ pub async fn maybe_liquidate_account(
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+    let health_cache = mango_client
+        .health_cache(&account)
         .await
         .context("creating health cache 1")?;
     let maint_health = health_cache.health(HealthType::Maint);
@@ -607,7 +633,8 @@ pub async fn maybe_liquidate_account(
     // This is -- unfortunately -- needed because the websocket streams seem to not
     // be great at providing timely updates to the account data.
     let account = account_fetcher.fetch_fresh_mango_account(pubkey).await?;
-    let health_cache = health_cache::new(&mango_client.context, account_fetcher, &account)
+    let health_cache = mango_client
+        .health_cache(&account)
         .await
         .context("creating health cache 2")?;
     if !health_cache.is_liquidatable() {

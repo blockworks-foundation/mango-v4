@@ -1402,13 +1402,14 @@ impl<
         Ok(())
     }
 
+    /// Returns amount of realized trade pnl for the maker
     pub fn execute_perp_maker(
         &mut self,
         perp_market_index: PerpMarketIndex,
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
         group: &Group,
-    ) -> Result<()> {
+    ) -> Result<I80F48> {
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
@@ -1422,7 +1423,7 @@ impl<
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
         pa.record_trading_fee(fees);
-        pa.record_trade(perp_market, base_change, quote);
+        let realized_pnl = pa.record_trade(perp_market, base_change, quote);
 
         pa.maker_volume += quote.abs().to_num::<u64>();
 
@@ -1453,15 +1454,16 @@ impl<
             }
         }
 
-        Ok(())
+        Ok(realized_pnl)
     }
 
+    /// Returns amount of realized trade pnl for the taker
     pub fn execute_perp_taker(
         &mut self,
         perp_market_index: PerpMarketIndex,
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
-    ) -> Result<()> {
+    ) -> Result<I80F48> {
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
@@ -1470,11 +1472,11 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
             I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
-        pa.record_trade(perp_market, base_change, quote_change_native);
+        let realized_pnl = pa.record_trade(perp_market, base_change, quote_change_native);
 
         pa.taker_volume += quote_change_native.abs().to_num::<u64>();
 
-        Ok(())
+        Ok(realized_pnl)
     }
 
     pub fn execute_perp_out_event(

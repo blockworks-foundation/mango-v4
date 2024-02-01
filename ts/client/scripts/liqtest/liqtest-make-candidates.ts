@@ -31,7 +31,7 @@ const CLUSTER = process.env.CLUSTER || 'mainnet-beta';
 // native prices
 const PRICES = {
   ETH: 1200.0,
-  SOL: 0.015,
+  SOL: 0.015, // not updated for the fact that the new mints we use have 6 decimals!
   USDC: 1,
   MNGO: 0.02,
 };
@@ -100,7 +100,7 @@ async function main() {
   async function createMangoAccount(name: string): Promise<MangoAccount> {
     const accountNum = maxAccountNum + 1;
     maxAccountNum = maxAccountNum + 1;
-    await client.createMangoAccount(group, accountNum, name, 4, 4, 4, 4);
+    await client.createMangoAccount(group, accountNum, name, 5, 4, 4, 4);
     return (await client.getMangoAccountForOwner(
       group,
       admin.publicKey,
@@ -202,7 +202,7 @@ async function main() {
       group,
       mangoAccount,
       sellMint,
-      new BN(100000),
+      new BN(150000),
     );
     await mangoAccount.reload(client);
 
@@ -217,20 +217,40 @@ async function main() {
         .build(),
     );
     try {
-      // At a price of $1/ui-SOL we can buy 0.1 ui-SOL for the 100k native-USDC we have.
-      // With maint weight of 0.9 we have 10x main-leverage. Buying 12x as much causes liquidation.
+      // At a price of $0.015/ui-SOL we can buy 10 ui-SOL for the 0.15 USDC (150k native-USDC) we have.
+      // With maint weight of 0.9 we have 10x main-leverage. Buying 11x as much causes liquidation.
       await client.serum3PlaceOrder(
         group,
         mangoAccount,
         market.serumMarketExternal,
         Serum3Side.bid,
-        1,
-        12 * 0.1,
+        0.015,
+        11 * 10,
         Serum3SelfTradeBehavior.abortTransaction,
         Serum3OrderType.limit,
         0,
         5,
       );
+      await mangoAccount.reload(client);
+
+      for (let market of group.serum3MarketsMapByMarketIndex.values()) {
+        if (market.name == 'SOL/USDC') {
+          continue;
+        }
+        await client.serum3PlaceOrder(
+          group,
+          mangoAccount,
+          market.serumMarketExternal,
+          Serum3Side.bid,
+          0.001,
+          1,
+          Serum3SelfTradeBehavior.abortTransaction,
+          Serum3OrderType.limit,
+          0,
+          5,
+        );
+        await mangoAccount.reload(client);
+      }
     } finally {
       // restore the weights
       await client.tokenEdit(
