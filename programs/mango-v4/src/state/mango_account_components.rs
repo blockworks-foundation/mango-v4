@@ -288,28 +288,30 @@ pub struct PerpPosition {
     /// Reset to 0 when the base position reaches or crosses 0.
     pub avg_entry_price_per_base_lot: f64,
 
-    /// Amount of pnl that was realized by bringing the base position closer to 0.
-    ///
-    /// The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.
-    /// Settling pnl reduces this value once other_pnl below is exhausted.
+    /// Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0.
     pub deprecated_realized_trade_pnl_native: I80F48,
 
-    // ### TODO: comment
-    /// Amount of pnl realized from fees, funding and liquidation.
+    /// Amount of pnl that can be settled once.
     ///
-    /// This type of realized pnl is always settleable.
-    /// Settling pnl reduces this value first.
+    /// - The value is signed: a negative number means negative pnl can be settled.
+    /// - A settlement in the right direction will decrease this amount.
+    ///
+    /// Typically added for fees, funding and liquidation.
     pub oneshot_settle_pnl_allowance: I80F48,
 
-    // ### TODO: comment
+    /// Amount of pnl that can be settled in each settle window.
+    ///
+    /// - Unsigned, the settlement can happen in both directions. Value is >= 0.
+    /// - Previously stored a similar value that was signed, so in migration cases
+    ///   this value can be negative and should be .abs()ed.
+    /// - If this value exceeds the current stable-upnl, it should be decreased,
+    ///   see apply_recurring_settle_pnl_allowance_constraint()
+    ///
     /// When the base position is reduced, the settle limit contribution from the reduced
     /// base position is materialized into this value. When the base position increases,
     /// some of the allowance is taken away.
     ///
     /// This also gets increased when a liquidator takes over pnl.
-    ///
-    /// This extra settle limit allowance is reduced when < unsettled pnl. It's also
-    /// reduced when the base position is increased.
     pub recurring_settle_pnl_allowance: i64,
 
     /// Trade pnl, fees, funding that were added over the current position's lifetime.
@@ -653,14 +655,11 @@ impl PerpPosition {
 
     /// Returns the (min_pnl, max_pnl) range of quote-native pnl that can be settled this window.
     ///
-    /// It contains contributions from three factors:
-    // ### TODO: fix comment
-    /// - a fraction of the base position stable value, which gives settlement limit
-    ///   equally in both directions
-    /// - the stored realized trade settle limit, which adds an extra settlement allowance
-    ///   in a single direction
-    /// - the stored realized other settle limit, which adds an extra settlement allowance
-    ///   in a single direction
+    /// 1. a fraction of the base position stable value, which gives settlement limit
+    ///    equally in both directions
+    /// 2. the stored recurring settle allowance, which is mostly allowance from 1. that was
+    ///    materialized when the position was reduced (see recurring_settle_pnl_allowance)
+    /// 3. once-only settlement allowance in a single direction (see oneshot_settle_pnl_allowance)
     pub fn settle_limit(&self, market: &PerpMarket) -> (i64, i64) {
         assert_eq!(self.market_index, market.perp_market_index);
         if market.settle_pnl_limit_factor < 0.0 {
