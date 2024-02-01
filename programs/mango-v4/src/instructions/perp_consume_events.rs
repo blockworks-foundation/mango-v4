@@ -74,40 +74,37 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         group,
                         event_queue
                     );
-                    let before_pnl = maker_taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-                    maker_taker.execute_perp_maker(
+                    let maker_realized_pnl = maker_taker.execute_perp_maker(
                         perp_market_index,
                         &mut perp_market,
                         fill,
                         &group,
                     )?;
-                    maker_taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
+                    let taker_realized_pnl = maker_taker.execute_perp_taker(
+                        perp_market_index,
+                        &mut perp_market,
+                        fill,
+                    )?;
                     emit_perp_balances(
                         group_key,
                         fill.maker,
                         maker_taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                    let after_pnl = maker_taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-                    let closed_pnl = after_pnl - before_pnl;
+                    let closed_pnl = maker_realized_pnl + taker_realized_pnl;
                     (closed_pnl, closed_pnl)
                 } else {
                     load_mango_account!(maker, fill.maker, mango_account_ais, group, event_queue);
                     load_mango_account!(taker, fill.taker, mango_account_ais, group, event_queue);
 
-                    let maker_before_pnl = maker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-                    let taker_before_pnl = taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-
-                    maker.execute_perp_maker(perp_market_index, &mut perp_market, fill, &group)?;
-                    taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
+                    let maker_realized_pnl = maker.execute_perp_maker(
+                        perp_market_index,
+                        &mut perp_market,
+                        fill,
+                        &group,
+                    )?;
+                    let taker_realized_pnl =
+                        taker.execute_perp_taker(perp_market_index, &mut perp_market, fill)?;
                     emit_perp_balances(
                         group_key,
                         fill.maker,
@@ -120,16 +117,8 @@ pub fn perp_consume_events(ctx: Context<PerpConsumeEvents>, limit: usize) -> Res
                         taker.perp_position(perp_market_index).unwrap(),
                         &perp_market,
                     );
-                    let maker_after_pnl = maker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
-                    let taker_after_pnl = taker
-                        .perp_position(perp_market_index)?
-                        .realized_trade_pnl_native;
 
-                    let maker_closed_pnl = maker_after_pnl - maker_before_pnl;
-                    let taker_closed_pnl = taker_after_pnl - taker_before_pnl;
-                    (maker_closed_pnl, taker_closed_pnl)
+                    (maker_realized_pnl, taker_realized_pnl)
                 };
                 emit_stack(FillLogV3 {
                     mango_group: group_key,
