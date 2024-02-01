@@ -112,8 +112,8 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
                 taker_fee: 0.0,
                 group_insurance_fund: true,
                 // adjust this factur such that we get the desired settle limit in the end
-                settle_pnl_limit_factor: (settle_limit as f32 + 0.1).min(0.0)
-                    / (-1.0 * 100.0 * adj_price) as f32,
+                settle_pnl_limit_factor: (settle_limit as f32 - 0.1).max(0.0)
+                    / (1.0 * 100.0 * adj_price) as f32,
                 settle_pnl_limit_window_size_ts: 24 * 60 * 60,
                 ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, base_token).await
             },
@@ -227,7 +227,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(account_data.perps[0].quote_position_native(), pnl);
         assert_eq!(
-            account_data.perps[0].settle_pnl_limit_realized_trade,
+            account_data.perps[0].recurring_settle_pnl_allowance,
             settle_limit
         );
         assert_eq!(
@@ -277,7 +277,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     };
 
     {
-        let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
+        let (perp_market, account, liqor) = setup_perp(-28, -50, 10).await;
         let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
 
         send_tx(
@@ -310,7 +310,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     }
 
     {
-        let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
+        let (perp_market, account, liqor) = setup_perp(-28, -50, 10).await;
         fund_insurance(2).await;
         let liqor_quote_before = account_position(solana, liqor, quote_token.bank).await;
 
@@ -348,7 +348,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
     }
 
     {
-        let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
+        let (perp_market, account, liqor) = setup_perp(-28, -50, 10).await;
         fund_insurance(5).await;
 
         send_tx(
@@ -371,7 +371,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
     // no insurance
     {
-        let (perp_market, account, liqor) = setup_perp(-28, -50, -10).await;
+        let (perp_market, account, liqor) = setup_perp(-28, -50, 10).await;
 
         send_tx(
             solana,
@@ -390,7 +390,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
     // no settlement: no settle health
     {
-        let (perp_market, account, liqor) = setup_perp(-200, -50, -10).await;
+        let (perp_market, account, liqor) = setup_perp(-200, -50, 10).await;
         fund_insurance(5).await;
 
         send_tx(
@@ -430,7 +430,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 
     // no socialized loss: fully covered by insurance fund
     {
-        let (perp_market, account, liqor) = setup_perp(-40, -50, -5).await;
+        let (perp_market, account, liqor) = setup_perp(-40, -50, 5).await;
         fund_insurance(42).await;
 
         send_tx(

@@ -68,7 +68,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         .min(I80F48::from(max_settle_amount));
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
 
-    perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
+    perp_position.record_settle(-settlement, &perp_market); // settle the negative pnl on the user perp position
     perp_market.fees_accrued -= settlement;
 
     emit_perp_balances(

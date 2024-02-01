@@ -9334,36 +9334,44 @@
             "type": "f64"
           },
           {
-            "name": "realizedTradePnlNative",
+            "name": "deprecatedRealizedTradePnlNative",
             "docs": [
-              "Amount of pnl that was realized by bringing the base position closer to 0.",
-              "",
-              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
-              "Settling pnl reduces this value once other_pnl below is exhausted."
+              "Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "realizedOtherPnlNative",
+            "name": "oneshotSettlePnlAllowance",
             "docs": [
-              "Amount of pnl realized from fees, funding and liquidation.",
+              "Amount of pnl that can be settled once.",
               "",
-              "This type of realized pnl is always settleable.",
-              "Settling pnl reduces this value first."
+              "- The value is signed: a negative number means negative pnl can be settled.",
+              "- A settlement in the right direction will decrease this amount.",
+              "",
+              "Typically added for fees, funding and liquidation."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "settlePnlLimitRealizedTrade",
+            "name": "recurringSettlePnlAllowance",
             "docs": [
-              "Settle limit contribution from realized pnl.",
+              "Amount of pnl that can be settled in each settle window.",
               "",
-              "Every time pnl is realized, this is increased by a fraction of the stable",
-              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+              "- Unsigned, the settlement can happen in both directions. Value is >= 0.",
+              "- Previously stored a similar value that was signed, so in migration cases",
+              "this value can be negative and should be .abs()ed.",
+              "- If this value exceeds the current stable-upnl, it should be decreased,",
+              "see apply_recurring_settle_pnl_allowance_constraint()",
+              "",
+              "When the base position is reduced, the settle limit contribution from the reduced",
+              "base position is materialized into this value. When the base position increases,",
+              "some of the allowance is taken away.",
+              "",
+              "This also gets increased when a liquidator takes over pnl."
             ],
             "type": "i64"
           },

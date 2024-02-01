@@ -598,7 +598,7 @@ pub(crate) fn liquidation_action(
         let token_transfer = pnl_transfer * spot_gain_per_settled;
 
         liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
-        liqee_perp_position.record_settle(pnl_transfer);
+        liqee_perp_position.record_settle(pnl_transfer, &perp_market);
 
         // Update the accounts' perp_spot_transfer statistics.
         let transfer_i64 = token_transfer.round_to_zero().to_num::<i64>();
@@ -1027,7 +1027,7 @@ mod tests {
                     init_liqee_base,
                     I80F48::from_num(init_liqee_quote),
                 );
-                p.realized_other_pnl_native = p
+                p.oneshot_settle_pnl_allowance = p
                     .unsettled_pnl(setup.perp_market.data(), I80F48::ONE)
                     .unwrap();
 
@@ -1072,7 +1072,7 @@ mod tests {
             // The settle limit taken over matches the quote pos when removing the
             // quote gains from giving away base lots
             assert_eq_f!(
-                I80F48::from_num(liqor_perp.settle_pnl_limit_realized_trade),
+                I80F48::from_num(liqor_perp.recurring_settle_pnl_allowance),
                 liqor_perp.quote_position_native.to_num::<f64>()
                     + liqor_perp.base_position_lots as f64,
                 1.1
