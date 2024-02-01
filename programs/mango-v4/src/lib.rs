@@ -1740,17 +1740,17 @@ pub mod mango_v4 {
     #[allow(clippy::too_many_arguments)]
     pub fn openbook_v2_place_order(
         ctx: Context<OpenbookV2PlaceOrder>,
-        side: openbook_v2::state::Side,
+        side: OpenbookV2Side,
         price_lots: i64,
         max_base_lots: i64,
         max_quote_lots_including_fees: i64,
         client_order_id: u64,
-        order_type: openbook_v2::state::PlaceOrderType,
+        order_type: OpenbookV2PlaceOrderType,
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
     ) -> Result<()> {
-        use openbook_v2::state::{Order, OrderParams, PlaceOrderType, SelfTradeBehavior};
+        use openbook_v2::state::{Order, OrderParams, SelfTradeBehavior};
         let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
             Some(t) => t,
             None => {
@@ -1759,18 +1759,20 @@ pub mod mango_v4 {
             }
         };
         let order = Order {
-            side,
+            side: side.to_external(),
             max_base_lots,
             max_quote_lots_including_fees,
             client_order_id,
             time_in_force,
             self_trade_behavior: SelfTradeBehavior::default(),
             params: match order_type {
-                PlaceOrderType::Market => OrderParams::Market {},
-                PlaceOrderType::ImmediateOrCancel => OrderParams::ImmediateOrCancel { price_lots },
+                OpenbookV2PlaceOrderType::Market => OrderParams::Market {},
+                OpenbookV2PlaceOrderType::ImmediateOrCancel => {
+                    OrderParams::ImmediateOrCancel { price_lots }
+                }
                 _ => OrderParams::Fixed {
                     price_lots,
-                    order_type: order_type.to_post_order_type()?,
+                    order_type: order_type.to_external_post_order_type()?,
                 },
             },
         };
@@ -1782,11 +1784,11 @@ pub mod mango_v4 {
 
     pub fn openbook_v2_cancel_order(
         ctx: Context<OpenbookV2CancelOrder>,
-        side: openbook_v2::state::Side,
+        side: OpenbookV2Side,
         order_id: u128,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::openbook_v2_cancel_order(ctx, side, order_id)?;
+        instructions::openbook_v2_cancel_order(ctx, side.to_external(), order_id)?;
         Ok(())
     }
 
@@ -1811,10 +1813,17 @@ pub mod mango_v4 {
     pub fn openbook_v2_cancel_all_orders(
         ctx: Context<OpenbookV2CancelOrder>,
         limit: u8,
-        side_opt: Option<openbook_v2::state::Side>,
+        side_opt: Option<OpenbookV2Side>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::openbook_v2_cancel_all_orders(ctx, limit, side_opt)?;
+        instructions::openbook_v2_cancel_all_orders(
+            ctx,
+            limit,
+            match side_opt {
+                Some(side) => Some(side.to_external()),
+                None => None,
+            },
+        )?;
         Ok(())
     }
 

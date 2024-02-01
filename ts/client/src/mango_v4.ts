@@ -6660,7 +6660,7 @@ export type MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "openbook_v2::state::Side"
+            "defined": "OpenbookV2Side"
           }
         },
         {
@@ -6682,7 +6682,7 @@ export type MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "openbook_v2::state::PlaceOrderType"
+            "defined": "OpenbookV2PlaceOrderType"
           }
         },
         {
@@ -6764,7 +6764,7 @@ export type MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "openbook_v2::state::Side"
+            "defined": "OpenbookV2Side"
           }
         },
         {
@@ -7086,7 +7086,7 @@ export type MangoV4 = {
           "name": "sideOpt",
           "type": {
             "option": {
-              "defined": "openbook_v2::state::Side"
+              "defined": "OpenbookV2Side"
             }
           }
         }
@@ -7529,14 +7529,6 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "potentialOpenbookTokens",
-            "docs": [
-              "Largest amount of tokens that might be added the the bank based on",
-              "oenbook open order execution."
-            ],
-            "type": "u64"
-          },
-          {
             "name": "zeroUtilRate",
             "docs": [
               "The unscaled borrow interest curve point for zero utilization.",
@@ -7566,6 +7558,14 @@ export type MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "potentialOpenbookTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "oenbook open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -10631,6 +10631,77 @@ export type MangoV4 = {
           },
           {
             "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2PlaceOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "Market"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2PostOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2SelfTradeBehavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
           }
         ]
       }
@@ -20952,7 +21023,7 @@ export const IDL: MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "openbook_v2::state::Side"
+            "defined": "OpenbookV2Side"
           }
         },
         {
@@ -20974,7 +21045,7 @@ export const IDL: MangoV4 = {
         {
           "name": "orderType",
           "type": {
-            "defined": "openbook_v2::state::PlaceOrderType"
+            "defined": "OpenbookV2PlaceOrderType"
           }
         },
         {
@@ -21056,7 +21127,7 @@ export const IDL: MangoV4 = {
         {
           "name": "side",
           "type": {
-            "defined": "openbook_v2::state::Side"
+            "defined": "OpenbookV2Side"
           }
         },
         {
@@ -21378,7 +21449,7 @@ export const IDL: MangoV4 = {
           "name": "sideOpt",
           "type": {
             "option": {
-              "defined": "openbook_v2::state::Side"
+              "defined": "OpenbookV2Side"
             }
           }
         }
@@ -21821,14 +21892,6 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "potentialOpenbookTokens",
-            "docs": [
-              "Largest amount of tokens that might be added the the bank based on",
-              "oenbook open order execution."
-            ],
-            "type": "u64"
-          },
-          {
             "name": "zeroUtilRate",
             "docs": [
               "The unscaled borrow interest curve point for zero utilization.",
@@ -21858,6 +21921,14 @@ export const IDL: MangoV4 = {
             "type": {
               "defined": "I80F48"
             }
+          },
+          {
+            "name": "potentialOpenbookTokens",
+            "docs": [
+              "Largest amount of tokens that might be added the the bank based on",
+              "oenbook open order execution."
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
@@ -24923,6 +24994,77 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Swap"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2PlaceOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "ImmediateOrCancel"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "Market"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2PostOrderType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Limit"
+          },
+          {
+            "name": "PostOnly"
+          },
+          {
+            "name": "PostOnlySlide"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2SelfTradeBehavior",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "DecrementTake"
+          },
+          {
+            "name": "CancelProvide"
+          },
+          {
+            "name": "AbortTransaction"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenbookV2Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Bid"
+          },
+          {
+            "name": "Ask"
           }
         ]
       }

@@ -2,10 +2,72 @@ use crate::error::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{Market, OpenOrdersAccount},
+    state::{Market, OpenOrdersAccount, PostOrderType, Side},
 };
+
+#[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum OpenbookV2PlaceOrderType {
+    Limit = 0,
+    ImmediateOrCancel = 1,
+    PostOnly = 2,
+    Market = 3,
+    PostOnlySlide = 4,
+}
+
+impl OpenbookV2PlaceOrderType {
+    pub fn to_external_post_order_type(&self) -> Result<PostOrderType> {
+        match *self {
+            Self::Market => Err(MangoError::SomeError.into()),
+            Self::ImmediateOrCancel => Err(MangoError::SomeError.into()),
+            Self::Limit => Ok(PostOrderType::Limit),
+            Self::PostOnly => Ok(PostOrderType::PostOnly),
+            Self::PostOnlySlide => Ok(PostOrderType::PostOnlySlide),
+        }
+    }
+}
+
+#[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum OpenbookV2PostOrderType {
+    Limit = 0,
+    PostOnly = 2,
+    PostOnlySlide = 4,
+}
+
+#[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
+#[repr(u8)]
+pub enum OpenbookV2SelfTradeBehavior {
+    DecrementTake = 0,
+    CancelProvide = 1,
+    AbortTransaction = 2,
+}
+
+#[derive(
+    Copy,
+    Clone,
+    TryFromPrimitive,
+    IntoPrimitive,
+    AnchorSerialize,
+    AnchorDeserialize,
+)]
+#[repr(u8)]
+pub enum OpenbookV2Side {
+    Bid = 0,
+    Ask = 1,
+}
+impl OpenbookV2Side {
+    pub fn to_external(&self) -> Side {
+        match *self {
+            Self::Bid => Side::Bid,
+            Self::Ask => Side::Ask,
+        }
+    }
+}
 
 #[derive(Accounts)]
 pub struct OpenbookV2PlaceOrder<'info> {
