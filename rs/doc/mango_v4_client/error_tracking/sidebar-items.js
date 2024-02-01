@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["AccountErrorState","ErrorTracking"]};
+window.SIDEBAR_ITEMS = {"enum":["ErrorTrackingBuilderError"],"struct":["ErrorState","ErrorTracking","ErrorTrackingBuilder"]};

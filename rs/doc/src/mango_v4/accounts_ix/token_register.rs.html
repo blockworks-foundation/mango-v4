@@ -68,6 +68,9 @@
 <a href="#68" id="68">68</a>
 <a href="#69" id="69">69</a>
 <a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_spl::token::{Mint, Token, TokenAccount};
 
@@ -120,6 +123,9 @@
 
     <span class="doccomment">/// CHECK: The oracle can be one of several different account types
     </span><span class="kw">pub </span>oracle: UncheckedAccount&lt;<span class="lifetime">&#39;info</span>&gt;,
+
+    <span class="doccomment">/// CHECK: The oracle can be one of several different account types
+    </span><span class="kw">pub </span>fallback_oracle: UncheckedAccount&lt;<span class="lifetime">&#39;info</span>&gt;,
 
     <span class="attr">#[account(<span class="kw-2">mut</span>)]
     </span><span class="kw">pub </span>payer: Signer&lt;<span class="lifetime">&#39;info</span>&gt;,

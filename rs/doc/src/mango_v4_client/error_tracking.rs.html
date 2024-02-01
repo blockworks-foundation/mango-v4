@@ -71,76 +71,292 @@
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
 <a href="#73" id="73">73</a>
-</pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::Pubkey;
-<span class="kw">use </span>std::{
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+</pre><pre class="rust"><code><span class="kw">use </span>std::{
     collections::HashMap,
     time::{Duration, Instant},
 };
 <span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
 <span class="attr">#[derive(Clone)]
-</span><span class="kw">pub struct </span>AccountErrorState {
-    <span class="kw">pub </span>messages: Vec&lt;String&gt;,
+</span><span class="kw">pub struct </span>ErrorState {
+    <span class="kw">pub </span>errors: Vec&lt;String&gt;,
     <span class="kw">pub </span>count: u64,
     <span class="kw">pub </span>last_at: Instant,
 }
 
-<span class="attr">#[derive(Default)]
-</span><span class="kw">pub struct </span>ErrorTracking {
-    <span class="kw">pub </span>accounts: HashMap&lt;Pubkey, AccountErrorState&gt;,
-    <span class="kw">pub </span>skip_threshold: u64,
-    <span class="kw">pub </span>skip_duration: Duration,
+<span class="attr">#[derive(Clone)]
+</span><span class="kw">struct </span>ErrorTypeState&lt;Key&gt; {
+    state_by_key: HashMap&lt;Key, ErrorState&gt;,
+
+    <span class="comment">// override global
+    </span>skip_threshold: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    skip_duration: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
 }
 
-<span class="kw">impl </span>ErrorTracking {
-    <span class="kw">pub fn </span>had_too_many_errors(<span class="kw-2">&amp;</span><span class="self">self</span>, pubkey: <span class="kw-2">&amp;</span>Pubkey, now: Instant) -&gt; <span class="prelude-ty">Option</span>&lt;AccountErrorState&gt; {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(error_entry) = <span class="self">self</span>.accounts.get(pubkey) {
-            <span class="kw">if </span>error_entry.count &gt;= <span class="self">self</span>.skip_threshold
-                &amp;&amp; now.duration_since(error_entry.last_at) &lt; <span class="self">self</span>.skip_duration
-            {
-                <span class="prelude-val">Some</span>(error_entry.clone())
-            } <span class="kw">else </span>{
-                <span class="prelude-val">None
-            </span>}
-        } <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
-    }
-
-    <span class="kw">pub fn </span>record_error(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pubkey: <span class="kw-2">&amp;</span>Pubkey, now: Instant, message: String) {
-        <span class="kw">let </span>error_entry = <span class="self">self</span>.accounts.entry(<span class="kw-2">*</span>pubkey).or_insert(AccountErrorState {
-            messages: Vec::with_capacity(<span class="number">1</span>),
-            count: <span class="number">0</span>,
-            last_at: now,
-        });
-        error_entry.count += <span class="number">1</span>;
-        error_entry.last_at = now;
-        <span class="kw">if </span>!error_entry.messages.contains(<span class="kw-2">&amp;</span>message) {
-            error_entry.messages.push(message);
-        }
-        <span class="kw">if </span>error_entry.messages.len() &gt; <span class="number">5 </span>{
-            error_entry.messages.remove(<span class="number">0</span>);
+<span class="kw">impl</span>&lt;Key&gt; Default <span class="kw">for </span>ErrorTypeState&lt;Key&gt; {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            state_by_key: Default::default(),
+            skip_threshold: <span class="prelude-val">None</span>,
+            skip_duration: <span class="prelude-val">None</span>,
         }
     }
+}
 
-    <span class="kw">pub fn </span>clear_errors(<span class="kw-2">&amp;mut </span><span class="self">self</span>, pubkey: <span class="kw-2">&amp;</span>Pubkey) {
-        <span class="self">self</span>.accounts.remove(pubkey);
+<span class="attr">#[derive(Builder)]
+</span><span class="kw">pub struct </span>ErrorTracking&lt;Key, ErrorType&gt; {
+    <span class="attr">#[builder(default, setter(custom))]
+    </span>errors_by_type: HashMap&lt;ErrorType, ErrorTypeState&lt;Key&gt;&gt;,
+
+    <span class="doccomment">/// number of errors of a type after which had_too_many_errors returns true
+    </span><span class="attr">#[builder(default = <span class="string">&quot;2&quot;</span>)]
+    </span><span class="kw">pub </span>skip_threshold: u64,
+
+    <span class="doccomment">/// duration that had_too_many_errors returns true for after skip_threshold is reached
+    </span><span class="attr">#[builder(default = <span class="string">&quot;Duration::from_secs(60)&quot;</span>)]
+    </span><span class="kw">pub </span>skip_duration: Duration,
+
+    <span class="attr">#[builder(default = <span class="string">&quot;3&quot;</span>)]
+    </span><span class="kw">pub </span>unique_messages_to_keep: usize,
+
+    <span class="doccomment">/// after what time of no-errors may error info be wiped?
+    </span><span class="attr">#[builder(default = <span class="string">&quot;Duration::from_secs(300)&quot;</span>)]
+    </span><span class="kw">pub </span>keep_duration: Duration,
+
+    <span class="attr">#[builder(setter(skip), default = <span class="string">&quot;Instant::now()&quot;</span>)]
+    </span>last_log: Instant,
+
+    <span class="attr">#[builder(default = <span class="string">&quot;Duration::from_secs(300)&quot;</span>)]
+    </span><span class="kw">pub </span>log_interval: Duration,
+}
+
+<span class="kw">impl</span>&lt;Key, ErrorType&gt; ErrorTrackingBuilder&lt;Key, ErrorType&gt;
+<span class="kw">where
+    </span>ErrorType: Copy + std::hash::Hash + std::cmp::Eq + std::fmt::Display,
+{
+    <span class="kw">pub fn </span>skip_threshold_for_type(<span class="kw-2">&amp;mut </span><span class="self">self</span>, error_type: ErrorType, threshold: u64) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
+        <span class="kw">if </span><span class="self">self</span>.errors_by_type.is_none() {
+            <span class="self">self</span>.errors_by_type = <span class="prelude-val">Some</span>(Default::default());
+        }
+        <span class="kw">let </span>errors_by_type = <span class="self">self</span>.errors_by_type.as_mut().unwrap();
+        errors_by_type.entry(error_type).or_default().skip_threshold = <span class="prelude-val">Some</span>(threshold);
+        <span class="self">self
+    </span>}
+}
+
+<span class="kw">impl</span>&lt;Key, ErrorType&gt; ErrorTracking&lt;Key, ErrorType&gt;
+<span class="kw">where
+    </span>Key: Clone + std::hash::Hash + std::cmp::Eq + std::fmt::Display,
+    ErrorType: Copy + std::hash::Hash + std::cmp::Eq + std::fmt::Display,
+{
+    <span class="kw">pub fn </span>builder() -&gt; ErrorTrackingBuilder&lt;Key, ErrorType&gt; {
+        ErrorTrackingBuilder::default()
     }
 
-    <span class="attr">#[instrument(skip_all, fields(%error_type))]
-    #[allow(unused_variables)]
-    </span><span class="kw">pub fn </span>log_persistent_errors(<span class="kw-2">&amp;</span><span class="self">self</span>, error_type: <span class="kw-2">&amp;</span>str, min_duration: Duration) {
+    <span class="kw">fn </span>should_skip(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        state: <span class="kw-2">&amp;</span>ErrorState,
+        error_type_state: <span class="kw-2">&amp;</span>ErrorTypeState&lt;Key&gt;,
+        now: Instant,
+    ) -&gt; bool {
+        <span class="kw">let </span>skip_threshold = error_type_state
+            .skip_threshold
+            .unwrap_or(<span class="self">self</span>.skip_threshold);
+        <span class="kw">let </span>skip_duration = error_type_state.skip_duration.unwrap_or(<span class="self">self</span>.skip_duration);
+        state.count &gt;= skip_threshold &amp;&amp; now.duration_since(state.last_at) &lt; skip_duration
+    }
+
+    <span class="kw">pub fn </span>had_too_many_errors(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        error_type: ErrorType,
+        key: <span class="kw-2">&amp;</span>Key,
+        now: Instant,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;ErrorState&gt; {
+        <span class="kw">let </span>error_type_state = <span class="self">self</span>.errors_by_type.get(<span class="kw-2">&amp;</span>error_type)<span class="question-mark">?</span>;
+        <span class="kw">let </span>state = error_type_state.state_by_key.get(key)<span class="question-mark">?</span>;
+        <span class="self">self</span>.should_skip(state, error_type_state, now)
+            .then(|| state.clone())
+    }
+
+    <span class="kw">pub fn </span>record(<span class="kw-2">&amp;mut </span><span class="self">self</span>, error_type: ErrorType, key: <span class="kw-2">&amp;</span>Key, message: String) {
         <span class="kw">let </span>now = Instant::now();
-        <span class="kw">for </span>(pubkey, errors) <span class="kw">in </span><span class="self">self</span>.accounts.iter() {
-            <span class="kw">if </span>now.duration_since(errors.last_at) &lt; min_duration {
-                <span class="kw">continue</span>;
+        <span class="kw">let </span>state = <span class="self">self
+            </span>.errors_by_type
+            .entry(error_type)
+            .or_default()
+            .state_by_key
+            .entry(key.clone())
+            .or_insert(ErrorState {
+                errors: Vec::with_capacity(<span class="number">1</span>),
+                count: <span class="number">0</span>,
+                last_at: now,
+            });
+        state.count += <span class="number">1</span>;
+        state.last_at = now;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(pos) = state.errors.iter().position(|m| m == <span class="kw-2">&amp;</span>message) {
+            state.errors.remove(pos);
+        }
+        state.errors.push(message);
+        <span class="kw">if </span>state.errors.len() &gt; <span class="self">self</span>.unique_messages_to_keep {
+            state.errors.remove(<span class="number">0</span>);
+        }
+
+        <span class="comment">// log when skip threshold is reached the first time
+        </span><span class="kw">if </span>state.count == <span class="self">self</span>.skip_threshold {
+            <span class="macro">trace!</span>(%error_type, %key, count = state.count, messages = <span class="question-mark">?</span>state.errors, <span class="string">&quot;had repeated errors, skipping...&quot;</span>);
+        }
+    }
+
+    <span class="kw">pub fn </span>clear(<span class="kw-2">&amp;mut </span><span class="self">self</span>, error_type: ErrorType, key: <span class="kw-2">&amp;</span>Key) {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(error_type_state) = <span class="self">self</span>.errors_by_type.get_mut(<span class="kw-2">&amp;</span>error_type) {
+            error_type_state.state_by_key.remove(key);
+        }
+    }
+
+    <span class="kw">pub fn </span>wipe_old(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>now = Instant::now();
+        <span class="kw">for </span>error_type_state <span class="kw">in </span><span class="self">self</span>.errors_by_type.values_mut() {
+            error_type_state
+                .state_by_key
+                .retain(|<span class="kw">_</span>, state| now.duration_since(state.last_at) &lt; <span class="self">self</span>.keep_duration);
+        }
+    }
+
+    <span class="doccomment">/// Wipes old errors and occasionally logs errors that caused skipping
+    </span><span class="kw">pub fn </span>update(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>now = Instant::now();
+        <span class="kw">if </span>now.duration_since(<span class="self">self</span>.last_log) &lt; <span class="self">self</span>.log_interval {
+            <span class="kw">return</span>;
+        }
+        <span class="self">self</span>.last_log = now;
+        <span class="self">self</span>.wipe_old();
+        <span class="self">self</span>.log_error_skips();
+    }
+
+    <span class="doccomment">/// Log all errors that cause skipping
+    </span><span class="kw">pub fn </span>log_error_skips(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">let </span>now = Instant::now();
+        <span class="kw">for </span>(error_type, error_type_state) <span class="kw">in </span><span class="self">self</span>.errors_by_type.iter() {
+            <span class="kw">let </span>span = <span class="macro">info_span!</span>(<span class="string">&quot;log_error_skips&quot;</span>, %error_type);
+            <span class="kw">let </span>_enter = span.enter();
+
+            <span class="kw">for </span>(key, state) <span class="kw">in </span>error_type_state.state_by_key.iter() {
+                <span class="kw">if </span><span class="self">self</span>.should_skip(state, error_type_state, now) {
+                    <span class="macro">info!</span>(
+                        %key,
+                        count = state.count,
+                        messages = <span class="question-mark">?</span>state.errors,
+                    );
+                }
             }
-            <span class="macro">info!</span>(
-                %pubkey,
-                count = errors.count,
-                messages = <span class="question-mark">?</span>errors.messages,
-                <span class="string">&quot;has persistent errors&quot;</span>,
-            );
         }
     }
 }

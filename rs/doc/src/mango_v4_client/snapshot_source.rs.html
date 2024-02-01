@@ -483,8 +483,8 @@
 }
 
 <span class="kw">pub fn </span>start(config: Config, mango_oracles: Vec&lt;Pubkey&gt;, sender: async_channel::Sender&lt;Message&gt;) {
-    <span class="kw">let </span><span class="kw-2">mut </span>poll_wait_first_snapshot = time::interval(time::Duration::from_secs(<span class="number">2</span>));
-    <span class="kw">let </span><span class="kw-2">mut </span>interval_between_snapshots = time::interval(config.snapshot_interval);
+    <span class="kw">let </span><span class="kw-2">mut </span>poll_wait_first_snapshot = <span class="kw">crate</span>::delay_interval(time::Duration::from_secs(<span class="number">2</span>));
+    <span class="kw">let </span><span class="kw-2">mut </span>interval_between_snapshots = <span class="kw">crate</span>::delay_interval(config.snapshot_interval);
 
     tokio::spawn(<span class="kw">async move </span>{
         <span class="kw">let </span>rpc_client = http::connect_with_options::&lt;MinimalClient&gt;(<span class="kw-2">&amp;</span>config.rpc_http_url, <span class="bool-val">true</span>)
