@@ -244,7 +244,6 @@ impl OpenbookClientInstruction for CloseOpenOrdersAccountInstruction {
 
         let accounts = openbook_v2::accounts::CloseOpenOrdersAccount {
             owner: self.owner.pubkey(),
-            payer: self.payer.pubkey(),
             open_orders_indexer,
             open_orders_account,
             sol_destination: self.sol_destination,
@@ -576,7 +575,6 @@ impl OpenbookClientInstruction for PlaceTakeOrderInstruction {
             user_quote_account: self.user_quote_account,
             market_base_vault: self.market_base_vault,
             market_quote_vault: self.market_quote_vault,
-            referrer_account: self.referrer_account,
             penalty_payer: self.signer.pubkey(), //todo-pan: fix this
             token_program: Token::id(),
             system_program: System::id(),

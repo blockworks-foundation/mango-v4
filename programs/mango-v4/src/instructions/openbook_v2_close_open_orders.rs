@@ -66,7 +66,6 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
 fn cpi_close_open_orders(ctx: &OpenbookV2CloseOpenOrders, seeds: &[&[&[u8]]]) -> Result<()> {
     let group = ctx.group.load()?;
     let cpi_accounts = CloseOpenOrdersAccount {
-        payer: ctx.authority.to_account_info(),
         owner: ctx.account.to_account_info(),
         open_orders_indexer: ctx.open_orders_indexer.to_account_info(),
         open_orders_account: ctx.open_orders_account.to_account_info(),

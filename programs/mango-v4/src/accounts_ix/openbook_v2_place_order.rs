@@ -6,7 +6,7 @@ use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{Market, OpenOrdersAccount, PostOrderType, Side},
+    state::{BookSide, Market, OpenOrdersAccount, PostOrderType, Side},
 };
 
 #[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
@@ -103,11 +103,11 @@ pub struct OpenbookV2PlaceOrder<'info> {
 
     #[account(mut)]
     /// CHECK: bids will be checked by openbook_v2
-    pub bids: UncheckedAccount<'info>,
+    pub bids: AccountLoader<'info, BookSide>,
 
     #[account(mut)]
     /// CHECK: asks will be checked by openbook_v2
-    pub asks: UncheckedAccount<'info>,
+    pub asks: AccountLoader<'info, BookSide>,
 
     #[account(mut)]
     /// CHECK: event queue will be checked by openbook_v2

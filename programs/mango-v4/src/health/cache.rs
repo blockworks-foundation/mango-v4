@@ -314,7 +314,7 @@ impl SpotInfo {
             quote_info_index,
             serum3_market_index: None,
             openbook_v2_market_index: Some(open_orders.market_index),
-            has_zero_funds: open_orders_account.position.is_empty(),
+            has_zero_funds: open_orders_account.position.is_empty(1),
         }
     }
 

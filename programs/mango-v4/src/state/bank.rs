@@ -204,10 +204,6 @@ pub struct Bank {
     /// zero means none, in token native
     pub deposit_limit: u64,
 
-    /// Largest amount of tokens that might be added the the bank based on
-    /// oenbook open order execution.
-    pub potential_openbook_tokens: u64,
-
     /// The unscaled borrow interest curve point for zero utilization.
     ///
     /// See util0, rate0, util1, rate1, max_rate
@@ -220,6 +216,10 @@ pub struct Bank {
     ///
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
+
+    /// Largest amount of tokens that might be added the the bank based on
+    /// oenbook open order execution.
+    pub potential_openbook_tokens: u64,
 
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 1912],
