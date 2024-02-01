@@ -137,10 +137,13 @@ impl Rpc {
             .cluster(anchor_client::Cluster::from_str(&self.url)?)
             .commitment(solana_sdk::commitment_config::CommitmentConfig::confirmed())
             .fee_payer(Some(Arc::new(fee_payer)))
-            .transaction_builder_config(TransactionBuilderConfig {
-                prioritization_micro_lamports: Some(5),
-                compute_budget_per_instruction: Some(250_000),
-            })
+            .transaction_builder_config(
+                TransactionBuilderConfig::builder()
+                    .prioritization_micro_lamports(Some(5))
+                    .compute_budget_per_instruction(Some(250_000))
+                    .build()
+                    .unwrap(),
+            )
             .build()
             .unwrap())
     }

@@ -271,7 +271,7 @@ impl<'a> SettleBatchProcessor<'a> {
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: client.config().transaction_builder_config,
+            config: client.config().transaction_builder_config.clone(),
         }
         .transaction_with_blockhash(self.blockhash)
     }

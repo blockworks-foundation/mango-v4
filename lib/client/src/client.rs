@@ -29,6 +29,7 @@ use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTr
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::health_cache;
+use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 use crate::util::PreparedInstructions;
 use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
@@ -53,7 +54,7 @@ use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Si
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
 // very close to anchor_client::Client, which unfortunately has no accessors or Clone
-#[derive(Clone, Debug, Builder)]
+#[derive(Clone, Builder)]
 #[builder(name = "ClientBuilder", build_fn(name = "build_config"))]
 pub struct ClientConfig {
     /// RPC url
@@ -376,7 +377,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: payer.pubkey(),
             signers: vec![owner, payer],
-            config: client.config.transaction_builder_config,
+            config: client.config.transaction_builder_config.clone(),
         }
         .send_and_confirm(&client)
         .await?;
@@ -1864,7 +1865,7 @@ impl MangoClient {
             address_lookup_tables: self.mango_address_lookup_tables().await?,
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: self.client.config.transaction_builder_config,
+            config: self.client.config.transaction_builder_config.clone(),
         })
     }
 
@@ -1878,7 +1879,7 @@ impl MangoClient {
             address_lookup_tables: vec![],
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: self.client.config.transaction_builder_config,
+            config: self.client.config.transaction_builder_config.clone(),
         }
         .simulate(&self.client)
         .await
@@ -1957,12 +1958,28 @@ impl Default for FallbackOracleConfig {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Clone, Default, Builder)]
 pub struct TransactionBuilderConfig {
     /// adds a SetComputeUnitPrice instruction in front if none exists
-    pub prioritization_micro_lamports: Option<u64>,
+    pub priority_fee_provider: Option<Arc<dyn PriorityFeeProvider>>,
     /// adds a SetComputeUnitBudget instruction if none exists
     pub compute_budget_per_instruction: Option<u32>,
+}
+
+impl TransactionBuilderConfig {
+    pub fn builder() -> TransactionBuilderConfigBuilder {
+        TransactionBuilderConfigBuilder::default()
+    }
+}
+
+impl TransactionBuilderConfigBuilder {
+    pub fn prioritization_micro_lamports(&mut self, cu: Option<u64>) -> &mut Self {
+        self.priority_fee_provider(
+            cu.map(|cu| {
+                Arc::new(FixedPriorityFeeProvider::new(cu)) as Arc<dyn PriorityFeeProvider>
+            }),
+        )
+    }
 }
 
 pub struct TransactionBuilder {
@@ -2018,7 +2035,12 @@ impl TransactionBuilder {
             );
         }
 
-        let cu_prio = self.config.prioritization_micro_lamports.unwrap_or(0);
+        let cu_prio = self
+            .config
+            .priority_fee_provider
+            .as_ref()
+            .map(|provider| provider.compute_unit_fee_microlamports())
+            .unwrap_or(0);
         if !has_compute_unit_price && cu_prio > 0 {
             ixs.insert(0, ComputeBudgetInstruction::set_compute_unit_price(cu_prio));
         }

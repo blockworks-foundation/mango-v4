@@ -100,11 +100,14 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         settler_owner.clone(),
         Some(rpc_timeout),
-        TransactionBuilderConfig {
-            prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                .then_some(cli.prioritization_micro_lamports),
-            compute_budget_per_instruction: Some(cli.compute_budget_per_instruction),
-        },
+        TransactionBuilderConfig::builder()
+            .compute_budget_per_instruction(Some(cli.compute_budget_per_instruction))
+            .prioritization_micro_lamports(
+                (cli.prioritization_micro_lamports > 0)
+                    .then_some(cli.prioritization_micro_lamports),
+            )
+            .build()
+            .unwrap(),
     );
 
     // The representation of current on-chain account data
