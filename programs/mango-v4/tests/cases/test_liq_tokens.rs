@@ -325,6 +325,62 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 2.0).await;
 
     //
+    // TEST: can't liquidate if token has no asset weight
+    //
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: collateral_token2.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                maint_asset_weight_opt: Some(0.0),
+                init_asset_weight_opt: Some(0.0),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+    let res = send_tx(
+        solana,
+        TokenLiqWithTokenInstruction {
+            liqee: account,
+            liqor: vault_account,
+            liqor_owner: owner,
+            asset_token_index: collateral_token2.index,
+            liab_token_index: borrow_token2.index,
+            asset_bank_index: 0,
+            liab_bank_index: 0,
+            max_liab_transfer: I80F48::from_num(10000.0),
+        },
+    )
+    .await;
+    assert_mango_error(
+        &res,
+        MangoError::TokenLiquidationAssetsMustHaveAssetWeight.into(),
+        "no asset weight".to_string(),
+    );
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: collateral_token2.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                maint_asset_weight_opt: Some(0.8),
+                init_asset_weight_opt: Some(0.6),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    //
     // TEST: liquidate borrow2 against too little collateral2
     //
 

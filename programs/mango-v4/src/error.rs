@@ -143,6 +143,8 @@ pub enum MangoError {
     InvalidFeedForCLMMOracle,
     #[msg("Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)")]
     MissingFeedForCLMMOracle,
+    #[msg("can only liquidate assets with asset weight")]
+    TokenLiquidationAssetsMustHaveAssetWeight,
 }
 
 impl MangoError {
