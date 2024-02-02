@@ -7,7 +7,7 @@ use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::priority_fees;
+use mango_v4_client::priority_fees_cli;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
@@ -88,13 +88,6 @@ impl From<TcsMode> for trigger_tcs::Mode {
     }
 }
 
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum PrioStyleArg {
-    None,
-    Fixed,
-    RecentCuPercentileEma,
-}
-
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -156,16 +149,12 @@ struct Cli {
     #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
     tcs_mode: TcsMode,
 
-    /// choose prio fee style
-    #[clap(long, env, value_enum, default_value = "none")]
-    prioritization_style: PrioStyleArg,
+    #[clap(flatten)]
+    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
 
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
-
+    /// url to the lite-rpc websocket, optional
     #[clap(long, env, default_value = "")]
-    block_prio_feed_url: String,
+    lite_rpc_url: String,
 
     /// compute limit requested for liquidation instructions
     #[clap(long, env, default_value = "250000")]
@@ -214,45 +203,14 @@ async fn main() -> anyhow::Result<()> {
         dotenv::dotenv().ok();
         std::env::args_os().collect()
     };
-    let mut cli = Cli::parse_from(args);
+    let cli = Cli::parse_from(args);
 
     //
     // Priority fee setup
     //
-    if cli.prioritization_micro_lamports > 0 && cli.prioritization_style == PrioStyleArg::None {
-        info!("forcing prioritization-style to fixed, since prioritization-micro-lamports was set");
-        cli.prioritization_style = PrioStyleArg::Fixed;
-    }
-    let (prio_provider, prio_jobs) = match cli.prioritization_style {
-        PrioStyleArg::None => (None, vec![]),
-        PrioStyleArg::Fixed => (
-            Some(Arc::new(priority_fees::FixedPriorityFeeProvider::new(
-                cli.prioritization_micro_lamports,
-            ))
-                as Arc<dyn priority_fees::PriorityFeeProvider>),
-            vec![],
-        ),
-        PrioStyleArg::RecentCuPercentileEma => {
-            if cli.block_prio_feed_url.is_empty() {
-                anyhow::bail!("cannot use recent-cu-percentile-ema prioritization style without a block prio feed url");
-            }
-            let (block_prio_broadcaster, block_prio_job) =
-                priority_fees::run_broadcast_from_websocket_feed(cli.block_prio_feed_url);
-            let (prio_fee_provider, prio_fee_provider_job) =
-                priority_fees::CuPercentileEmaPriorityFeeProvider::run(
-                    priority_fees::EmaPriorityFeeProviderConfig::builder()
-                        .percentile(75)
-                        .fallback_prio(cli.prioritization_micro_lamports)
-                        .build()
-                        .unwrap(),
-                    &block_prio_broadcaster,
-                );
-            (
-                Some(prio_fee_provider as Arc<dyn priority_fees::PriorityFeeProvider>),
-                vec![block_prio_job, prio_fee_provider_job],
-            )
-        }
-    };
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
 
     //
     // Client setup

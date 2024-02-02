@@ -10,13 +10,15 @@ use mango_v4::{
     accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
     state::TokenIndex,
 };
+use tokio::task::JoinHandle;
 use tracing::*;
 
 use crate::MangoClient;
 
 pub async fn runner(
     mango_client: Arc<MangoClient>,
-    _debugging_handle: impl Future,
+    debugging_handle: impl Future,
+    extra_jobs: Vec<JoinHandle<()>>,
 ) -> Result<(), anyhow::Error> {
     ensure_deposit(&mango_client).await?;
     ensure_oo(&mango_client).await?;
@@ -53,7 +55,9 @@ pub async fn runner(
 
     futures::join!(
         futures::future::join_all(handles1),
-        futures::future::join_all(handles2)
+        futures::future::join_all(handles2),
+        debugging_handle,
+        futures::future::join_all(extra_jobs),
     );
 
     Ok(())
