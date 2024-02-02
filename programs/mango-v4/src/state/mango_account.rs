@@ -151,8 +151,14 @@ pub struct MangoAccount {
     /// Next id to use when adding a token condition swap
     pub next_token_conditional_swap_id: u64,
 
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+
+    /// Time at which the last collateral fee was charged
+    pub last_collateral_fee_charge: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 200],
+    pub reserved: [u8; 152],
 
     // dynamic
     pub header_version: u8,
@@ -203,7 +209,10 @@ impl MangoAccount {
             buyback_fees_accrued_previous: 0,
             buyback_fees_expiry_timestamp: 0,
             next_token_conditional_swap_id: 0,
-            reserved: [0; 200],
+            temporary_delegate: Pubkey::default(),
+            temporary_delegate_expiry: 0,
+            last_collateral_fee_charge: 0,
+            reserved: [0; 152],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -327,11 +336,12 @@ pub struct MangoAccountFixed {
     pub next_token_conditional_swap_id: u64,
     pub temporary_delegate: Pubkey,
     pub temporary_delegate_expiry: u64,
-    pub reserved: [u8; 160],
+    pub last_collateral_fee_charge: u64,
+    pub reserved: [u8; 152],
 }
 const_assert_eq!(
     size_of::<MangoAccountFixed>(),
-    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 152
 );
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);

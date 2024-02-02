@@ -98,11 +98,32 @@ pub struct Group {
     /// Number of fast listings that are allowed per interval
     pub allowed_fast_listings_per_interval: u16,
 
-    pub reserved: [u8; 1812],
+    pub padding2: [u8; 4],
+
+    /// Intervals in which collateral fee is applied
+    pub collateral_fee_interval: u64,
+
+    pub reserved: [u8; 1800],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 8 + 2 * 2 + 1812
+    32 + 4
+        + 32 * 2
+        + 4
+        + 32 * 2
+        + 4
+        + 4
+        + 20 * 32
+        + 32
+        + 8
+        + 16
+        + 32
+        + 8
+        + 8
+        + 2 * 2
+        + 4
+        + 8
+        + 1800
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);

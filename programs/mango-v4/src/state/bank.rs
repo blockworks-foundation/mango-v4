@@ -217,8 +217,12 @@ pub struct Bank {
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
 
+    pub collected_collateral_fees: I80F48,
+
+    pub collateral_fee_per_day: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1920],
+    pub reserved: [u8; 1900],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -255,8 +259,9 @@ const_assert_eq!(
         + 16 * 3
         + 32
         + 8
-        + 16 * 3
-        + 1920
+        + 16 * 4
+        + 4
+        + 1900
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -300,6 +305,7 @@ impl Bank {
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
             collected_liquidation_fees: I80F48::ZERO,
+            collected_collateral_fees: I80F48::ZERO,
             fees_withdrawn: 0,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
@@ -363,7 +369,8 @@ impl Bank {
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
-            reserved: [0; 1920],
+            collateral_fee_per_day: existing_bank.collateral_fee_per_day,
+            reserved: [0; 1900],
         }
     }
 
