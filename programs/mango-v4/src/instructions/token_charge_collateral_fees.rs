@@ -3,14 +3,10 @@ use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token;
-use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{
-    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
-};
+use crate::logs::{emit_stack, TokenCollateralFeeLog};
 
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -35,12 +31,41 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
     // there won't be a huge charge based only on the end state.
     let charge_seconds = (now_ts - last_charge_ts).min(2 * group.collateral_fee_interval);
 
+    // The fees are configured in "interest per day" so we need to get the fraction of days
+    // that has passed since the last update for scaling
     let inv_seconds_per_day = I80F48::from_num(1.157407407407e-5); // 1 / (24 * 60 * 60)
-    let collateral_fee_scaling = I80F48::from(charge_seconds) * inv_seconds_per_day;
+    let time_scaling = I80F48::from(charge_seconds) * inv_seconds_per_day;
 
-    // TODO: Get health cache to compute total maint liabs and total maint assets
     let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
     let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+
+    // We want to find the total asset health and total liab health, but don't want
+    // to treat borrows that moved into open orders accounts as realized. Hence we
+    // pretend all spot orders are closed and settled and add their funds back to
+    // the token positions.
+    let mut token_balances = health_cache.effective_token_balances(HealthType::Maint);
+    for s3info in health_cache.serum3_infos.iter() {
+        token_balances[s3info.base_info_index].spot_and_perp += s3info.reserved_base;
+        token_balances[s3info.quote_info_index].spot_and_perp += s3info.reserved_quote;
+    }
+
+    let mut total_liab_health = I80F48::ZERO;
+    let mut total_asset_health = I80F48::ZERO;
+    for (info, balance) in health_cache.token_infos.iter().zip(token_balances.iter()) {
+        let health = info.health_contribution(HealthType::Maint, balance.spot_and_perp);
+        if health.is_positive() {
+            total_asset_health += health;
+        } else {
+            total_liab_health -= health;
+        }
+    }
+
+    // Users only pay for assets that are actively used to cover their liabilities.
+    let asset_usage_scaling = (total_liab_health / total_asset_health)
+        .max(I80F48::ZERO)
+        .min(I80F48::ONE);
+
+    let scaling = asset_usage_scaling * time_scaling;
 
     let token_position_count = account.active_token_positions().count();
     for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
@@ -55,11 +80,7 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             continue;
         }
 
-        // TODO: Get the right amounts
-        let used_collateral = token_balance; // depends on liab size, this asset size and total asset size
-        let fee = used_collateral
-            * I80F48::from_num(bank.collateral_fee_per_day)
-            * collateral_fee_scaling;
+        let fee = token_balance * scaling * I80F48::from_num(bank.collateral_fee_per_day);
         assert!(fee <= token_balance);
 
         let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
@@ -70,7 +91,13 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         bank.collected_fees_native += fee;
         bank.collected_collateral_fees += fee;
 
-        // TODO: emit a log
+        emit_stack(TokenCollateralFeeLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index,
+            fee: fee.to_bits(),
+            asset_usage_fraction: asset_usage_scaling.to_bits(),
+        })
     }
 
     Ok(())
