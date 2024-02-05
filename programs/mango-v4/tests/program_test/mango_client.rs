@@ -1842,6 +1842,7 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
         allowed_fast_listings_per_interval_opt: None,
+        collateral_fee_interval_opt: None,
     }
 }
 

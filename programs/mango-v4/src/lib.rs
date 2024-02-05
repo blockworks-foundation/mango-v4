@@ -84,6 +84,7 @@ pub mod mango_v4 {
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
         allowed_fast_listings_per_interval_opt: Option<u16>,
+        collateral_fee_interval_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -100,6 +101,7 @@ pub mod mango_v4 {
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
             allowed_fast_listings_per_interval_opt,
+            collateral_fee_interval_opt,
         )?;
         Ok(())
     }
