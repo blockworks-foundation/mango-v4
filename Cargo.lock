@@ -3301,7 +3301,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.21.2"
+version = "0.21.3"
 dependencies = [
  "anchor-lang",
  "anchor-spl",

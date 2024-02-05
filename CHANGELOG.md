@@ -4,11 +4,16 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.21.3, 2024-2-
+
+- Remove deposit limit check on Openbook v1 when placing an order to sell
+  deposits (#869)
+
+## mainnet
+
 ### v0.21.2, 2024-1-
 
 - Allow fast-listing of Openbook v1 markets (#839, #841)
-
-## mainnet
 
 ### v0.21.1, 2024-1-
 
