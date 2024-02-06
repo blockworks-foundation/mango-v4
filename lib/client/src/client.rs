@@ -49,6 +49,7 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
+use mango_v4::error::MangoError;
 
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
@@ -1057,17 +1058,33 @@ impl MangoClient {
         limit: u8,
         self_trade_behavior: SelfTradeBehavior,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mut ixs = PreparedInstructions::new();
+
         let perp = self.context.perp(market_index);
+        let mut account = account.clone();
+
+        let close_perp_ixs_opt = self
+            .replace_perp_market_if_needed(
+                &account,
+                market_index
+            )
+            .await?;
+
+        if let Some((close_perp_ixs, modified_account)) = close_perp_ixs_opt {
+            account = modified_account;
+            ixs.append(close_perp_ixs);
+        }
+
         let (health_remaining_metas, health_cu) = self
             .derive_health_check_remaining_account_metas(
-                account,
+                &account,
                 vec![],
                 vec![],
                 vec![market_index],
             )
             .await?;
 
-        let ixs = PreparedInstructions::from_single(
+        let ix =
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
@@ -1101,12 +1118,43 @@ impl MangoClient {
                         self_trade_behavior,
                     },
                 ),
-            },
-            self.instruction_cu(health_cu)
-                + self.context.compute_estimates.cu_per_perp_order_match * limit as u32,
-        );
+            };
+
+        ixs.push(ix,self.instruction_cu(health_cu)
+            + self.context.compute_estimates.cu_per_perp_order_match * limit as u32);
 
         Ok(ixs)
+    }
+
+    async fn replace_perp_market_if_needed(
+        &self,
+        account: &MangoAccountValue,
+        perk_market_index: PerpMarketIndex,
+    ) -> anyhow::Result<Option<(PreparedInstructions, MangoAccountValue)>> {
+        let context = &self.context;
+        let settle_token_index = context.perp(perk_market_index).settle_token_index;
+
+        let mut account = account.clone();
+        let enforce_position_result = account.ensure_perp_position(perk_market_index, settle_token_index);
+
+        if enforce_position_result.is_err() {
+            let perp_position_to_close_opt = account.find_first_unused_perp_position();
+            match perp_position_to_close_opt {
+                Some(perp_position_to_close) => {
+                    let close_ix = self.perp_deactivate_position_instruction(perp_position_to_close.market_index)
+                        .await?;
+
+                    let previous_market = context.perp(perp_position_to_close.market_index);
+                    account.deactivate_perp_position(perp_position_to_close.market_index, previous_market.settle_token_index)?;
+                    account.ensure_perp_position(perk_market_index, settle_token_index)?;
+
+                    Ok(Some((close_ix, account)))
+                },
+                None => Err(anyhow::format_err!("No perp market slot available"))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1181,6 +1229,14 @@ impl MangoClient {
         &self,
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
+        let ixs = self.perp_deactivate_position_instruction(market_index).await?;
+        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+    }
+
+    async fn perp_deactivate_position_instruction(
+        &self,
+        market_index: PerpMarketIndex
+    ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
         let mango_account = &self.mango_account().await?;
 
@@ -1210,7 +1266,7 @@ impl MangoClient {
             },
             self.instruction_cu(health_cu),
         );
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        Ok(ixs)
     }
 
     pub async fn perp_settle_pnl_instruction(
