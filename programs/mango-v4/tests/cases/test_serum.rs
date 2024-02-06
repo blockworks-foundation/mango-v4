@@ -1727,7 +1727,6 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
             group: group_with_tokens.group,
             admin: group_with_tokens.admin,
             mint: quote_token.mint.pubkey,
-            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 deposit_limit_opt: Some(1),
                 ..token_edit_instruction_default()
