@@ -304,6 +304,7 @@ export class MangoClient {
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
     allowedFastListingsPerInterval?: number,
+    collateralFeeInterval?: BN,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -319,6 +320,7 @@ export class MangoClient {
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
         allowedFastListingsPerInterval ?? null,
+        collateralFeeInterval ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -461,6 +463,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.collateralFeePerDay,
       )
       .accounts({
         group: group.publicKey,
@@ -548,6 +551,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.collateralFeePerDay,
       )
       .accounts({
         group: group.publicKey,

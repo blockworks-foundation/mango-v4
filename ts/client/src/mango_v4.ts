@@ -277,6 +277,12 @@ export type MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -630,6 +636,10 @@ export type MangoV4 = {
         },
         {
           "name": "platformLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "collateralFeePerDay",
           "type": "f32"
         }
       ]
@@ -1038,6 +1048,12 @@ export type MangoV4 = {
         },
         {
           "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
           "type": {
             "option": "f32"
           }
@@ -7514,11 +7530,29 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1900
               ]
             }
           }
@@ -7647,11 +7681,27 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -7774,11 +7824,26 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -9549,11 +9614,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -13678,6 +13747,36 @@ export type MangoV4 = {
         {
           "name": "incentiveAmount",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
           "index": false
         }
       ]
@@ -14311,6 +14410,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -14664,6 +14769,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "platformLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "collateralFeePerDay",
           "type": "f32"
         }
       ]
@@ -15072,6 +15181,12 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
           "type": {
             "option": "f32"
           }
@@ -21548,11 +21663,29 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1900
               ]
             }
           }
@@ -21681,11 +21814,27 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -21808,11 +21957,26 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -23583,11 +23747,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -27712,6 +27880,36 @@ export const IDL: MangoV4 = {
         {
           "name": "incentiveAmount",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
           "index": false
         }
       ]

@@ -217,8 +217,12 @@ pub struct Bank {
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
 
+    /// Collateral fees that have been collected (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
     pub collected_collateral_fees: I80F48,
 
+    /// The daily collateral fees rate for fully utilized collateral.
     pub collateral_fee_per_day: f32,
 
     #[derivative(Debug = "ignore")]
