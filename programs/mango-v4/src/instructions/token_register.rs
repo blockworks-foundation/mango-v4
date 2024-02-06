@@ -44,6 +44,7 @@ pub fn token_register(
     deposit_limit: u64,
     zero_util_rate: f32,
     platform_liquidation_fee: f32,
+    collateral_fee_per_day: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -128,7 +129,7 @@ pub fn token_register(
         platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
         collected_liquidation_fees: I80F48::ZERO,
         collected_collateral_fees: I80F48::ZERO,
-        collateral_fee_per_day: 0.0, // TODO
+        collateral_fee_per_day,
         reserved: [0; 1900],
     };
 

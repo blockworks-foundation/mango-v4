@@ -403,6 +403,7 @@ impl Bank {
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
         require_gte!(self.zero_util_rate, I80F48::ZERO);
         require_gte!(self.platform_liquidation_fee, 0.0);
+        require_gte!(self.collateral_fee_per_day, 0.0);
         Ok(())
     }
 

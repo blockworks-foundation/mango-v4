@@ -1077,6 +1077,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             deposit_limit: 0,
             zero_util_rate: 0.0,
             platform_liquidation_fee: self.platform_liquidation_fee,
+            collateral_fee_per_day: 0.0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1324,6 +1325,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         deposit_limit_opt: None,
         zero_util_rate_opt: None,
         platform_liquidation_fee_opt: None,
+        collateral_fee_per_day_opt: None,
     }
 }
 
