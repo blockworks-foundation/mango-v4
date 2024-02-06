@@ -682,6 +682,7 @@ mod tests {
             init_scaled_liab_weight: I80F48::from_num(1.0 + x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
             balance_spot: I80F48::ZERO,
+            allow_asset_liquidation: true,
         }
     }
 

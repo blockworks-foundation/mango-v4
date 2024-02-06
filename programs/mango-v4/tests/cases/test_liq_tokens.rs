@@ -338,6 +338,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             options: mango_v4::instruction::TokenEdit {
                 maint_asset_weight_opt: Some(0.0),
                 init_asset_weight_opt: Some(0.0),
+                disable_asset_liquidation_opt: Some(true),
+                reduce_only_opt: Some(1),
                 ..token_edit_instruction_default()
             },
         },
@@ -360,8 +362,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     .await;
     assert_mango_error(
         &res,
-        MangoError::TokenLiquidationAssetsMustHaveAssetWeight.into(),
-        "no asset weight".to_string(),
+        MangoError::TokenAssetLiquidationDisabled.into(),
+        "liquidation disabled".to_string(),
     );
     send_tx(
         solana,
@@ -373,6 +375,8 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             options: mango_v4::instruction::TokenEdit {
                 maint_asset_weight_opt: Some(0.8),
                 init_asset_weight_opt: Some(0.6),
+                disable_asset_liquidation_opt: Some(false),
+                reduce_only_opt: Some(0),
                 ..token_edit_instruction_default()
             },
         },

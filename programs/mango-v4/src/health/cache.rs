@@ -175,6 +175,8 @@ pub struct TokenInfo {
     /// Includes TokenPosition and free Serum3OpenOrders balances.
     /// Does not include perp upnl or Serum3 reserved amounts.
     pub balance_spot: I80F48,
+
+    pub allow_asset_liquidation: bool,
 }
 
 /// Temporary value used during health computations
@@ -907,7 +909,7 @@ impl HealthCache {
     }
 
     /// Liquidatable spot assets mean: actual token deposits and also a positive effective token balance
-    /// and a maint asset weight > 0
+    /// and is available for asset liquidation
     pub fn has_liq_spot_assets(&self) -> bool {
         let health_token_balances = self.effective_token_balances(HealthType::LiquidationEnd);
         self.token_infos
@@ -915,7 +917,7 @@ impl HealthCache {
             .zip(health_token_balances.iter())
             .any(|(ti, b)| {
                 // need 1 native token to use token_liq_with_token
-                ti.balance_spot >= 1 && b.spot_and_perp >= 1 && ti.maint_asset_weight.is_positive()
+                ti.balance_spot >= 1 && b.spot_and_perp >= 1 && ti.allow_asset_liquidation
             })
     }
 
@@ -934,7 +936,7 @@ impl HealthCache {
         let all_iter = || self.token_infos.iter().zip(health_token_balances.iter());
         all_iter().any(|(ti, b)| ti.balance_spot < 0 && b.spot_and_perp < 0)
             && all_iter().any(|(ti, b)| {
-                ti.balance_spot >= 1 && b.spot_and_perp >= 1 && ti.maint_asset_weight.is_positive()
+                ti.balance_spot >= 1 && b.spot_and_perp >= 1 && ti.allow_asset_liquidation
             })
     }
 
@@ -1289,6 +1291,7 @@ fn new_health_cache_impl(
             init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
             balance_spot: native,
+            allow_asset_liquidation: bank.allows_asset_liquidation(),
         });
     }
 
