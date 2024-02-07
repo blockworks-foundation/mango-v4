@@ -130,6 +130,7 @@ export class Bank implements BankForHealth {
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
       forceClose: number;
+      disableAssetLiquidation: number;
       feesWithdrawn: BN;
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
@@ -211,6 +212,7 @@ export class Bank implements BankForHealth {
       obj.zeroUtilRate,
       obj.platformLiquidationFee,
       obj.collectedLiquidationFees,
+      obj.disableAssetLiquidation == 0,
     );
   }
 
@@ -276,6 +278,7 @@ export class Bank implements BankForHealth {
     zeroUtilRate: I80F48Dto,
     platformLiquidationFee: I80F48Dto,
     collectedLiquidationFees: I80F48Dto,
+    public allowAssetLiquidation: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
