@@ -1610,19 +1610,13 @@ impl MangoClient {
         account: (&Pubkey, &MangoAccountValue),
         token_conditional_swap_id: u64,
     ) -> anyhow::Result<PreparedInstructions> {
-        let mango_account = &self.mango_account().await?;
         let (tcs_index, tcs) = account
             .1
             .token_conditional_swap_by_id(token_conditional_swap_id)?;
 
         let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
         let (health_remaining_ams, health_cu) = self
-            .derive_health_check_remaining_account_metas(
-                mango_account,
-                vec![],
-                affected_tokens,
-                vec![],
-            )
+            .derive_health_check_remaining_account_metas(account.1, vec![], affected_tokens, vec![])
             .await
             .unwrap();
 
