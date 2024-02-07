@@ -311,7 +311,9 @@ async fn main() -> anyhow::Result<()> {
                     account_addresses = state.mango_accounts.iter().cloned().collect();
                 }
 
-                settlement.settle(account_addresses).await.unwrap();
+                if let Err(err) = settlement.settle(account_addresses).await {
+                    warn!("settle error: {err:?}");
+                }
             }
         }
     });
@@ -332,7 +334,9 @@ async fn main() -> anyhow::Result<()> {
                     account_addresses = state.mango_accounts.iter().cloned().collect();
                 }
 
-                tcs_start.run_pass(account_addresses).await.unwrap();
+                if let Err(err) = tcs_start.run_pass(account_addresses).await {
+                    warn!("tcs-start error: {err:?}");
+                }
             }
         }
     });
