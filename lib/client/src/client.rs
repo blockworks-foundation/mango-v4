@@ -1449,8 +1449,8 @@ impl MangoClient {
 
         let affected_tokens = vec![tcs.buy_token_index, tcs.sell_token_index];
         let (health_remaining_ams, health_cu) = self
-            .derive_health_check_remaining_account_metas(vec![], affected_tokens, vec![])
-            .await
+            .context
+            .derive_health_check_remaining_account_metas(account.1, vec![], affected_tokens, vec![])
             .unwrap();
 
         let ix = Instruction {
