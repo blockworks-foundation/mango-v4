@@ -8,7 +8,8 @@ use anchor_client::Cluster;
 
 use clap::{Parser, Subcommand};
 use mango_v4_client::{
-    keypair_from_cli, Client, FallbackOracleConfig, MangoClient, TransactionBuilderConfig,
+    keypair_from_cli, priority_fees_cli, Client, FallbackOracleConfig, MangoClient,
+    TransactionBuilderConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
@@ -63,9 +64,12 @@ struct Cli {
     #[clap(long, env, default_value_t = 10)]
     timeout: u64,
 
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
+    #[clap(flatten)]
+    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
+
+    /// url to the lite-rpc websocket, optional
+    #[clap(long, env, default_value = "")]
+    lite_rpc_url: String,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -87,6 +91,10 @@ async fn main() -> Result<(), anyhow::Error> {
     };
     let cli = Cli::parse_from(args);
 
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
+
     let owner = Arc::new(keypair_from_cli(&cli.owner));
 
     let rpc_url = cli.rpc_url;
@@ -105,11 +113,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 .commitment(commitment)
                 .fee_payer(Some(owner.clone()))
                 .timeout(Duration::from_secs(cli.timeout))
-                .transaction_builder_config(TransactionBuilderConfig {
-                    prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                        .then_some(cli.prioritization_micro_lamports),
-                    compute_budget_per_instruction: None,
-                })
+                .transaction_builder_config(
+                    TransactionBuilderConfig::builder()
+                        .priority_fee_provider(prio_provider)
+                        .compute_budget_per_instruction(None)
+                        .build()
+                        .unwrap(),
+                )
                 .fallback_oracle_config(FallbackOracleConfig::Never)
                 .build()
                 .unwrap(),
@@ -143,12 +153,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 cli.interval_consume_events,
                 cli.interval_update_funding,
                 cli.interval_check_new_listings_and_abort,
+                prio_jobs,
             )
             .await
         }
         Command::Taker { .. } => {
             let client = mango_client.clone();
-            taker::runner(client, debugging_handle).await
+            taker::runner(client, debugging_handle, prio_jobs).await
         }
     }
 }

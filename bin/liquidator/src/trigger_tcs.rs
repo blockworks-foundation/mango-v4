@@ -14,7 +14,7 @@ use mango_v4::{
 use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
-use solana_sdk::{signature::Signature, signer::Signer};
+use solana_sdk::signature::Signature;
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
@@ -1168,10 +1168,8 @@ impl Context {
             let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
-                address_lookup_tables: vec![],
-                payer: fee_payer.pubkey(),
                 signers: vec![self.mango_client.owner.clone(), fee_payer],
-                config: self.mango_client.client.config().transaction_builder_config,
+                ..self.mango_client.transaction_builder().await?
             }
         };
 
