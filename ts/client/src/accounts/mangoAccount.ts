@@ -617,11 +617,9 @@ export class MangoAccount {
     sourceBank: Bank,
     targetBank: Bank,
     targetRemainingDepositLimit: BN,
-  ): BN {
-    return new BN(
-      I80F48.fromI64(targetRemainingDepositLimit)
-        .mul(targetBank.price.div(sourceBank.price))
-        .toNumber(),
+  ): I80F48 {
+    return I80F48.fromI64(targetRemainingDepositLimit).mul(
+      targetBank.price.div(sourceBank.price),
     );
   }
 
@@ -668,7 +666,7 @@ export class MangoAccount {
         targetRemainingDepositLimit,
       );
 
-      maxSource = maxSource.min(I80F48.fromI64(equivalentSourceAmount));
+      maxSource = maxSource.min(equivalentSourceAmount);
     }
 
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
@@ -816,7 +814,7 @@ export class MangoAccount {
         targetRemainingDepositLimit,
       );
 
-      quoteAmount = quoteAmount.min(I80F48.fromI64(equivalentSourceAmount));
+      quoteAmount = quoteAmount.min(equivalentSourceAmount);
     }
 
     quoteAmount = quoteAmount.div(
@@ -871,7 +869,7 @@ export class MangoAccount {
         targetRemainingDepositLimit,
       );
 
-      baseAmount = baseAmount.min(I80F48.fromI64(equivalentSourceAmount));
+      baseAmount = baseAmount.min(equivalentSourceAmount);
     }
 
     baseAmount = baseAmount.div(
