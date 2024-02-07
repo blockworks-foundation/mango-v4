@@ -34,35 +34,64 @@ async function extendTable(
   group: Group,
   payer: Keypair,
   nick: string,
-  altAddress: PublicKey,
-  addresses: PublicKey[],
+  altAddresses: PublicKey[],
+  addressesToAdd: PublicKey[],
 ): Promise<void> {
   await group.reloadAll(client);
-  const alt = await client.program.provider.connection.getAddressLookupTable(
-    altAddress,
-  );
 
-  addresses = addresses.filter(
+  let addressesAlreadyIndexed: PublicKey[] = [];
+  for (const altAddr of altAddresses) {
+    const alt = await client.program.provider.connection.getAddressLookupTable(
+      altAddr,
+    );
+    if (alt.value?.state.addresses) {
+      addressesAlreadyIndexed = addressesAlreadyIndexed.concat(
+        alt.value?.state.addresses,
+      );
+    }
+  }
+
+  addressesToAdd = addressesToAdd.filter(
     (newAddress) =>
-      alt.value?.state.addresses &&
-      alt.value?.state.addresses.findIndex((addressInAlt) =>
+      addressesAlreadyIndexed.findIndex((addressInAlt) =>
         addressInAlt.equals(newAddress),
       ) === -1,
   );
-  if (addresses.length === 0) {
-    return;
-  }
-  console.log(
-    `Extending ${altAddress} with ${nick} ${
-      addresses.length
-    } addresses - ${addresses.join(', ')}`,
-  );
-
-  if (DRY_RUN) {
+  if (addressesToAdd.length === 0) {
     return;
   }
 
-  for (const chunk_ of chunk(addresses, 20)) {
+  let altIndex = 0;
+  for (const chunk_ of chunk(addressesToAdd, 20)) {
+    let alt;
+    while (altIndex < altAddresses.length) {
+      alt = await client.program.provider.connection.getAddressLookupTable(
+        altAddresses[altIndex],
+      );
+      if (alt.value?.state.addresses.length < 234) {
+        break;
+      } else {
+        if (altIndex == altAddresses.length - 1) {
+          console.log(
+            `...need to create a new alt, all existing ones are full`,
+          );
+          process.exit(-1);
+        }
+        console.log(
+          `...using a new alt ${altAddresses[altIndex + 1]}, ${
+            altAddresses[altIndex]
+          } is almost full`,
+        );
+      }
+      altIndex++;
+    }
+
+    console.log(
+      `Extending ${altAddresses[altIndex]} with ${nick} ${
+        chunk_.length
+      } addresses - ${chunk_.join(', ')}`,
+    );
+
     const extendIx = AddressLookupTableProgram.extendLookupTable({
       lookupTable: alt.value!.key,
       payer: payer.publicKey,
@@ -73,6 +102,10 @@ async function extendTable(
       client.program.provider as AnchorProvider,
       [extendIx],
     );
+
+    if (DRY_RUN) {
+      continue;
+    }
     const sig = await client.program.provider.connection.sendTransaction(
       extendTx,
     );
@@ -80,7 +113,39 @@ async function extendTable(
   }
 }
 
-async function run(): Promise<void> {
+async function createANewAlt() {
+  const options = AnchorProvider.defaultOptions();
+  const connection = new Connection(MB_CLUSTER_URL!, options);
+  const payer = Keypair.fromSecretKey(
+    Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
+  );
+  const payerWallet = new Wallet(payer);
+  const userProvider = new AnchorProvider(connection, payerWallet, options);
+  const client = await MangoClient.connect(
+    userProvider,
+    CLUSTER,
+    MANGO_V4_ID[CLUSTER],
+    {
+      idsSource: 'get-program-accounts',
+    },
+  );
+
+  const createIx = AddressLookupTableProgram.createLookupTable({
+    authority: payer.publicKey,
+    payer: payer.publicKey,
+    recentSlot: await connection.getSlot('finalized'),
+  });
+  const createTx = await buildVersionedTx(
+    client.program.provider as AnchorProvider,
+    [createIx[0]],
+  );
+  const sig = await connection.sendTransaction(createTx);
+  console.log(
+    `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+  );
+}
+
+async function populateExistingAlts(): Promise<void> {
   try {
     const options = AnchorProvider.defaultOptions();
     const connection = new Connection(MB_CLUSTER_URL!, options);
@@ -107,10 +172,14 @@ async function run(): Promise<void> {
       'AgCBUZ6UMWqPLftTxeAqpQxtrfiCyL2HgRfmmM6QTfCj',
     );
     // group and insurance vault
-    await extendTable(client, group, payer, 'group', altAddress0, [
-      group.publicKey,
-      group.insuranceVault,
-    ]);
+    await extendTable(
+      client,
+      group,
+      payer,
+      'group',
+      [altAddress0],
+      [group.publicKey, group.insuranceVault],
+    );
     // Banks + vaults + oracles
     // Split into 3 ixs since we end up with RangeError: encoding overruns Uint8Array otherwise
     await extendTable(
@@ -118,7 +187,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'token banks',
-      altAddress0,
+      [altAddress0],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.publicKey),
@@ -128,7 +197,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'token bank oracles',
-      altAddress0,
+      [altAddress0],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.oracle),
@@ -138,7 +207,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'token bank vaults',
-      altAddress0,
+      [altAddress0],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.vault),
@@ -149,7 +218,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'perp markets and perp oracles',
-      altAddress0,
+      [altAddress0],
       Array.from(group.perpMarketsMapByMarketIndex.values())
         .flat()
         .map((perpMarket) => [perpMarket.publicKey, perpMarket.oracle])
@@ -161,7 +230,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'well known addresses',
-      altAddress0,
+      [altAddress0],
       [
         // Solana specific
         SystemProgram.programId,
@@ -182,13 +251,19 @@ async function run(): Promise<void> {
     const altAddress1 = new PublicKey(
       'FGZCgVhVGqzfWnmJFP9Hx4BvGvnFApEp1dM2whzXvg1Z',
     );
+    const altAddress2 = new PublicKey(
+      'FsruqicZDGnCnm7dRthjL5eFrTmaNRkkomxhPJQP2kdu',
+    );
+    const altAddress3 = new PublicKey(
+      '2JAg3Rm6TmQ3gSYgUCCyZ9bCQKThD9jxHCN6U2ByTPMb',
+    );
     // bank mints
     await extendTable(
       client,
       group,
       payer,
       'token mints',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => [bank.mint])
@@ -200,7 +275,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'mint infos',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.mintInfosMapByMint.values())
         .flat()
         .map((mintInto) => [mintInto.publicKey])
@@ -213,7 +288,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'serum3 markets',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.serum3MarketsMapByMarketIndex.values())
         .flat()
         .map((serum3Market) => serum3Market.publicKey),
@@ -223,7 +298,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'serum3 external markets',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.publicKey),
@@ -233,7 +308,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'serum3 external markets bids',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.bidsAddress),
@@ -243,7 +318,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'serum3 external markets asks',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.asksAddress),
@@ -253,7 +328,7 @@ async function run(): Promise<void> {
       group,
       payer,
       'perp market event queues, bids, and asks',
-      altAddress1,
+      [altAddress1, altAddress2, altAddress3],
       Array.from(group.perpMarketsMapByMarketIndex.values())
         .flat()
         .map((perpMarket) => [
@@ -268,4 +343,5 @@ async function run(): Promise<void> {
   }
 }
 
-run();
+// createANewAlt();
+populateExistingAlts();
