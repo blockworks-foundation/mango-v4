@@ -11,7 +11,10 @@ use mango_v4_client::MangoClient;
 
 pub struct Config {
     pub quote_index: TokenIndex,
+
+    /// Size in quote_index-token native tokens to quote.
     pub quote_amount: u64,
+
     pub jupiter_version: jupiter::Version,
 }
 
