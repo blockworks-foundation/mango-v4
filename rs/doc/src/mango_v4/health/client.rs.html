@@ -1730,6 +1730,7 @@
 <a href="#1730" id="1730">1730</a>
 <a href="#1731" id="1731">1731</a>
 <a href="#1732" id="1732">1732</a>
+<a href="#1733" id="1733">1733</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2414,6 +2415,7 @@
             init_scaled_liab_weight: I80F48::from_num(<span class="number">1.0 </span>+ x),
             prices: Prices::new_single_price(I80F48::from_num(price)),
             balance_spot: I80F48::ZERO,
+            allow_asset_liquidation: <span class="bool-val">true</span>,
         }
     }
 

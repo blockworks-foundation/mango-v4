@@ -1768,6 +1768,19 @@
 <a href="#1768" id="1768">1768</a>
 <a href="#1769" id="1769">1769</a>
 <a href="#1770" id="1770">1770</a>
+<a href="#1771" id="1771">1771</a>
+<a href="#1772" id="1772">1772</a>
+<a href="#1773" id="1773">1773</a>
+<a href="#1774" id="1774">1774</a>
+<a href="#1775" id="1775">1775</a>
+<a href="#1776" id="1776">1776</a>
+<a href="#1777" id="1777">1777</a>
+<a href="#1778" id="1778">1778</a>
+<a href="#1779" id="1779">1779</a>
+<a href="#1780" id="1780">1780</a>
+<a href="#1781" id="1781">1781</a>
+<a href="#1782" id="1782">1782</a>
+<a href="#1783" id="1783">1783</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1928,8 +1941,12 @@
     </span><span class="kw">pub </span>reduce_only: u8,
     <span class="kw">pub </span>force_close: u8,
 
+    <span class="doccomment">/// If set to 1, deposits cannot be liquidated when an account is liquidatable.
+    /// That means bankrupt accounts may still have assets of this type deposited.
+    </span><span class="kw">pub </span>disable_asset_liquidation: u8,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>padding: [u8; <span class="number">6</span>],
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">5</span>],
 
     <span class="comment">// Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -2116,7 +2133,8 @@
             deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
             reduce_only: existing_bank.reduce_only,
             force_close: existing_bank.force_close,
-            padding: [<span class="number">0</span>; <span class="number">6</span>],
+            disable_asset_liquidation: existing_bank.disable_asset_liquidation,
+            padding: [<span class="number">0</span>; <span class="number">5</span>],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -2166,6 +2184,10 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_liab_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.zero_util_rate, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.platform_liquidation_fee, <span class="number">0.0</span>);
+        <span class="kw">if </span>!<span class="self">self</span>.allows_asset_liquidation() {
+            <span class="macro">require!</span>(<span class="self">self</span>.are_borrows_reduce_only(), MangoError::SomeError);
+            <span class="macro">require_eq!</span>(<span class="self">self</span>.maint_asset_weight, I80F48::ZERO);
+        }
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -2185,6 +2207,10 @@
 
     <span class="kw">pub fn </span>is_force_close(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.force_close == <span class="number">1
+    </span>}
+
+    <span class="kw">pub fn </span>allows_asset_liquidation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.disable_asset_liquidation == <span class="number">0
     </span>}
 
     <span class="attr">#[inline(always)]

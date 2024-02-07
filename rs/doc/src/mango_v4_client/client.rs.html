@@ -2148,6 +2148,28 @@
 <a href="#2148" id="2148">2148</a>
 <a href="#2149" id="2149">2149</a>
 <a href="#2150" id="2150">2150</a>
+<a href="#2151" id="2151">2151</a>
+<a href="#2152" id="2152">2152</a>
+<a href="#2153" id="2153">2153</a>
+<a href="#2154" id="2154">2154</a>
+<a href="#2155" id="2155">2155</a>
+<a href="#2156" id="2156">2156</a>
+<a href="#2157" id="2157">2157</a>
+<a href="#2158" id="2158">2158</a>
+<a href="#2159" id="2159">2159</a>
+<a href="#2160" id="2160">2160</a>
+<a href="#2161" id="2161">2161</a>
+<a href="#2162" id="2162">2162</a>
+<a href="#2163" id="2163">2163</a>
+<a href="#2164" id="2164">2164</a>
+<a href="#2165" id="2165">2165</a>
+<a href="#2166" id="2166">2166</a>
+<a href="#2167" id="2167">2167</a>
+<a href="#2168" id="2168">2168</a>
+<a href="#2169" id="2169">2169</a>
+<a href="#2170" id="2170">2170</a>
+<a href="#2171" id="2171">2171</a>
+<a href="#2172" id="2172">2172</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -2179,6 +2201,7 @@
 <span class="kw">use </span><span class="kw">crate</span>::context::MangoGroupContext;
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
 <span class="kw">use </span><span class="kw">crate</span>::health_cache;
+<span class="kw">use </span><span class="kw">crate</span>::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 <span class="kw">use </span><span class="kw">crate</span>::util::PreparedInstructions;
 <span class="kw">use crate</span>::{jupiter, util};
 <span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
@@ -2203,7 +2226,7 @@
 <span class="kw">pub const </span>MAX_ACCOUNTS_PER_TRANSACTION: usize = <span class="number">64</span>;
 
 <span class="comment">// very close to anchor_client::Client, which unfortunately has no accessors or Clone
-</span><span class="attr">#[derive(Clone, Debug, Builder)]
+</span><span class="attr">#[derive(Clone, Builder)]
 #[builder(name = <span class="string">&quot;ClientBuilder&quot;</span>, build_fn(name = <span class="string">&quot;build_config&quot;</span>))]
 </span><span class="kw">pub struct </span>ClientConfig {
     <span class="doccomment">/// RPC url
@@ -2526,7 +2549,7 @@
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: payer.pubkey(),
             signers: <span class="macro">vec!</span>[owner, payer],
-            config: client.config.transaction_builder_config,
+            config: client.config.transaction_builder_config.clone(),
         }
         .send_and_confirm(<span class="kw-2">&amp;</span>client)
         .<span class="kw">await</span><span class="question-mark">?</span>;
@@ -4008,7 +4031,7 @@
             address_lookup_tables: <span class="self">self</span>.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>,
             payer: fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[fee_payer],
-            config: <span class="self">self</span>.client.config.transaction_builder_config,
+            config: <span class="self">self</span>.client.config.transaction_builder_config.clone(),
         })
     }
 
@@ -4022,7 +4045,7 @@
             address_lookup_tables: <span class="macro">vec!</span>[],
             payer: fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[fee_payer],
-            config: <span class="self">self</span>.client.config.transaction_builder_config,
+            config: <span class="self">self</span>.client.config.transaction_builder_config.clone(),
         }
         .simulate(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -4101,12 +4124,28 @@
     }
 }
 
-<span class="attr">#[derive(Copy, Clone, Debug, Default)]
+<span class="attr">#[derive(Clone, Default, Builder)]
 </span><span class="kw">pub struct </span>TransactionBuilderConfig {
     <span class="doccomment">/// adds a SetComputeUnitPrice instruction in front if none exists
-    </span><span class="kw">pub </span>prioritization_micro_lamports: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+    </span><span class="kw">pub </span>priority_fee_provider: <span class="prelude-ty">Option</span>&lt;Arc&lt;<span class="kw">dyn </span>PriorityFeeProvider&gt;&gt;,
     <span class="doccomment">/// adds a SetComputeUnitBudget instruction if none exists
     </span><span class="kw">pub </span>compute_budget_per_instruction: <span class="prelude-ty">Option</span>&lt;u32&gt;,
+}
+
+<span class="kw">impl </span>TransactionBuilderConfig {
+    <span class="kw">pub fn </span>builder() -&gt; TransactionBuilderConfigBuilder {
+        TransactionBuilderConfigBuilder::default()
+    }
+}
+
+<span class="kw">impl </span>TransactionBuilderConfigBuilder {
+    <span class="kw">pub fn </span>prioritization_micro_lamports(<span class="kw-2">&amp;mut </span><span class="self">self</span>, cu: <span class="prelude-ty">Option</span>&lt;u64&gt;) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self </span>{
+        <span class="self">self</span>.priority_fee_provider(
+            cu.map(|cu| {
+                Arc::new(FixedPriorityFeeProvider::new(cu)) <span class="kw">as </span>Arc&lt;<span class="kw">dyn </span>PriorityFeeProvider&gt;
+            }),
+        )
+    }
 }
 
 <span class="kw">pub struct </span>TransactionBuilder {
@@ -4162,7 +4201,12 @@
             );
         }
 
-        <span class="kw">let </span>cu_prio = <span class="self">self</span>.config.prioritization_micro_lamports.unwrap_or(<span class="number">0</span>);
+        <span class="kw">let </span>cu_prio = <span class="self">self
+            </span>.config
+            .priority_fee_provider
+            .as_ref()
+            .map(|provider| provider.compute_unit_fee_microlamports())
+            .unwrap_or(<span class="number">0</span>);
         <span class="kw">if </span>!has_compute_unit_price &amp;&amp; cu_prio &gt; <span class="number">0 </span>{
             ixs.insert(<span class="number">0</span>, ComputeBudgetInstruction::set_compute_unit_price(cu_prio));
         }

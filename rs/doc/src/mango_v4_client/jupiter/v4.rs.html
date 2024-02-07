@@ -369,6 +369,11 @@
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
 <a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
 </pre><pre class="rust"><code><span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="kw">use </span>std::str::FromStr;
 
@@ -709,7 +714,12 @@
             address_lookup_tables,
             payer,
             signers: <span class="macro">vec!</span>[<span class="self">self</span>.mango_client.owner.clone()],
-            config: <span class="self">self</span>.mango_client.client.config().transaction_builder_config,
+            config: <span class="self">self
+                </span>.mango_client
+                .client
+                .config()
+                .transaction_builder_config
+                .clone(),
         })
     }
 

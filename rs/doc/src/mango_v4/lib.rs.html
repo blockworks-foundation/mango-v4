@@ -1754,6 +1754,10 @@
 <a href="#1754" id="1754">1754</a>
 <a href="#1755" id="1755">1755</a>
 <a href="#1756" id="1756">1756</a>
+<a href="#1757" id="1757">1757</a>
+<a href="#1758" id="1758">1758</a>
+<a href="#1759" id="1759">1759</a>
+<a href="#1760" id="1760">1760</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1913,6 +1917,7 @@
         deposit_limit: u64,
         zero_util_rate: f32,
         platform_liquidation_fee: f32,
+        disable_asset_liquidation: bool,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1946,6 +1951,7 @@
             deposit_limit,
             zero_util_rate,
             platform_liquidation_fee,
+            disable_asset_liquidation,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -2001,6 +2007,7 @@
         deposit_limit_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
         zero_util_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         platform_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        disable_asset_liquidation_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -2043,6 +2050,7 @@
             deposit_limit_opt,
             zero_util_rate_opt,
             platform_liquidation_fee_opt,
+            disable_asset_liquidation_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
