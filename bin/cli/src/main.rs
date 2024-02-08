@@ -5,6 +5,8 @@ use mango_v4_client::{
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use mango_v4::state::{PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Side};
 
 mod save_snapshot;
 mod test_oracles;
@@ -88,6 +90,34 @@ struct JupiterSwap {
     rpc: Rpc,
 }
 
+#[derive(Args, Debug, Clone)]
+struct PerpPlaceOrder {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(long)]
+    side: String,
+
+    #[clap(short, long)]
+    price: f64,
+
+    #[clap(long)]
+    quantity: f64,
+
+    #[clap(long)]
+    expiry: u64,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum Command {
     CreateAccount(CreateAccount),
@@ -128,6 +158,7 @@ enum Command {
         #[clap(short, long)]
         output: String,
     },
+    PerpPlaceOrder(PerpPlaceOrder)
 }
 
 impl Rpc {
@@ -244,6 +275,39 @@ async fn main() -> Result<(), anyhow::Error> {
             let mango_group = pubkey_from_cli(&group);
             let client = rpc.client(None)?;
             save_snapshot::save_snapshot(mango_group, client, output).await?
+        }
+        Command::PerpPlaceOrder(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let market = client.context.perp_markets
+                .iter()
+                .find(|p| p.1.name == cmd.market_name).unwrap().1;
+
+            fn native(x: f64, b: u32) -> i64 {
+                (x * (10_i64.pow(b)) as f64) as i64
+            }
+
+            let price_lots = native(cmd.price, 6) * market.base_lot_size / (market.quote_lot_size * 10_i64.pow(market.base_decimals.into()));
+            let max_base_lots = native(cmd.quantity, market.base_decimals.into()) / market.base_lot_size;
+
+            let txsig = client
+            .perp_place_order(
+                market.perp_market_index,
+                if cmd.side.to_lowercase() == "bid" { Side::Bid } else { Side::Ask },
+                price_lots,
+                max_base_lots,
+                i64::max_value(),
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                PlaceOrderType::Limit,
+                false,
+                if cmd.expiry > 0 { SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + cmd.expiry } else { 0 },
+                10,
+                SelfTradeBehavior::AbortTransaction
+            )
+            .await?;
+            println!("{}", txsig);
         }
     };
 
