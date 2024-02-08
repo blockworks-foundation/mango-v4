@@ -32,9 +32,6 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
     }
     account.fixed.last_collateral_fee_charge = now_ts;
 
-    // TODO: should we charge collateral fees for accounts that are being liquidated?
-    require!(!account.being_liquidated(), MangoError::BeingLiquidated);
-
     // Charge the user at most for 2x the interval. So if no one calls this for a long time
     // there won't be a huge charge based only on the end state.
     let charge_seconds = (now_ts - last_charge_ts).min(2 * group.collateral_fee_interval);
