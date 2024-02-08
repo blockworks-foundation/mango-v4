@@ -439,10 +439,11 @@ export class Group {
     } else {
       markets = await Promise.all(
         Array.from(this.openbookV2MarketsMapByExternal.values()).map(
-          (openbookV2Market) =>
-            openbookClient.program.account.market.fetch(
+          (openbookV2Market) => {
+            return openbookClient.program.account.market.fetch(
               openbookV2Market.openbookMarketExternal,
-            ),
+            );
+          },
         ),
       );
     }
