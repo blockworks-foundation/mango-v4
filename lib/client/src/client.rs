@@ -1238,11 +1238,6 @@ impl MangoClient {
         market_index: PerpMarketIndex
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
-        let mango_account = &self.mango_account().await?;
-
-        let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(mango_account, vec![], vec![], vec![])
-            .await?;
 
         let ixs = PreparedInstructions::from_single(
             Instruction {
@@ -1257,14 +1252,13 @@ impl MangoClient {
                         },
                         None,
                     );
-                    ams.extend(health_check_metas.into_iter());
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
                     &mango_v4::instruction::PerpDeactivatePosition {},
                 ),
             },
-            self.instruction_cu(health_cu),
+            self.context.compute_estimates.cu_per_mango_instruction,
         );
         Ok(ixs)
     }
