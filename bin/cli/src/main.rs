@@ -6,7 +6,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use mango_v4::state::{PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Side};
+use mango_v4::state::{PlaceOrderType, SelfTradeBehavior, Side};
 
 mod save_snapshot;
 mod test_oracles;

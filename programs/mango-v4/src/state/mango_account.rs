@@ -1864,11 +1864,10 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 
 #[cfg(test)]
 mod tests {
-    use anchor_lang::error::Error::AnchorError;
     use bytemuck::Zeroable;
     use itertools::Itertools;
 
-    use crate::state::{PostOrderType};
+    use crate::state::PostOrderType;
 
     use super::*;
 

@@ -49,7 +49,6 @@ use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::sysvar;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signer::Signer};
-use mango_v4::error::MangoError;
 
 pub const MAX_ACCOUNTS_PER_TRANSACTION: usize = 64;
 
@@ -1243,7 +1242,7 @@ impl MangoClient {
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
-                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    let ams = anchor_lang::ToAccountMetas::to_account_metas(
                         &mango_v4::accounts::PerpDeactivatePosition {
                             group: self.group(),
                             account: self.mango_account_address,
