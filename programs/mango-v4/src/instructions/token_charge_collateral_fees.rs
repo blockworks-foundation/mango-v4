@@ -10,15 +10,20 @@ use crate::logs::{emit_stack, TokenCollateralFeeLog};
 
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
-    if group.collateral_fee_interval == 0 {
-        return Ok(());
-    }
-
     let mut account = ctx.accounts.account.load_full_mut()?;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
-    // TODO: should we charge collateral fees for accounts that are being liquidated?
-    require!(!account.being_liquidated(), MangoError::BeingLiquidated);
+    if group.collateral_fee_interval == 0 {
+        // By resetting, a new enabling of collateral fees will not immediately create a charge
+        account.fixed.last_collateral_fee_charge = 0;
+        return Ok(());
+    }
+
+    // When collateral fees are enabled the first time, don't immediately charge
+    if account.fixed.last_collateral_fee_charge == 0 {
+        account.fixed.last_collateral_fee_charge = now_ts;
+        return Ok(());
+    }
 
     // Is the next fee-charging due?
     let last_charge_ts = account.fixed.last_collateral_fee_charge;
@@ -26,6 +31,9 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         return Ok(());
     }
     account.fixed.last_collateral_fee_charge = now_ts;
+
+    // TODO: should we charge collateral fees for accounts that are being liquidated?
+    require!(!account.being_liquidated(), MangoError::BeingLiquidated);
 
     // Charge the user at most for 2x the interval. So if no one calls this for a long time
     // there won't be a huge charge based only on the end state.
@@ -36,8 +44,11 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
     let inv_seconds_per_day = I80F48::from_num(1.157407407407e-5); // 1 / (24 * 60 * 60)
     let time_scaling = I80F48::from(charge_seconds) * inv_seconds_per_day;
 
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+    let health_cache = {
+        let retriever =
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+        new_health_cache(&account.borrow(), &retriever, now_ts)?
+    };
 
     // We want to find the total asset health and total liab health, but don't want
     // to treat borrows that moved into open orders accounts as realized. Hence we

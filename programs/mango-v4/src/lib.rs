@@ -1611,6 +1611,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_charge_collateral_fees(ctx)?;
+        Ok(())
+    }
+
     pub fn alt_set(ctx: Context<AltSet>, index: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::alt_set(ctx, index)?;

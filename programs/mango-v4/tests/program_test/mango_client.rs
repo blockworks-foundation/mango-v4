@@ -5039,3 +5039,48 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
         vec![self.liqor_owner]
     }
 }
+
+#[derive(Clone)]
+pub struct TokenChargeCollateralFeesInstruction {
+    pub account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenChargeCollateralFeesInstruction {
+    type Accounts = mango_v4::accounts::TokenChargeCollateralFees;
+    type Instruction = mango_v4::instruction::TokenChargeCollateralFees;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {};
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
