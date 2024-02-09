@@ -28,9 +28,9 @@ use crate::account_fetcher::*;
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
+use crate::health_cache;
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 use crate::util::PreparedInstructions;
-use crate::{health_cache, Serum3MarketContext};
 use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
@@ -661,21 +661,40 @@ impl MangoClient {
     // Serum3
     //
 
-    fn serum3_create_open_orders_address(&self, market_index: Serum3MarketIndex) -> Pubkey {
+    pub fn serum3_close_open_orders_instruction(
+        &self,
+        market_index: Serum3MarketIndex,
+    ) -> Instruction {
         let account_pubkey = self.mango_account_address;
         let s3 = self.context.serum3(market_index);
 
-        let open_orders = Pubkey::find_program_address(
-            &[
-                b"Serum3OO".as_ref(),
-                account_pubkey.as_ref(),
-                s3.address.as_ref(),
-            ],
-            &mango_v4::ID,
-        )
-        .0;
+        let open_orders = self.serum3_create_open_orders_address(market_index);
 
-        open_orders
+        Instruction {
+            program_id: mango_v4::id(),
+            accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                &mango_v4::accounts::Serum3CloseOpenOrders {
+                    group: self.group(),
+                    account: account_pubkey,
+                    serum_market: s3.address,
+                    serum_program: s3.serum_program,
+                    serum_market_external: s3.serum_market_external,
+                    open_orders,
+                    owner: self.owner(),
+                    sol_destination: self.owner(),
+                },
+                None,
+            ),
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::Serum3CloseOpenOrders {},
+            ),
+        }
+    }
+
+    pub async fn serum3_close_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
+        let market_index = self.context.serum3_market_index(name);
+        let ix = self.serum3_close_open_orders_instruction(market_index);
+        self.send_and_confirm_owner_tx(vec![ix]).await
     }
 
     pub fn serum3_create_open_orders_instruction(
@@ -708,6 +727,23 @@ impl MangoClient {
                 &mango_v4::instruction::Serum3CreateOpenOrders {},
             ),
         }
+    }
+
+    fn serum3_create_open_orders_address(&self, market_index: Serum3MarketIndex) -> Pubkey {
+        let account_pubkey = self.mango_account_address;
+        let s3 = self.context.serum3(market_index);
+
+        let open_orders = Pubkey::find_program_address(
+            &[
+                b"Serum3OO".as_ref(),
+                account_pubkey.as_ref(),
+                s3.address.as_ref(),
+            ],
+            &mango_v4::ID,
+        )
+        .0;
+
+        open_orders
     }
 
     pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
@@ -745,6 +781,11 @@ impl MangoClient {
             .serum3_orders(market_index)
             .map(|x| x.open_orders)
             .ok();
+
+        // TODO FAS
+        // 0/ If slot already available -> Continue with place order
+        // 1/ If there is no free slot, try to close one or fail ()
+        // 2/ If there is a free slot, create a new open orders (serum3_create_open_orders_instruction)
 
         if open_orders_opt.is_none() {
             ixs.push(
