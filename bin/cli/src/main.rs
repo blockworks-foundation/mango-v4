@@ -1,5 +1,6 @@
 use clap::clap_derive::ArgEnum;
 use clap::{Args, Parser, Subcommand};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::state::{PlaceOrderType, SelfTradeBehavior, Side};
 use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
@@ -126,6 +127,34 @@ struct PerpPlaceOrder {
     rpc: Rpc,
 }
 
+#[derive(Args, Debug, Clone)]
+struct Serum3PlaceOrder {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(long, value_enum)]
+    side: CliSide,
+
+    #[clap(short, long)]
+    price: f64,
+
+    #[clap(long)]
+    quantity: f64,
+
+    #[clap(long)]
+    expiry: u64,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum Command {
     CreateAccount(CreateAccount),
@@ -167,6 +196,7 @@ enum Command {
         output: String,
     },
     PerpPlaceOrder(PerpPlaceOrder),
+    Serum3PlaceOrder(Serum3PlaceOrder),
 }
 
 impl Rpc {
@@ -329,6 +359,47 @@ async fn main() -> Result<(), anyhow::Error> {
                     },
                     10,
                     SelfTradeBehavior::AbortTransaction,
+                )
+                .await?;
+            println!("{}", txsig);
+        }
+        Command::Serum3PlaceOrder(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let market_index = client.context.serum3_market_index(&cmd.market_name);
+            let market = client.context.serum3(market_index);
+            let base_token = client.context.token(market.base_token_index);
+            let quote_token = client.context.token(market.quote_token_index);
+
+            fn native(x: f64, b: u32) -> u64 {
+                (x * (10_i64.pow(b)) as f64) as u64
+            }
+
+            // coin_lot_size = base lot size ?
+            // cf priceNumberToLots
+            let price_lots = native(cmd.price, quote_token.decimals as u32) * market.coin_lot_size
+                / native(market.pc_lot_size as f64, base_token.decimals as u32);
+
+            // cf baseSizeNumberToLots
+            let max_base_lots =
+                native(cmd.quantity, base_token.decimals as u32) / market.coin_lot_size;
+
+            let txsig = client
+                .serum3_place_order(
+                    &cmd.market_name,
+                    match cmd.side {
+                        CliSide::Bid => Serum3Side::Bid,
+                        CliSide::Ask => Serum3Side::Ask,
+                    },
+                    price_lots,
+                    max_base_lots as u64,
+                    ((price_lots * max_base_lots) as f64 * 1.01) as u64,
+                    Serum3SelfTradeBehavior::AbortTransaction,
+                    Serum3OrderType::Limit,
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    10,
                 )
                 .await?;
             println!("{}", txsig);

@@ -729,14 +729,19 @@ impl MangoClient {
             .expect("oo is created")
             .open_orders;
 
-        let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])
-            .await?;
-
-        let payer_token = match side {
-            Serum3Side::Bid => &quote,
-            Serum3Side::Ask => &base,
+        let (payer_token, receiver_token) = match side {
+            Serum3Side::Bid => (&quote, &base),
+            Serum3Side::Ask => (&base, &quote),
         };
+
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
+                account,
+                vec![],
+                vec![receiver_token.token_index],
+                vec![],
+            )
+            .await?;
 
         let ixs = PreparedInstructions::from_single(
             Instruction {
@@ -769,7 +774,7 @@ impl MangoClient {
                     ams
                 },
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::Serum3PlaceOrder {
+                    &mango_v4::instruction::Serum3PlaceOrderV2 {
                         side,
                         limit_price,
                         max_base_qty,
