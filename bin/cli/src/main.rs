@@ -128,6 +128,22 @@ struct PerpPlaceOrder {
 }
 
 #[derive(Args, Debug, Clone)]
+struct Serum3CreateOpenOrders {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
+#[derive(Args, Debug, Clone)]
 struct Serum3PlaceOrder {
     #[clap(long)]
     account: String,
@@ -147,9 +163,6 @@ struct Serum3PlaceOrder {
 
     #[clap(long)]
     quantity: f64,
-
-    #[clap(long)]
-    expiry: u64,
 
     #[clap(flatten)]
     rpc: Rpc,
@@ -196,6 +209,7 @@ enum Command {
         output: String,
     },
     PerpPlaceOrder(PerpPlaceOrder),
+    Serum3CreateOpenOrders(Serum3CreateOpenOrders),
     Serum3PlaceOrder(Serum3PlaceOrder),
 }
 
@@ -361,6 +375,15 @@ async fn main() -> Result<(), anyhow::Error> {
                     SelfTradeBehavior::AbortTransaction,
                 )
                 .await?;
+            println!("{}", txsig);
+        }
+        Command::Serum3CreateOpenOrders(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+
+            let txsig = client.serum3_create_open_orders(&cmd.market_name).await?;
             println!("{}", txsig);
         }
         Command::Serum3PlaceOrder(cmd) => {
