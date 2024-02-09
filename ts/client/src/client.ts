@@ -472,6 +472,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
       )
       .accounts({
         group: group.publicKey,
@@ -559,6 +560,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
       )
       .accounts({
         group: group.publicKey,

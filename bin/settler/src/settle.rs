@@ -13,7 +13,7 @@ use solana_sdk::signature::Signature;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::VersionedTransaction;
 use tracing::*;
-use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
     /// Amount of time to wait before reusing a positive-pnl account
@@ -96,7 +96,13 @@ impl SettlementState {
         let mut all_negative_settleable =
             HashMap::<PerpMarketIndex, priority_queue::PriorityQueue<Pubkey, I80F48>>::new();
         for account_key in accounts.iter() {
-            let mut account = account_fetcher.fetch_mango_account(account_key)?;
+            let mut account = match account_fetcher.fetch_mango_account(account_key) {
+                Ok(acc) => acc,
+                Err(e) => {
+                    info!("could not fetch account, skipping {account_key}: {e:?}");
+                    continue;
+                }
+            };
             if account.fixed.group != mango_client.group() {
                 continue;
             }
@@ -111,10 +117,10 @@ impl SettlementState {
                 continue;
             }
 
-            let health_cache = mango_client
-                .health_cache(&account)
-                .await
-                .context("creating health cache")?;
+            let health_cache = match mango_client.health_cache(&account).await {
+                Ok(hc) => hc,
+                Err(_) => continue, // Skip for stale/unconfident oracles
+            };
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
 
             for perp_market_index in perp_indexes {
@@ -123,14 +129,19 @@ impl SettlementState {
                         Some(v) => v,
                         None => continue, // skip accounts with perp positions where we couldn't get the price and market
                     };
-                let perp_max_settle =
-                    health_cache.perp_max_settle(perp_market.settle_token_index)?;
+                let perp_max_settle = health_cache
+                    .perp_max_settle(perp_market.settle_token_index)
+                    .expect("perp_max_settle always succeeds when the token index is valid");
 
-                let perp_position = account.perp_position_mut(perp_market_index).unwrap();
+                let perp_position = account
+                    .perp_position_mut(perp_market_index)
+                    .expect("index comes from active_perp_positions()");
                 perp_position.settle_funding(perp_market);
                 perp_position.update_settle_limit(perp_market, now_ts);
 
-                let unsettled = perp_position.unsettled_pnl(perp_market, *perp_price)?;
+                let unsettled = perp_position
+                    .unsettled_pnl(perp_market, *perp_price)
+                    .expect("unsettled_pnl always succeeds with the right perp market");
                 let limited = perp_position.apply_pnl_settle_limit(perp_market, unsettled);
                 let settleable = if limited >= 0 {
                     limited
@@ -157,7 +168,7 @@ impl SettlementState {
                             liq_end_health,
                             maint_health,
                         )
-                        .unwrap();
+                        .expect("always ok");
 
                     // Assume that settle_fee_flat is near the tx fee, and if we can't possibly
                     // make up for the tx fee even with multiple settle ix in one tx, skip.
@@ -181,7 +192,9 @@ impl SettlementState {
         let address_lookup_tables = mango_client.mango_address_lookup_tables().await?;
 
         for (perp_market_index, mut positive_settleable) in all_positive_settleable {
-            let (perp_market, _, _) = perp_market_info.get(&perp_market_index).unwrap();
+            let (perp_market, _, _) = perp_market_info
+                .get(&perp_market_index)
+                .expect("perp market must exist");
             let negative_settleable = match all_negative_settleable.get_mut(&perp_market_index) {
                 None => continue,
                 Some(v) => v,
@@ -271,7 +284,7 @@ impl<'a> SettleBatchProcessor<'a> {
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: client.config().transaction_builder_config,
+            config: client.config().transaction_builder_config.clone(),
         }
         .transaction_with_blockhash(self.blockhash)
     }
@@ -286,14 +299,16 @@ impl<'a> SettleBatchProcessor<'a> {
 
         let send_result = self.mango_client.client.send_transaction(&tx).await;
 
-        if let Err(err) = send_result {
-            info!("error while sending settle batch: {}", err);
-            return Ok(None);
+        match send_result {
+            Ok(txsig) => {
+                info!("sent settle tx: {txsig}");
+                Ok(Some(txsig))
+            }
+            Err(err) => {
+                info!("error while sending settle batch: {}", err);
+                Ok(None)
+            }
         }
-
-        let txsig = send_result.unwrap();
-        info!("sent settle tx: {txsig}");
-        Ok(Some(txsig))
     }
 
     async fn add_and_maybe_send(

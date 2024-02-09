@@ -1320,6 +1320,7 @@ impl<
         }
     }
 
+    // Only used in unit tests
     pub fn deactivate_perp_position(
         &mut self,
         perp_market_index: PerpMarketIndex,
@@ -1359,6 +1360,19 @@ impl<
         settle_token_position.decrement_in_use();
 
         Ok(())
+    }
+
+    pub fn find_first_active_unused_perp_position(&self) -> Option<&PerpPosition> {
+        let first_unused_position_opt = self.all_perp_positions().find(|p| {
+            p.is_active()
+                && p.base_position_lots == 0
+                && p.quote_position_native == 0
+                && p.bids_base_lots == 0
+                && p.asks_base_lots == 0
+                && p.taker_base_lots == 0
+                && p.taker_quote_lots == 0
+        });
+        first_unused_position_opt
     }
 
     pub fn add_perp_order(
@@ -3138,6 +3152,36 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_perp_auto_close_first_unused() {
+        let mut account = make_test_account();
+
+        // Fill all perp slots
+        assert_eq!(account.header.perp_count, 4);
+        account.ensure_perp_position(1, 0).unwrap();
+        account.ensure_perp_position(2, 0).unwrap();
+        account.ensure_perp_position(3, 0).unwrap();
+        account.ensure_perp_position(4, 0).unwrap();
+        assert_eq!(account.active_perp_positions().count(), 4);
+
+        // Force usage of some perp slot (leaves 3 unused)
+        account.perp_position_mut(1).unwrap().taker_base_lots = 10;
+        account.perp_position_mut(2).unwrap().base_position_lots = 10;
+        account.perp_position_mut(4).unwrap().quote_position_native = I80F48::from_num(10);
+        assert!(account.perp_position(3).ok().is_some());
+
+        // Should not succeed anymore
+        {
+            let e = account.ensure_perp_position(5, 0);
+            assert!(e.is_anchor_error_with_code(MangoError::NoFreePerpPositionIndex.error_code()));
+        }
+
+        // Act
+        let to_be_closed_account_opt = account.find_first_active_unused_perp_position();
+
+        assert_eq!(to_be_closed_account_opt.unwrap().market_index, 3)
     }
 }
 

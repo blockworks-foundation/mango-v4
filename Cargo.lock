@@ -3594,6 +3594,7 @@ dependencies = [
  "atty",
  "base64 0.13.1",
  "bincode",
+ "clap 3.2.25",
  "derive_builder",
  "fixed",
  "futures 0.3.28",
@@ -3618,6 +3619,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-stream",
+ "tokio-tungstenite 0.17.2",
  "tracing",
  "tracing-subscriber",
 ]

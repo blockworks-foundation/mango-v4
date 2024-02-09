@@ -631,6 +631,10 @@ export type MangoV4 = {
         {
           "name": "platformLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "disableAssetLiquidation",
+          "type": "bool"
         }
       ]
     },
@@ -1040,6 +1044,12 @@ export type MangoV4 = {
           "name": "platformLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -7430,11 +7440,19 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "disableAssetLiquidation",
+            "docs": [
+              "If set to 1, deposits cannot be liquidated when an account is liquidatable.",
+              "That means bankrupt accounts may still have assets of this type deposited."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -14437,11 +14455,16 @@ export type MangoV4 = {
     },
     {
       "code": 6069,
+      "name": "TokenAssetLiquidationDisabled",
+      "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
       "name": "NoFreeOpenbookV2OpenOrdersIndex",
       "msg": "no free openbook v2 open orders index"
     },
     {
-      "code": 6070,
+      "code": 6071,
       "name": "OpenbookV2OpenOrdersExistAlready",
       "msg": "openbook v2 open orders exist already"
     }
@@ -15081,6 +15104,10 @@ export const IDL: MangoV4 = {
         {
           "name": "platformLiquidationFee",
           "type": "f32"
+        },
+        {
+          "name": "disableAssetLiquidation",
+          "type": "bool"
         }
       ]
     },
@@ -15490,6 +15517,12 @@ export const IDL: MangoV4 = {
           "name": "platformLiquidationFeeOpt",
           "type": {
             "option": "f32"
+          }
+        },
+        {
+          "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -21880,11 +21913,19 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "disableAssetLiquidation",
+            "docs": [
+              "If set to 1, deposits cannot be liquidated when an account is liquidatable.",
+              "That means bankrupt accounts may still have assets of this type deposited."
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                6
+                5
               ]
             }
           },
@@ -28887,11 +28928,16 @@ export const IDL: MangoV4 = {
     },
     {
       "code": 6069,
+      "name": "TokenAssetLiquidationDisabled",
+      "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
       "name": "NoFreeOpenbookV2OpenOrdersIndex",
       "msg": "no free openbook v2 open orders index"
     },
     {
-      "code": 6070,
+      "code": 6071,
       "name": "OpenbookV2OpenOrdersExistAlready",
       "msg": "openbook v2 open orders exist already"
     }

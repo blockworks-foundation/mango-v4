@@ -6,8 +6,8 @@ use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoClient, MangoGroupContext, TransactionBuilderConfig,
+    account_update_stream, chain_data, keypair_from_cli, priority_fees_cli, snapshot_source,
+    websocket_source, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
 use tracing::*;
 
@@ -61,9 +61,12 @@ struct Cli {
     #[clap(long, env, default_value = "100")]
     get_multiple_accounts_count: usize,
 
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
+    #[clap(flatten)]
+    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
+
+    /// url to the lite-rpc websocket, optional
+    #[clap(long, env, default_value = "")]
+    lite_rpc_url: String,
 
     /// compute budget for each instruction
     #[clap(long, env, default_value = "250000")]
@@ -87,6 +90,10 @@ async fn main() -> anyhow::Result<()> {
     };
     let cli = Cli::parse_from(args);
 
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
+
     let settler_owner = Arc::new(keypair_from_cli(&cli.settler_owner));
 
     let rpc_url = cli.rpc_url;
@@ -100,11 +107,11 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         settler_owner.clone(),
         Some(rpc_timeout),
-        TransactionBuilderConfig {
-            prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                .then_some(cli.prioritization_micro_lamports),
-            compute_budget_per_instruction: Some(cli.compute_budget_per_instruction),
-        },
+        TransactionBuilderConfig::builder()
+            .compute_budget_per_instruction(Some(cli.compute_budget_per_instruction))
+            .priority_fee_provider(prio_provider)
+            .build()
+            .unwrap(),
     );
 
     // The representation of current on-chain account data
@@ -308,7 +315,9 @@ async fn main() -> anyhow::Result<()> {
                     account_addresses = state.mango_accounts.iter().cloned().collect();
                 }
 
-                settlement.settle(account_addresses).await.unwrap();
+                if let Err(err) = settlement.settle(account_addresses).await {
+                    warn!("settle error: {err:?}");
+                }
             }
         }
     });
@@ -329,7 +338,9 @@ async fn main() -> anyhow::Result<()> {
                     account_addresses = state.mango_accounts.iter().cloned().collect();
                 }
 
-                tcs_start.run_pass(account_addresses).await.unwrap();
+                if let Err(err) = tcs_start.run_pass(account_addresses).await {
+                    warn!("tcs-start error: {err:?}");
+                }
             }
         }
     });
@@ -348,6 +359,7 @@ async fn main() -> anyhow::Result<()> {
         check_changes_for_abort_job,
     ]
     .into_iter()
+    .chain(prio_jobs.into_iter())
     .collect();
     jobs.next().await;
 
