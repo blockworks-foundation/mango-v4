@@ -2809,6 +2809,50 @@
 <a href="#2809" id="2809">2809</a>
 <a href="#2810" id="2810">2810</a>
 <a href="#2811" id="2811">2811</a>
+<a href="#2812" id="2812">2812</a>
+<a href="#2813" id="2813">2813</a>
+<a href="#2814" id="2814">2814</a>
+<a href="#2815" id="2815">2815</a>
+<a href="#2816" id="2816">2816</a>
+<a href="#2817" id="2817">2817</a>
+<a href="#2818" id="2818">2818</a>
+<a href="#2819" id="2819">2819</a>
+<a href="#2820" id="2820">2820</a>
+<a href="#2821" id="2821">2821</a>
+<a href="#2822" id="2822">2822</a>
+<a href="#2823" id="2823">2823</a>
+<a href="#2824" id="2824">2824</a>
+<a href="#2825" id="2825">2825</a>
+<a href="#2826" id="2826">2826</a>
+<a href="#2827" id="2827">2827</a>
+<a href="#2828" id="2828">2828</a>
+<a href="#2829" id="2829">2829</a>
+<a href="#2830" id="2830">2830</a>
+<a href="#2831" id="2831">2831</a>
+<a href="#2832" id="2832">2832</a>
+<a href="#2833" id="2833">2833</a>
+<a href="#2834" id="2834">2834</a>
+<a href="#2835" id="2835">2835</a>
+<a href="#2836" id="2836">2836</a>
+<a href="#2837" id="2837">2837</a>
+<a href="#2838" id="2838">2838</a>
+<a href="#2839" id="2839">2839</a>
+<a href="#2840" id="2840">2840</a>
+<a href="#2841" id="2841">2841</a>
+<a href="#2842" id="2842">2842</a>
+<a href="#2843" id="2843">2843</a>
+<a href="#2844" id="2844">2844</a>
+<a href="#2845" id="2845">2845</a>
+<a href="#2846" id="2846">2846</a>
+<a href="#2847" id="2847">2847</a>
+<a href="#2848" id="2848">2848</a>
+<a href="#2849" id="2849">2849</a>
+<a href="#2850" id="2850">2850</a>
+<a href="#2851" id="2851">2851</a>
+<a href="#2852" id="2852">2852</a>
+<a href="#2853" id="2853">2853</a>
+<a href="#2854" id="2854">2854</a>
+<a href="#2855" id="2855">2855</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -3966,7 +4010,8 @@
         }
     }
 
-    <span class="kw">pub fn </span>deactivate_perp_position(
+    <span class="comment">// Only used in unit tests
+    </span><span class="kw">pub fn </span>deactivate_perp_position(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         perp_market_index: PerpMarketIndex,
         settle_token_index: TokenIndex,
@@ -4005,6 +4050,19 @@
         settle_token_position.decrement_in_use();
 
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>find_first_active_unused_perp_position(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>PerpPosition&gt; {
+        <span class="kw">let </span>first_unused_position_opt = <span class="self">self</span>.all_perp_positions().find(|p| {
+            p.is_active()
+                &amp;&amp; p.base_position_lots == <span class="number">0
+                </span>&amp;&amp; p.quote_position_native == <span class="number">0
+                </span>&amp;&amp; p.bids_base_lots == <span class="number">0
+                </span>&amp;&amp; p.asks_base_lots == <span class="number">0
+                </span>&amp;&amp; p.taker_base_lots == <span class="number">0
+                </span>&amp;&amp; p.taker_quote_lots == <span class="number">0
+        </span>});
+        first_unused_position_opt
     }
 
     <span class="kw">pub fn </span>add_perp_order(
@@ -5618,6 +5676,36 @@
         }
 
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_perp_auto_close_first_unused() {
+        <span class="kw">let </span><span class="kw-2">mut </span>account = make_test_account();
+
+        <span class="comment">// Fill all perp slots
+        </span><span class="macro">assert_eq!</span>(account.header.perp_count, <span class="number">4</span>);
+        account.ensure_perp_position(<span class="number">1</span>, <span class="number">0</span>).unwrap();
+        account.ensure_perp_position(<span class="number">2</span>, <span class="number">0</span>).unwrap();
+        account.ensure_perp_position(<span class="number">3</span>, <span class="number">0</span>).unwrap();
+        account.ensure_perp_position(<span class="number">4</span>, <span class="number">0</span>).unwrap();
+        <span class="macro">assert_eq!</span>(account.active_perp_positions().count(), <span class="number">4</span>);
+
+        <span class="comment">// Force usage of some perp slot (leaves 3 unused)
+        </span>account.perp_position_mut(<span class="number">1</span>).unwrap().taker_base_lots = <span class="number">10</span>;
+        account.perp_position_mut(<span class="number">2</span>).unwrap().base_position_lots = <span class="number">10</span>;
+        account.perp_position_mut(<span class="number">4</span>).unwrap().quote_position_native = I80F48::from_num(<span class="number">10</span>);
+        <span class="macro">assert!</span>(account.perp_position(<span class="number">3</span>).ok().is_some());
+
+        <span class="comment">// Should not succeed anymore
+        </span>{
+            <span class="kw">let </span>e = account.ensure_perp_position(<span class="number">5</span>, <span class="number">0</span>);
+            <span class="macro">assert!</span>(e.is_anchor_error_with_code(MangoError::NoFreePerpPositionIndex.error_code()));
+        }
+
+        <span class="comment">// Act
+        </span><span class="kw">let </span>to_be_closed_account_opt = account.find_first_active_unused_perp_position();
+
+        <span class="macro">assert_eq!</span>(to_be_closed_account_opt.unwrap().market_index, <span class="number">3</span>)
     }
 }
 </code></pre></div>
