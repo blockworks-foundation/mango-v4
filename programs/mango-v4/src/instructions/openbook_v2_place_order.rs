@@ -136,6 +136,12 @@ pub fn openbook_v2_place_order(
         });
     }
 
+    // Get price lots before the book gets modified
+    let bids = ctx.accounts.bids.load_mut()?;
+    let asks = ctx.accounts.asks.load_mut()?;
+    let order_book = openbook_v2::state::Orderbook { bids, asks };
+    let price_lots = order.price(now_ts, None, &order_book)?.0;
+
     //
     // CPI to place order
     //
@@ -165,10 +171,6 @@ pub fn openbook_v2_place_order(
         openbook.highest_placed_ask = 0.0;
     }
     // in the normal quote per base units
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let order_book = openbook_v2::state::Orderbook { bids, asks };
-    let price_lots = order.price(now_ts, None, &order_book)?.0;
     let limit_price = price_lots as f64 * quote_lot_size as f64 / base_lot_size as f64;
 
     let new_order_on_book = after_oo_free_slots != before_oo_free_slots;
