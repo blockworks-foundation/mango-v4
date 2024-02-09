@@ -47,14 +47,7 @@ pub enum OpenbookV2SelfTradeBehavior {
     AbortTransaction = 2,
 }
 
-#[derive(
-    Copy,
-    Clone,
-    TryFromPrimitive,
-    IntoPrimitive,
-    AnchorSerialize,
-    AnchorDeserialize,
-)]
+#[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum OpenbookV2Side {
     Bid = 0,

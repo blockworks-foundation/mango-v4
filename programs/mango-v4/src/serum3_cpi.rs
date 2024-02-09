@@ -166,7 +166,9 @@ impl OpenOrdersSlim {
             native_coin_free: oo.position.base_free_native,
             native_coin_total: base_locked_native + oo.position.base_free_native,
             native_pc_free: oo.position.quote_free_native,
-            native_pc_total: quote_locked_native + oo.position.quote_free_native + oo.position.locked_maker_fees,
+            native_pc_total: quote_locked_native
+                + oo.position.quote_free_native
+                + oo.position.locked_maker_fees,
             referrer_rebates_accrued: oo.position.referrer_rebates_available,
         }
     }

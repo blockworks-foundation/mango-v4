@@ -237,7 +237,7 @@ impl TokenInfo {
 pub enum SpotMarketIndex {
     Serum3(Serum3MarketIndex),
     OpenbookV2(OpenbookV2MarketIndex),
- }
+}
 
 /// Information about reserved funds on Serum3 and Openbook V2 open orders accounts.
 ///
@@ -319,7 +319,9 @@ impl SpotInfo {
             base_info_index,
             quote_info_index,
             spot_market_index: SpotMarketIndex::OpenbookV2(open_orders.market_index),
-            has_zero_funds: open_orders_account.position.is_empty(open_orders_account.version),
+            has_zero_funds: open_orders_account
+                .position
+                .is_empty(open_orders_account.version),
         }
     }
 
@@ -905,7 +907,9 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.spot_market_index == SpotMarketIndex::Serum3(serum_account.market_index))
+            .position(|m| {
+                m.spot_market_index == SpotMarketIndex::Serum3(serum_account.market_index)
+            })
             .ok_or_else(|| error_msg!("serum3 market {} not found", serum_account.market_index))?;
 
         let spot_info = &self.spot_infos[spot_info_index];
@@ -942,7 +946,9 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.spot_market_index == SpotMarketIndex::OpenbookV2(open_orders.market_index))
+            .position(|m| {
+                m.spot_market_index == SpotMarketIndex::OpenbookV2(open_orders.market_index)
+            })
             .ok_or_else(|| {
                 error_msg!("openbook v2 market {} not found", open_orders.market_index)
             })?;
