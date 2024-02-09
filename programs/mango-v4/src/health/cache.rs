@@ -231,6 +231,12 @@ impl TokenInfo {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum SpotMarketIndex {
+    Serum3(Serum3MarketIndex),
+    OpenbookV2(OpenbookV2MarketIndex),
+ }
+
 /// Information about reserved funds on Serum3 and Openbook V2 open orders accounts.
 ///
 /// Note that all "free" funds on open orders accounts are added directly
@@ -252,8 +258,7 @@ pub struct SpotInfo {
     pub base_info_index: usize,
     pub quote_info_index: usize,
 
-    pub serum3_market_index: Option<Serum3MarketIndex>,
-    pub openbook_v2_market_index: Option<OpenbookV2MarketIndex>,
+    pub spot_market_index: SpotMarketIndex,
 
     /// The open orders account has no free or reserved funds
     pub has_zero_funds: bool,
@@ -282,8 +287,7 @@ impl SpotInfo {
             reserved_quote_as_base_highest_bid,
             base_info_index,
             quote_info_index,
-            serum3_market_index: Some(serum_account.market_index),
-            openbook_v2_market_index: None,
+            spot_market_index: SpotMarketIndex::Serum3(serum_account.market_index),
             has_zero_funds: open_orders.native_base_total() == 0
                 && open_orders.native_quote_total() == 0
                 && open_orders.native_rebates() == 0,
@@ -312,9 +316,8 @@ impl SpotInfo {
             reserved_quote_as_base_highest_bid,
             base_info_index,
             quote_info_index,
-            serum3_market_index: None,
-            openbook_v2_market_index: Some(open_orders.market_index),
-            has_zero_funds: open_orders_account.position.is_empty(1),
+            spot_market_index: SpotMarketIndex::OpenbookV2(open_orders.market_index),
+            has_zero_funds: open_orders_account.position.is_empty(open_orders_account.version),
         }
     }
 
@@ -900,7 +903,7 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.serum3_market_index == Some(serum_account.market_index))
+            .position(|m| m.spot_market_index == SpotMarketIndex::Serum3(serum_account.market_index))
             .ok_or_else(|| error_msg!("serum3 market {} not found", serum_account.market_index))?;
 
         let spot_info = &self.spot_infos[spot_info_index];
@@ -937,7 +940,7 @@ impl HealthCache {
         let spot_info_index = self
             .spot_infos
             .iter_mut()
-            .position(|m| m.openbook_v2_market_index == Some(open_orders.market_index))
+            .position(|m| m.spot_market_index == SpotMarketIndex::OpenbookV2(open_orders.market_index))
             .ok_or_else(|| {
                 error_msg!("openbook v2 market {} not found", open_orders.market_index)
             })?;

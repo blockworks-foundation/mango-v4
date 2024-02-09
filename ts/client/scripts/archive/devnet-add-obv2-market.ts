@@ -30,7 +30,7 @@ async function addSpotMarket() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const groupPk = '2xDjFmWRyvoP6LWoRaDBmVL5EeeKzFfvP81Wa9HH9J6V';
+  const groupPk = 'DTenAtYztNUHZBvqXUFM5jCB4X8cUUfgkCaDVDPddm8M';
   const group = await client.getGroup(new PublicKey(groupPk));
   console.log(`Found group ${group.publicKey.toBase58()}`);
 
