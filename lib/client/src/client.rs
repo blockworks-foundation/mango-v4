@@ -28,9 +28,9 @@ use crate::account_fetcher::*;
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::health_cache;
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 use crate::util::PreparedInstructions;
+use crate::{health_cache, Serum3MarketContext};
 use crate::{jupiter, util};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
@@ -661,10 +661,7 @@ impl MangoClient {
     // Serum3
     //
 
-    pub fn serum3_create_open_orders_instruction(
-        &self,
-        market_index: Serum3MarketIndex,
-    ) -> Instruction {
+    fn serum3_create_open_orders_address(&self, market_index: Serum3MarketIndex) -> Pubkey {
         let account_pubkey = self.mango_account_address;
         let s3 = self.context.serum3(market_index);
 
@@ -677,6 +674,18 @@ impl MangoClient {
             &mango_v4::ID,
         )
         .0;
+
+        open_orders
+    }
+
+    pub fn serum3_create_open_orders_instruction(
+        &self,
+        market_index: Serum3MarketIndex,
+    ) -> Instruction {
+        let account_pubkey = self.mango_account_address;
+        let s3 = self.context.serum3(market_index);
+
+        let open_orders = self.serum3_create_open_orders_address(market_index);
 
         Instruction {
             program_id: mango_v4::id(),
@@ -721,29 +730,45 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<PreparedInstructions> {
+        let mut ixs = PreparedInstructions::new();
+        let mut account = account.clone();
+
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
-        let open_orders = account
-            .serum3_orders(market_index)
-            .expect("oo is created")
-            .open_orders;
-
         let (payer_token, receiver_token) = match side {
             Serum3Side::Bid => (&quote, &base),
             Serum3Side::Ask => (&base, &quote),
         };
 
+        let mut open_orders_opt = account
+            .serum3_orders(market_index)
+            .map(|x| x.open_orders)
+            .ok();
+
+        if open_orders_opt.is_none() {
+            ixs.push(
+                self.serum3_create_open_orders_instruction(market_index),
+                self.context.compute_estimates.health_cu_per_serum,
+            );
+
+            let created_open_orders = self.serum3_create_open_orders_address(market_index);
+            open_orders_opt = Some(created_open_orders);
+            account.create_serum3_orders(market_index)?.open_orders = created_open_orders;
+        }
+
+        let open_orders = open_orders_opt.expect("oo is created");
+
         let (health_check_metas, health_cu) = self
             .derive_health_check_remaining_account_metas(
-                account,
+                &account,
                 vec![],
                 vec![receiver_token.token_index],
                 vec![],
             )
             .await?;
 
-        let ixs = PreparedInstructions::from_single(
+        ixs.push(
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
