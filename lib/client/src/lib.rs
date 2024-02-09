@@ -15,6 +15,8 @@ pub mod gpa;
 pub mod health_cache;
 pub mod jupiter;
 pub mod perp_pnl;
+pub mod priority_fees;
+pub mod priority_fees_cli;
 pub mod snapshot_source;
 mod util;
 pub mod websocket_source;

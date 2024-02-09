@@ -143,6 +143,8 @@ pub enum MangoError {
     InvalidFeedForCLMMOracle,
     #[msg("Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)")]
     MissingFeedForCLMMOracle,
+    #[msg("the asset does not allow liquidation")]
+    TokenAssetLiquidationDisabled,
     #[msg("no free openbook v2 open orders index")]
     NoFreeOpenbookV2OpenOrdersIndex,
     #[msg("openbook v2 open orders exist already")]

@@ -157,6 +157,7 @@ pub mod mango_v4 {
         deposit_limit: u64,
         zero_util_rate: f32,
         platform_liquidation_fee: f32,
+        disable_asset_liquidation: bool,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -190,6 +191,7 @@ pub mod mango_v4 {
             deposit_limit,
             zero_util_rate,
             platform_liquidation_fee,
+            disable_asset_liquidation,
         )?;
         Ok(())
     }
@@ -245,6 +247,7 @@ pub mod mango_v4 {
         deposit_limit_opt: Option<u64>,
         zero_util_rate_opt: Option<f32>,
         platform_liquidation_fee_opt: Option<f32>,
+        disable_asset_liquidation_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -287,6 +290,7 @@ pub mod mango_v4 {
             deposit_limit_opt,
             zero_util_rate_opt,
             platform_liquidation_fee_opt,
+            disable_asset_liquidation_opt,
         )?;
         Ok(())
     }

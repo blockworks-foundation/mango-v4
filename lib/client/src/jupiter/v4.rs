@@ -338,7 +338,12 @@ impl<'a> JupiterV4<'a> {
             address_lookup_tables,
             payer,
             signers: vec![self.mango_client.owner.clone()],
-            config: self.mango_client.client.config().transaction_builder_config,
+            config: self
+                .mango_client
+                .client
+                .config()
+                .transaction_builder_config
+                .clone(),
         })
     }
 

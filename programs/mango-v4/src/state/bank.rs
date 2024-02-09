@@ -158,8 +158,12 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    /// If set to 1, deposits cannot be liquidated when an account is liquidatable.
+    /// That means bankrupt accounts may still have assets of this type deposited.
+    pub disable_asset_liquidation: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 6],
+    pub padding: [u8; 5],
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -352,7 +356,8 @@ impl Bank {
             deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
             reduce_only: existing_bank.reduce_only,
             force_close: existing_bank.force_close,
-            padding: [0; 6],
+            disable_asset_liquidation: existing_bank.disable_asset_liquidation,
+            padding: [0; 5],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -402,6 +407,10 @@ impl Bank {
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
         require_gte!(self.zero_util_rate, I80F48::ZERO);
         require_gte!(self.platform_liquidation_fee, 0.0);
+        if !self.allows_asset_liquidation() {
+            require!(self.are_borrows_reduce_only(), MangoError::SomeError);
+            require_eq!(self.maint_asset_weight, I80F48::ZERO);
+        }
         Ok(())
     }
 
@@ -421,6 +430,10 @@ impl Bank {
 
     pub fn is_force_close(&self) -> bool {
         self.force_close == 1
+    }
+
+    pub fn allows_asset_liquidation(&self) -> bool {
+        self.disable_asset_liquidation == 0
     }
 
     #[inline(always)]

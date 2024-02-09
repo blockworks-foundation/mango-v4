@@ -370,11 +370,11 @@ impl<'a> LiquidateHelper<'a> {
             .filter_map(|(ti, effective)| {
                 // check constraints for liquidatable assets, see also has_possible_spot_liquidations()
                 let tokens = ti.balance_spot.min(effective.spot_and_perp);
-                let is_valid_asset = tokens >= 1;
+                let is_valid_asset = tokens >= 1 && ti.allow_asset_liquidation;
                 let quote_value = tokens * ti.prices.oracle;
                 // prefer to liquidate tokens with asset weight that have >$1 liquidatable
                 let is_preferred =
-                    ti.init_asset_weight > 0 && quote_value > I80F48::from(1_000_000);
+                    ti.maint_asset_weight > 0 && quote_value > I80F48::from(1_000_000);
                 is_valid_asset.then_some((ti.token_index, is_preferred, quote_value))
             })
             .collect_vec();

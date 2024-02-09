@@ -53,6 +53,7 @@ pub fn token_edit(
     deposit_limit_opt: Option<u64>,
     zero_util_rate: Option<f32>,
     platform_liquidation_fee: Option<f32>,
+    disable_asset_liquidation_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -482,6 +483,16 @@ pub fn token_edit(
                 platform_liquidation_fee
             );
             bank.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
+            require_group_admin = true;
+        }
+
+        if let Some(disable_asset_liquidation) = disable_asset_liquidation_opt {
+            msg!(
+                "Asset liquidation disabled old {:?}, new {:?}",
+                bank.disable_asset_liquidation,
+                disable_asset_liquidation
+            );
+            bank.disable_asset_liquidation = u8::from(disable_asset_liquidation);
             require_group_admin = true;
         }
     }

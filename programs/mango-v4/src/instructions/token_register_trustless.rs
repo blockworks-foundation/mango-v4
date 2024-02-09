@@ -90,6 +90,7 @@ pub fn token_register_trustless(
         deposit_weight_scale_start_quote: 5_000_000_000.0, // $5k
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
+        disable_asset_liquidation: 1,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate: 0.0,
