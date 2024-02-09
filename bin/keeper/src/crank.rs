@@ -1,12 +1,27 @@
-use std::{collections::HashSet, sync::Arc, time::Duration, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::Arc,
+    time::Instant,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use crate::MangoClient;
+use anyhow::Context;
 use itertools::Itertools;
 
-use anchor_lang::{__private::bytemuck::cast_ref, solana_program};
+use anchor_lang::{__private::bytemuck::cast_ref, solana_program, Discriminator};
 use futures::Future;
-use mango_v4::state::{EventQueue, EventType, FillEvent, OutEvent, TokenIndex};
-use mango_v4_client::PerpMarketContext;
+use mango_v4::{
+    accounts_zerocopy::AccountReader,
+    state::{
+        EventQueue, EventType, FillEvent, Group, MangoAccount, MangoAccountValue, OutEvent,
+        TokenIndex,
+    },
+};
+use mango_v4_client::{
+    account_fetcher_fetch_anchor_account, AccountFetcher, PerpMarketContext, PreparedInstructions,
+    RpcAccountFetcher, TransactionBuilder,
+};
 use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -80,6 +95,7 @@ pub async fn runner(
     interval_consume_events: u64,
     interval_update_funding: u64,
     interval_check_for_changes_and_abort: u64,
+    interval_charge_collateral_fees: u64,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
         .context
@@ -138,6 +154,7 @@ pub async fn runner(
         futures::future::join_all(handles1),
         futures::future::join_all(handles2),
         futures::future::join_all(handles3),
+        loop_charge_collateral_fees(mango_client.clone(), interval_charge_collateral_fees),
         MangoClient::loop_check_for_context_changes_and_abort(
             mango_client.clone(),
             Duration::from_secs(interval_check_for_changes_and_abort),
@@ -406,6 +423,125 @@ pub async fn loop_update_funding(
                 perp_market.name, confirmation_time,
             );
             info!("{:?}", sig_result);
+        }
+    }
+}
+
+pub async fn loop_charge_collateral_fees(mango_client: Arc<MangoClient>, interval: u64) {
+    if interval == 0 {
+        return;
+    }
+
+    // Make a new one separate from the mango_client.account_fetcher,
+    // because we don't want cached responses
+    let fetcher = RpcAccountFetcher {
+        rpc: mango_client.client.new_rpc_async(),
+    };
+
+    let group: Group = account_fetcher_fetch_anchor_account(&fetcher, &mango_client.context.group)
+        .await
+        .unwrap();
+    let collateral_fee_interval = group.collateral_fee_interval;
+
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(interval));
+    loop {
+        interval.tick().await;
+
+        match charge_collateral_fees_inner(&mango_client, &fetcher, collateral_fee_interval).await {
+            Ok(()) => {}
+            Err(err) => {
+                error!("charge_collateral_fees error: {err:?}");
+            }
+        }
+    }
+}
+
+async fn charge_collateral_fees_inner(
+    client: &MangoClient,
+    fetcher: &RpcAccountFetcher,
+    collateral_fee_interval: u64,
+) -> anyhow::Result<()> {
+    let mango_accounts = fetcher
+        .fetch_program_accounts(&mango_v4::id(), MangoAccount::DISCRIMINATOR)
+        .await
+        .context("fetching mango accounts")?
+        .into_iter()
+        .filter_map(
+            |(pk, data)| match MangoAccountValue::from_bytes(&data.data()[8..]) {
+                Ok(acc) => Some((pk, acc)),
+                Err(err) => {
+                    error!(pk=%pk, "charge_collateral_fees could not parse account: {err:?}");
+                    None
+                }
+            },
+        );
+
+    let mut ix_to_send = Vec::new();
+    let now_ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as u64;
+    for (pk, account) in mango_accounts {
+        let should_reset =
+            collateral_fee_interval == 0 && account.fixed.last_collateral_fee_charge > 0;
+        let should_charge = collateral_fee_interval > 0
+            && now_ts > account.fixed.last_collateral_fee_charge + collateral_fee_interval;
+        if !(should_reset || should_charge) {
+            continue;
+        }
+
+        let ixs = match client
+            .token_charge_collateral_fees_instruction((&pk, &account))
+            .await
+        {
+            Ok(ixs) => ixs,
+            Err(err) => {
+                error!(pk=%pk, "charge_collateral_fees could not build instruction: {err:?}");
+                continue;
+            }
+        };
+
+        ix_to_send.push(ixs);
+    }
+
+    send_batched_log_errors_no_confirm(
+        client.transaction_builder().await?,
+        &client.client,
+        &ix_to_send,
+    )
+    .await;
+
+    Ok(())
+}
+
+/// Try to batch the instructions into transactions and send them
+async fn send_batched_log_errors_no_confirm(
+    mut tx_builder: TransactionBuilder,
+    client: &mango_v4_client::Client,
+    ixs_list: &[PreparedInstructions],
+) {
+    let mut current_batch = PreparedInstructions::new();
+    for ixs in ixs_list {
+        let previous_batch = current_batch.clone();
+        current_batch.append(ixs.clone());
+
+        tx_builder.instructions = current_batch.clone().to_instructions();
+        if !tx_builder.transaction_size().is_ok() {
+            tx_builder.instructions = previous_batch.to_instructions();
+            match tx_builder.send(client).await {
+                Err(err) => error!("could not send transaction: {err:?}"),
+                _ => {}
+            }
+
+            current_batch = ixs.clone();
+        }
+    }
+
+    if !current_batch.is_empty() {
+        tx_builder.instructions = current_batch.to_instructions();
+        match tx_builder.send(client).await {
+            Err(err) => error!("could not send transaction: {err:?}"),
+            _ => {}
         }
     }
 }
