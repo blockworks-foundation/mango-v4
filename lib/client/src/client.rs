@@ -44,6 +44,7 @@ use solana_sdk::signer::keypair;
 use solana_sdk::transaction::TransactionError;
 
 use anyhow::Context;
+use mango_v4::error::{IsAnchorErrorWithCode, MangoError};
 use solana_sdk::account::ReadableAccount;
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::signature::{Keypair, Signature};
@@ -1134,27 +1135,29 @@ impl MangoClient {
         let enforce_position_result =
             account.ensure_perp_position(perk_market_index, settle_token_index);
 
-        if enforce_position_result.is_err() {
-            let perp_position_to_close_opt = account.find_first_unused_perp_position();
-            match perp_position_to_close_opt {
-                Some(perp_position_to_close) => {
-                    let close_ix = self
-                        .perp_deactivate_position_instruction(perp_position_to_close.market_index)
-                        .await?;
+        if !enforce_position_result
+            .is_anchor_error_with_code(MangoError::NoFreePerpPositionIndex.error_code())
+        {
+            return Ok(None);
+        }
 
-                    let previous_market = context.perp(perp_position_to_close.market_index);
-                    account.deactivate_perp_position(
-                        perp_position_to_close.market_index,
-                        previous_market.settle_token_index,
-                    )?;
-                    account.ensure_perp_position(perk_market_index, settle_token_index)?;
+        let perp_position_to_close_opt = account.find_first_active_unused_perp_position();
+        match perp_position_to_close_opt {
+            Some(perp_position_to_close) => {
+                let close_ix = self
+                    .perp_deactivate_position_instruction(perp_position_to_close.market_index)
+                    .await?;
 
-                    Ok(Some((close_ix, account)))
-                }
-                None => Err(anyhow::format_err!("No perp market slot available")),
+                let previous_market = context.perp(perp_position_to_close.market_index);
+                account.deactivate_perp_position(
+                    perp_position_to_close.market_index,
+                    previous_market.settle_token_index,
+                )?;
+                account.ensure_perp_position(perk_market_index, settle_token_index)?;
+
+                Ok(Some((close_ix, account)))
             }
-        } else {
-            Ok(None)
+            None => anyhow::bail!("No perp market slot available"),
         }
     }
 

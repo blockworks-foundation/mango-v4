@@ -1197,7 +1197,7 @@ impl<
         Ok(())
     }
 
-    pub fn find_first_unused_perp_position(&self) -> Option<&PerpPosition> {
+    pub fn find_first_active_unused_perp_position(&self) -> Option<&PerpPosition> {
         let first_unused_position_opt = self.all_perp_positions().find(|p| {
             p.is_active()
                 && p.base_position_lots == 0
@@ -2848,7 +2848,7 @@ mod tests {
         }
 
         // Act
-        let to_be_closed_account_opt = account.find_first_unused_perp_position();
+        let to_be_closed_account_opt = account.find_first_active_unused_perp_position();
 
         assert_eq!(to_be_closed_account_opt.unwrap().market_index, 3)
     }

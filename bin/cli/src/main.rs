@@ -1,3 +1,4 @@
+use clap::clap_derive::ArgEnum;
 use clap::{Args, Parser, Subcommand};
 use mango_v4::state::{PlaceOrderType, SelfTradeBehavior, Side};
 use mango_v4_client::{
@@ -90,6 +91,13 @@ struct JupiterSwap {
     rpc: Rpc,
 }
 
+#[derive(ArgEnum, Clone, Debug)]
+#[repr(u8)]
+pub enum CliSide {
+    Bid = 0,
+    Ask = 1,
+}
+
 #[derive(Args, Debug, Clone)]
 struct PerpPlaceOrder {
     #[clap(long)]
@@ -102,8 +110,8 @@ struct PerpPlaceOrder {
     #[clap(long)]
     market_name: String,
 
-    #[clap(long)]
-    side: String,
+    #[clap(long, value_enum)]
+    side: CliSide,
 
     #[clap(short, long)]
     price: f64,
@@ -301,10 +309,9 @@ async fn main() -> Result<(), anyhow::Error> {
             let txsig = client
                 .perp_place_order(
                     market.perp_market_index,
-                    if cmd.side.to_lowercase() == "bid" {
-                        Side::Bid
-                    } else {
-                        Side::Ask
+                    match cmd.side {
+                        CliSide::Bid => Side::Bid,
+                        CliSide::Ask => Side::Ask,
                     },
                     price_lots,
                     max_base_lots,
