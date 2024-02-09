@@ -149,6 +149,10 @@ struct Cli {
     #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
     tcs_mode: TcsMode,
 
+    /// largest tcs amount to trigger in one transaction, in dollar
+    #[clap(long, env, default_value = "1000.0")]
+    tcs_max_trigger_amount: f64,
+
     #[clap(flatten)]
     prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
 
@@ -179,6 +183,11 @@ struct Cli {
     /// provide a jupiter token, currently only for jup v6
     #[clap(long, env, default_value = "")]
     jupiter_token: String,
+
+    /// size of the swap to quote via jupiter to get slippage info, in dollar
+    /// should be larger than tcs_max_trigger_amount
+    #[clap(long, env, default_value = "1000.0")]
+    jupiter_swap_info_amount: f64,
 
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
@@ -340,8 +349,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let token_swap_info_config = token_swap_info::Config {
-        quote_index: 0,              // USDC
-        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        quote_index: 0, // USDC
+        quote_amount: (cli.jupiter_swap_info_amount * 1e6) as u64,
         jupiter_version: cli.jupiter_version.into(),
     };
 
@@ -360,7 +369,7 @@ async fn main() -> anyhow::Result<()> {
 
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
-        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
+        max_trigger_quote_amount: (cli.tcs_max_trigger_amount * 1e6) as u64,
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
         collateral_token_index: 0, // USDC
