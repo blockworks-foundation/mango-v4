@@ -129,6 +129,7 @@ impl ClientBuilder {
         }
     }
 }
+
 pub struct Client {
     config: ClientConfig,
     rpc_async: RpcClientAsync,
@@ -580,40 +581,40 @@ impl MangoClient {
 
         let ixs = PreparedInstructions::from_vec(
             vec![
-            spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &self.owner(),
-                &self.owner(),
-                &mint,
-                &Token::id(),
-            ),
-            Instruction {
-                program_id: mango_v4::id(),
-                accounts: {
-                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::TokenWithdraw {
-                            group: self.group(),
-                            account: self.mango_account_address,
-                            owner: self.owner(),
-                            bank: token.first_bank(),
-                            vault: token.first_vault(),
-                            oracle: token.oracle,
-                            token_account: get_associated_token_address(
-                                &self.owner(),
-                                &token.mint,
-                            ),
-                            token_program: Token::id(),
-                        },
-                        None,
-                    );
-                    ams.extend(health_check_metas.into_iter());
-                    ams
+                spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                    &self.owner(),
+                    &self.owner(),
+                    &mint,
+                    &Token::id(),
+                ),
+                Instruction {
+                    program_id: mango_v4::id(),
+                    accounts: {
+                        let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                            &mango_v4::accounts::TokenWithdraw {
+                                group: self.group(),
+                                account: self.mango_account_address,
+                                owner: self.owner(),
+                                bank: token.first_bank(),
+                                vault: token.first_vault(),
+                                oracle: token.oracle,
+                                token_account: get_associated_token_address(
+                                    &self.owner(),
+                                    &token.mint,
+                                ),
+                                token_program: Token::id(),
+                            },
+                            None,
+                        );
+                        ams.extend(health_check_metas.into_iter());
+                        ams
+                    },
+                    data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenWithdraw {
+                        amount,
+                        allow_borrow,
+                    }),
                 },
-                data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenWithdraw {
-                    amount,
-                    allow_borrow,
-                }),
-            },
-        ],
+            ],
             self.instruction_cu(health_cu),
         );
         Ok(ixs)
@@ -782,12 +783,44 @@ impl MangoClient {
             .map(|x| x.open_orders)
             .ok();
 
-        // TODO FAS
-        // 0/ If slot already available -> Continue with place order
-        // 1/ If there is no free slot, try to close one or fail ()
-        // 2/ If there is a free slot, create a new open orders (serum3_create_open_orders_instruction)
-
         if open_orders_opt.is_none() {
+            let has_available_slot = account.all_serum3_orders().any(|p| !p.is_active());
+
+            if !has_available_slot {
+                let mut serum3_closable_order_market_index = None;
+
+                for p in account.all_serum3_orders() {
+                    let open_orders_acc = self
+                        .account_fetcher
+                        .fetch_raw_account(&p.open_orders)
+                        .await?;
+                    let open_orders_bytes = open_orders_acc.data();
+                    let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
+                        &open_orders_bytes
+                            [5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
+                    );
+
+                    let is_closable = open_orders_data.free_slot_bits == u128::MAX
+                        && open_orders_data.native_coin_total == 0
+                        && open_orders_data.native_pc_total == 0;
+
+                    if is_closable {
+                        serum3_closable_order_market_index = Some(p.market_index);
+                        break;
+                    }
+                }
+
+                let first_closable_slot = serum3_closable_order_market_index
+                    .expect("couldn't find any serum3 slot available");
+
+                ixs.push(
+                    self.serum3_close_open_orders_instruction(first_closable_slot),
+                    self.context.compute_estimates.health_cu_per_serum,
+                );
+
+                account.deactivate_serum3_orders(first_closable_slot)?;
+            }
+
             ixs.push(
                 self.serum3_create_open_orders_instruction(market_index),
                 self.context.compute_estimates.health_cu_per_serum,
@@ -2034,7 +2067,7 @@ impl MangoClient {
 #[derive(Debug, thiserror::Error)]
 pub enum MangoClientError {
     #[error("Transaction simulation error. Error: {err:?}, Logs: {}",
-        .logs.iter().join("; ")
+    .logs.iter().join("; ")
     )]
     SendTransactionPreflightFailure {
         err: Option<TransactionError>,
@@ -2073,6 +2106,7 @@ pub enum FallbackOracleConfig {
     /// Every possible fallback oracle (may cause serious issues with the 64 accounts-per-tx limit)
     All,
 }
+
 impl Default for FallbackOracleConfig {
     fn default() -> Self {
         FallbackOracleConfig::Dynamic
