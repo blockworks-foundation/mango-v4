@@ -1198,15 +1198,15 @@ impl<
     }
 
     pub fn find_first_unused_perp_position(&self) -> Option<&PerpPosition> {
-        let first_unused_position_opt = self.all_perp_positions()
-            .find(|p| p.is_active()
+        let first_unused_position_opt = self.all_perp_positions().find(|p| {
+            p.is_active()
                 && p.base_position_lots == 0
                 && p.quote_position_native == 0
                 && p.bids_base_lots == 0
                 && p.asks_base_lots == 0
                 && p.taker_base_lots == 0
                 && p.taker_quote_lots == 0
-            );
+        });
         first_unused_position_opt
     }
 

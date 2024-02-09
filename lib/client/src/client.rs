@@ -1063,10 +1063,7 @@ impl MangoClient {
         let mut account = account.clone();
 
         let close_perp_ixs_opt = self
-            .replace_perp_market_if_needed(
-                &account,
-                market_index
-            )
+            .replace_perp_market_if_needed(&account, market_index)
             .await?;
 
         if let Some((close_perp_ixs, modified_account)) = close_perp_ixs_opt {
@@ -1083,44 +1080,44 @@ impl MangoClient {
             )
             .await?;
 
-        let ix =
-            Instruction {
-                program_id: mango_v4::id(),
-                accounts: {
-                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
-                        &mango_v4::accounts::PerpPlaceOrder {
-                            group: self.group(),
-                            account: self.mango_account_address,
-                            owner: self.owner(),
-                            perp_market: perp.address,
-                            bids: perp.bids,
-                            asks: perp.asks,
-                            event_queue: perp.event_queue,
-                            oracle: perp.oracle,
-                        },
-                        None,
-                    );
-                    ams.extend(health_remaining_metas.into_iter());
-                    ams
-                },
-                data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::PerpPlaceOrderV2 {
-                        side,
-                        price_lots,
-                        max_base_lots,
-                        max_quote_lots,
-                        client_order_id,
-                        order_type,
-                        reduce_only,
-                        expiry_timestamp,
-                        limit,
-                        self_trade_behavior,
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::PerpPlaceOrder {
+                        group: self.group(),
+                        account: self.mango_account_address,
+                        owner: self.owner(),
+                        perp_market: perp.address,
+                        bids: perp.bids,
+                        asks: perp.asks,
+                        event_queue: perp.event_queue,
+                        oracle: perp.oracle,
                     },
-                ),
-            };
+                    None,
+                );
+                ams.extend(health_remaining_metas.into_iter());
+                ams
+            },
+            data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpPlaceOrderV2 {
+                side,
+                price_lots,
+                max_base_lots,
+                max_quote_lots,
+                client_order_id,
+                order_type,
+                reduce_only,
+                expiry_timestamp,
+                limit,
+                self_trade_behavior,
+            }),
+        };
 
-        ixs.push(ix,self.instruction_cu(health_cu)
-            + self.context.compute_estimates.cu_per_perp_order_match * limit as u32);
+        ixs.push(
+            ix,
+            self.instruction_cu(health_cu)
+                + self.context.compute_estimates.cu_per_perp_order_match * limit as u32,
+        );
 
         Ok(ixs)
     }
@@ -1134,22 +1131,27 @@ impl MangoClient {
         let settle_token_index = context.perp(perk_market_index).settle_token_index;
 
         let mut account = account.clone();
-        let enforce_position_result = account.ensure_perp_position(perk_market_index, settle_token_index);
+        let enforce_position_result =
+            account.ensure_perp_position(perk_market_index, settle_token_index);
 
         if enforce_position_result.is_err() {
             let perp_position_to_close_opt = account.find_first_unused_perp_position();
             match perp_position_to_close_opt {
                 Some(perp_position_to_close) => {
-                    let close_ix = self.perp_deactivate_position_instruction(perp_position_to_close.market_index)
+                    let close_ix = self
+                        .perp_deactivate_position_instruction(perp_position_to_close.market_index)
                         .await?;
 
                     let previous_market = context.perp(perp_position_to_close.market_index);
-                    account.deactivate_perp_position(perp_position_to_close.market_index, previous_market.settle_token_index)?;
+                    account.deactivate_perp_position(
+                        perp_position_to_close.market_index,
+                        previous_market.settle_token_index,
+                    )?;
                     account.ensure_perp_position(perk_market_index, settle_token_index)?;
 
                     Ok(Some((close_ix, account)))
-                },
-                None => Err(anyhow::format_err!("No perp market slot available"))
+                }
+                None => Err(anyhow::format_err!("No perp market slot available")),
             }
         } else {
             Ok(None)
@@ -1228,13 +1230,15 @@ impl MangoClient {
         &self,
         market_index: PerpMarketIndex,
     ) -> anyhow::Result<Signature> {
-        let ixs = self.perp_deactivate_position_instruction(market_index).await?;
+        let ixs = self
+            .perp_deactivate_position_instruction(market_index)
+            .await?;
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
     async fn perp_deactivate_position_instruction(
         &self,
-        market_index: PerpMarketIndex
+        market_index: PerpMarketIndex,
     ) -> anyhow::Result<PreparedInstructions> {
         let perp = self.context.perp(market_index);
 
