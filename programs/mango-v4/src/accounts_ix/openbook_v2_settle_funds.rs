@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use openbook_v2::state::OpenOrdersAccount;
 
 use crate::error::*;
 use crate::state::*;
@@ -23,8 +24,7 @@ pub struct OpenbookV2SettleFunds<'info> {
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,
@@ -73,4 +73,5 @@ pub struct OpenbookV2SettleFunds<'info> {
     pub base_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }

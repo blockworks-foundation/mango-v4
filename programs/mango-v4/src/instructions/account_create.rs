@@ -14,6 +14,7 @@ pub fn account_create(
     perp_count: u8,
     perp_oo_count: u8,
     token_conditional_swap_count: u8,
+    openbook_v2_count: u8,
     name: String,
 ) -> Result<()> {
     let mut account = account_ai.load_full_init()?;
@@ -24,6 +25,7 @@ pub fn account_create(
         perp_count,
         perp_oo_count,
         token_conditional_swap_count,
+        openbook_v2_count,
     };
     header.check_resize_from(&MangoAccountDynamicHeader::zero())?;
 
@@ -46,6 +48,7 @@ pub fn account_create(
         perp_count,
         perp_oo_count,
         token_conditional_swap_count,
+        openbook_v2_count,
     )?;
 
     Ok(())

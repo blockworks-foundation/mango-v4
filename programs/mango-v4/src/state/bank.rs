@@ -221,8 +221,12 @@ pub struct Bank {
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
 
+    /// Largest amount of tokens that might be added the the bank based on
+    /// oenbook open order execution.
+    pub potential_openbook_tokens: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1920],
+    pub reserved: [u8; 1912],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -257,10 +261,11 @@ const_assert_eq!(
         + 8 * 2
         + 8 * 2
         + 16 * 3
+        + 8
         + 32
         + 8
         + 16 * 3
-        + 1920
+        + 1912
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -310,6 +315,7 @@ impl Bank {
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
             potential_serum_tokens: 0,
+            potential_openbook_tokens: 0,
             bump,
             bank_num,
 
@@ -368,7 +374,7 @@ impl Bank {
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
-            reserved: [0; 1920],
+            reserved: [0; 1912],
         }
     }
 
@@ -931,7 +937,8 @@ impl Bank {
         let deposits = self.deposit_index * (self.indexed_deposits + I80F48::DELTA);
 
         let serum = I80F48::from(self.potential_serum_tokens);
-        let total = deposits + serum;
+        let openbook = I80F48::from(self.potential_openbook_tokens);
+        let total = deposits + serum + openbook;
 
         I80F48::from(self.deposit_limit) - total
     }
@@ -946,17 +953,19 @@ impl Bank {
         // will not cause a limit overrun.
         let deposits = self.native_deposits();
         let serum = I80F48::from(self.potential_serum_tokens);
-        let total = deposits + serum;
+        let openbook = I80F48::from(self.potential_openbook_tokens);
+        let total = deposits + serum + openbook;
         let remaining = I80F48::from(self.deposit_limit) - total;
         if remaining < 0 {
             return Err(error_msg_typed!(
                 MangoError::BankDepositLimit,
-                "deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}",
+                "deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}, openbook: {}",
                 remaining,
                 total,
                 self.deposit_limit,
                 deposits,
                 serum,
+                openbook,
             ));
         }
 
@@ -1212,8 +1221,9 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits =
-            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
+        let all_deposits = self.native_deposits().to_num::<f64>()
+            + self.potential_serum_tokens as f64
+            + self.potential_openbook_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1250,6 +1260,17 @@ impl Bank {
             self.potential_serum_tokens += new - old;
         } else {
             self.potential_serum_tokens = self.potential_serum_tokens.saturating_sub(old - new);
+        }
+    }
+
+    /// Grows potential_openbook_tokens if new > old, shrinks it otherwise
+    #[inline(always)]
+    pub fn update_potential_openbook_tokens(&mut self, old: u64, new: u64) {
+        if new >= old {
+            self.potential_openbook_tokens += new - old;
+        } else {
+            self.potential_openbook_tokens =
+                self.potential_openbook_tokens.saturating_sub(old - new);
         }
     }
 }
@@ -1549,7 +1570,8 @@ mod tests {
             bank.net_borrow_limit_per_window_quote = 100;
             bank.net_borrows_in_window = 200;
             bank.deposit_limit = 100;
-            bank.potential_serum_tokens = 200;
+            bank.potential_serum_tokens = 100;
+            bank.potential_openbook_tokens = 100;
 
             let half = I80F48::from(50);
             bank.checked_transfer_with_fee(&mut a1, half, &mut a2, half, 0, I80F48::ONE)

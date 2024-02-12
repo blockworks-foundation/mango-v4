@@ -119,6 +119,7 @@ pub fn token_register(
         interest_target_utilization,
         interest_curve_scaling: interest_curve_scaling.into(),
         potential_serum_tokens: 0,
+        potential_openbook_tokens: 0,
         maint_weight_shift_start: 0,
         maint_weight_shift_end: 0,
         maint_weight_shift_duration_inv: I80F48::ZERO,
@@ -129,7 +130,7 @@ pub fn token_register(
         zero_util_rate: I80F48::from_num(zero_util_rate),
         platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
         collected_liquidation_fees: I80F48::ZERO,
-        reserved: [0; 1920],
+        reserved: [0; 1912],
     };
 
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;

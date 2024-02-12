@@ -1,29 +1,31 @@
 use anchor_lang::prelude::*;
+use openbook_v2::cpi::accounts::{CancelOrder, SettleFunds};
 
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::instructions::serum3_place_order::apply_settle_changes;
-use crate::instructions::serum3_settle_funds::charge_loan_origination_fees;
-use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2};
-use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
+use crate::instructions::openbook_v2_place_order::apply_settle_changes;
+use crate::instructions::openbook_v2_settle_funds::charge_loan_origination_fees;
+use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::serum3_cpi::OpenOrdersAmounts;
+use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
 
-pub fn serum3_liq_force_cancel_orders(
-    ctx: Context<Serum3LiqForceCancelOrders>,
+pub fn openbook_v2_liq_force_cancel_orders(
+    ctx: Context<OpenbookV2LiqForceCancelOrders>,
     limit: u8,
 ) -> Result<()> {
     //
     // Validation
     //
-    let serum_market = ctx.accounts.serum_market.load()?;
+    let openbook_market = ctx.accounts.openbook_v2_market.load()?;
     {
         let account = ctx.accounts.account.load_full()?;
 
         // Validate open_orders #2
         require!(
             account
-                .serum3_orders(serum_market.market_index)?
+                .openbook_v2_orders(openbook_market.market_index)?
                 .open_orders
                 == ctx.accounts.open_orders.key(),
             MangoError::SomeError
@@ -36,7 +38,7 @@ pub fn serum3_liq_force_cancel_orders(
             MangoError::SomeError
         );
         require!(
-            quote_bank.token_index == serum_market.quote_token_index,
+            quote_bank.token_index == openbook_market.quote_token_index,
             MangoError::SomeError
         );
         let base_bank = ctx.accounts.base_bank.load()?;
@@ -45,7 +47,7 @@ pub fn serum3_liq_force_cancel_orders(
             MangoError::SomeError
         );
         require!(
-            base_bank.token_index == serum_market.base_token_index,
+            base_bank.token_index == openbook_market.base_token_index,
             MangoError::SomeError
         );
     }
@@ -64,7 +66,7 @@ pub fn serum3_liq_force_cancel_orders(
         let liquidatable = account.check_liquidatable(&health_cache)?;
         let can_force_cancel = !account.fixed.is_operational()
             || liquidatable == CheckLiquidatable::Liquidatable
-            || serum_market.is_force_close();
+            || openbook_market.is_force_close();
         if !can_force_cancel {
             return Ok(());
         }
@@ -75,16 +77,19 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // Charge any open loan origination fees
     //
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+    let base_lot_size: u64 = openbook_market_external.base_lot_size.try_into().unwrap();
+    let quote_lot_size: u64 = openbook_market_external.quote_lot_size.try_into().unwrap();
     let before_oo = {
-        let open_orders = load_open_orders_ref(ctx.accounts.open_orders.as_ref())?;
-        let before_oo = OpenOrdersSlim::from_oo(&open_orders);
+        let open_orders = ctx.accounts.open_orders.load()?;
+        let before_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
         let mut account = ctx.accounts.account.load_full_mut()?;
         let mut base_bank = ctx.accounts.base_bank.load_mut()?;
         let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
         charge_loan_origination_fees(
             &ctx.accounts.group.key(),
             &ctx.accounts.account.key(),
-            serum_market.market_index,
+            openbook_market.market_index,
             &mut base_bank,
             &mut quote_bank,
             &mut account.borrow_mut(),
@@ -105,24 +110,25 @@ pub fn serum3_liq_force_cancel_orders(
     //
     // Cancel all and settle
     //
-    cpi_cancel_all_orders(ctx.accounts, limit)?;
-    cpi_settle_funds(ctx.accounts)?;
+    let account = ctx.accounts.account.load()?;
+    let account_seeds = mango_account_seeds!(account);
+    cpi_cancel_all_orders(ctx.accounts, &[account_seeds], limit)?;
+    cpi_settle_funds(ctx.accounts, &[account_seeds])?;
 
     //
     // After-settle tracking
     //
     let after_oo;
     {
-        let oo_ai = &ctx.accounts.open_orders.as_ref();
-        let open_orders = load_open_orders_ref(oo_ai)?;
-        after_oo = OpenOrdersSlim::from_oo(&open_orders);
+        let open_orders = ctx.accounts.open_orders.load()?;
+        after_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
 
-        emit_stack(Serum3OpenOrdersBalanceLogV2 {
+        emit!(OpenbookV2OpenOrdersBalanceLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
-            market_index: serum_market.market_index,
-            base_token_index: serum_market.base_token_index,
-            quote_token_index: serum_market.quote_token_index,
+            market_index: openbook_market.market_index,
+            base_token_index: openbook_market.base_token_index,
+            quote_token_index: openbook_market.quote_token_index,
             base_total: after_oo.native_base_total(),
             base_free: after_oo.native_base_free(),
             quote_total: after_oo.native_quote_total(),
@@ -140,13 +146,14 @@ pub fn serum3_liq_force_cancel_orders(
     let mut base_bank = ctx.accounts.base_bank.load_mut()?;
     let mut quote_bank = ctx.accounts.quote_bank.load_mut()?;
     let group = ctx.accounts.group.load()?;
+    let open_orders = ctx.accounts.open_orders.load()?;
     apply_settle_changes(
         &group,
         ctx.accounts.account.key(),
         &mut account.borrow_mut(),
         &mut base_bank,
         &mut quote_bank,
-        &serum_market,
+        &openbook_market,
         before_base_vault,
         before_quote_vault,
         &before_oo,
@@ -156,6 +163,7 @@ pub fn serum3_liq_force_cancel_orders(
         Some(&mut health_cache),
         true,
         None,
+        &open_orders,
     )?;
 
     //
@@ -169,37 +177,52 @@ pub fn serum3_liq_force_cancel_orders(
     Ok(())
 }
 
-fn cpi_cancel_all_orders(ctx: &Serum3LiqForceCancelOrders, limit: u8) -> Result<()> {
-    use crate::serum3_cpi;
+fn cpi_cancel_all_orders(
+    ctx: &OpenbookV2LiqForceCancelOrders,
+    seeds: &[&[&[u8]]],
+    limit: u8,
+) -> Result<()> {
     let group = ctx.group.load()?;
-    serum3_cpi::CancelOrder {
-        program: ctx.serum_program.to_account_info(),
-        market: ctx.serum_market_external.to_account_info(),
-        bids: ctx.market_bids.to_account_info(),
-        asks: ctx.market_asks.to_account_info(),
-        event_queue: ctx.market_event_queue.to_account_info(),
+    let cpi_accounts = CancelOrder {
+        market: ctx.openbook_v2_market_external.to_account_info(),
+        open_orders_account: ctx.open_orders.to_account_info(),
+        signer: ctx.account.to_account_info(),
+        bids: ctx.bids.to_account_info(),
+        asks: ctx.asks.to_account_info(),
+    };
 
-        open_orders: ctx.open_orders.to_account_info(),
-        open_orders_authority: ctx.group.to_account_info(),
-    }
-    .cancel_all(&group, limit)
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.openbook_v2_program.to_account_info(),
+        cpi_accounts,
+        seeds,
+    );
+
+    // todo-pan: maybe allow passing side for cu opt
+    openbook_v2::cpi::cancel_all_orders(cpi_ctx, None, limit)
 }
 
-fn cpi_settle_funds(ctx: &Serum3LiqForceCancelOrders) -> Result<()> {
-    use crate::serum3_cpi;
+fn cpi_settle_funds(ctx: &OpenbookV2LiqForceCancelOrders, seeds: &[&[&[u8]]]) -> Result<()> {
     let group = ctx.group.load()?;
-    serum3_cpi::SettleFunds {
-        program: ctx.serum_program.to_account_info(),
-        market: ctx.serum_market_external.to_account_info(),
-        open_orders: ctx.open_orders.to_account_info(),
-        open_orders_authority: ctx.group.to_account_info(),
-        base_vault: ctx.market_base_vault.to_account_info(),
-        quote_vault: ctx.market_quote_vault.to_account_info(),
-        user_base_wallet: ctx.base_vault.to_account_info(),
-        user_quote_wallet: ctx.quote_vault.to_account_info(),
-        vault_signer: ctx.market_vault_signer.to_account_info(),
+    let cpi_accounts = SettleFunds {
+        penalty_payer: ctx.payer.to_account_info(),
+        market: ctx.openbook_v2_market_external.to_account_info(),
+        market_authority: ctx.market_vault_signer.to_account_info(),
+        market_base_vault: ctx.market_base_vault.to_account_info(),
+        market_quote_vault: ctx.market_quote_vault.to_account_info(),
+        user_base_account: ctx.base_vault.to_account_info(),
+        user_quote_account: ctx.quote_vault.to_account_info(),
+        referrer_account: Some(ctx.quote_vault.to_account_info()),
         token_program: ctx.token_program.to_account_info(),
-        rebates_quote_wallet: ctx.quote_vault.to_account_info(),
-    }
-    .call(&group)
+        owner: ctx.account.to_account_info(),
+        open_orders_account: ctx.open_orders.to_account_info(),
+        system_program: ctx.system_program.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.openbook_v2_program.to_account_info(),
+        cpi_accounts,
+        seeds,
+    );
+
+    openbook_v2::cpi::settle_funds(cpi_ctx)
 }

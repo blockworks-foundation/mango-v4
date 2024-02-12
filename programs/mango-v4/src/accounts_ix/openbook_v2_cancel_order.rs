@@ -2,7 +2,10 @@ use anchor_lang::prelude::*;
 
 use crate::error::*;
 use crate::state::*;
-use openbook_v2::{program::OpenbookV2, state::Market};
+use openbook_v2::{
+    program::OpenbookV2,
+    state::{Market, OpenOrdersAccount},
+};
 
 #[derive(Accounts)]
 pub struct OpenbookV2CancelOrder<'info> {
@@ -21,7 +24,7 @@ pub struct OpenbookV2CancelOrder<'info> {
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,

@@ -19,7 +19,7 @@ pub struct ListingKeys {
 }
 
 #[derive(Clone, Debug)]
-pub struct SpotMarketCookie {
+pub struct SerumMarketCookie {
     pub market: Pubkey,
     pub req_q: Pubkey,
     pub event_q: Pubkey,
@@ -95,7 +95,7 @@ impl SerumCookie {
         &self,
         coin_mint: &MintCookie,
         pc_mint: &MintCookie,
-    ) -> SpotMarketCookie {
+    ) -> SerumMarketCookie {
         let serum_program_id = self.program_id;
         let coin_mint_pk = coin_mint.pubkey;
         let pc_mint_pk = pc_mint.pubkey;
@@ -167,7 +167,7 @@ impl SerumCookie {
             .create_token_account(&fee_account_owner, coin_mint.pubkey)
             .await;
 
-        SpotMarketCookie {
+        SerumMarketCookie {
             market: market_key.pubkey(),
             req_q: req_q_key.pubkey(),
             event_q: event_q_key.pubkey(),
@@ -185,7 +185,7 @@ impl SerumCookie {
 
     pub async fn consume_spot_events(
         &self,
-        spot_market_cookie: &SpotMarketCookie,
+        spot_market_cookie: &SerumMarketCookie,
         open_orders: &[Pubkey],
     ) {
         let mut sorted_oos = open_orders.to_vec();

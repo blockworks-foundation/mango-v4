@@ -8,12 +8,11 @@ use openbook_v2::{program::OpenbookV2, state::Market};
 pub struct OpenbookV2RegisterMarket<'info> {
     #[account(
         mut,
-        has_one = admin,
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2RegisterMarket) @ MangoError::IxIsDisabled,
         constraint = group.load()?.openbook_v2_supported()
     )]
     pub group: AccountLoader<'info, Group>,
-
+    /// group admin or fast listing admin, checked at #1
     pub admin: Signer<'info>,
 
     /// CHECK: Can register a market for any openbook_v2 program

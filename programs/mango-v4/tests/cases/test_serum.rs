@@ -2,6 +2,7 @@
 use super::*;
 
 use anchor_lang::prelude::AccountMeta;
+use mango_client::StubOracleCreate;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
@@ -1954,7 +1955,7 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
 
 struct CommonSetup {
     group_with_tokens: GroupWithTokens,
-    serum_market_cookie: SpotMarketCookie,
+    serum_market_cookie: SerumMarketCookie,
     quote_token: crate::program_test::mango_setup::Token,
     base_token: crate::program_test::mango_setup::Token,
     order_placer: SerumOrderPlacer,

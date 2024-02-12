@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 
 use super::mango_client::*;
 use super::solana::SolanaCookie;
-use super::{send_tx, MintCookie, TestKeypair, UserCookie};
+use super::{MintCookie, TestKeypair, UserCookie};
 
 #[derive(Default)]
 pub struct GroupWithTokensConfig {

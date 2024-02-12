@@ -10,6 +10,7 @@ pub fn account_expand(
     perp_count: u8,
     perp_oo_count: u8,
     token_conditional_swap_count: u8,
+    openbook_v2_count: u8,
 ) -> Result<()> {
     let new_size = MangoAccount::space(
         token_count,
@@ -17,6 +18,7 @@ pub fn account_expand(
         perp_count,
         perp_oo_count,
         token_conditional_swap_count,
+        openbook_v2_count,
     );
     let new_rent_minimum = Rent::get()?.minimum_balance(new_size);
 
@@ -64,6 +66,7 @@ pub fn account_expand(
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            openbook_v2_count,
         )?;
     }
 

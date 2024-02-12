@@ -375,7 +375,7 @@ pub fn serum3_place_order(
             Serum3Side::Bid => {
                 require_msg_typed!(
                     limit_price_in_dollar * band_factor >= base_oracle_f64,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "bid price {} must be larger than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 / (quote_oracle_f64 * band_factor),
@@ -385,7 +385,7 @@ pub fn serum3_place_order(
             Serum3Side::Ask => {
                 require_msg_typed!(
                     limit_price_in_dollar <= base_oracle_f64 * band_factor,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "ask price {} must be smaller than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 * band_factor / quote_oracle_f64,
@@ -415,7 +415,7 @@ pub fn serum3_place_order(
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =
-            health_cache.total_serum3_potential(HealthType::Maint, receiver_token_index)?;
+            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?;
         require_msg_typed!(
             balance + potential < 1,
             MangoError::TokenInReduceOnlyMode,
@@ -461,6 +461,20 @@ impl OODifference {
             self.free_quote_change,
         )
     }
+
+    pub fn recompute_health_cache_openbook_v2_state(
+        &self,
+        health_cache: &mut HealthCache,
+        openbook_account: &OpenbookV2Orders,
+        open_orders: &openbook_v2::state::OpenOrdersAccount,
+    ) -> Result<()> {
+        health_cache.recompute_openbook_v2_info(
+            openbook_account,
+            open_orders,
+            self.free_base_change,
+            self.free_quote_change,
+        )
+    }
 }
 
 pub struct VaultDifference {
@@ -483,7 +497,7 @@ impl VaultDifference {
 /// Called in apply_settle_changes() and place_order to adjust token positions after
 /// changing the vault balances
 /// Also logs changes to token balances
-fn apply_vault_difference(
+pub fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
     serum_market_index: Serum3MarketIndex,

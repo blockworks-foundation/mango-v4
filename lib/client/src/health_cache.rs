@@ -16,6 +16,7 @@ pub async fn new(
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();
     let active_perp_len = account.active_perp_positions().count();
+    let active_serum3_len = account.active_serum3_orders().count();
 
     let fallback_keys = context
         .derive_fallback_oracle_keys(fallback_config, account_fetcher)
@@ -43,6 +44,7 @@ pub async fn new(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
+        begin_openbook_v2: active_token_len * 2 + active_perp_len * 2 + active_serum3_len,
         staleness_slot: None,
         begin_fallback_oracles: metas.len(),
         usdc_oracle_index: metas
@@ -64,6 +66,7 @@ pub fn new_sync(
 ) -> anyhow::Result<HealthCache> {
     let active_token_len = account.active_token_positions().count();
     let active_perp_len = account.active_perp_positions().count();
+    let active_serum3_len = account.active_serum3_orders().count();
 
     let (metas, _health_cu) = context.derive_health_check_remaining_account_metas(
         account,
@@ -88,6 +91,7 @@ pub fn new_sync(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
+        begin_openbook_v2: active_token_len * 2 + active_perp_len * 2 + active_serum3_len,
         staleness_slot: None,
         begin_fallback_oracles: metas.len(),
         usdc_oracle_index: None,

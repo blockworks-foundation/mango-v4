@@ -2,6 +2,7 @@ use std::{path::PathBuf, str::FromStr};
 
 use super::*;
 use anchor_lang::prelude::AccountMeta;
+use mango_client::StubOracleCreate;
 use solana_sdk::account::AccountSharedData;
 
 #[tokio::test]
