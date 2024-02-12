@@ -23,7 +23,9 @@
 
 - Do a verifiable build
 
-  anchor build --verifiable --solana-version 1.14.13 -- --features enable-gpl
+  Set GITHUB_SHA and GITHUB_REF_NAME to the release sha1 and tag name.
+
+  anchor build --verifiable --docker-image backpackapp/build:v0.28.0 --solana-version 1.16.14 --env GITHUB_SHA --env GITHUB_REF_NAME -- --features enable-gpl
 
   (or wait for github to finish and create the release)
 
