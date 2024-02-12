@@ -44,6 +44,7 @@ pub fn token_register(
     deposit_limit: u64,
     zero_util_rate: f32,
     platform_liquidation_fee: f32,
+    disable_asset_liquidation: bool,
     collateral_fee_per_day: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
@@ -110,6 +111,7 @@ pub fn token_register(
         deposit_weight_scale_start_quote,
         reduce_only,
         force_close: 0,
+        disable_asset_liquidation: u8::from(disable_asset_liquidation),
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,

@@ -27,6 +27,7 @@ use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
+use tokio::task::JoinHandle;
 use tracing::*;
 use warp::Filter;
 
@@ -96,6 +97,7 @@ pub async fn runner(
     interval_update_funding: u64,
     interval_check_for_changes_and_abort: u64,
     interval_charge_collateral_fees: u64,
+    extra_jobs: Vec<JoinHandle<()>>,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
         .context
@@ -161,6 +163,7 @@ pub async fn runner(
         ),
         serve_metrics(),
         debugging_handle,
+        futures::future::join_all(extra_jobs),
     );
 
     Ok(())

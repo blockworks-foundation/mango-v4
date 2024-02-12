@@ -160,7 +160,7 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
     send_tx(solana, TokenChargeCollateralFeesInstruction { account })
         .await
         .unwrap();
-    last_time = solana.clock_timestamp().await;
+    //last_time = solana.clock_timestamp().await;
     assert!(assert_equal_f64_f64(
         account_position_f64(solana, account, tokens[0].bank).await,
         last_balance * (1.0 - 0.1 * (7.0 / 24.0) * (720.0 / (last_balance * 0.8))),

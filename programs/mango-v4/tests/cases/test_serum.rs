@@ -1762,6 +1762,7 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
     //
     let deposit_amount = 5000; // for 10k tokens over both order_placers
     let CommonSetup {
+        serum_market_cookie,
         group_with_tokens,
         mut order_placer,
         quote_token,
@@ -1879,11 +1880,15 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
     let remaining_quote = {
         || async {
             let b: Bank = solana2.get_account(quote_bank).await;
-            b.remaining_deposits_until_limit().round().to_num::<u64>()
+            b.remaining_deposits_until_limit().round().to_num::<i64>()
         }
     };
 
     order_placer.cancel_all().await;
+    context
+        .serum
+        .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
+        .await;
 
     //
     // TEST: even when placing all quote tokens into a bid, they still count
@@ -1906,6 +1911,43 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
     let r = order_placer.try_ask(5.0, 401).await;
     assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
     order_placer.try_ask(5.0, 399).await.unwrap(); // not 400 due to rounding
+
+    // reset
+    order_placer.cancel_all().await;
+    context
+        .serum
+        .consume_spot_events(&serum_market_cookie, &[order_placer.open_orders])
+        .await;
+    order_placer.settle().await;
+
+    //
+    // TEST: can place a bid even if quote deposit limit is exhausted
+    //
+    send_tx(
+        solana,
+        TokenEdit {
+            group: group_with_tokens.group,
+            admin: group_with_tokens.admin,
+            mint: quote_token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                deposit_limit_opt: Some(1),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+    assert!(remaining_quote().await < 0);
+    assert_eq!(
+        account_position(solana, order_placer.account, quote_token.bank).await,
+        5000
+    );
+    // borrowing might lead to a deposit increase later
+    let r = order_placer.try_bid(1.0, 5001, false).await;
+    assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
+    // but just selling deposits is fine
+    order_placer.try_bid(1.0, 4999, false).await.unwrap();
 
     Ok(())
 }

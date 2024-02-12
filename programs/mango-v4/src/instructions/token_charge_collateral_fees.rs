@@ -1,5 +1,4 @@
 use crate::accounts_zerocopy::*;
-use crate::error::*;
 use crate::health::*;
 use crate::state::*;
 use anchor_lang::prelude::*;

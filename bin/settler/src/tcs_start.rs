@@ -57,7 +57,13 @@ impl State {
 
         let mut startable = vec![];
         for account_key in accounts.iter() {
-            let account = account_fetcher.fetch_mango_account(account_key).unwrap();
+            let account = match account_fetcher.fetch_mango_account(account_key) {
+                Ok(acc) => acc,
+                Err(e) => {
+                    info!("could not fetch account, skipping {account_key}: {e:?}");
+                    continue;
+                }
+            };
             if account.fixed.group != mango_client.group() {
                 continue;
             }
@@ -96,6 +102,11 @@ impl State {
             let mut ix_targets = vec![];
             let mut liqor_account = mango_client.mango_account().await?;
             for (pubkey, tcs_id, incentive_token_index) in startable_chunk {
+                // can only batch until all token positions are full
+                if let Err(_) = liqor_account.ensure_token_position(*incentive_token_index) {
+                    break;
+                }
+
                 let ixs = match self.make_start_ix(pubkey, *tcs_id).await {
                     Ok(v) => v,
                     Err(e) => {
@@ -109,7 +120,6 @@ impl State {
                 };
                 instructions.append(ixs);
                 ix_targets.push((*pubkey, *tcs_id));
-                liqor_account.ensure_token_position(*incentive_token_index)?;
             }
 
             // Clear newly created token positions, so the liqor account is mostly empty
@@ -120,9 +130,13 @@ impl State {
                 .collect_vec();
             for token_index in new_token_pos_indices {
                 let mint = mango_client.context.token(token_index).mint;
-                let ix = mango_client
+                let ix = match mango_client
                     .token_withdraw_instructions(&liqor_account, mint, u64::MAX, false)
-                    .await?;
+                    .await
+                {
+                    Ok(ix) => ix,
+                    Err(_) => continue,
+                };
 
                 instructions.append(ix)
             }
@@ -165,7 +179,7 @@ impl State {
         pubkey: &Pubkey,
         tcs_id: u64,
     ) -> anyhow::Result<PreparedInstructions> {
-        let account = self.account_fetcher.fetch_mango_account(pubkey).unwrap();
+        let account = self.account_fetcher.fetch_mango_account(pubkey)?;
         self.mango_client
             .token_conditional_swap_start_instruction((pubkey, &account), tcs_id)
             .await

@@ -463,6 +463,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
         params.collateralFeePerDay,
       )
       .accounts({
@@ -551,6 +552,7 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
         params.collateralFeePerDay,
       )
       .accounts({

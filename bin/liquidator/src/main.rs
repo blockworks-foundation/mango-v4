@@ -7,6 +7,7 @@ use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::priority_fees_cli;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
@@ -148,9 +149,16 @@ struct Cli {
     #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
     tcs_mode: TcsMode,
 
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
+    /// largest tcs amount to trigger in one transaction, in dollar
+    #[clap(long, env, default_value = "1000.0")]
+    tcs_max_trigger_amount: f64,
+
+    #[clap(flatten)]
+    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
+
+    /// url to the lite-rpc websocket, optional
+    #[clap(long, env, default_value = "")]
+    lite_rpc_url: String,
 
     /// compute limit requested for liquidation instructions
     #[clap(long, env, default_value = "250000")]
@@ -176,6 +184,11 @@ struct Cli {
     #[clap(long, env, default_value = "")]
     jupiter_token: String,
 
+    /// size of the swap to quote via jupiter to get slippage info, in dollar
+    /// should be larger than tcs_max_trigger_amount
+    #[clap(long, env, default_value = "1000.0")]
+    jupiter_swap_info_amount: f64,
+
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
     telemetry: BoolArg,
@@ -189,20 +202,31 @@ pub fn encode_address(addr: &Pubkey) -> String {
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
 
-    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+    let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
-        cli_dotenv.remaining_args
+        std::env::args_os()
+            .take(1)
+            .chain(cli_dotenv.remaining_args.into_iter())
+            .collect()
     } else {
         dotenv::dotenv().ok();
         std::env::args_os().collect()
     };
     let cli = Cli::parse_from(args);
 
-    let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
+    //
+    // Priority fee setup
+    //
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
 
+    //
+    // Client setup
+    //
+    let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
-
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
@@ -214,12 +238,14 @@ async fn main() -> anyhow::Result<()> {
         .jupiter_v4_url(cli.jupiter_v4_url)
         .jupiter_v6_url(cli.jupiter_v6_url)
         .jupiter_token(cli.jupiter_token)
-        .transaction_builder_config(TransactionBuilderConfig {
-            prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                .then_some(cli.prioritization_micro_lamports),
-            // Liquidation and tcs triggers set their own budgets, this is a default for other tx
-            compute_budget_per_instruction: Some(250_000),
-        })
+        .transaction_builder_config(
+            TransactionBuilderConfig::builder()
+                .priority_fee_provider(prio_provider)
+                // Liquidation and tcs triggers set their own budgets, this is a default for other tx
+                .compute_budget_per_instruction(Some(250_000))
+                .build()
+                .unwrap(),
+        )
         .override_send_transaction_urls(cli.override_send_transaction_url)
         .build()
         .unwrap();
@@ -323,8 +349,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let token_swap_info_config = token_swap_info::Config {
-        quote_index: 0,              // USDC
-        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        quote_index: 0, // USDC
+        quote_amount: (cli.jupiter_swap_info_amount * 1e6) as u64,
         jupiter_version: cli.jupiter_version.into(),
     };
 
@@ -343,7 +369,7 @@ async fn main() -> anyhow::Result<()> {
 
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
-        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
+        max_trigger_quote_amount: (cli.tcs_max_trigger_amount * 1e6) as u64,
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
         collateral_token_index: 0, // USDC
@@ -584,6 +610,7 @@ async fn main() -> anyhow::Result<()> {
         check_changes_for_abort_job,
     ]
     .into_iter()
+    .chain(prio_jobs.into_iter())
     .collect();
     jobs.next().await;
 
