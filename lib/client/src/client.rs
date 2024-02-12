@@ -1,3 +1,4 @@
+use anchor_client::ClientError::AnchorError;
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -783,42 +784,47 @@ impl MangoClient {
             .map(|x| x.open_orders)
             .ok();
 
+        let mut missing_tokens = false;
+
+        let token_replace_ixs = self
+            .find_existing_or_try_to_replace_token_positions(
+                &mut account,
+                Vec::from([payer_token.token_index, receiver_token.token_index]),
+            )
+            .await;
+        match token_replace_ixs {
+            Ok(res) => {
+                if let Some(ix) = res {
+                    ixs.append(ix);
+                }
+            }
+            Err(_) => missing_tokens = true,
+        }
+
         if open_orders_opt.is_none() {
             let has_available_slot = account.all_serum3_orders().any(|p| !p.is_active());
+            let should_close_one_open_orders_account = !has_available_slot || missing_tokens;
 
-            if !has_available_slot {
-                let mut serum3_closable_order_market_index = None;
-
-                for p in account.all_serum3_orders() {
-                    let open_orders_acc = self
-                        .account_fetcher
-                        .fetch_raw_account(&p.open_orders)
-                        .await?;
-                    let open_orders_bytes = open_orders_acc.data();
-                    let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
-                        &open_orders_bytes
-                            [5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
-                    );
-
-                    let is_closable = open_orders_data.free_slot_bits == u128::MAX
-                        && open_orders_data.native_coin_total == 0
-                        && open_orders_data.native_pc_total == 0;
-
-                    if is_closable {
-                        serum3_closable_order_market_index = Some(p.market_index);
-                        break;
-                    }
-                }
-
-                let first_closable_slot = serum3_closable_order_market_index
-                    .expect("couldn't find any serum3 slot available");
-
-                ixs.push(
-                    self.serum3_close_open_orders_instruction(first_closable_slot),
-                    self.context.compute_estimates.health_cu_per_serum,
+            if should_close_one_open_orders_account {
+                ixs.append(
+                    self.deactivate_first_active_unused_serum3_orders(&mut account)
+                        .await?,
                 );
+            }
 
-                account.deactivate_serum3_orders(first_closable_slot)?;
+            // in case of missing token slots
+            // try again to create, as maybe deactivating the market slot resulted in some token being now unused
+            // but this time, in case of error, propagate to caller
+            if missing_tokens {
+                if let Some(ix) = self
+                    .find_existing_or_try_to_replace_token_positions(
+                        &mut account,
+                        Vec::from([payer_token.token_index, receiver_token.token_index]),
+                    )
+                    .await?
+                {
+                    ixs.append(ix);
+                }
             }
 
             ixs.push(
@@ -890,6 +896,142 @@ impl MangoClient {
         );
 
         Ok(ixs)
+    }
+
+    async fn deactivate_first_active_unused_serum3_orders(
+        &self,
+        account: &mut MangoAccountValue,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let mut serum3_closable_order_market_index = None;
+
+        for p in account.all_serum3_orders() {
+            let open_orders_acc = self
+                .account_fetcher
+                .fetch_raw_account(&p.open_orders)
+                .await?;
+            let open_orders_bytes = open_orders_acc.data();
+            let open_orders_data: &serum_dex::state::OpenOrders = bytemuck::from_bytes(
+                &open_orders_bytes[5..5 + std::mem::size_of::<serum_dex::state::OpenOrders>()],
+            );
+
+            let is_closable = open_orders_data.free_slot_bits == u128::MAX
+                && open_orders_data.native_coin_total == 0
+                && open_orders_data.native_pc_total == 0;
+
+            if is_closable {
+                serum3_closable_order_market_index = Some(p.market_index);
+                break;
+            }
+        }
+
+        let first_closable_slot =
+            serum3_closable_order_market_index.expect("couldn't find any serum3 slot available");
+
+        let ixs = PreparedInstructions::from_single(
+            self.serum3_close_open_orders_instruction(first_closable_slot),
+            self.context.compute_estimates.health_cu_per_serum,
+        );
+
+        let first_closable_market = account.serum3_orders(first_closable_slot)?;
+        let (tk1, tk2) = (
+            first_closable_market.base_token_index,
+            first_closable_market.quote_token_index,
+        );
+        account.token_position_mut(tk1)?.0.decrement_in_use();
+        account.token_position_mut(tk2)?.0.decrement_in_use();
+        account.deactivate_serum3_orders(first_closable_slot)?;
+
+        Ok(ixs)
+    }
+
+    async fn find_existing_or_try_to_replace_token_positions(
+        &self,
+        account: &mut MangoAccountValue,
+        token_indexes: Vec<TokenIndex>,
+    ) -> anyhow::Result<Option<PreparedInstructions>> {
+        let mut ixs = PreparedInstructions::new();
+
+        for token_index in token_indexes {
+            let result = self
+                .find_existing_or_try_to_replace_token_position(account, token_index)
+                .await?;
+            if let Some(ix) = result {
+                ixs.append(ix);
+            }
+        }
+        if ixs.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(ixs))
+    }
+
+    async fn find_existing_or_try_to_replace_token_position(
+        &self,
+        account: &mut MangoAccountValue,
+        token_index: TokenIndex,
+    ) -> anyhow::Result<Option<PreparedInstructions>> {
+        let token_position_missing = account
+            .ensure_token_position(token_index)
+            .is_anchor_error_with_code(MangoError::NoFreeTokenPositionIndex.error_code());
+
+        if !token_position_missing {
+            return Ok(None);
+        }
+
+        let ixs = self.deactivate_first_active_unused_token(account).await?;
+
+        Ok(Some(ixs))
+    }
+
+    async fn deactivate_first_active_unused_token(
+        &self,
+        account: &mut MangoAccountValue,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let mut all_pos = Vec::new();
+        for x in account.all_token_positions() {
+            let bank = self.first_bank(x.token_index).await?;
+            let amount = x.native(&bank);
+            let name = bank.name().to_string();
+            all_pos.push((x.token_index, x.in_use_count, amount, name));
+        }
+
+        let closable_tokens = account
+            .all_token_positions()
+            .enumerate()
+            .filter(|p| p.1.is_active() && !p.1.is_in_use());
+
+        let mut closable_token_position_raw_index_opt = None;
+        let mut closable_token_bank_opt = None;
+
+        for (closable_token_position_raw_index, closable_token_position) in closable_tokens {
+            let bank = self.first_bank(closable_token_position.token_index).await?;
+            let deposit = closable_token_position.native(&bank);
+
+            if deposit > I80F48::ONE {
+                continue;
+            }
+
+            closable_token_position_raw_index_opt = Some(closable_token_position_raw_index);
+            closable_token_bank_opt = Some(bank);
+            break;
+        }
+
+        if closable_token_bank_opt.is_none() {
+            return Err(AnchorError(MangoError::NoFreeTokenPositionIndex.into()).into());
+        }
+
+        let withdraw_ixs = self
+            .token_withdraw_instructions(
+                &account,
+                closable_token_bank_opt.unwrap().mint,
+                u64::MAX,
+                false,
+            )
+            .await?;
+
+        account.deactivate_token_position(closable_token_position_raw_index_opt.unwrap());
+        return Ok(withdraw_ixs);
     }
 
     #[allow(clippy::too_many_arguments)]
