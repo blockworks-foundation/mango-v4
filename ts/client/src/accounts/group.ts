@@ -437,19 +437,14 @@ export class Group {
         }),
       );
     } else {
-      const pKs = Array.from(this.openbookV2MarketsMapByExternal.values()).map(
-        (m) => m.openbookMarketExternal,
-      );
-      console.log('pks', pKs);
       markets = await Promise.all(
-        (
-          await client.program.provider.connection.getMultipleAccountsInfo(pKs)
-        ).map((account) => {
-          if (!account) {
-            throw new Error(`Undefined AI for openbook market`);
-          }
-          return openbookClient.decodeMarket(account?.data) as MarketAccount;
-        }),
+        Array.from(this.openbookV2MarketsMapByExternal.values()).map(
+          (openbookV2Market) => {
+            return openbookClient.program.account.market.fetch(
+              openbookV2Market.openbookMarketExternal,
+            );
+          },
+        ),
       );
     }
 
