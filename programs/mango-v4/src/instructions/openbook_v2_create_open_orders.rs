@@ -41,7 +41,7 @@ pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>) 
 
     // account constraint #1
     require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.payer.key()),
+        account.fixed.is_owner_or_delegate(ctx.accounts.authority.key()),
         MangoError::SomeError
     );
 

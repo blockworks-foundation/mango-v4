@@ -36,6 +36,8 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
     /// CHECK: Will be checked against seeds and will be initiated by openbook v2
     pub open_orders_account: UncheckedAccount<'info>,
 
+    pub authority: Signer<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
