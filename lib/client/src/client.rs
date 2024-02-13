@@ -666,37 +666,40 @@ impl MangoClient {
     pub fn serum3_close_open_orders_instruction(
         &self,
         market_index: Serum3MarketIndex,
-    ) -> Instruction {
+    ) -> PreparedInstructions {
         let account_pubkey = self.mango_account_address;
         let s3 = self.context.serum3(market_index);
 
         let open_orders = self.serum3_create_open_orders_address(market_index);
 
-        Instruction {
-            program_id: mango_v4::id(),
-            accounts: anchor_lang::ToAccountMetas::to_account_metas(
-                &mango_v4::accounts::Serum3CloseOpenOrders {
-                    group: self.group(),
-                    account: account_pubkey,
-                    serum_market: s3.address,
-                    serum_program: s3.serum_program,
-                    serum_market_external: s3.serum_market_external,
-                    open_orders,
-                    owner: self.owner(),
-                    sol_destination: self.owner(),
-                },
-                None,
-            ),
-            data: anchor_lang::InstructionData::data(
-                &mango_v4::instruction::Serum3CloseOpenOrders {},
-            ),
-        }
+        PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::Serum3CloseOpenOrders {
+                        group: self.group(),
+                        account: account_pubkey,
+                        serum_market: s3.address,
+                        serum_program: s3.serum_program,
+                        serum_market_external: s3.serum_market_external,
+                        open_orders,
+                        owner: self.owner(),
+                        sol_destination: self.owner(),
+                    },
+                    None,
+                ),
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::Serum3CloseOpenOrders {},
+                ),
+            },
+            self.context.compute_estimates.health_cu_per_serum,
+        )
     }
 
     pub async fn serum3_close_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
         let market_index = self.context.serum3_market_index(name);
         let ix = self.serum3_close_open_orders_instruction(market_index);
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        self.send_and_confirm_owner_tx(ix.to_instructions()).await
     }
 
     pub fn serum3_create_open_orders_instruction(
@@ -769,7 +772,7 @@ impl MangoClient {
         limit: u16,
     ) -> anyhow::Result<PreparedInstructions> {
         let mut ixs = PreparedInstructions::new();
-        let mut account = account.clone();
+        let account = account.clone();
 
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
@@ -779,65 +782,10 @@ impl MangoClient {
             Serum3Side::Ask => (&base, &quote),
         };
 
-        let mut open_orders_opt = account
+        let open_orders = account
             .serum3_orders(market_index)
             .map(|x| x.open_orders)
-            .ok();
-
-        let mut missing_tokens = false;
-
-        let token_replace_ixs = self
-            .find_existing_or_try_to_replace_token_positions(
-                &mut account,
-                Vec::from([payer_token.token_index, receiver_token.token_index]),
-            )
-            .await;
-        match token_replace_ixs {
-            Ok(res) => {
-                if let Some(ix) = res {
-                    ixs.append(ix);
-                }
-            }
-            Err(_) => missing_tokens = true,
-        }
-
-        if open_orders_opt.is_none() {
-            let has_available_slot = account.all_serum3_orders().any(|p| !p.is_active());
-            let should_close_one_open_orders_account = !has_available_slot || missing_tokens;
-
-            if should_close_one_open_orders_account {
-                ixs.append(
-                    self.deactivate_first_active_unused_serum3_orders(&mut account)
-                        .await?,
-                );
-            }
-
-            // in case of missing token slots
-            // try again to create, as maybe deactivating the market slot resulted in some token being now unused
-            // but this time, in case of error, propagate to caller
-            if missing_tokens {
-                if let Some(ix) = self
-                    .find_existing_or_try_to_replace_token_positions(
-                        &mut account,
-                        Vec::from([payer_token.token_index, receiver_token.token_index]),
-                    )
-                    .await?
-                {
-                    ixs.append(ix);
-                }
-            }
-
-            ixs.push(
-                self.serum3_create_open_orders_instruction(market_index),
-                self.context.compute_estimates.health_cu_per_serum,
-            );
-
-            let created_open_orders = self.serum3_create_open_orders_address(market_index);
-            open_orders_opt = Some(created_open_orders);
-            account.create_serum3_orders(market_index)?.open_orders = created_open_orders;
-        }
-
-        let open_orders = open_orders_opt.expect("oo is created");
+            .expect("oo is created");
 
         let (health_check_metas, health_cu) = self
             .derive_health_check_remaining_account_metas(
@@ -898,6 +846,79 @@ impl MangoClient {
         Ok(ixs)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub async fn serum3_create_or_replace_account_instruction(
+        &self,
+        mut account: &mut MangoAccountValue,
+        market_index: Serum3MarketIndex,
+        side: Serum3Side,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let mut ixs = PreparedInstructions::new();
+
+        let base = self.context.serum3_base_token(market_index);
+        let quote = self.context.serum3_quote_token(market_index);
+        let (payer_token, receiver_token) = match side {
+            Serum3Side::Bid => (&quote, &base),
+            Serum3Side::Ask => (&base, &quote),
+        };
+
+        let open_orders_opt = account
+            .serum3_orders(market_index)
+            .map(|x| x.open_orders)
+            .ok();
+
+        let mut missing_tokens = false;
+
+        let token_replace_ixs = self
+            .find_existing_or_try_to_replace_token_positions(
+                &mut account,
+                &[payer_token.token_index, receiver_token.token_index],
+            )
+            .await;
+        match token_replace_ixs {
+            Ok(res) => {
+                ixs.append(res);
+            }
+            Err(_) => missing_tokens = true,
+        }
+
+        if open_orders_opt.is_none() {
+            let has_available_slot = account.all_serum3_orders().any(|p| !p.is_active());
+            let should_close_one_open_orders_account = !has_available_slot || missing_tokens;
+
+            if should_close_one_open_orders_account {
+                ixs.append(
+                    self.deactivate_first_active_unused_serum3_orders(&mut account)
+                        .await?,
+                );
+            }
+
+            // in case of missing token slots
+            // try again to create, as maybe deactivating the market slot resulted in some token being now unused
+            // but this time, in case of error, propagate to caller
+            if missing_tokens {
+                ixs.append(
+                    self.find_existing_or_try_to_replace_token_positions(
+                        &mut account,
+                        &[payer_token.token_index, receiver_token.token_index],
+                    )
+                    .await?,
+                );
+            }
+
+            ixs.push(
+                self.serum3_create_open_orders_instruction(market_index),
+                self.context.compute_estimates.health_cu_per_serum,
+            );
+
+            let created_open_orders = self.serum3_create_open_orders_address(market_index);
+
+            account.create_serum3_orders(market_index)?.open_orders = created_open_orders;
+        }
+
+        Ok(ixs)
+    }
+
     async fn deactivate_first_active_unused_serum3_orders(
         &self,
         account: &mut MangoAccountValue,
@@ -927,10 +948,7 @@ impl MangoClient {
         let first_closable_slot =
             serum3_closable_order_market_index.expect("couldn't find any serum3 slot available");
 
-        let ixs = PreparedInstructions::from_single(
-            self.serum3_close_open_orders_instruction(first_closable_slot),
-            self.context.compute_estimates.health_cu_per_serum,
-        );
+        let ixs = self.serum3_close_open_orders_instruction(first_closable_slot);
 
         let first_closable_market = account.serum3_orders(first_closable_slot)?;
         let (tk1, tk2) = (
@@ -947,23 +965,20 @@ impl MangoClient {
     async fn find_existing_or_try_to_replace_token_positions(
         &self,
         account: &mut MangoAccountValue,
-        token_indexes: Vec<TokenIndex>,
-    ) -> anyhow::Result<Option<PreparedInstructions>> {
+        token_indexes: &[TokenIndex],
+    ) -> anyhow::Result<PreparedInstructions> {
         let mut ixs = PreparedInstructions::new();
 
         for token_index in token_indexes {
             let result = self
-                .find_existing_or_try_to_replace_token_position(account, token_index)
+                .find_existing_or_try_to_replace_token_position(account, *token_index)
                 .await?;
             if let Some(ix) = result {
                 ixs.append(ix);
             }
         }
-        if ixs.is_empty() {
-            return Ok(None);
-        }
 
-        Ok(Some(ixs))
+        Ok(ixs)
     }
 
     async fn find_existing_or_try_to_replace_token_position(
@@ -980,6 +995,7 @@ impl MangoClient {
         }
 
         let ixs = self.deactivate_first_active_unused_token(account).await?;
+        account.ensure_token_position(token_index)?;
 
         Ok(Some(ixs))
     }
@@ -988,27 +1004,22 @@ impl MangoClient {
         &self,
         account: &mut MangoAccountValue,
     ) -> anyhow::Result<PreparedInstructions> {
-        let mut all_pos = Vec::new();
-        for x in account.all_token_positions() {
-            let bank = self.first_bank(x.token_index).await?;
-            let amount = x.native(&bank);
-            let name = bank.name().to_string();
-            all_pos.push((x.token_index, x.in_use_count, amount, name));
-        }
-
         let closable_tokens = account
             .all_token_positions()
             .enumerate()
-            .filter(|p| p.1.is_active() && !p.1.is_in_use());
+            .filter(|(_, p)| p.is_active() && !p.is_in_use());
 
         let mut closable_token_position_raw_index_opt = None;
         let mut closable_token_bank_opt = None;
 
         for (closable_token_position_raw_index, closable_token_position) in closable_tokens {
             let bank = self.first_bank(closable_token_position.token_index).await?;
-            let deposit = closable_token_position.native(&bank);
+            let native_balance = closable_token_position.native(&bank);
 
-            if deposit > I80F48::ONE {
+            if native_balance < I80F48::ZERO {
+                continue;
+            }
+            if native_balance > I80F48::ONE {
                 continue;
             }
 
@@ -1047,9 +1058,12 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<Signature> {
-        let account = self.mango_account().await?;
+        let mut account = self.mango_account().await?.clone();
         let market_index = self.context.serum3_market_index(name);
-        let ixs = self
+        let create_or_replace_ixs = self
+            .serum3_create_or_replace_account_instruction(&mut account, market_index, side)
+            .await?;
+        let place_order_ixs = self
             .serum3_place_order_instruction(
                 &account,
                 market_index,
@@ -1063,6 +1077,10 @@ impl MangoClient {
                 limit,
             )
             .await?;
+
+        let mut ixs = PreparedInstructions::new();
+        ixs.append(create_or_replace_ixs);
+        ixs.append(place_order_ixs);
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
