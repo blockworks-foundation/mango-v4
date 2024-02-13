@@ -433,7 +433,7 @@ export class Group {
               `Undefined AI for openbook market ${externalMarketIds[index]}!`,
             );
           }
-          return openbookClient.decodeMarket(account?.data);
+          return openbookClient.decodeMarket(account?.data) as MarketAccount;
         }),
       );
     } else {
@@ -448,7 +448,7 @@ export class Group {
           if (!account) {
             throw new Error(`Undefined AI for openbook market`);
           }
-          return openbookClient.decodeMarket(account?.data);
+          return openbookClient.decodeMarket(account?.data) as MarketAccount;
         }),
       );
     }
