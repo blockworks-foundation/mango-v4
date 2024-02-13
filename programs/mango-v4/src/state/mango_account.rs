@@ -747,6 +747,12 @@ impl<
         self.dynamic.deref_or_borrow()
     }
 
+    #[allow(dead_code)]
+    fn dynamic_reserved_bytes(&self) -> &[u8] {
+        let reserved_offset = self.header().reserved_bytes_offset();
+        &self.dynamic()[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
+    }
+
     /// Returns
     /// - the position
     /// - the raw index into the token positions list (for use with get_raw/deactivate)
@@ -1876,6 +1882,7 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 mod tests {
     use bytemuck::Zeroable;
     use itertools::Itertools;
+    use std::path::PathBuf;
 
     use crate::state::PostOrderType;
 
@@ -2402,12 +2409,7 @@ mod tests {
             );
         }
 
-        let reserved_offset = account.header.reserved_bytes_offset();
-        assert!(
-            account.dynamic[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
-                .iter()
-                .all(|&v| v == 0)
-        );
+        assert!(account.dynamic_reserved_bytes().iter().all(|&v| v == 0));
 
         Ok(())
     }
@@ -2861,5 +2863,90 @@ mod tests {
         let to_be_closed_account_opt = account.find_first_active_unused_perp_position();
 
         assert_eq!(to_be_closed_account_opt.unwrap().market_index, 3)
+    }
+
+    // Attempts reading old mango account data with borsh and with zerocopy
+    #[test]
+    fn test_mango_account_backwards_compatibility() -> Result<()> {
+        use solana_program_test::{find_file, read_file};
+
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        // Grab live accounts with
+        // solana account CZGf1qbYPaSoabuA1EmdN8W5UHvH5CeXcNZ7RTx65aVQ --output-file programs/mango-v4/resources/test/mangoaccount-v0.21.3.bin
+        let fixtures = vec!["mangoaccount-v0.21.3"];
+
+        for fixture in fixtures {
+            let filename = format!("resources/test/{}.bin", fixture);
+            let account_bytes = read_file(find_file(&filename).unwrap());
+
+            // Try a roundtrip via borsh
+            {
+                let mut account_bytes_slice: &[u8] = &account_bytes;
+                let data = MangoAccount::try_deserialize(&mut account_bytes_slice)?;
+                let mut borsh_bytes = Vec::new();
+                data.try_serialize(&mut borsh_bytes)?;
+                assert_eq!(account_bytes, borsh_bytes);
+            }
+
+            // Try a roundtrip via zerocopy
+            {
+                let data = MangoAccountValue::from_bytes(&account_bytes[8..])?;
+                let fixed = &data.fixed;
+                let value = MangoAccount {
+                    group: fixed.group,
+                    owner: fixed.owner,
+                    name: fixed.name,
+                    delegate: fixed.delegate,
+                    account_num: fixed.account_num,
+                    being_liquidated: fixed.being_liquidated,
+                    in_health_region: fixed.in_health_region,
+                    bump: fixed.bump,
+                    padding: Default::default(),
+                    net_deposits: fixed.net_deposits,
+                    perp_spot_transfers: fixed.perp_spot_transfers,
+                    health_region_begin_init_health: fixed.health_region_begin_init_health,
+                    frozen_until: fixed.frozen_until,
+                    buyback_fees_accrued_current: fixed.buyback_fees_accrued_current,
+                    buyback_fees_accrued_previous: fixed.buyback_fees_accrued_previous,
+                    buyback_fees_expiry_timestamp: fixed.buyback_fees_expiry_timestamp,
+                    next_token_conditional_swap_id: fixed.next_token_conditional_swap_id,
+                    temporary_delegate: fixed.temporary_delegate,
+                    temporary_delegate_expiry: fixed.temporary_delegate_expiry,
+                    last_collateral_fee_charge: fixed.last_collateral_fee_charge,
+                    reserved: [0u8; 152],
+
+                    header_version: *data.header_version(),
+                    padding3: Default::default(),
+
+                    padding4: Default::default(),
+                    tokens: data.all_token_positions().cloned().collect_vec(),
+
+                    padding5: Default::default(),
+                    serum3: data.all_serum3_orders().cloned().collect_vec(),
+
+                    padding6: Default::default(),
+                    perps: data.all_perp_positions().cloned().collect_vec(),
+
+                    padding7: Default::default(),
+                    perp_open_orders: data.all_perp_orders().cloned().collect_vec(),
+
+                    padding8: Default::default(),
+                    token_conditional_swaps: data
+                        .all_token_conditional_swaps()
+                        .cloned()
+                        .collect_vec(),
+
+                    reserved_dynamic: data.dynamic_reserved_bytes().try_into().unwrap(),
+                };
+
+                let mut borsh_bytes = Vec::new();
+                value.try_serialize(&mut borsh_bytes)?;
+                assert_eq!(account_bytes, borsh_bytes);
+            }
+        }
+
+        Ok(())
     }
 }
