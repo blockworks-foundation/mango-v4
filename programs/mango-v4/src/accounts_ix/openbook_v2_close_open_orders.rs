@@ -39,7 +39,7 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
     #[account(mut)]
     /// CHECK: Will be checked against seeds and will be initiated by openbook v2
     /// can't zerocopy this unfortunately
-    pub open_orders_indexer: Account<'info, OpenOrdersIndexer>,
+    pub open_orders_indexer: Box<Account<'info, OpenOrdersIndexer>>,
 
     #[account(mut)]
     /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
