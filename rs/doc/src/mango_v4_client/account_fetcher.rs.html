@@ -262,88 +262,6 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-<a href="#283" id="283">283</a>
-<a href="#284" id="284">284</a>
-<a href="#285" id="285">285</a>
-<a href="#286" id="286">286</a>
-<a href="#287" id="287">287</a>
-<a href="#288" id="288">288</a>
-<a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-<a href="#328" id="328">328</a>
-<a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
-<a href="#336" id="336">336</a>
-<a href="#337" id="337">337</a>
-<a href="#338" id="338">338</a>
-<a href="#339" id="339">339</a>
-<a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
-<a href="#343" id="343">343</a>
-<a href="#344" id="344">344</a>
-<a href="#345" id="345">345</a>
-<a href="#346" id="346">346</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 <span class="kw">use </span>std::sync::Arc;
 <span class="kw">use </span>std::sync::Mutex;
@@ -357,13 +275,9 @@
 
 <span class="kw">use </span>solana_client::nonblocking::rpc_client::RpcClient <span class="kw">as </span>RpcClientAsync;
 <span class="kw">use </span>solana_sdk::account::{AccountSharedData, ReadableAccount};
-<span class="kw">use </span>solana_sdk::hash::Hash;
-<span class="kw">use </span>solana_sdk::hash::Hasher;
 <span class="kw">use </span>solana_sdk::pubkey::Pubkey;
 
 <span class="kw">use </span>mango_v4::state::MangoAccountValue;
-
-<span class="kw">use </span><span class="kw">crate</span>::gpa;
 
 <span class="attr">#[async_trait::async_trait]
 </span><span class="kw">pub trait </span>AccountFetcher: Sync + Send {
@@ -379,13 +293,6 @@
         program: <span class="kw-2">&amp;</span>Pubkey,
         discriminator: [u8; <span class="number">8</span>],
     ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt;;
-
-    <span class="kw">async fn </span>fetch_multiple_accounts(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        keys: <span class="kw-2">&amp;</span>[Pubkey],
-    ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt;;
-
-    <span class="kw">async fn </span>get_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;u64&gt;;
 }
 
 <span class="comment">// Can&#39;t be in the trait, since then it would no longer be object-safe...
@@ -457,17 +364,6 @@
             .map(|(pk, acc)| (pk, acc.into()))
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;())
     }
-
-    <span class="kw">async fn </span>fetch_multiple_accounts(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        keys: <span class="kw-2">&amp;</span>[Pubkey],
-    ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt; {
-        gpa::fetch_multiple_accounts(<span class="kw-2">&amp;</span><span class="self">self</span>.rpc, keys).<span class="kw">await
-    </span>}
-
-    <span class="kw">async fn </span>get_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;u64&gt; {
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>.rpc.get_slot().<span class="kw">await</span><span class="question-mark">?</span>)
-    }
 }
 
 <span class="kw">struct </span>CoalescedAsyncJob&lt;Key, Output&gt; {
@@ -506,8 +402,6 @@
     keys_for_program_and_discriminator: HashMap&lt;(Pubkey, [u8; <span class="number">8</span>]), Vec&lt;Pubkey&gt;&gt;,
 
     account_jobs: CoalescedAsyncJob&lt;Pubkey, anyhow::Result&lt;AccountSharedData&gt;&gt;,
-    multiple_accounts_jobs:
-        CoalescedAsyncJob&lt;Hash, anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt;&gt;,
     program_accounts_jobs:
         CoalescedAsyncJob&lt;(Pubkey, [u8; <span class="number">8</span>]), anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt;&gt;,
 }
@@ -631,64 +525,6 @@
             )),
         }
     }
-
-    <span class="kw">async fn </span>fetch_multiple_accounts(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        keys: <span class="kw-2">&amp;</span>[Pubkey],
-    ) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt; {
-        <span class="kw">let </span>fetch_job = {
-            <span class="kw">let </span><span class="kw-2">mut </span>cache = <span class="self">self</span>.cache.lock().unwrap();
-            <span class="kw">let </span><span class="kw-2">mut </span>missing_keys: Vec&lt;Pubkey&gt; = keys
-                .iter()
-                .filter(|k| !cache.accounts.contains_key(k))
-                .cloned()
-                .collect();
-            <span class="kw">if </span>missing_keys.len() == <span class="number">0 </span>{
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(keys
-                    .iter()
-                    .map(|pk| (<span class="kw-2">*</span>pk, cache.accounts.get(<span class="kw-2">&amp;</span>pk).unwrap().clone()))
-                    .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;());
-            }
-
-            <span class="kw">let </span>self_copy = <span class="self">self</span>.clone();
-            missing_keys.sort();
-            <span class="kw">let </span><span class="kw-2">mut </span>hasher = Hasher::default();
-            <span class="kw">for </span>key <span class="kw">in </span>missing_keys.iter() {
-                hasher.hash(key.as_ref());
-            }
-            <span class="kw">let </span>job_key = hasher.result();
-            cache
-                .multiple_accounts_jobs
-                .run_coalesced(job_key.clone(), <span class="kw">async move </span>{
-                    <span class="kw">let </span>result = self_copy
-                        .fetcher
-                        .fetch_multiple_accounts(<span class="kw-2">&amp;</span>missing_keys)
-                        .<span class="kw">await</span>;
-                    <span class="kw">let </span><span class="kw-2">mut </span>cache = self_copy.cache.lock().unwrap();
-                    cache.multiple_accounts_jobs.remove(<span class="kw-2">&amp;</span>job_key);
-
-                    <span class="kw">if let </span><span class="prelude-val">Ok</span>(results) = result.as_ref() {
-                        <span class="kw">for </span>(key, account) <span class="kw">in </span>results {
-                            cache.accounts.insert(<span class="kw-2">*</span>key, account.clone());
-                        }
-                    }
-                    result
-                })
-        };
-
-        <span class="kw">match </span>fetch_job.get().<span class="kw">await </span>{
-            <span class="prelude-val">Ok</span>(v) =&gt; <span class="prelude-val">Ok</span>(v.clone()),
-            <span class="comment">// Can&#39;t clone the stored error, so need to stringize it
-            </span><span class="prelude-val">Err</span>(err) =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow::format_err!</span>(
-                <span class="string">&quot;fetch error in CachedAccountFetcher: {:?}&quot;</span>,
-                err
-            )),
-        }
-    }
-
-    <span class="kw">async fn </span>get_slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; anyhow::Result&lt;u64&gt; {
-        <span class="self">self</span>.fetcher.get_slot().<span class="kw">await
-    </span>}
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>

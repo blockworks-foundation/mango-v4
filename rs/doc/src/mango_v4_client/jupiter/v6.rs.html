@@ -406,20 +406,6 @@
 <a href="#406" id="406">406</a>
 <a href="#407" id="407">407</a>
 <a href="#408" id="408">408</a>
-<a href="#409" id="409">409</a>
-<a href="#410" id="410">410</a>
-<a href="#411" id="411">411</a>
-<a href="#412" id="412">412</a>
-<a href="#413" id="413">413</a>
-<a href="#414" id="414">414</a>
-<a href="#415" id="415">415</a>
-<a href="#416" id="416">416</a>
-<a href="#417" id="417">417</a>
-<a href="#418" id="418">418</a>
-<a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
-<a href="#421" id="421">421</a>
-<a href="#422" id="422">422</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 
 <span class="kw">use </span>anchor_lang::prelude::Pubkey;
@@ -602,30 +588,24 @@
         </span><span class="kw">let </span>buffer_accounts = <span class="number">6</span>;
         <span class="kw">let </span>flash_loan_account_num = health_account_num + extra_accounts + buffer_accounts;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>query_args = <span class="macro">vec!</span>[
-            (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
-            (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
-            (<span class="string">&quot;amount&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, amount)),
-            (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage_bps)),
-            (<span class="string">&quot;onlyDirectRoutes&quot;</span>, only_direct_routes.to_string()),
-            (
-                <span class="string">&quot;maxAccounts&quot;</span>,
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;{}&quot;</span>,
-                    <span class="kw">crate</span>::MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
-                ),
-            ),
-        ];
-        <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
-        <span class="kw">if </span>!config.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
-        }
-
         <span class="kw">let </span>response = <span class="self">self
             </span>.mango_client
             .http_client
-            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, config.jupiter_v6_url))
-            .query(<span class="kw-2">&amp;</span>query_args)
+            .get(<span class="string">&quot;https://quote-api.jup.ag/v6/quote&quot;</span>)
+            .query(<span class="kw-2">&amp;</span>[
+                (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
+                (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
+                (<span class="string">&quot;amount&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, amount)),
+                (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage_bps)),
+                (<span class="string">&quot;onlyDirectRoutes&quot;</span>, only_direct_routes.to_string()),
+                (
+                    <span class="string">&quot;maxAccounts&quot;</span>,
+                    <span class="macro">format!</span>(
+                        <span class="string">&quot;{}&quot;</span>,
+                        <span class="kw">crate</span>::MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
+                    ),
+                ),
+            ])
             .send()
             .<span class="kw">await
             </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
@@ -648,20 +628,25 @@
         <span class="kw">let </span>source_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>input_mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>target_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>output_mint)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>bank_ams = [source_token.first_bank(), target_token.first_bank()]
-            .into_iter()
-            .map(util::to_writable_account_meta)
-            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>bank_ams = [
+            source_token.mint_info.first_bank(),
+            target_token.mint_info.first_bank(),
+        ]
+        .into_iter()
+        .map(util::to_writable_account_meta)
+        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>vault_ams = [source_token.first_vault(), target_token.first_vault()]
-            .into_iter()
-            .map(util::to_writable_account_meta)
-            .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>vault_ams = [
+            source_token.mint_info.first_vault(),
+            target_token.mint_info.first_vault(),
+        ]
+        .into_iter()
+        .map(util::to_writable_account_meta)
+        .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="kw">let </span>owner = <span class="self">self</span>.mango_client.owner();
-        <span class="kw">let </span>account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>token_ams = [source_token.mint, target_token.mint]
+        <span class="kw">let </span>token_ams = [source_token.mint_info.mint, target_token.mint_info.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
@@ -682,7 +667,6 @@
         </span><span class="kw">let </span>(health_ams, _health_cu) = <span class="self">self
             </span>.mango_client
             .derive_health_check_remaining_account_metas(
-                account,
                 <span class="macro">vec!</span>[source_token.token_index, target_token.token_index],
                 <span class="macro">vec!</span>[source_token.token_index, target_token.token_index],
                 <span class="macro">vec!</span>[],
@@ -690,17 +674,10 @@
             .<span class="kw">await
             </span>.context(<span class="string">&quot;building health accounts&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>query_args = <span class="macro">vec!</span>[];
-        <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
-        <span class="kw">if </span>!config.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
-        }
-
         <span class="kw">let </span>swap_response = <span class="self">self
             </span>.mango_client
             .http_client
-            .post(<span class="macro">format!</span>(<span class="string">&quot;{}/swap-instructions&quot;</span>, config.jupiter_v6_url))
-            .query(<span class="kw-2">&amp;</span>query_args)
+            .post(<span class="string">&quot;https://quote-api.jup.ag/v6/swap-instructions&quot;</span>)
             .json(<span class="kw-2">&amp;</span>SwapRequest {
                 user_public_key: owner.to_string(),
                 wrap_and_unwrap_sol: <span class="bool-val">false</span>,
@@ -734,7 +711,7 @@
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 <span class="kw-2">&amp;</span>owner,
                 <span class="kw-2">&amp;</span>owner,
-                <span class="kw-2">&amp;</span>source_token.mint,
+                <span class="kw-2">&amp;</span>source_token.mint_info.mint,
                 <span class="kw-2">&amp;</span>Token::id(),
             ),
         );
@@ -810,12 +787,7 @@
             address_lookup_tables,
             payer,
             signers: <span class="macro">vec!</span>[<span class="self">self</span>.mango_client.owner.clone()],
-            config: <span class="self">self
-                </span>.mango_client
-                .client
-                .config()
-                .transaction_builder_config
-                .clone(),
+            config: <span class="self">self</span>.mango_client.client.transaction_builder_config,
         })
     }
 
