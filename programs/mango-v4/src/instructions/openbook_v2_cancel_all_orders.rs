@@ -18,6 +18,13 @@ pub fn openbook_v2_cancel_all_orders(
     // Validation
     //
     {
+        // Check instruction gate
+        let group = ctx.accounts.group.load()?;
+        require!(
+            group.is_ix_enabled(IxGate::OpenbookV2CancelAllOrders),
+            MangoError::IxIsDisabled
+        );
+
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
         require!(

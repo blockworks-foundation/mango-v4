@@ -80,6 +80,7 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::OpenbookV2PlaceTakeOrder);
     log_if_changed(&group, ix_gate, IxGate::OpenbookV2RegisterMarket);
     log_if_changed(&group, ix_gate, IxGate::OpenbookV2SettleFunds);
+    log_if_changed(&group, ix_gate, IxGate::OpenbookV2CancelAllOrders);
     log_if_changed(&group, ix_gate, IxGate::AdminTokenWithdrawFees);
     log_if_changed(&group, ix_gate, IxGate::AdminPerpWithdrawFees);
     log_if_changed(&group, ix_gate, IxGate::AccountSizeMigration);

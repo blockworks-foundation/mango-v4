@@ -224,6 +224,7 @@ pub enum IxGate {
     TokenConditionalSwapCreatePremiumAuction = 69,
     TokenConditionalSwapCreateLinearAuction = 70,
     Serum3PlaceOrderV2 = 71,
+    OpenbookV2CancelAllOrders = 72,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

@@ -17,6 +17,13 @@ pub fn openbook_v2_cancel_order(
     side: OpenbookV2Side,
     order_id: u128,
 ) -> Result<()> {
+    // Check instruction gate
+    let group = ctx.accounts.group.load()?;
+    require!(
+        group.is_ix_enabled(IxGate::OpenbookV2CancelAllOrders),
+        MangoError::IxIsDisabled
+    );
+
     let openbook_market = ctx.accounts.openbook_v2_market.load()?;
 
     //
