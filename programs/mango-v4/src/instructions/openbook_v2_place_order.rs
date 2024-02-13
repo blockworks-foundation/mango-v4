@@ -76,8 +76,16 @@ pub fn openbook_v2_place_order(
         retriever.bank_and_oracle(&group_key, receiver_active_index, receiver_token_index)?;
 
     require_keys_eq!(payer_bank.vault, ctx.accounts.payer_vault.key());
-    require_eq!(payer_bank.token_index, payer_token_index);
-    require_eq!(receiver_bank.token_index, receiver_token_index);
+
+    // Validate bank token indexes #4
+    require_eq!(
+        ctx.accounts.payer_bank.load()?.token_index,
+        payer_token_index
+    );
+    require_eq!(
+        ctx.accounts.receiver_bank.load()?.token_index,
+        receiver_token_index
+    );
 
     //
     // Pre-health computation
