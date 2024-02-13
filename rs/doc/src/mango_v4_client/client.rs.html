@@ -2226,6 +2226,43 @@
 <a href="#2226" id="2226">2226</a>
 <a href="#2227" id="2227">2227</a>
 <a href="#2228" id="2228">2228</a>
+<a href="#2229" id="2229">2229</a>
+<a href="#2230" id="2230">2230</a>
+<a href="#2231" id="2231">2231</a>
+<a href="#2232" id="2232">2232</a>
+<a href="#2233" id="2233">2233</a>
+<a href="#2234" id="2234">2234</a>
+<a href="#2235" id="2235">2235</a>
+<a href="#2236" id="2236">2236</a>
+<a href="#2237" id="2237">2237</a>
+<a href="#2238" id="2238">2238</a>
+<a href="#2239" id="2239">2239</a>
+<a href="#2240" id="2240">2240</a>
+<a href="#2241" id="2241">2241</a>
+<a href="#2242" id="2242">2242</a>
+<a href="#2243" id="2243">2243</a>
+<a href="#2244" id="2244">2244</a>
+<a href="#2245" id="2245">2245</a>
+<a href="#2246" id="2246">2246</a>
+<a href="#2247" id="2247">2247</a>
+<a href="#2248" id="2248">2248</a>
+<a href="#2249" id="2249">2249</a>
+<a href="#2250" id="2250">2250</a>
+<a href="#2251" id="2251">2251</a>
+<a href="#2252" id="2252">2252</a>
+<a href="#2253" id="2253">2253</a>
+<a href="#2254" id="2254">2254</a>
+<a href="#2255" id="2255">2255</a>
+<a href="#2256" id="2256">2256</a>
+<a href="#2257" id="2257">2257</a>
+<a href="#2258" id="2258">2258</a>
+<a href="#2259" id="2259">2259</a>
+<a href="#2260" id="2260">2260</a>
+<a href="#2261" id="2261">2261</a>
+<a href="#2262" id="2262">2262</a>
+<a href="#2263" id="2263">2263</a>
+<a href="#2264" id="2264">2264</a>
+<a href="#2265" id="2265">2265</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -3707,6 +3744,43 @@
             },
             data: anchor_lang::InstructionData::data(
                 <span class="kw-2">&amp;</span>mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2 { max_liab_transfer },
+            ),
+        };
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.instruction_cu(health_cu),
+        ))
+    }
+
+    <span class="kw">pub async fn </span>token_charge_collateral_fees_instruction(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        account: (<span class="kw-2">&amp;</span>Pubkey, <span class="kw-2">&amp;</span>MangoAccountValue),
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
+        <span class="kw">let </span>(<span class="kw-2">mut </span>health_remaining_ams, health_cu) = <span class="self">self
+            </span>.derive_health_check_remaining_account_metas(account.<span class="number">1</span>, <span class="macro">vec!</span>[], <span class="macro">vec!</span>[], <span class="macro">vec!</span>[])
+            .<span class="kw">await
+            </span>.unwrap();
+
+        <span class="comment">// The instruction requires mutable banks
+        </span><span class="kw">for </span>am <span class="kw">in </span><span class="kw-2">&amp;mut </span>health_remaining_ams[<span class="number">0</span>..account.<span class="number">1</span>.active_token_positions().count()] {
+            am.is_writable = <span class="bool-val">true</span>;
+        }
+
+        <span class="kw">let </span>ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    <span class="kw-2">&amp;</span>mango_v4::accounts::TokenChargeCollateralFees {
+                        group: <span class="self">self</span>.group(),
+                        account: <span class="kw-2">*</span>account.<span class="number">0</span>,
+                    },
+                    <span class="prelude-val">None</span>,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                <span class="kw-2">&amp;</span>mango_v4::instruction::TokenChargeCollateralFees {},
             ),
         };
         <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(

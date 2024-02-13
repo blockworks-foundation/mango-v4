@@ -2853,6 +2853,16 @@
 <a href="#2853" id="2853">2853</a>
 <a href="#2854" id="2854">2854</a>
 <a href="#2855" id="2855">2855</a>
+<a href="#2856" id="2856">2856</a>
+<a href="#2857" id="2857">2857</a>
+<a href="#2858" id="2858">2858</a>
+<a href="#2859" id="2859">2859</a>
+<a href="#2860" id="2860">2860</a>
+<a href="#2861" id="2861">2861</a>
+<a href="#2862" id="2862">2862</a>
+<a href="#2863" id="2863">2863</a>
+<a href="#2864" id="2864">2864</a>
+<a href="#2865" id="2865">2865</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -3006,8 +3016,14 @@
     <span class="doccomment">/// Next id to use when adding a token condition swap
     </span><span class="kw">pub </span>next_token_conditional_swap_id: u64,
 
+    <span class="kw">pub </span>temporary_delegate: Pubkey,
+    <span class="kw">pub </span>temporary_delegate_expiry: u64,
+
+    <span class="doccomment">/// Time at which the last collateral fee was charged
+    </span><span class="kw">pub </span>last_collateral_fee_charge: u64,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">200</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">152</span>],
 
     <span class="comment">// dynamic
     </span><span class="kw">pub </span>header_version: u8,
@@ -3058,7 +3074,10 @@
             buyback_fees_accrued_previous: <span class="number">0</span>,
             buyback_fees_expiry_timestamp: <span class="number">0</span>,
             next_token_conditional_swap_id: <span class="number">0</span>,
-            reserved: [<span class="number">0</span>; <span class="number">200</span>],
+            temporary_delegate: Pubkey::default(),
+            temporary_delegate_expiry: <span class="number">0</span>,
+            last_collateral_fee_charge: <span class="number">0</span>,
+            reserved: [<span class="number">0</span>; <span class="number">152</span>],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -3182,11 +3201,12 @@
     <span class="kw">pub </span>next_token_conditional_swap_id: u64,
     <span class="kw">pub </span>temporary_delegate: Pubkey,
     <span class="kw">pub </span>temporary_delegate_expiry: u64,
-    <span class="kw">pub </span>reserved: [u8; <span class="number">160</span>],
+    <span class="kw">pub </span>last_collateral_fee_charge: u64,
+    <span class="kw">pub </span>reserved: [u8; <span class="number">152</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;MangoAccountFixed&gt;(),
-    <span class="number">32 </span>* <span class="number">4 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">8 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">160
+    <span class="number">32 </span>* <span class="number">4 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>* <span class="number">8 </span>+ <span class="number">32 </span>+ <span class="number">8 </span>+ <span class="number">8 </span>+ <span class="number">152
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;MangoAccountFixed&gt;(), <span class="number">400</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;MangoAccountFixed&gt;() % <span class="number">8</span>, <span class="number">0</span>);
