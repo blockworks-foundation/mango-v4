@@ -15,7 +15,6 @@ pub struct OpenbookV2RegisterMarket<'info> {
     /// group admin or fast listing admin, checked at #1
     pub admin: Signer<'info>,
 
-    /// CHECK: Can register a market for any openbook_v2 program
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
     #[account(

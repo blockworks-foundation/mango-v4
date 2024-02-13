@@ -66,6 +66,18 @@ pub fn openbook_v2_settle_funds<'info>(
             base_bank.token_index == openbook_market.base_token_index,
             MangoError::SomeError
         );
+
+        // Validate oracles #4
+        require_keys_eq!(
+            base_bank.oracle,
+            ctx.accounts.base_oracle.key(),
+            MangoError::SomeError
+        );
+        require_keys_eq!(
+            quote_bank.oracle,
+            ctx.accounts.quote_oracle.key(),
+            MangoError::SomeError
+        );
     }
 
     //

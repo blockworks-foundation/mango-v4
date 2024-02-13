@@ -67,9 +67,8 @@ pub struct OpenbookV2SettleFunds<'info> {
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    /// validated against banks at #4
     pub quote_oracle: UncheckedAccount<'info>,
-    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
     pub base_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
