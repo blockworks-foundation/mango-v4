@@ -692,7 +692,7 @@ impl MangoClient {
                     &mango_v4::instruction::Serum3CloseOpenOrders {},
                 ),
             },
-            self.context.compute_estimates.health_cu_per_serum,
+            self.context.compute_estimates.cu_per_mango_instruction,
         )
     }
 
@@ -771,9 +771,6 @@ impl MangoClient {
         client_order_id: u64,
         limit: u16,
     ) -> anyhow::Result<PreparedInstructions> {
-        let mut ixs = PreparedInstructions::new();
-        let account = account.clone();
-
         let s3 = self.context.serum3(market_index);
         let base = self.context.serum3_base_token(market_index);
         let quote = self.context.serum3_quote_token(market_index);
@@ -796,7 +793,7 @@ impl MangoClient {
             )
             .await?;
 
-        ixs.push(
+        let ixs = PreparedInstructions::from_single(
             Instruction {
                 program_id: mango_v4::id(),
                 accounts: {
@@ -908,7 +905,7 @@ impl MangoClient {
 
             ixs.push(
                 self.serum3_create_open_orders_instruction(market_index),
-                self.context.compute_estimates.health_cu_per_serum,
+                self.context.compute_estimates.cu_per_mango_instruction,
             );
 
             let created_open_orders = self.serum3_create_open_orders_address(market_index);

@@ -429,8 +429,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // coin_lot_size = base lot size ?
             // cf priceNumberToLots
             let price_lots = native(cmd.price, quote_token.decimals as u32) * market.coin_lot_size
-                / native(1.0, base_token.decimals as u32)
-                * market.pc_lot_size;
+                / (native(1.0, base_token.decimals as u32) * market.pc_lot_size);
 
             // cf baseSizeNumberToLots
             let max_base_lots =
