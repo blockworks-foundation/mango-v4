@@ -779,3 +779,12 @@ pub struct TokenConditionalSwapStartLog {
     pub incentive_token_index: u16,
     pub incentive_amount: u64,
 }
+
+#[event]
+pub struct TokenCollateralFeeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub asset_usage_fraction: i128,
+    pub fee: i128,
+}

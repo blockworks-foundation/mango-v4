@@ -1487,6 +1487,43 @@ impl MangoClient {
         ))
     }
 
+    pub async fn token_charge_collateral_fees_instruction(
+        &self,
+        account: (&Pubkey, &MangoAccountValue),
+    ) -> anyhow::Result<PreparedInstructions> {
+        let (mut health_remaining_ams, health_cu) = self
+            .derive_health_check_remaining_account_metas(account.1, vec![], vec![], vec![])
+            .await
+            .unwrap();
+
+        // The instruction requires mutable banks
+        for am in &mut health_remaining_ams[0..account.1.active_token_positions().count()] {
+            am.is_writable = true;
+        }
+
+        let ix = Instruction {
+            program_id: mango_v4::id(),
+            accounts: {
+                let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                    &mango_v4::accounts::TokenChargeCollateralFees {
+                        group: self.group(),
+                        account: *account.0,
+                    },
+                    None,
+                );
+                ams.extend(health_remaining_ams);
+                ams
+            },
+            data: anchor_lang::InstructionData::data(
+                &mango_v4::instruction::TokenChargeCollateralFees {},
+            ),
+        };
+        Ok(PreparedInstructions::from_single(
+            ix,
+            self.instruction_cu(health_cu),
+        ))
+    }
+
     //
     // Liquidation
     //

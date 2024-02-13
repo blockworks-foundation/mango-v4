@@ -83,6 +83,7 @@ export class Bank implements BankForHealth {
   public zeroUtilRate: I80F48;
   public platformLiquidationFee: I80F48;
   public collectedLiquidationFees: I80F48;
+  public collectedCollateralFees: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -148,6 +149,8 @@ export class Bank implements BankForHealth {
       zeroUtilRate: I80F48Dto;
       platformLiquidationFee: I80F48Dto;
       collectedLiquidationFees: I80F48Dto;
+      collectedCollateralFees: I80F48Dto;
+      collateralFeePerDay: number;
     },
   ): Bank {
     return new Bank(
@@ -213,6 +216,8 @@ export class Bank implements BankForHealth {
       obj.platformLiquidationFee,
       obj.collectedLiquidationFees,
       obj.disableAssetLiquidation == 0,
+      obj.collectedCollateralFees,
+      obj.collateralFeePerDay,
     );
   }
 
@@ -279,6 +284,8 @@ export class Bank implements BankForHealth {
     platformLiquidationFee: I80F48Dto,
     collectedLiquidationFees: I80F48Dto,
     public allowAssetLiquidation: boolean,
+    collectedCollateralFees: I80F48Dto,
+    public collateralFeePerDay: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -311,6 +318,7 @@ export class Bank implements BankForHealth {
     this.zeroUtilRate = I80F48.from(zeroUtilRate);
     this.platformLiquidationFee = I80F48.from(platformLiquidationFee);
     this.collectedLiquidationFees = I80F48.from(collectedLiquidationFees);
+    this.collectedCollateralFees = I80F48.from(collectedCollateralFees);
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
