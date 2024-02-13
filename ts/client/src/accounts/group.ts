@@ -440,7 +440,7 @@ export class Group {
       const pKs = Array.from(this.openbookV2MarketsMapByExternal.values()).map(
         (m) => m.openbookMarketExternal,
       );
-
+      console.log('pks', pKs);
       markets = await Promise.all(
         (
           await client.program.provider.connection.getMultipleAccountsInfo(pKs)
