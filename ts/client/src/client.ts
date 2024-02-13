@@ -3770,7 +3770,7 @@ export class MangoClient {
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
       120,
-      1,
+      2,
       10,
     );
   }
@@ -3846,7 +3846,7 @@ export class MangoClient {
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
       120,
-      1,
+      2,
       10,
     );
   }
@@ -3925,7 +3925,7 @@ export class MangoClient {
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
       120,
-      1,
+      2,
       10,
     );
   }
@@ -4004,7 +4004,7 @@ export class MangoClient {
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
       120,
-      1,
+      2,
       10,
     );
   }
@@ -4047,7 +4047,7 @@ export class MangoClient {
       maxBuy,
       maxSell,
     );
-    const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
+    const pricePremiumRate = pricePremium / 100;
 
     let intention: TokenConditionalSwapIntention;
     switch (tcsIntention) {
@@ -4334,13 +4334,19 @@ export class MangoClient {
         sellBank.tokenIndex,
         liqorTcsChunkSizeInUsd,
       );
+
+      if (buyTokenPriceImpact <= 0 || sellTokenPriceImpact <= 0) {
+        throw new Error(
+          `Error compitong slippage/premium for token conditional swap!`,
+        );
+      }
+
       maxPricePremiumPercent =
         ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) -
           1) *
         100;
     }
-    let maxPricePremiumRate =
-      maxPricePremiumPercent > 0 ? maxPricePremiumPercent / 100 : 0.03;
+    let maxPricePremiumRate = maxPricePremiumPercent / 100;
     maxPricePremiumRate =
       maxPricePremiumRate * premiumMultiplier + extraPricePremiumBps / 10000;
 
