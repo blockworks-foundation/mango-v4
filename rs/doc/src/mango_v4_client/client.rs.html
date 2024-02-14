@@ -2208,61 +2208,6 @@
 <a href="#2208" id="2208">2208</a>
 <a href="#2209" id="2209">2209</a>
 <a href="#2210" id="2210">2210</a>
-<a href="#2211" id="2211">2211</a>
-<a href="#2212" id="2212">2212</a>
-<a href="#2213" id="2213">2213</a>
-<a href="#2214" id="2214">2214</a>
-<a href="#2215" id="2215">2215</a>
-<a href="#2216" id="2216">2216</a>
-<a href="#2217" id="2217">2217</a>
-<a href="#2218" id="2218">2218</a>
-<a href="#2219" id="2219">2219</a>
-<a href="#2220" id="2220">2220</a>
-<a href="#2221" id="2221">2221</a>
-<a href="#2222" id="2222">2222</a>
-<a href="#2223" id="2223">2223</a>
-<a href="#2224" id="2224">2224</a>
-<a href="#2225" id="2225">2225</a>
-<a href="#2226" id="2226">2226</a>
-<a href="#2227" id="2227">2227</a>
-<a href="#2228" id="2228">2228</a>
-<a href="#2229" id="2229">2229</a>
-<a href="#2230" id="2230">2230</a>
-<a href="#2231" id="2231">2231</a>
-<a href="#2232" id="2232">2232</a>
-<a href="#2233" id="2233">2233</a>
-<a href="#2234" id="2234">2234</a>
-<a href="#2235" id="2235">2235</a>
-<a href="#2236" id="2236">2236</a>
-<a href="#2237" id="2237">2237</a>
-<a href="#2238" id="2238">2238</a>
-<a href="#2239" id="2239">2239</a>
-<a href="#2240" id="2240">2240</a>
-<a href="#2241" id="2241">2241</a>
-<a href="#2242" id="2242">2242</a>
-<a href="#2243" id="2243">2243</a>
-<a href="#2244" id="2244">2244</a>
-<a href="#2245" id="2245">2245</a>
-<a href="#2246" id="2246">2246</a>
-<a href="#2247" id="2247">2247</a>
-<a href="#2248" id="2248">2248</a>
-<a href="#2249" id="2249">2249</a>
-<a href="#2250" id="2250">2250</a>
-<a href="#2251" id="2251">2251</a>
-<a href="#2252" id="2252">2252</a>
-<a href="#2253" id="2253">2253</a>
-<a href="#2254" id="2254">2254</a>
-<a href="#2255" id="2255">2255</a>
-<a href="#2256" id="2256">2256</a>
-<a href="#2257" id="2257">2257</a>
-<a href="#2258" id="2258">2258</a>
-<a href="#2259" id="2259">2259</a>
-<a href="#2260" id="2260">2260</a>
-<a href="#2261" id="2261">2261</a>
-<a href="#2262" id="2262">2262</a>
-<a href="#2263" id="2263">2263</a>
-<a href="#2264" id="2264">2264</a>
-<a href="#2265" id="2265">2265</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -2354,9 +2299,6 @@
     <span class="doccomment">/// Defaults to waiting up to 60s for confirmation
     </span><span class="attr">#[builder(default = <span class="string">&quot;ClientBuilder::default_rpc_confirm_transaction_config()&quot;</span>)]
     </span><span class="kw">pub </span>rpc_confirm_transaction_config: RpcConfirmTransactionConfig,
-
-    <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v4\&quot;.into()&quot;</span>)]
-    </span><span class="kw">pub </span>jupiter_v4_url: String,
 
     <span class="attr">#[builder(default = <span class="string">&quot;\&quot;https://quote-api.jup.ag/v6\&quot;.into()&quot;</span>)]
     </span><span class="kw">pub </span>jupiter_v6_url: String,
@@ -4088,11 +4030,7 @@
 
     <span class="comment">// jupiter
 
-    </span><span class="kw">pub fn </span>jupiter_v4(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; jupiter::v4::JupiterV4 {
-        jupiter::v4::JupiterV4 { mango_client: <span class="self">self </span>}
-    }
-
-    <span class="kw">pub fn </span>jupiter_v6(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; jupiter::v6::JupiterV6 {
+    </span><span class="kw">pub fn </span>jupiter_v6(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; jupiter::v6::JupiterV6 {
         jupiter::v6::JupiterV6 { mango_client: <span class="self">self </span>}
     }
 
@@ -4133,54 +4071,6 @@
             .try_collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
             .<span class="kw">await
     </span>}
-
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">async fn </span>deserialize_instructions_and_alts(
-        <span class="kw-2">&amp;</span><span class="self">self</span>,
-        message: <span class="kw-2">&amp;</span>solana_sdk::message::VersionedMessage,
-    ) -&gt; anyhow::Result&lt;(Vec&lt;Instruction&gt;, Vec&lt;AddressLookupTableAccount&gt;)&gt; {
-        <span class="kw">let </span>lookups = message.address_table_lookups().unwrap_or_default();
-        <span class="kw">let </span>address_lookup_tables = <span class="self">self
-            </span>.fetch_address_lookup_tables(lookups.iter().map(|a| <span class="kw-2">&amp;</span>a.account_key))
-            .<span class="kw">await</span><span class="question-mark">?</span>;
-
-        <span class="kw">let </span><span class="kw-2">mut </span>account_keys = message.static_account_keys().to_vec();
-        <span class="kw">for </span>(lookups, table) <span class="kw">in </span>lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .writable_indexes
-                    .iter()
-                    .map(|<span class="kw-2">&amp;</span>index| table.addresses[index <span class="kw">as </span>usize]),
-            );
-        }
-        <span class="kw">for </span>(lookups, table) <span class="kw">in </span>lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .readonly_indexes
-                    .iter()
-                    .map(|<span class="kw-2">&amp;</span>index| table.addresses[index <span class="kw">as </span>usize]),
-            );
-        }
-
-        <span class="kw">let </span>compiled_ix = message
-            .instructions()
-            .iter()
-            .map(|ci| solana_sdk::instruction::Instruction {
-                program_id: <span class="kw-2">*</span>ci.program_id(<span class="kw-2">&amp;</span>account_keys),
-                accounts: ci
-                    .accounts
-                    .iter()
-                    .map(|<span class="kw-2">&amp;</span>index| AccountMeta {
-                        pubkey: account_keys[index <span class="kw">as </span>usize],
-                        is_signer: message.is_signer(index.into()),
-                        is_writable: message.is_maybe_writable(index.into()),
-                    })
-                    .collect(),
-                data: ci.data.clone(),
-            })
-            .collect();
-
-        <span class="prelude-val">Ok</span>((compiled_ix, address_lookup_tables))
-    }
 
     <span class="kw">fn </span>instruction_cu(<span class="kw-2">&amp;</span><span class="self">self</span>, health_cu: u32) -&gt; u32 {
         <span class="self">self</span>.context.compute_estimates.cu_per_mango_instruction + health_cu
