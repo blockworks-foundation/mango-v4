@@ -26,6 +26,7 @@ use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
+    signature::Signature,
 };
 use tokio::task::JoinHandle;
 use tracing::*;
@@ -507,12 +508,13 @@ async fn charge_collateral_fees_inner(
         ix_to_send.push(ixs);
     }
 
-    send_batched_log_errors_no_confirm(
+    let txsigs = send_batched_log_errors_no_confirm(
         client.transaction_builder().await?,
         &client.client,
         &ix_to_send,
     )
     .await;
+    info!("charge collateral fees: {:?}", txsigs);
 
     Ok(())
 }
@@ -522,7 +524,9 @@ async fn send_batched_log_errors_no_confirm(
     mut tx_builder: TransactionBuilder,
     client: &mango_v4_client::Client,
     ixs_list: &[PreparedInstructions],
-) {
+) -> Vec<Signature> {
+    let mut txsigs = Vec::new();
+
     let mut current_batch = PreparedInstructions::new();
     for ixs in ixs_list {
         let previous_batch = current_batch.clone();
@@ -533,7 +537,7 @@ async fn send_batched_log_errors_no_confirm(
             tx_builder.instructions = previous_batch.to_instructions();
             match tx_builder.send(client).await {
                 Err(err) => error!("could not send transaction: {err:?}"),
-                _ => {}
+                Ok(txsig) => txsigs.push(txsig),
             }
 
             current_batch = ixs.clone();
@@ -544,7 +548,9 @@ async fn send_batched_log_errors_no_confirm(
         tx_builder.instructions = current_batch.to_instructions();
         match tx_builder.send(client).await {
             Err(err) => error!("could not send transaction: {err:?}"),
-            _ => {}
+            Ok(txsig) => txsigs.push(txsig),
         }
     }
+
+    txsigs
 }
