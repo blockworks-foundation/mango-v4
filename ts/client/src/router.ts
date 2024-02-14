@@ -7,8 +7,10 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
-import fetch from 'node-fetch';
-import { createAssociatedTokenAccountIdempotentInstruction } from './utils';
+import {
+  buildFetch,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from './utils';
 
 export const MANGO_ROUTER_API_URL = 'https://api.mngo.cloud/router/v1';
 
@@ -168,9 +170,9 @@ const fetchJupiterRoutes = async (
       swapMode,
     }).toString();
 
-    const response = await fetch(
-      `https://quote-api.jup.ag/v4/quote?${paramsString}`,
-    );
+    const response = await (
+      await buildFetch()
+    )(`https://quote-api.jup.ag/v4/quote?${paramsString}`);
 
     const res = await response.json();
     const data = res.data;
@@ -364,7 +366,9 @@ export const fetchJupiterTransaction = async (
   outputMint: PublicKey,
 ): Promise<[TransactionInstruction[], AddressLookupTableAccount[]]> => {
   const transactions = await (
-    await fetch('https://quote-api.jup.ag/v4/swap', {
+    await (
+      await buildFetch()
+    )('https://quote-api.jup.ag/v4/swap', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -415,7 +415,9 @@ export class Bank implements BankForHealth {
   }
 
   scaledInitAssetWeight(price: I80F48): I80F48 {
-    const depositsQuote = this.nativeDeposits().mul(price);
+    const depositsQuote = this.nativeDeposits()
+      .add(I80F48.fromU64(this.potentialSerumTokens))
+      .mul(price);
     if (
       this.depositWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
@@ -645,6 +647,28 @@ export class Bank implements BankForHealth {
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();
     return Math.max(timeToNextBorrowLimitWindowStartsTs, 0);
+  }
+
+  /**
+   *
+   * @param mintPk
+   * @returns remaining deposit limit for mint, returns null if there is no limit for bank
+   */
+  public getRemainingDepositLimit(): BN | null {
+    const nativeDeposits = this.nativeDeposits();
+    const isNoLimit = this.depositLimit.isZero();
+
+    const remainingDepositLimit = !isNoLimit
+      ? this.depositLimit
+          .sub(new BN(nativeDeposits.toNumber()))
+          .sub(this.potentialSerumTokens)
+      : null;
+
+    return remainingDepositLimit
+      ? remainingDepositLimit.isNeg()
+        ? new BN(0)
+        : remainingDepositLimit
+      : null;
   }
 }
 
