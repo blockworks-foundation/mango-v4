@@ -90,9 +90,6 @@ pub struct ClientConfig {
     #[builder(default = "ClientBuilder::default_rpc_confirm_transaction_config()")]
     pub rpc_confirm_transaction_config: RpcConfirmTransactionConfig,
 
-    #[builder(default = "\"https://quote-api.jup.ag/v4\".into()")]
-    pub jupiter_v4_url: String,
-
     #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
     pub jupiter_v6_url: String,
 
@@ -1823,10 +1820,6 @@ impl MangoClient {
 
     // jupiter
 
-    pub fn jupiter_v4(&self) -> jupiter::v4::JupiterV4 {
-        jupiter::v4::JupiterV4 { mango_client: self }
-    }
-
     pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
         jupiter::v6::JupiterV6 { mango_client: self }
     }
@@ -1867,54 +1860,6 @@ impl MangoClient {
             .then(|&k| self.fetch_address_lookup_table(k))
             .try_collect::<Vec<_>>()
             .await
-    }
-
-    pub(crate) async fn deserialize_instructions_and_alts(
-        &self,
-        message: &solana_sdk::message::VersionedMessage,
-    ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
-        let lookups = message.address_table_lookups().unwrap_or_default();
-        let address_lookup_tables = self
-            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
-            .await?;
-
-        let mut account_keys = message.static_account_keys().to_vec();
-        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .writable_indexes
-                    .iter()
-                    .map(|&index| table.addresses[index as usize]),
-            );
-        }
-        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .readonly_indexes
-                    .iter()
-                    .map(|&index| table.addresses[index as usize]),
-            );
-        }
-
-        let compiled_ix = message
-            .instructions()
-            .iter()
-            .map(|ci| solana_sdk::instruction::Instruction {
-                program_id: *ci.program_id(&account_keys),
-                accounts: ci
-                    .accounts
-                    .iter()
-                    .map(|&index| AccountMeta {
-                        pubkey: account_keys[index as usize],
-                        is_signer: message.is_signer(index.into()),
-                        is_writable: message.is_maybe_writable(index.into()),
-                    })
-                    .collect(),
-                data: ci.data.clone(),
-            })
-            .collect();
-
-        Ok((compiled_ix, address_lookup_tables))
     }
 
     fn instruction_cu(&self, health_cu: u32) -> u32 {
