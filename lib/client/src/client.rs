@@ -90,9 +90,6 @@ pub struct ClientConfig {
     #[builder(default = "ClientBuilder::default_rpc_confirm_transaction_config()")]
     pub rpc_confirm_transaction_config: RpcConfirmTransactionConfig,
 
-    #[builder(default = "\"https://quote-api.jup.ag/v4\".into()")]
-    pub jupiter_v4_url: String,
-
     #[builder(default = "\"https://quote-api.jup.ag/v6\".into()")]
     pub jupiter_v6_url: String,
 
@@ -1822,10 +1819,6 @@ impl MangoClient {
     }
 
     // jupiter
-
-    pub fn jupiter_v4(&self) -> jupiter::v4::JupiterV4 {
-        jupiter::v4::JupiterV4 { mango_client: self }
-    }
 
     pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
         jupiter::v6::JupiterV6 { mango_client: self }

@@ -57,7 +57,6 @@ enum BoolArg {
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 enum JupiterVersionArg {
     Mock,
-    V4,
     V6,
 }
 
@@ -65,7 +64,6 @@ impl From<JupiterVersionArg> for jupiter::Version {
     fn from(a: JupiterVersionArg) -> Self {
         match a {
             JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V4 => jupiter::Version::V4,
             JupiterVersionArg::V6 => jupiter::Version::V6,
         }
     }
@@ -172,10 +170,6 @@ struct Cli {
     #[clap(long, env, value_enum, default_value = "v6")]
     jupiter_version: JupiterVersionArg,
 
-    /// override the url to jupiter v4
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v4")]
-    jupiter_v4_url: String,
-
     /// override the url to jupiter v6
     #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
     jupiter_v6_url: String,
@@ -235,7 +229,6 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
-        .jupiter_v4_url(cli.jupiter_v4_url)
         .jupiter_v6_url(cli.jupiter_v6_url)
         .jupiter_token(cli.jupiter_token)
         .transaction_builder_config(
