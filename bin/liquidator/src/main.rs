@@ -7,10 +7,9 @@ use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::priority_fees_cli;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
-    account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
+    account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
     TransactionBuilderConfig,
 };
@@ -21,6 +20,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
 use tracing::*;
 
+pub mod cli_args;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
@@ -35,158 +35,6 @@ use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-#[derive(Parser, Debug)]
-#[clap()]
-struct CliDotenv {
-    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
-    #[clap(long)]
-    dotenv: std::path::PathBuf,
-
-    remaining_args: Vec<std::ffi::OsString>,
-}
-
-// Prefer "--rebalance false" over "--no-rebalance" because it works
-// better with REBALANCE=false env values.
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum BoolArg {
-    True,
-    False,
-}
-
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum JupiterVersionArg {
-    Mock,
-    V6,
-}
-
-impl From<JupiterVersionArg> for jupiter::Version {
-    fn from(a: JupiterVersionArg) -> Self {
-        match a {
-            JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V6 => jupiter::Version::V6,
-        }
-    }
-}
-
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum TcsMode {
-    BorrowBuy,
-    SwapSellIntoBuy,
-    SwapCollateralIntoBuy,
-}
-
-impl From<TcsMode> for trigger_tcs::Mode {
-    fn from(a: TcsMode) -> Self {
-        match a {
-            TcsMode::BorrowBuy => trigger_tcs::Mode::BorrowBuyToken,
-            TcsMode::SwapSellIntoBuy => trigger_tcs::Mode::SwapSellIntoBuy,
-            TcsMode::SwapCollateralIntoBuy => trigger_tcs::Mode::SwapCollateralIntoBuy,
-        }
-    }
-}
-
-#[derive(Parser)]
-#[clap()]
-struct Cli {
-    #[clap(short, long, env)]
-    rpc_url: String,
-
-    #[clap(long, env, value_delimiter = ';')]
-    override_send_transaction_url: Option<Vec<String>>,
-
-    #[clap(long, env)]
-    liqor_mango_account: Pubkey,
-
-    #[clap(long, env)]
-    liqor_owner: String,
-
-    #[clap(long, env, default_value = "1000")]
-    check_interval_ms: u64,
-
-    #[clap(long, env, default_value = "300")]
-    snapshot_interval_secs: u64,
-
-    /// how many getMultipleAccounts requests to send in parallel
-    #[clap(long, env, default_value = "10")]
-    parallel_rpc_requests: usize,
-
-    /// typically 100 is the max number of accounts getMultipleAccounts will retrieve at once
-    #[clap(long, env, default_value = "100")]
-    get_multiple_accounts_count: usize,
-
-    /// liquidator health ratio should not fall below this value
-    #[clap(long, env, default_value = "50")]
-    min_health_ratio: f64,
-
-    /// if rebalancing is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    rebalance: BoolArg,
-
-    /// max slippage to request on swaps to rebalance spot tokens
-    #[clap(long, env, default_value = "100")]
-    rebalance_slippage_bps: u64,
-
-    /// tokens to not rebalance (in addition to USDC); use a comma separated list of names
-    #[clap(long, env, default_value = "")]
-    rebalance_skip_tokens: String,
-
-    /// if taking tcs orders is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    take_tcs: BoolArg,
-
-    /// profit margin at which to take tcs orders
-    #[clap(long, env, default_value = "0.0005")]
-    tcs_profit_fraction: f64,
-
-    /// control how tcs triggering provides buy tokens
-    #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
-    tcs_mode: TcsMode,
-
-    /// largest tcs amount to trigger in one transaction, in dollar
-    #[clap(long, env, default_value = "1000.0")]
-    tcs_max_trigger_amount: f64,
-
-    #[clap(flatten)]
-    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
-
-    /// url to the lite-rpc websocket, optional
-    #[clap(long, env, default_value = "")]
-    lite_rpc_url: String,
-
-    /// compute limit requested for liquidation instructions
-    #[clap(long, env, default_value = "250000")]
-    compute_limit_for_liquidation: u32,
-
-    /// compute limit requested for tcs trigger instructions
-    #[clap(long, env, default_value = "300000")]
-    compute_limit_for_tcs: u32,
-
-    /// control which version of jupiter to use
-    #[clap(long, env, value_enum, default_value = "v6")]
-    jupiter_version: JupiterVersionArg,
-
-    /// override the url to jupiter v6
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
-    jupiter_v6_url: String,
-
-    /// provide a jupiter token, currently only for jup v6
-    #[clap(long, env, default_value = "")]
-    jupiter_token: String,
-
-    /// size of the swap to quote via jupiter to get slippage info, in dollar
-    /// should be larger than tcs_max_trigger_amount
-    #[clap(long, env, default_value = "1000.0")]
-    jupiter_swap_info_amount: f64,
-
-    /// report liquidator's existence and pubkey
-    #[clap(long, env, value_enum, default_value = "true")]
-    telemetry: BoolArg,
-}
 
 pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
@@ -594,6 +442,7 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    use cli_args::{BoolArg, Cli, CliDotenv};
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
