@@ -1518,10 +1518,25 @@ impl MangoClient {
                 &mango_v4::instruction::TokenChargeCollateralFees {},
             ),
         };
-        Ok(PreparedInstructions::from_single(
-            ix,
-            self.instruction_cu(health_cu),
-        ))
+
+        let mut chargeable_token_positions = 0;
+        for tp in account.1.active_token_positions() {
+            let bank = self.first_bank(tp.token_index).await?;
+            let native = tp.native(&bank);
+            if native.is_positive()
+                && bank.maint_asset_weight.is_positive()
+                && bank.collateral_fee_per_day > 0.0
+            {
+                chargeable_token_positions += 1;
+            }
+        }
+
+        let cu_est = &self.context.compute_estimates;
+        let cu = cu_est.cu_per_charge_collateral_fees
+            + cu_est.cu_per_charge_collateral_fees_token * chargeable_token_positions
+            + health_cu;
+
+        Ok(PreparedInstructions::from_single(ix, cu))
     }
 
     //
