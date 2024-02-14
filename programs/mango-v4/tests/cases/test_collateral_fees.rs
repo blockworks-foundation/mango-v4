@@ -1,3 +1,4 @@
+#![allow(unused_assignments)]
 use super::*;
 
 #[tokio::test]
@@ -40,6 +41,18 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
         &context.users[1],
         &mints[0..1],
         1_500, // maint: 0.8 * 1500 = 1200
+        0,
+    )
+    .await;
+
+    let empty_account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        2,
+        &context.users[1],
+        &mints[0..0],
+        0,
         0,
     )
     .await;
@@ -93,13 +106,47 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
     .unwrap();
 
     //
+    // TEST: It works on empty accounts
+    //
+
+    send_tx(
+        solana,
+        TokenChargeCollateralFeesInstruction {
+            account: empty_account,
+        },
+    )
+    .await
+    .unwrap();
+    let mut last_time = solana.clock_timestamp().await;
+    solana.set_clock_timestamp(last_time + 9 * hour).await;
+
+    // send it twice, because the first time will never charge anything
+    send_tx(
+        solana,
+        TokenChargeCollateralFeesInstruction {
+            account: empty_account,
+        },
+    )
+    .await
+    .unwrap();
+    last_time = solana.clock_timestamp().await;
+
+    //
     // TEST: Without borrows, charging collateral fees has no effect
     //
 
     send_tx(solana, TokenChargeCollateralFeesInstruction { account })
         .await
         .unwrap();
-    let mut last_time = solana.clock_timestamp().await;
+    last_time = solana.clock_timestamp().await;
+    solana.set_clock_timestamp(last_time + 9 * hour).await;
+
+    // send it twice, because the first time will never charge anything
+    send_tx(solana, TokenChargeCollateralFeesInstruction { account })
+        .await
+        .unwrap();
+    last_time = solana.clock_timestamp().await;
+
     // no effect
     assert_eq!(
         account_position(solana, account, tokens[0].bank).await,

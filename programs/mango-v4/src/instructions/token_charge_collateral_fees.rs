@@ -67,6 +67,11 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         }
     }
 
+    // If there's no assets or no liabs, we can't charge fees
+    if total_asset_health.is_zero() || total_liab_health.is_zero() {
+        return Ok(());
+    }
+
     // Users only pay for assets that are actively used to cover their liabilities.
     let asset_usage_scaling = (total_liab_health / total_asset_health)
         .max(I80F48::ZERO)
@@ -77,7 +82,7 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
     let token_position_count = account.active_token_positions().count();
     for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
         let mut bank = bank_ai.load_mut::<Bank>()?;
-        if bank.collateral_fee_per_day <= 0.0 {
+        if bank.collateral_fee_per_day <= 0.0 || bank.maint_asset_weight.is_zero() {
             continue;
         }
 
