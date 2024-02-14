@@ -204,8 +204,15 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         max_cu_per_transaction: 1_000_000,
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
+        refresh_timeout: Duration::from_secs(cli.liquidation_refresh_timeout_secs as u64),
+        only_allowed_tokens: cli
+            .liquidation_only_allow_tokens
+            .map(|v| v.iter().map(|x| TokenIndex::from(*x)).collect())
+            .map_or(HashSet::new(), |v: Vec<TokenIndex>| HashSet::from_iter(v)),
+        forbidden_tokens: cli
+            .liquidation_forbidden_tokens
+            .map(|v| v.iter().map(|x| TokenIndex::from(*x)).collect())
+            .map_or(HashSet::new(), |v: Vec<TokenIndex>| HashSet::from_iter(v)),
     };
 
     let tcs_config = trigger_tcs::Config {
