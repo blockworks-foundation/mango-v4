@@ -13,6 +13,7 @@ pub enum Version {
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum RawQuote {
     Mock,
     V6(v6::QuoteResponse),
