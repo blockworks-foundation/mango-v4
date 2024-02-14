@@ -1732,6 +1732,44 @@
 <a href="#1732" id="1732">1732</a>
 <a href="#1733" id="1733">1733</a>
 <a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
+<a href="#1737" id="1737">1737</a>
+<a href="#1738" id="1738">1738</a>
+<a href="#1739" id="1739">1739</a>
+<a href="#1740" id="1740">1740</a>
+<a href="#1741" id="1741">1741</a>
+<a href="#1742" id="1742">1742</a>
+<a href="#1743" id="1743">1743</a>
+<a href="#1744" id="1744">1744</a>
+<a href="#1745" id="1745">1745</a>
+<a href="#1746" id="1746">1746</a>
+<a href="#1747" id="1747">1747</a>
+<a href="#1748" id="1748">1748</a>
+<a href="#1749" id="1749">1749</a>
+<a href="#1750" id="1750">1750</a>
+<a href="#1751" id="1751">1751</a>
+<a href="#1752" id="1752">1752</a>
+<a href="#1753" id="1753">1753</a>
+<a href="#1754" id="1754">1754</a>
+<a href="#1755" id="1755">1755</a>
+<a href="#1756" id="1756">1756</a>
+<a href="#1757" id="1757">1757</a>
+<a href="#1758" id="1758">1758</a>
+<a href="#1759" id="1759">1759</a>
+<a href="#1760" id="1760">1760</a>
+<a href="#1761" id="1761">1761</a>
+<a href="#1762" id="1762">1762</a>
+<a href="#1763" id="1763">1763</a>
+<a href="#1764" id="1764">1764</a>
+<a href="#1765" id="1765">1765</a>
+<a href="#1766" id="1766">1766</a>
+<a href="#1767" id="1767">1767</a>
+<a href="#1768" id="1768">1768</a>
+<a href="#1769" id="1769">1769</a>
+<a href="#1770" id="1770">1770</a>
+<a href="#1771" id="1771">1771</a>
+<a href="#1772" id="1772">1772</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -1749,6 +1787,7 @@
 <span class="kw">pub mod </span>accounts_ix;
 <span class="kw">pub mod </span>accounts_zerocopy;
 <span class="kw">pub mod </span>address_lookup_table_program;
+<span class="kw">mod </span>allocator;
 <span class="kw">pub mod </span>error;
 <span class="kw">pub mod </span>events;
 <span class="kw">pub mod </span>health;
@@ -1817,6 +1856,7 @@
         mngo_token_index_opt: <span class="prelude-ty">Option</span>&lt;TokenIndex&gt;,
         buyback_fees_expiry_interval_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
         allowed_fast_listings_per_interval_opt: <span class="prelude-ty">Option</span>&lt;u16&gt;,
+        collateral_fee_interval_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::group_edit(
@@ -1833,6 +1873,7 @@
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
             allowed_fast_listings_per_interval_opt,
+            collateral_fee_interval_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1888,6 +1929,10 @@
         interest_target_utilization: f32,
         group_insurance_fund: bool,
         deposit_limit: u64,
+        zero_util_rate: f32,
+        platform_liquidation_fee: f32,
+        disable_asset_liquidation: bool,
+        collateral_fee_per_day: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_register(
@@ -1919,6 +1964,10 @@
             interest_target_utilization,
             group_insurance_fund,
             deposit_limit,
+            zero_util_rate,
+            platform_liquidation_fee,
+            disable_asset_liquidation,
+            collateral_fee_per_day,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -1970,8 +2019,12 @@
         maint_weight_shift_asset_target_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         maint_weight_shift_liab_target_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         maint_weight_shift_abort: bool,
-        set_fallback_oracle: bool, <span class="comment">// unused, introduced in v0.22
-        </span>deposit_limit_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        set_fallback_oracle: bool,
+        deposit_limit_opt: <span class="prelude-ty">Option</span>&lt;u64&gt;,
+        zero_util_rate_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        platform_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
+        disable_asset_liquidation_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        collateral_fee_per_day_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::token_edit(
@@ -2012,6 +2065,10 @@
             maint_weight_shift_abort,
             set_fallback_oracle,
             deposit_limit_opt,
+            zero_util_rate_opt,
+            platform_liquidation_fee_opt,
+            disable_asset_liquidation_opt,
+            collateral_fee_per_day_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -2415,6 +2472,15 @@
         <span class="prelude-val">Ok</span>(())
     }
 
+    <span class="kw">pub fn </span>serum3_cancel_order_by_client_order_id(
+        ctx: Context&lt;Serum3CancelOrder&gt;,
+        client_order_id: u64,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::serum3_cancel_order_by_client_order_id(ctx, client_order_id)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
     <span class="kw">pub fn </span>serum3_cancel_all_orders(ctx: Context&lt;Serum3CancelAllOrders&gt;, limit: u8) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::serum3_cancel_all_orders(ctx, limit)<span class="question-mark">?</span>;
@@ -2557,6 +2623,7 @@
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
+        platform_liquidation_fee: f32,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::perp_create_market(
@@ -2588,6 +2655,7 @@
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
+            platform_liquidation_fee,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -2625,6 +2693,7 @@
         positive_pnl_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
         name_opt: <span class="prelude-ty">Option</span>&lt;String&gt;,
         force_close_opt: <span class="prelude-ty">Option</span>&lt;bool&gt;,
+        platform_liquidation_fee_opt: <span class="prelude-ty">Option</span>&lt;f32&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
         </span>instructions::perp_edit_market(
@@ -2659,6 +2728,7 @@
             positive_pnl_liquidation_fee_opt,
             name_opt,
             force_close_opt,
+            platform_liquidation_fee_opt,
         )<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
@@ -3314,6 +3384,12 @@
             token_conditional_swap_index.into(),
             token_conditional_swap_id,
         )<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>token_charge_collateral_fees(ctx: Context&lt;TokenChargeCollateralFees&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_charge_collateral_fees(ctx)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 

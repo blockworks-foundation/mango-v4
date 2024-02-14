@@ -129,14 +129,33 @@
 <a href="#129" id="129">129</a>
 <a href="#130" id="130">130</a>
 <a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::{AccountDeserialize, Discriminator};
-
 <span class="kw">use </span>mango_v4::state::{Bank, MangoAccount, MangoAccountValue, MintInfo, PerpMarket, Serum3Market};
 
 <span class="kw">use </span>solana_account_decoder::UiAccountEncoding;
 <span class="kw">use </span>solana_client::nonblocking::rpc_client::RpcClient <span class="kw">as </span>RpcClientAsync;
 <span class="kw">use </span>solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
 <span class="kw">use </span>solana_client::rpc_filter::{Memcmp, RpcFilterType};
+<span class="kw">use </span>solana_sdk::account::AccountSharedData;
 <span class="kw">use </span>solana_sdk::pubkey::Pubkey;
 
 <span class="kw">pub async fn </span>fetch_mango_accounts(
@@ -260,5 +279,24 @@
     )
     .<span class="kw">await
 </span>}
+
+<span class="kw">pub async fn </span>fetch_multiple_accounts(
+    rpc: <span class="kw-2">&amp;</span>RpcClientAsync,
+    keys: <span class="kw-2">&amp;</span>[Pubkey],
+) -&gt; anyhow::Result&lt;Vec&lt;(Pubkey, AccountSharedData)&gt;&gt; {
+    <span class="kw">let </span>config = RpcAccountInfoConfig {
+        encoding: <span class="prelude-val">Some</span>(UiAccountEncoding::Base64),
+        ..RpcAccountInfoConfig::default()
+    };
+    <span class="prelude-val">Ok</span>(rpc
+        .get_multiple_accounts_with_config(keys, config)
+        .<span class="kw">await</span><span class="question-mark">?
+        </span>.value
+        .into_iter()
+        .zip(keys.iter())
+        .filter(|(maybe_acc, <span class="kw">_</span>)| maybe_acc.is_some())
+        .map(|(acc, key)| (<span class="kw-2">*</span>key, acc.unwrap().into()))
+        .collect())
+}
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>

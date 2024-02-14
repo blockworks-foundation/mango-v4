@@ -1874,6 +1874,12 @@
 <a href="#1874" id="1874">1874</a>
 <a href="#1875" id="1875">1875</a>
 <a href="#1876" id="1876">1876</a>
+<a href="#1877" id="1877">1877</a>
+<a href="#1878" id="1878">1878</a>
+<a href="#1879" id="1879">1879</a>
+<a href="#1880" id="1880">1880</a>
+<a href="#1881" id="1881">1881</a>
+<a href="#1882" id="1882">1882</a>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -2051,6 +2057,8 @@
     /// Includes TokenPosition and free Serum3OpenOrders balances.
     /// Does not include perp upnl or Serum3 reserved amounts.
     </span><span class="kw">pub </span>balance_spot: I80F48,
+
+    <span class="kw">pub </span>allow_asset_liquidation: bool,
 }
 
 <span class="doccomment">/// Temporary value used during health computations
@@ -2466,7 +2474,7 @@
 </span><span class="attr">#[allow(unused)]
 #[derive(Clone, Debug)]
 </span><span class="kw">pub struct </span>HealthCache {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) token_infos: Vec&lt;TokenInfo&gt;,
+    <span class="kw">pub </span>token_infos: Vec&lt;TokenInfo&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) serum3_infos: Vec&lt;Serum3Info&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) perp_infos: Vec&lt;PerpInfo&gt;,
     <span class="attr">#[allow(unused)]
@@ -2783,6 +2791,7 @@
     }
 
     <span class="doccomment">/// Liquidatable spot assets mean: actual token deposits and also a positive effective token balance
+    /// and is available for asset liquidation
     </span><span class="kw">pub fn </span>has_liq_spot_assets(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>health_token_balances = <span class="self">self</span>.effective_token_balances(HealthType::LiquidationEnd);
         <span class="self">self</span>.token_infos
@@ -2790,11 +2799,11 @@
             .zip(health_token_balances.iter())
             .any(|(ti, b)| {
                 <span class="comment">// need 1 native token to use token_liq_with_token
-                </span>ti.balance_spot &gt;= <span class="number">1 </span>&amp;&amp; b.spot_and_perp &gt;= <span class="number">1
-            </span>})
+                </span>ti.balance_spot &gt;= <span class="number">1 </span>&amp;&amp; b.spot_and_perp &gt;= <span class="number">1 </span>&amp;&amp; ti.allow_asset_liquidation
+            })
     }
 
-    <span class="doccomment">/// Liquidatable spot borrows mean: actual toen borrows plus a negative effective token balance
+    <span class="doccomment">/// Liquidatable spot borrows mean: actual token borrows plus a negative effective token balance
     </span><span class="kw">pub fn </span>has_liq_spot_borrows(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span>health_token_balances = <span class="self">self</span>.effective_token_balances(HealthType::LiquidationEnd);
         <span class="self">self</span>.token_infos
@@ -2808,7 +2817,9 @@
         <span class="kw">let </span>health_token_balances = <span class="self">self</span>.effective_token_balances(HealthType::LiquidationEnd);
         <span class="kw">let </span>all_iter = || <span class="self">self</span>.token_infos.iter().zip(health_token_balances.iter());
         all_iter().any(|(ti, b)| ti.balance_spot &lt; <span class="number">0 </span>&amp;&amp; b.spot_and_perp &lt; <span class="number">0</span>)
-            &amp;&amp; all_iter().any(|(ti, b)| ti.balance_spot &gt;= <span class="number">1 </span>&amp;&amp; b.spot_and_perp &gt;= <span class="number">1</span>)
+            &amp;&amp; all_iter().any(|(ti, b)| {
+                ti.balance_spot &gt;= <span class="number">1 </span>&amp;&amp; b.spot_and_perp &gt;= <span class="number">1 </span>&amp;&amp; ti.allow_asset_liquidation
+            })
     }
 
     <span class="kw">pub fn </span>has_serum3_open_orders_funds(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -3162,6 +3173,7 @@
             init_scaled_liab_weight: bank.scaled_init_liab_weight(liab_price),
             prices,
             balance_spot: native,
+            allow_asset_liquidation: bank.allows_asset_liquidation(),
         });
     }
 
