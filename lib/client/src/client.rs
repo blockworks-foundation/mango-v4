@@ -1862,54 +1862,6 @@ impl MangoClient {
             .await
     }
 
-    pub(crate) async fn deserialize_instructions_and_alts(
-        &self,
-        message: &solana_sdk::message::VersionedMessage,
-    ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
-        let lookups = message.address_table_lookups().unwrap_or_default();
-        let address_lookup_tables = self
-            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
-            .await?;
-
-        let mut account_keys = message.static_account_keys().to_vec();
-        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .writable_indexes
-                    .iter()
-                    .map(|&index| table.addresses[index as usize]),
-            );
-        }
-        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
-            account_keys.extend(
-                lookups
-                    .readonly_indexes
-                    .iter()
-                    .map(|&index| table.addresses[index as usize]),
-            );
-        }
-
-        let compiled_ix = message
-            .instructions()
-            .iter()
-            .map(|ci| solana_sdk::instruction::Instruction {
-                program_id: *ci.program_id(&account_keys),
-                accounts: ci
-                    .accounts
-                    .iter()
-                    .map(|&index| AccountMeta {
-                        pubkey: account_keys[index as usize],
-                        is_signer: message.is_signer(index.into()),
-                        is_writable: message.is_maybe_writable(index.into()),
-                    })
-                    .collect(),
-                data: ci.data.clone(),
-            })
-            .collect();
-
-        Ok((compiled_ix, address_lookup_tables))
-    }
-
     fn instruction_cu(&self, health_cu: u32) -> u32 {
         self.context.compute_estimates.cu_per_mango_instruction + health_cu
     }
