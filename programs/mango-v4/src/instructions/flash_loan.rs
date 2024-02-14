@@ -378,10 +378,10 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     match flash_loan_type {
         FlashLoanType::Unknown => {}
-        FlashLoanType::Swap => {
+        FlashLoanType::Swap | FlashLoanType::SwapWithoutFee => {
             require_msg!(
                 changes.len() == 2,
-                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
+                "when flash_loan_type is Swap or SwapWithoutFee there must be exactly 2 token vault changes"
             )
         }
     }
