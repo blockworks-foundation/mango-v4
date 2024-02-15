@@ -24,6 +24,9 @@ pub struct Config {
     pub only_allowed_tokens: HashSet<TokenIndex>,
     pub forbidden_tokens: HashSet<TokenIndex>,
 
+    pub only_allowed_perp_markets: HashSet<PerpMarketIndex>,
+    pub forbidden_perp_markets: HashSet<PerpMarketIndex>,
+
     /// If we cram multiple ix into a transaction, don't exceed this level
     /// of expected-cu.
     pub max_cu_per_transaction: u32,
@@ -140,6 +143,25 @@ impl<'a> LiquidateHelper<'a> {
         let all_perp_base_positions: anyhow::Result<
             Vec<Option<(PerpMarketIndex, i64, I80F48, I80F48)>>,
         > = stream::iter(self.liqee.active_perp_positions())
+            .filter(|pp| async {
+                if self
+                    .config
+                    .forbidden_perp_markets
+                    .contains(&pp.market_index)
+                {
+                    return false;
+                }
+                if !self.config.only_allowed_perp_markets.is_empty()
+                    && !self
+                        .config
+                        .only_allowed_perp_markets
+                        .contains(&pp.market_index)
+                {
+                    return false;
+                }
+
+                true
+            })
             .then(|pp| async {
                 let base_lots = pp.base_position_lots();
                 if (base_lots == 0 && pp.quote_position_native() <= 0) || pp.has_open_taker_fills()

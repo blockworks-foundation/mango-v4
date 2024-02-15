@@ -205,14 +205,16 @@ async fn main() -> anyhow::Result<()> {
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         max_cu_per_transaction: 1_000_000,
         refresh_timeout: Duration::from_secs(cli.liquidation_refresh_timeout_secs as u64),
-        only_allowed_tokens: cli
-            .liquidation_only_allow_tokens
-            .map(|v| v.iter().map(|x| TokenIndex::from(*x)).collect())
-            .map_or(HashSet::new(), |v: Vec<TokenIndex>| HashSet::from_iter(v)),
-        forbidden_tokens: cli
-            .liquidation_forbidden_tokens
-            .map(|v| v.iter().map(|x| TokenIndex::from(*x)).collect())
-            .map_or(HashSet::new(), |v: Vec<TokenIndex>| HashSet::from_iter(v)),
+        only_allowed_tokens: cli_args::cli_to_hashset::<TokenIndex>(
+            cli.liquidation_only_allow_tokens,
+        ),
+        forbidden_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.liquidation_forbidden_tokens),
+        only_allowed_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_only_allow_perp_markets,
+        ),
+        forbidden_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_forbidden_perp_markets,
+        ),
     };
 
     let tcs_config = trigger_tcs::Config {

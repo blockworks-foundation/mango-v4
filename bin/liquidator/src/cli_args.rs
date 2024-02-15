@@ -2,6 +2,7 @@ use crate::trigger_tcs;
 use anchor_lang::prelude::Pubkey;
 use clap::Parser;
 use mango_v4_client::{jupiter, priority_fees_cli};
+use std::collections::HashSet;
 
 #[derive(Parser, Debug)]
 #[clap()]
@@ -51,6 +52,14 @@ impl From<TcsMode> for trigger_tcs::Mode {
             TcsMode::SwapCollateralIntoBuy => trigger_tcs::Mode::SwapCollateralIntoBuy,
         }
     }
+}
+
+pub(crate) fn cli_to_hashset<T: Eq + std::hash::Hash + From<u16>>(
+    str_list: Option<Vec<u16>>,
+) -> HashSet<T> {
+    return str_list
+        .map(|v| v.iter().map(|x| T::from(*x)).collect())
+        .map_or(HashSet::new(), |v: Vec<T>| HashSet::from_iter(v));
 }
 
 #[derive(Parser)]
@@ -166,4 +175,13 @@ pub struct Cli {
     /// when empty, allows all pairs
     #[clap(long, env, value_parser, value_delimiter = ' ')]
     pub(crate) liquidation_only_allow_tokens: Option<Vec<u16>>,
+
+    /// perp market to exclude for liquidation
+    #[clap(long, env, value_parser, value_delimiter = ' ')]
+    pub(crate) liquidation_forbidden_perp_markets: Option<Vec<u16>>,
+
+    /// perp market to allow for liquidation (only liquidate if is in this list)
+    /// when empty, allows all pairs
+    #[clap(long, env, value_parser, value_delimiter = ' ')]
+    pub(crate) liquidation_only_allow_perp_markets: Option<Vec<u16>>,
 }
