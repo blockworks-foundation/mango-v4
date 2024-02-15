@@ -132,6 +132,7 @@ export class Bank implements BankForHealth {
       reduceOnly: number;
       forceClose: number;
       disableAssetLiquidation: number;
+      forceWithdraw: number;
       feesWithdrawn: BN;
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
@@ -218,6 +219,7 @@ export class Bank implements BankForHealth {
       obj.disableAssetLiquidation == 0,
       obj.collectedCollateralFees,
       obj.collateralFeePerDay,
+      obj.forceWithdraw == 1,
     );
   }
 
@@ -286,6 +288,7 @@ export class Bank implements BankForHealth {
     public allowAssetLiquidation: boolean,
     collectedCollateralFees: I80F48Dto,
     public collateralFeePerDay: number,
+    public forceWithdraw: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {

@@ -788,3 +788,13 @@ pub struct TokenCollateralFeeLog {
     pub asset_usage_fraction: i128,
     pub fee: i128,
 }
+
+#[event]
+pub struct ForceWithdrawLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub quantity: u64,
+    pub price: i128, // I80F48
+    pub to_token_account: Pubkey,
+}

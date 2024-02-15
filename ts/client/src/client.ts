@@ -559,6 +559,7 @@ export class MangoClient {
         params.platformLiquidationFee,
         params.disableAssetLiquidation,
         params.collateralFeePerDay,
+        params.forceWithdraw,
       )
       .accounts({
         group: group.publicKey,
@@ -621,6 +622,34 @@ export class MangoClient {
         liqee: liqee.publicKey,
       })
       .remainingAccounts(parsedHealthAccounts)
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenForceWithdraw(
+    group: Group,
+    account: MangoAccount,
+    tokenIndex: TokenIndex,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByTokenIndex(tokenIndex);
+    if (!bank.forceWithdraw) {
+      throw new Error('Bank is not in force-withdraw mode');
+    }
+
+    // TODO: potentially create the user target ata
+    // TODO: verify that the user even has deposits on that token
+
+    const ix = await this.program.methods
+      .tokenForceWithdraw()
+      .accounts({
+        group: group.publicKey,
+        account: account.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        oracle: bank.oracle,
+        ownerAtaTokenAccount: PublicKey.default, // TODO
+        alternateOwnerTokenAccount: PublicKey.default, // TODO
+      })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }

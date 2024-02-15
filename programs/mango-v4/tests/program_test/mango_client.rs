@@ -1328,6 +1328,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         platform_liquidation_fee_opt: None,
         disable_asset_liquidation_opt: None,
         collateral_fee_per_day_opt: None,
+        force_withdraw_opt: None,
     }
 }
 
