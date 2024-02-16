@@ -716,6 +716,12 @@
 <a href="#716" id="716">716</a>
 <a href="#717" id="717">717</a>
 <a href="#718" id="718">718</a>
+<a href="#719" id="719">719</a>
+<a href="#720" id="720">720</a>
+<a href="#721" id="721">721</a>
+<a href="#722" id="722">722</a>
+<a href="#723" id="723">723</a>
+<a href="#724" id="724">724</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
@@ -838,6 +844,8 @@
     <span class="kw">pub </span>cu_per_perp_order_match: u32,
     <span class="kw">pub </span>cu_per_perp_order_cancel: u32,
     <span class="kw">pub </span>cu_per_oracle_fallback: u32,
+    <span class="kw">pub </span>cu_per_charge_collateral_fees: u32,
+    <span class="kw">pub </span>cu_per_charge_collateral_fees_token: u32,
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>ComputeEstimates {
@@ -857,6 +865,10 @@
             </span>cu_per_perp_order_cancel: <span class="number">7_000</span>,
             <span class="comment">// measured around 2k, see test_health_compute_tokens_fallback_oracles
             </span>cu_per_oracle_fallback: <span class="number">2000</span>,
+            <span class="comment">// the base cost is mostly the division
+            </span>cu_per_charge_collateral_fees: <span class="number">20_000</span>,
+            <span class="comment">// per-chargable-token cost
+            </span>cu_per_charge_collateral_fees_token: <span class="number">12_000</span>,
         }
     }
 }

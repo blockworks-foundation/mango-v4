@@ -2208,6 +2208,21 @@
 <a href="#2208" id="2208">2208</a>
 <a href="#2209" id="2209">2209</a>
 <a href="#2210" id="2210">2210</a>
+<a href="#2211" id="2211">2211</a>
+<a href="#2212" id="2212">2212</a>
+<a href="#2213" id="2213">2213</a>
+<a href="#2214" id="2214">2214</a>
+<a href="#2215" id="2215">2215</a>
+<a href="#2216" id="2216">2216</a>
+<a href="#2217" id="2217">2217</a>
+<a href="#2218" id="2218">2218</a>
+<a href="#2219" id="2219">2219</a>
+<a href="#2220" id="2220">2220</a>
+<a href="#2221" id="2221">2221</a>
+<a href="#2222" id="2222">2222</a>
+<a href="#2223" id="2223">2223</a>
+<a href="#2224" id="2224">2224</a>
+<a href="#2225" id="2225">2225</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::sync::Arc;
@@ -3725,10 +3740,25 @@
                 <span class="kw-2">&amp;</span>mango_v4::instruction::TokenChargeCollateralFees {},
             ),
         };
-        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(
-            ix,
-            <span class="self">self</span>.instruction_cu(health_cu),
-        ))
+
+        <span class="kw">let </span><span class="kw-2">mut </span>chargeable_token_positions = <span class="number">0</span>;
+        <span class="kw">for </span>tp <span class="kw">in </span>account.<span class="number">1</span>.active_token_positions() {
+            <span class="kw">let </span>bank = <span class="self">self</span>.first_bank(tp.token_index).<span class="kw">await</span><span class="question-mark">?</span>;
+            <span class="kw">let </span>native = tp.native(<span class="kw-2">&amp;</span>bank);
+            <span class="kw">if </span>native.is_positive()
+                &amp;&amp; bank.maint_asset_weight.is_positive()
+                &amp;&amp; bank.collateral_fee_per_day &gt; <span class="number">0.0
+            </span>{
+                chargeable_token_positions += <span class="number">1</span>;
+            }
+        }
+
+        <span class="kw">let </span>cu_est = <span class="kw-2">&amp;</span><span class="self">self</span>.context.compute_estimates;
+        <span class="kw">let </span>cu = cu_est.cu_per_charge_collateral_fees
+            + cu_est.cu_per_charge_collateral_fees_token * chargeable_token_positions
+            + health_cu;
+
+        <span class="prelude-val">Ok</span>(PreparedInstructions::from_single(ix, cu))
     }
 
     <span class="comment">//
