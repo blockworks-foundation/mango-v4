@@ -58,8 +58,8 @@ pub(crate) fn cli_to_hashset<T: Eq + std::hash::Hash + From<u16>>(
     str_list: Option<Vec<u16>>,
 ) -> HashSet<T> {
     return str_list
-        .map(|v| v.iter().map(|x| T::from(*x)).collect())
-        .map_or(HashSet::new(), |v: Vec<T>| HashSet::from_iter(v));
+        .map(|v| v.iter().map(|x| T::from(*x)).collect::<HashSet<T>>())
+        .unwrap_or_default();
 }
 
 #[derive(Parser)]

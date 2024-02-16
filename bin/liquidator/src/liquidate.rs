@@ -40,8 +40,6 @@ struct LiquidateHelper<'a> {
     health_cache: &'a HealthCache,
     maint_health: I80F48,
     liqor_min_health_ratio: I80F48,
-    allowed_asset_tokens: HashSet<Pubkey>,
-    allowed_liab_tokens: HashSet<Pubkey>,
     config: Config,
 }
 
@@ -423,7 +421,7 @@ impl<'a> LiquidateHelper<'a> {
                 is_valid_liab.then_some((ti.token_index, false, quote_value))
             })
             .collect_vec();
-        // largest liquidatable liability at the end
+        // largest liquidatable liability at the start
         potential_liabs.sort_by_key(|(_, is_preferred, amount)| Reverse((*is_preferred, *amount)));
 
         //
@@ -437,11 +435,9 @@ impl<'a> LiquidateHelper<'a> {
             let mut best_whitelisted = None;
             let mut best = None;
 
-            let allowed_token_list = token_list.iter().filter_map(|(ti, _, _)| {
-                lh.allowed_asset_tokens
-                    .contains(&lh.client.context.token(*ti).mint)
-                    .then_some(ti)
-            });
+            let allowed_token_list = token_list
+                .iter()
+                .filter_map(|(ti, _, _)| (!lh.config.forbidden_tokens.contains(ti)).then_some(ti));
 
             for ti in allowed_token_list {
                 let whitelisted = lh.config.only_allowed_tokens.is_empty()
@@ -536,9 +532,7 @@ impl<'a> LiquidateHelper<'a> {
             .iter()
             .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
                 liab_usdc_equivalent.is_negative()
-                    && self
-                        .allowed_liab_tokens
-                        .contains(&self.client.context.token(*liab_token_index).mint)
+                    && !self.config.forbidden_tokens.contains(liab_token_index)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -695,15 +689,6 @@ pub async fn maybe_liquidate_account(
 
     let maint_health = health_cache.health(HealthType::Maint);
 
-    let all_token_mints =
-        HashSet::from_iter(mango_client.context.tokens.values().filter_map(|c| {
-            if config.forbidden_tokens.contains(&c.token_index) {
-                None
-            } else {
-                Some(c.mint)
-            }
-        }));
-
     // try liquidating
     let maybe_txsig = LiquidateHelper {
         client: mango_client,
@@ -713,8 +698,6 @@ pub async fn maybe_liquidate_account(
         health_cache: &health_cache,
         maint_health,
         liqor_min_health_ratio,
-        allowed_asset_tokens: all_token_mints.clone(),
-        allowed_liab_tokens: all_token_mints,
         config: config.clone(),
     }
     .send_liq_tx()
