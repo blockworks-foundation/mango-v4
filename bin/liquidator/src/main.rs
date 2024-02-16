@@ -229,6 +229,9 @@ async fn main() -> anyhow::Result<()> {
 
         mode: cli.tcs_mode.into(),
         min_buy_fraction: cli.tcs_min_buy_fraction,
+
+        only_allowed_tokens: liq_config.only_allowed_tokens.clone(),
+        forbidden_tokens: liq_config.forbidden_tokens.clone(),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));

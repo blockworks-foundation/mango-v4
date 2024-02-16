@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -72,6 +73,9 @@ pub struct Config {
     pub jupiter_version: jupiter::Version,
     pub jupiter_slippage_bps: u64,
     pub mode: Mode,
+
+    pub only_allowed_tokens: HashSet<TokenIndex>,
+    pub forbidden_tokens: HashSet<TokenIndex>,
 }
 
 pub enum JupiterQuoteCacheResult<T> {
@@ -400,10 +404,42 @@ impl Context {
         Ok(taker_price >= base_price * cost_over_oracle * (1.0 + self.config.profit_fraction))
     }
 
+    // excluded by config
+    fn tcs_pair_is_allowed(
+        &self,
+        buy_token_index: TokenIndex,
+        sell_token_index: TokenIndex,
+    ) -> bool {
+        if self.config.forbidden_tokens.contains(&buy_token_index) {
+            return false;
+        }
+
+        if self.config.forbidden_tokens.contains(&sell_token_index) {
+            return false;
+        }
+
+        if self.config.only_allowed_tokens.is_empty() {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&buy_token_index) {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&sell_token_index) {
+            return true;
+        }
+
+        return false;
+    }
+
     // Either expired or triggerable with ok-looking price.
     fn tcs_is_interesting(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
         if tcs.is_expired(self.now_ts) {
             return Ok(true);
+        }
+        if !self.tcs_pair_is_allowed(tcs.buy_token_index, tcs.buy_token_index) {
+            return Ok(false);
         }
 
         let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
