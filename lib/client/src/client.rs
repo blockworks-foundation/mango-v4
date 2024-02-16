@@ -779,10 +779,7 @@ impl MangoClient {
             Serum3Side::Ask => (&base, &quote),
         };
 
-        let open_orders = account
-            .serum3_orders(market_index)
-            .map(|x| x.open_orders)
-            .expect("oo is created");
+        let open_orders = account.serum3_orders(market_index).map(|x| x.open_orders)?;
 
         let (health_check_metas, health_cu) = self
             .derive_health_check_remaining_account_metas(
