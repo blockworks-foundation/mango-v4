@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     pin::Pin,
     sync::{Arc, RwLock},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use futures_core::Future;
@@ -56,7 +56,6 @@ pub enum Mode {
 pub struct Config {
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
-    pub refresh_timeout: Duration,
     pub compute_limit_for_trigger: u32,
     pub collateral_token_index: TokenIndex,
 

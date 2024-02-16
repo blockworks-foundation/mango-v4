@@ -223,14 +223,12 @@ async fn main() -> anyhow::Result<()> {
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
         collateral_token_index: 0, // USDC
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
 
         jupiter_version: cli.jupiter_version.into(),
         jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
         mode: cli.tcs_mode.into(),
-        min_buy_fraction: 0.7,
+        min_buy_fraction: cli.tcs_min_buy_fraction,
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
@@ -238,16 +236,10 @@ async fn main() -> anyhow::Result<()> {
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
-        // TODO: config
-        borrow_settle_excess: 1.05,
-        refresh_timeout: Duration::from_secs(30),
+        borrow_settle_excess: (1f64 + cli.rebalance_borrow_settle_excess).max(1f64),
+        refresh_timeout: Duration::from_secs(cli.rebalance_refresh_timeout_secs),
         jupiter_version: cli.jupiter_version.into(),
-        skip_tokens: cli
-            .rebalance_skip_tokens
-            .split(',')
-            .filter(|v| !v.is_empty())
-            .map(|name| mango_client.context.token_by_name(name).token_index)
-            .collect(),
+        skip_tokens: cli.rebalance_skip_tokens.unwrap_or(Vec::new()),
         allow_withdraws: signer_is_owner,
     };
 
@@ -389,16 +381,13 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    took_tcs = match liquidation
+                    took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
-                    {
-                        Ok(v) => v,
-                        Err(err) => {
+                        .unwrap_or_else(|err| {
                             error!("error during maybe_take_token_conditional_swap: {err}");
                             false
-                        }
-                    }
+                        })
                 }
 
                 if liquidated || took_tcs {
@@ -409,14 +398,15 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let token_swap_info_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(60));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(
+            cli.token_swap_refresh_interval_secs,
+        ));
         let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                startup_wait.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
+                    startup_wait.tick().await;
                     continue;
                 }
 

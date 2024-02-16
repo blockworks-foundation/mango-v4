@@ -83,6 +83,10 @@ pub struct Cli {
     #[clap(long, env, default_value = "300")]
     pub(crate) snapshot_interval_secs: u64,
 
+    // how often do we refresh token swap route/prices
+    #[clap(long, env, default_value = "30")]
+    pub(crate) token_swap_refresh_interval_secs: u64,
+
     /// how many getMultipleAccounts requests to send in parallel
     #[clap(long, env, default_value = "10")]
     pub(crate) parallel_rpc_requests: usize,
@@ -105,9 +109,18 @@ pub struct Cli {
     #[clap(long, env, default_value = "100")]
     pub(crate) rebalance_slippage_bps: u64,
 
-    /// tokens to not rebalance (in addition to USDC); use a comma separated list of names
-    #[clap(long, env, default_value = "")]
-    pub(crate) rebalance_skip_tokens: String,
+    /// tokens to not rebalance (in addition to USDC=0); use a comma separated list of token index
+    #[clap(long, env, value_parser, value_delimiter = ',')]
+    pub(crate) rebalance_skip_tokens: Option<Vec<u16>>,
+
+    /// When closing borrows, the rebalancer can't close token positions exactly.
+    /// Instead it purchases too much and then gets rid of the excess in a second step.
+    /// If this is 0.05, then it'll swap borrow_value * (1 + 0.05) quote token into borrow token.
+    #[clap(long, env, default_value = "0.05")]
+    pub(crate) rebalance_borrow_settle_excess: f64,
+
+    #[clap(long, env, default_value = "30")]
+    pub(crate) rebalance_refresh_timeout_secs: u64,
 
     /// if taking tcs orders is enabled
     ///
@@ -126,6 +139,13 @@ pub struct Cli {
     /// largest tcs amount to trigger in one transaction, in dollar
     #[clap(long, env, default_value = "1000.0")]
     pub(crate) tcs_max_trigger_amount: f64,
+
+    /// Minimum fraction of max_buy to buy for success when triggering,
+    /// useful in conjunction with jupiter swaps in same tx to avoid over-buying.
+    ///
+    /// Can be set to 0 to allow executions of any size.
+    #[clap(long, env, default_value = "0.7")]
+    pub(crate) tcs_min_buy_fraction: f64,
 
     #[clap(flatten)]
     pub(crate) prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
