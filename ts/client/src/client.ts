@@ -661,7 +661,8 @@ export class MangoClient {
       }
     } else {
       const account = await unpackAccount(ownerAtaTokenAccount, ai);
-      // if owner is not same as mango account's owner, then create another token account
+      // if owner is not same as mango account's owner on the ATA (for whatever reason)
+      // then create another token account
       if (!account.owner.equals(mangoAccount.owner)) {
         const kp = Keypair.generate();
         alternateOwnerTokenAccount = kp.publicKey;
