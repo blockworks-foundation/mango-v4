@@ -185,6 +185,7 @@ async function updateTokenParams(): Promise<void> {
 
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
+    .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
       // eslint-disable-next-line no-constant-condition
       if (true) {
