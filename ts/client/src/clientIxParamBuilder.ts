@@ -117,6 +117,7 @@ export interface TokenEditParams {
   platformLiquidationFee: number | null;
   disableAssetLiquidation: boolean | null;
   collateralFeePerDay: number | null;
+  forceWithdraw: boolean | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -160,6 +161,7 @@ export const NullTokenEditParams: TokenEditParams = {
   platformLiquidationFee: null,
   disableAssetLiquidation: null,
   collateralFeePerDay: null,
+  forceWithdraw: null,
 };
 
 export interface PerpEditParams {
@@ -307,6 +309,7 @@ export interface IxGateParams {
   TokenConditionalSwapCreatePremiumAuction: boolean;
   TokenConditionalSwapCreateLinearAuction: boolean;
   Serum3PlaceOrderV2: boolean;
+  TokenForceWithdraw: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -386,6 +389,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapCreatePremiumAuction: true,
   TokenConditionalSwapCreateLinearAuction: true,
   Serum3PlaceOrderV2: true,
+  TokenForceWithdraw: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -475,6 +479,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
   toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
+  toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
 
   return ixGate;
 }

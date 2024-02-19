@@ -1067,6 +1067,12 @@ export type MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "forceWithdrawOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -3788,6 +3794,63 @@ export type MangoV4 = {
           }
         }
       ]
+    },
+    {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "perpCreateMarket",
@@ -7427,11 +7490,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -10938,6 +11005,9 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }
@@ -15245,6 +15315,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "f32"
           }
+        },
+        {
+          "name": "forceWithdrawOpt",
+          "type": {
+            "option": "bool"
+          }
         }
       ]
     },
@@ -17966,6 +18042,63 @@ export const IDL: MangoV4 = {
           }
         }
       ]
+    },
+    {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "perpCreateMarket",
@@ -21605,11 +21738,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -25116,6 +25253,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }

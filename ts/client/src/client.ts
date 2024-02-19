@@ -1,16 +1,10 @@
-import {
-  AnchorProvider,
-  BN,
-  Instruction,
-  Program,
-  Provider,
-  Wallet,
-} from '@coral-xyz/anchor';
-import * as borsh from '@coral-xyz/borsh';
+import { AnchorProvider, BN, Program, Wallet } from '@coral-xyz/anchor';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
+  createAccount,
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
+  unpackAccount,
 } from '@solana/spl-token';
 import {
   AccountInfo,
@@ -26,13 +20,13 @@ import {
   RecentPrioritizationFees,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  Signer,
   SystemProgram,
   TransactionInstruction,
-  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
-import chunk from 'lodash/chunk';
 import copy from 'fast-copy';
+import chunk from 'lodash/chunk';
 import groupBy from 'lodash/groupBy';
 import mapValues from 'lodash/mapValues';
 import maxBy from 'lodash/maxBy';
@@ -45,7 +39,6 @@ import {
   Serum3Orders,
   TokenConditionalSwap,
   TokenConditionalSwapDisplayPriceStyle,
-  TokenConditionalSwapDto,
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -70,7 +63,6 @@ import {
 } from './accounts/serum3';
 import {
   IxGateParams,
-  PerpEditParams,
   TokenEditParams,
   TokenRegisterParams,
   buildIxGate,
@@ -559,6 +551,7 @@ export class MangoClient {
         params.platformLiquidationFee,
         params.disableAssetLiquidation,
         params.collateralFeePerDay,
+        params.forceWithdraw,
       )
       .accounts({
         group: group.publicKey,
@@ -623,6 +616,94 @@ export class MangoClient {
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenForceWithdraw(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenIndex: TokenIndex,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByTokenIndex(tokenIndex);
+    if (!bank.forceWithdraw) {
+      throw new Error('Bank is not in force-withdraw mode');
+    }
+
+    const ownerAtaTokenAccount = await getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+      true,
+    );
+    let alternateOwnerTokenAccount = PublicKey.default;
+    const preInstructions: TransactionInstruction[] = [];
+    const postInstructions: TransactionInstruction[] = [];
+
+    const ai = await this.connection.getAccountInfo(ownerAtaTokenAccount);
+
+    // ensure withdraws don't fail with missing ATAs
+    if (ai == null) {
+      preInstructions.push(
+        await createAssociatedTokenAccountIdempotentInstruction(
+          (this.program.provider as AnchorProvider).wallet.publicKey,
+          mangoAccount.owner,
+          bank.mint,
+        ),
+      );
+
+      // wsol case
+      if (bank.mint.equals(NATIVE_MINT)) {
+        postInstructions.push(
+          createCloseAccountInstruction(
+            ownerAtaTokenAccount,
+            mangoAccount.owner,
+            mangoAccount.owner,
+          ),
+        );
+      }
+    } else {
+      const account = await unpackAccount(ownerAtaTokenAccount, ai);
+      // if owner is not same as mango account's owner on the ATA (for whatever reason)
+      // then create another token account
+      if (!account.owner.equals(mangoAccount.owner)) {
+        const kp = Keypair.generate();
+        alternateOwnerTokenAccount = kp.publicKey;
+        await createAccount(
+          this.connection,
+          (this.program.provider as AnchorProvider).wallet as any as Signer,
+          bank.mint,
+          mangoAccount.owner,
+          kp,
+        );
+
+        // wsol case
+        if (bank.mint.equals(NATIVE_MINT)) {
+          postInstructions.push(
+            createCloseAccountInstruction(
+              alternateOwnerTokenAccount,
+              mangoAccount.owner,
+              mangoAccount.owner,
+            ),
+          );
+        }
+      }
+    }
+
+    const ix = await this.program.methods
+      .tokenForceWithdraw()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        oracle: bank.oracle,
+        ownerAtaTokenAccount,
+        alternateOwnerTokenAccount,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenDeregister(

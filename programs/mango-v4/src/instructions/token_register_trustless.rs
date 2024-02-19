@@ -91,6 +91,7 @@ pub fn token_register_trustless(
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
         disable_asset_liquidation: 1,
+        force_withdraw: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate: 0.0,

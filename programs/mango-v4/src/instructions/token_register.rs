@@ -112,6 +112,7 @@ pub fn token_register(
         reduce_only,
         force_close: 0,
         disable_asset_liquidation: u8::from(disable_asset_liquidation),
+        force_withdraw: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
