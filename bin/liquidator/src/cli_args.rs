@@ -187,14 +187,14 @@ pub struct Cli {
     #[clap(long, env, default_value = "30")]
     pub(crate) liquidation_refresh_timeout_secs: u8,
 
-    /// tokens to exclude for liquidation (never liquidate any pair where base or quote is in this list)
+    /// tokens to exclude for liquidation/tcs (never liquidate any pair where base or quote is in this list)
     #[clap(long, env, value_parser, value_delimiter = ' ')]
-    pub(crate) liquidation_forbidden_tokens: Option<Vec<u16>>,
+    pub(crate) forbidden_tokens: Option<Vec<u16>>,
 
-    /// tokens to allow for liquidation (only liquidate a pair if base or quote is in this list)
+    /// tokens to allow for liquidation/tcs (only liquidate a pair if base or quote is in this list)
     /// when empty, allows all pairs
     #[clap(long, env, value_parser, value_delimiter = ' ')]
-    pub(crate) liquidation_only_allow_tokens: Option<Vec<u16>>,
+    pub(crate) only_allow_tokens: Option<Vec<u16>>,
 
     /// perp market to exclude for liquidation
     #[clap(long, env, value_parser, value_delimiter = ' ')]
