@@ -10580,6 +10580,9 @@ export type MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
@@ -24755,6 +24758,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }

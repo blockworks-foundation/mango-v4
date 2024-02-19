@@ -10580,6 +10580,9 @@
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
