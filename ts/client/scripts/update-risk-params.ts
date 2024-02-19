@@ -10,6 +10,7 @@ import {
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
 } from '@solana/spl-governance';
+import { Builder } from '../src/builder';
 
 import {
   AccountMeta,
@@ -23,7 +24,6 @@ import fs from 'fs';
 import { Bank } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { MangoAccount } from '../src/accounts/mangoAccount';
-import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
@@ -187,6 +187,9 @@ async function updateTokenParams(): Promise<void> {
     .map((banks) => banks[0])
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
+      const builder = Builder(NullTokenEditParams);
+      let change = false;
+
       // eslint-disable-next-line no-constant-condition
       if (true) {
         const tier = Object.values(LISTING_PRESETS).find((x) =>
@@ -201,18 +204,22 @@ async function updateTokenParams(): Promise<void> {
           console.log(`${bank.name}, no tier found`);
         } else {
           console.log(
-            `${bank.name.padStart(10)}, ${bank.loanOriginationFeeRate
+            `${bank.name.padStart(10)}, ${bank.loanFeeRate
               .mul(I80F48.fromNumber(100))
-              .toFixed(2)}, ${(bank.flashLoanSwapFeeRate * 100).toFixed(
-              2,
-            )}, ${tier?.preset_name.padStart(5)}, ${(
-              tier!.loanOriginationFeeRate * 100
-            ).toFixed(2)}`,
+              .toFixed(2)}, ${bank.loanOriginationFeeRate
+              .mul(I80F48.fromNumber(100))
+              .toFixed(2)}, ${tier?.preset_name.padStart(5)}, ${(
+              tier.loanFeeRate * 100
+            ).toFixed(2)}, ${(tier!.loanOriginationFeeRate * 100).toFixed(2)}`,
           );
+
+          builder.loanFeeRate(tier!.loanFeeRate);
+          builder.loanOriginationFeeRate(tier!.loanOriginationFeeRate);
+          builder.flashLoanSwapFeeRate(tier!.loanOriginationFeeRate);
+          change = true;
         }
       }
 
-      let change = false;
       try {
         // formulas are sourced from here
         // https://www.notion.so/mango-markets/Mango-v4-Risk-parameter-recommendations-d309cdf5faac4aeea7560356e68532ab
@@ -222,8 +229,6 @@ async function updateTokenParams(): Promise<void> {
         //   50 * ttlLiqorEquityUi,
         //   4 * priceImpact.target_amount,
         // );
-
-        const builder = Builder(NullTokenEditParams);
 
         if (!bank.areBorrowsReduceOnly()) {
           // eslint-disable-next-line no-constant-condition
@@ -319,6 +324,10 @@ async function updateTokenParams(): Promise<void> {
           }
 
           const params = builder.build();
+          console.log(bank.name);
+          console.log(params.loanFeeRate);
+          console.log(params.loanOriginationFeeRate);
+          console.log(params.flashLoanSwapFeeRate);
 
           const ix = await client.program.methods
             .tokenEdit(
@@ -422,7 +431,9 @@ async function updateTokenParams(): Promise<void> {
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update deposit limits for tokens',
+      PROPOSAL_TITLE
+        ? PROPOSAL_TITLE
+        : 'Update loan fee, loan origination fee, and flash loan fees in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
