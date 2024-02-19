@@ -3,17 +3,11 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import {
-  OPENBOOK_PROGRAM_ID,
-  RUST_I64_MAX,
-  RUST_I64_MIN,
-  USDC_MINT,
-} from '../constants';
+import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
   U64_MAX_BN,
   roundTo5,
-  toNative,
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
@@ -476,6 +470,24 @@ export class MangoAccount {
   public getLiabsValue(group: Group): I80F48 {
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc.healthAssetsAndLiabs(undefined, false).liabs;
+  }
+
+  public getCollateraFeeRatePerDayUi(group: Group, bank: Bank): number {
+    const hc = HealthCache.fromMangoAccount(group, this);
+    const aAndL = hc.healthAssetsAndLiabs(HealthType.maint, false);
+    const assets = aAndL.assets;
+    const liabs = aAndL.liabs;
+
+    if (assets.eq(ZERO_I80F48()) || liabs.eq(ZERO_I80F48())) {
+      return 0;
+    }
+
+    const assetUsageScaling = liabs
+      .div(assets)
+      .max(ZERO_I80F48())
+      .min(ONE_I80F48());
+
+    return assetUsageScaling.toNumber() * bank.collateralFeePerDay;
   }
 
   /**
