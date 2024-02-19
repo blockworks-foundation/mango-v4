@@ -51,24 +51,24 @@ async function main(): Promise<void> {
       }),
     );
 
-    // const sig = await client.tcsTakeProfitOnDeposit(
-    //   group,
-    //   account,
-    //   group.getFirstBankByTokenIndex(4 as TokenIndex),
-    //   group.getFirstBankByTokenIndex(0 as TokenIndex),
-    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice + 1,
-    //   false,
-    //   null,
-    //   null,
-    //   null,
-    // );
+    const sig = await client.tcsTakeProfitOnDeposit(
+      group,
+      account,
+      group.getFirstBankByTokenIndex(4 as TokenIndex),
+      group.getFirstBankByTokenIndex(0 as TokenIndex),
+      group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 1,
+      false,
+      null,
+      null,
+      null,
+    );
 
     // const sig = await client.tcsStopLossOnDeposit(
     //   group,
     //   account,
     //   group.getFirstBankByTokenIndex(4 as TokenIndex),
     //   group.getFirstBankByTokenIndex(0 as TokenIndex),
-    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 1,
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 0.001,
     //   false,
     //   null,
     //   null,
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
     //   account,
     //   group.getFirstBankByTokenIndex(0 as TokenIndex),
     //   group.getFirstBankByTokenIndex(4 as TokenIndex),
-    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 1,
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice - 0.001,
     //   true,
     //   null,
     //   null,
@@ -88,18 +88,18 @@ async function main(): Promise<void> {
     //   null,
     // );
 
-    const sig = await client.tcsStopLossOnBorrow(
-      group,
-      account,
-      group.getFirstBankByTokenIndex(0 as TokenIndex),
-      group.getFirstBankByTokenIndex(4 as TokenIndex),
-      group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice + 1,
-      true,
-      null,
-      null,
-      null,
-      null,
-    );
+    // const sig = await client.tcsStopLossOnBorrow(
+    //   group,
+    //   account,
+    //   group.getFirstBankByTokenIndex(0 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex),
+    //   group.getFirstBankByTokenIndex(4 as TokenIndex).uiPrice + 0.001,
+    //   true,
+    //   null,
+    //   null,
+    //   null,
+    //   null,
+    // );
 
     console.log(sig);
 
