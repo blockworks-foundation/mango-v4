@@ -786,10 +786,16 @@ impl PerpPosition {
         self.oneshot_settle_pnl_allowance += change;
     }
 
-    /// Adds to the quote position and adds a recurring ("realized trade") settle limit
-    pub fn record_liquidation_pnl_takeover(&mut self, change: I80F48, recurring_limit: I80F48) {
+    /// Takes over a quote position along with recurring and oneshot settle limit allowance
+    pub fn record_liquidation_pnl_takeover(
+        &mut self,
+        change: I80F48,
+        recurring_limit: i64,
+        oneshot_limit: i64,
+    ) {
         self.change_quote_position(change);
-        self.recurring_settle_pnl_allowance += recurring_limit.abs().ceil().to_num::<i64>();
+        self.recurring_settle_pnl_allowance += recurring_limit;
+        self.oneshot_settle_pnl_allowance += I80F48::from(oneshot_limit);
     }
 }
 
