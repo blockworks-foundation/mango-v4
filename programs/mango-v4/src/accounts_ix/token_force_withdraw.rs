@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address;
-use anchor_spl::token;
 use anchor_spl::token::Token;
 use anchor_spl::token::TokenAccount;
 
@@ -52,24 +51,4 @@ pub struct TokenForceWithdraw<'info> {
     pub alternate_owner_token_account: Box<Account<'info, TokenAccount>>,
 
     pub token_program: Program<'info, Token>,
-}
-
-impl<'info> TokenForceWithdraw<'info> {
-    pub fn withdraw_target(&self) -> AccountInfo<'info> {
-        if self.owner_ata_token_account.owner == self.account.load().unwrap().owner {
-            self.owner_ata_token_account.to_account_info()
-        } else {
-            self.alternate_owner_token_account.to_account_info()
-        }
-    }
-
-    pub fn transfer_ctx(&self) -> CpiContext<'_, '_, '_, 'info, token::Transfer<'info>> {
-        let program = self.token_program.to_account_info();
-        let accounts = token::Transfer {
-            from: self.vault.to_account_info(),
-            to: self.withdraw_target(),
-            authority: self.group.to_account_info(),
-        };
-        CpiContext::new(program, accounts)
-    }
 }

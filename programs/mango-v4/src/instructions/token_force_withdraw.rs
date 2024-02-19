@@ -17,6 +17,13 @@ pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
     require!(bank.is_force_withdraw(), MangoError::SomeError);
 
     let mut account = ctx.accounts.account.load_full_mut()?;
+
+    let withdraw_target = if ctx.accounts.owner_ata_token_account.owner == account.fixed.owner {
+        ctx.accounts.owner_ata_token_account.to_account_info()
+    } else {
+        ctx.accounts.alternate_owner_token_account.to_account_info()
+    };
+
     let (position, raw_token_index) = account.token_position_mut(token_index)?;
     let native_position = position.native(&bank);
 
@@ -41,7 +48,15 @@ pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
     // Transfer the actual tokens
     let group_seeds = group_seeds!(group);
     token::transfer(
-        ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.vault.to_account_info(),
+                to: withdraw_target.clone(),
+                authority: ctx.accounts.group.to_account_info(),
+            },
+        )
+        .with_signer(&[group_seeds]),
         amount,
     )?;
 
@@ -76,7 +91,7 @@ pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
         token_index,
         quantity: amount,
         price: unsafe_oracle_state.price.to_bits(),
-        to_token_account: ctx.accounts.withdraw_target().key(),
+        to_token_account: withdraw_target.key(),
     });
 
     bank.enforce_borrows_lte_deposits()?;
