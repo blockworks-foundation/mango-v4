@@ -602,15 +602,19 @@ pub(crate) fn liquidation_action(
                 .max(1);
             let settle = pnl_transfer.floor().to_num::<i128>();
             let total = liqee_pnl.max(settle);
-            limit_transfer_recurring = (liqee_recurring * settle / total)
-                .min(liqee_pnl)
-                // at least 1, to compensate for rounding down
-                .max(1)
+            let transfer_recurring: i64 = (liqee_recurring * settle / total).try_into().unwrap();
+            let transfer_oneshot: i64 = (liqee_oneshot_positive * settle / total)
                 .try_into()
                 .unwrap();
-            limit_transfer_oneshot = (liqee_oneshot_positive * settle / total)
-                .try_into()
-                .unwrap();
+
+            // never transfer more than pnl_transfer rounded up
+            // and transfer at least 1, to compensate for rounding down `settle` and int div
+            let max_transfer = pnl_transfer.ceil().to_num::<i64>();
+            limit_transfer_recurring = transfer_recurring.min(max_transfer).max(1);
+            // make is so the sum of recurring and oneshot doesn't exceed max_transfer
+            limit_transfer_oneshot = transfer_oneshot
+                .min(max_transfer - limit_transfer_recurring)
+                .max(0);
         };
 
         // The liqor pays less than the full amount to receive the positive pnl
