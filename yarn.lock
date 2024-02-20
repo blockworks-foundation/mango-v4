@@ -30,7 +30,7 @@
   dependencies:
     regenerator-runtime "^0.14.0"
 
-"@blockworks-foundation/mango-v4-settings@0.4.15":
+"@blockworks-foundation/mango-v4-settings@0.14.15":
   version "0.14.15"
   resolved "https://registry.yarnpkg.com/@blockworks-foundation/mango-v4-settings/-/mango-v4-settings-0.14.15.tgz#0ac04f2cffbd27a4129bc2086ec1418e29393880"
   integrity sha512-GBo43KCosdaohbtS3Rtz8e2zsLsiN3JqTfLKVtStRYO3f2tQLzeo/D2Khz07psw2egq6TCNZJH7+v32iGrPq0w==
