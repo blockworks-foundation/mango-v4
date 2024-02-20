@@ -237,6 +237,213 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     }
 }
 
+/// TODO: Assumes the account infos needed for the health computation follow a strict order.
+///
+/// 1. n_banks Bank account, in the order of account.token_iter_active()
+/// 2. n_banks oracle accounts, one for each bank in the same order
+/// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
+/// 4. PerpMarket oracle accounts, in the order of the perp market accounts
+/// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
+pub struct FixedOrderAccountRetriever2<T: KeyedAccountReader> {
+    pub ais: Vec<T>,
+    pub n_banks: usize,
+    pub n_perps: usize,
+    pub begin_perp: usize,
+    pub begin_serum3: usize,
+    pub staleness_slot: Option<u64>,
+    pub begin_fallback_oracles: usize,
+    pub usdc_oracle_index: Option<usize>,
+    pub sol_oracle_index: Option<usize>,
+}
+
+pub fn new_fixed_order_account_retriever2<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccountRef,
+) -> Result<FixedOrderAccountRetriever2<AccountInfoRef<'a, 'info>>> {
+    // Scan for the number of banks provided
+    let n_banks = ais
+        .iter()
+        .enumerate()
+        .position(|i_ai| can_load_as::<Bank>(i_ai).is_none())
+        .unwrap_or(ais.len());
+
+    let active_token_len = account.active_token_positions().count();
+    require_gte!(active_token_len, n_banks);
+
+    let active_serum3_len = account.active_serum3_orders().count();
+    let active_perp_len = account.active_perp_positions().count();
+    let expected_ais = n_banks * 2 // banks + oracles
+        + active_perp_len * 2 // PerpMarkets + Oracles
+        + active_serum3_len; // open_orders
+
+    require_msg_typed!(ais.len() >= expected_ais, MangoError::InvalidHealthAccountCount,
+        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)",
+        ais.len(), expected_ais,
+        n_banks, active_token_len, active_perp_len, active_perp_len, active_serum3_len
+    );
+    let usdc_oracle_index = ais[..]
+        .iter()
+        .position(|o| o.key == &pyth_mainnet_usdc_oracle::ID);
+    let sol_oracle_index = ais[..]
+        .iter()
+        .position(|o| o.key == &pyth_mainnet_sol_oracle::ID);
+
+    Ok(FixedOrderAccountRetriever2 {
+        ais: AccountInfoRef::borrow_slice(ais)?,
+        n_banks,
+        n_perps: active_perp_len,
+        begin_perp: active_token_len * 2,
+        begin_serum3: active_token_len * 2 + active_perp_len * 2,
+        staleness_slot: Some(Clock::get()?.slot),
+        begin_fallback_oracles: expected_ais,
+        usdc_oracle_index,
+        sol_oracle_index,
+    })
+}
+
+impl<T: KeyedAccountReader> FixedOrderAccountRetriever2<T> {
+    fn bank(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(usize, &Bank)> {
+        for i in (0..=account_index).rev() {
+            let ai = &self.ais[i];
+            let bank = ai.load_fully_unchecked::<Bank>()?;
+            if bank.token_index == token_index {
+                require_keys_eq!(bank.group, *group);
+                return Ok((i, bank));
+            }
+        }
+        Err(error_msg_typed!(
+            MangoError::InvalidHealthAccountCount,
+            "bank for token index {} not found",
+            token_index
+        ))
+    }
+
+    fn perp_market(
+        &self,
+        group: &Pubkey,
+        account_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<&PerpMarket> {
+        let market_ai = &self.ais[account_index];
+        let market = market_ai.load::<PerpMarket>()?;
+        require_keys_eq!(market.group, *group);
+        require_eq!(market.perp_market_index, perp_market_index);
+        Ok(market)
+    }
+
+    fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
+        let oracle = &self.ais[account_index];
+        let oracle_acc_infos = OracleAccountInfos::from_reader(oracle);
+        perp_market.oracle_price(&oracle_acc_infos, self.staleness_slot)
+    }
+
+    #[inline(always)]
+    fn create_oracle_infos(
+        &self,
+        oracle_index: usize,
+        fallback_key: &Pubkey,
+    ) -> OracleAccountInfos<T> {
+        let oracle = &self.ais[oracle_index];
+        let fallback_opt = self.ais[self.begin_fallback_oracles..]
+            .iter()
+            .find(|ai| ai.key() == fallback_key);
+
+        OracleAccountInfos {
+            oracle,
+            fallback_opt,
+            usdc_opt: self.usdc_oracle_index.map(|i| &self.ais[i]),
+            sol_opt: self.sol_oracle_index.map(|i| &self.ais[i]),
+        }
+    }
+}
+
+impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever2<T> {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>> {
+        let mut result = Vec::with_capacity(self.n_banks);
+        for bank_ai in &self.ais[0..self.n_banks] {
+            let bank = bank_ai.load_fully_unchecked::<Bank>()?;
+            result.push(bank.token_index);
+        }
+        Ok(result)
+    }
+
+    fn bank_and_oracle(
+        &self,
+        group: &Pubkey,
+        active_token_position_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(&Bank, I80F48)> {
+        let (bank_account_index, bank) =
+            self.bank(group, active_token_position_index, token_index)?;
+
+        let oracle_index = self.n_banks + bank_account_index;
+        let oracle_acc_infos = &self.create_oracle_infos(oracle_index, &bank.fallback_oracle);
+        let oracle_price_result = bank.oracle_price(oracle_acc_infos, self.staleness_slot);
+        let oracle_price = oracle_price_result.with_context(|| {
+            format!(
+                "getting oracle for bank with health account index {} and token index {}, passed account {}",
+                bank_account_index,
+                token_index,
+                self.ais[oracle_index].key(),
+            )
+        })?;
+
+        Ok((bank, oracle_price))
+    }
+
+    fn perp_market_and_oracle_price(
+        &self,
+        group: &Pubkey,
+        active_perp_position_index: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<(&PerpMarket, I80F48)> {
+        let perp_index = self.begin_perp + active_perp_position_index;
+        let perp_market = self
+            .perp_market(group, perp_index, perp_market_index)
+            .with_context(|| {
+                format!(
+                    "loading perp market with health account index {} and perp market index {}, passed account {}",
+                    perp_index,
+                    perp_market_index,
+                    self.ais[perp_index].key(),
+                )
+            })?;
+
+        let oracle_index = perp_index + self.n_perps;
+        let oracle_price = self.oracle_price_perp(oracle_index, perp_market).with_context(|| {
+            format!(
+                "getting oracle for perp market with health account index {} and perp market index {}, passed account {}",
+                oracle_index,
+                perp_market_index,
+                self.ais[oracle_index].key(),
+            )
+        })?;
+        Ok((perp_market, oracle_price))
+    }
+
+    fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
+        let serum_oo_index = self.begin_serum3 + active_serum_oo_index;
+        let ai = &self.ais[serum_oo_index];
+        (|| {
+            require_keys_eq!(*key, *ai.key());
+            serum3_cpi::load_open_orders(ai)
+        })()
+        .with_context(|| {
+            format!(
+                "loading serum open orders with health account index {}, passed account {}",
+                serum_oo_index,
+                ai.key(),
+            )
+        })
+    }
+}
+
 pub struct ScannedBanksAndOracles<'a, 'info> {
     banks: Vec<AccountInfoRefMut<'a, 'info>>,
     oracles: Vec<AccountInfoRef<'a, 'info>>,
