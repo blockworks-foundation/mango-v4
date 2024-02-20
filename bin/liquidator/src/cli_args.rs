@@ -204,4 +204,8 @@ pub struct Cli {
     /// when empty, allows all pairs
     #[clap(long, env, value_parser, value_delimiter = ' ')]
     pub(crate) liquidation_only_allow_perp_markets: Option<Vec<u16>>,
+
+    /// how long should it wait before logging an oracle error again (for the same token)
+    #[clap(long, env, default_value = "30")]
+    pub(crate) skip_oracle_error_in_logs_duration_secs: u64,
 }

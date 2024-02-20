@@ -27,6 +27,7 @@ pub mod rebalance;
 pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
+mod unwrappable_oracle_error;
 pub mod util;
 
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
@@ -262,6 +263,12 @@ async fn main() -> anyhow::Result<()> {
             .skip_threshold_for_type(LiqErrorType::Liq, 5)
             .skip_duration(Duration::from_secs(120))
             .build()?,
+        oracle_errors: ErrorTracking::builder()
+            .skip_threshold(1)
+            .skip_duration(Duration::from_secs(
+                cli.skip_oracle_error_in_logs_duration_secs,
+            ))
+            .build()?,
     });
 
     info!("main loop");
@@ -375,6 +382,7 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 liquidation.errors.update();
+                liquidation.oracle_errors.update();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -499,6 +507,7 @@ struct LiquidationState {
     trigger_tcs_config: trigger_tcs::Config,
 
     errors: ErrorTracking<Pubkey, LiqErrorType>,
+    oracle_errors: ErrorTracking<TokenIndex, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -548,6 +557,7 @@ impl LiquidationState {
             &self.account_fetcher,
             pubkey,
             &self.liquidation_config,
+            &mut self.oracle_errors,
         )
         .await;
 
