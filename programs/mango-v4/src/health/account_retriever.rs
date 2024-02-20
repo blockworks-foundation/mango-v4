@@ -26,6 +26,8 @@ use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenInde
 ///   are passed because health needs to be computed for different baskets in
 ///   one instruction (such as for liquidation instructions).
 pub trait AccountRetriever {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>>;
+
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -146,6 +148,15 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>> {
+        let mut result = Vec::with_capacity(self.n_banks);
+        for bank_ai in &self.ais[0..self.n_banks] {
+            let bank = bank_ai.load::<Bank>()?;
+            result.push(bank.token_index);
+        }
+        Ok(result)
+    }
+
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -505,6 +516,10 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 }
 
 impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>> {
+        Ok(self.banks_and_oracles.index_map.keys().copied().collect())
+    }
+
     fn bank_and_oracle(
         &self,
         _group: &Pubkey,

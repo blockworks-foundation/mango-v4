@@ -1230,7 +1230,7 @@ pub fn new_health_cache(
     retriever: &impl AccountRetriever,
     now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, now_ts, false)
+    new_health_cache_impl(account, retriever, now_ts, false, false)
 }
 
 /// Generate a special HealthCache for an account and its health accounts
@@ -1243,7 +1243,7 @@ pub fn new_health_cache_skipping_bad_oracles(
     retriever: &impl AccountRetriever,
     now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, now_ts, true)
+    new_health_cache_impl(account, retriever, now_ts, true, false)
 }
 
 fn new_health_cache_impl(
@@ -1254,11 +1254,28 @@ fn new_health_cache_impl(
     // not be negative, skip it. This decreases health, but maybe overall it's
     // still positive?
     skip_bad_oracles: bool,
+    skip_missing_banks: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
+    let available_banks = if skip_missing_banks {
+        Some(retriever.available_banks()?)
+    } else {
+        None
+    };
+
     for (i, position) in account.active_token_positions().enumerate() {
+        let bank_is_available = available_banks
+            .as_ref()
+            .map(|ab| ab.contains(&position.token_index))
+            .unwrap_or(true);
+        if skip_missing_banks && !bank_is_available {
+            // Allow skipping of missing banks only if they have a nonnegative balance
+            require!(position.indexed_position >= 0, MangoError::SomeError); // TODO: error
+            continue;
+        }
+
         let bank_oracle_result =
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index);
         if skip_bad_oracles
