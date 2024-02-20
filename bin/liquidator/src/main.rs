@@ -566,7 +566,7 @@ impl LiquidationState {
                 if self
                     .oracle_errors
                     .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
-                    .is_some()
+                    .is_none()
                 {
                     println!(
                         "{:?} recording oracle error for token {} {}",

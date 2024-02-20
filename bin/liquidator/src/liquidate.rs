@@ -1,6 +1,5 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::time::Duration;
 
 use itertools::Itertools;
@@ -10,7 +9,6 @@ use mango_v4_client::{chain_data, MangoClient, PreparedInstructions};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
-use mango_v4_client::chain_data::AccountFetcher;
 use rand::seq::SliceRandom;
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -654,8 +652,8 @@ impl<'a> LiquidateHelper<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn maybe_liquidate_account(
-    mango_client: &Arc<MangoClient>,
-    account_fetcher: &Arc<AccountFetcher>,
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
     config: &Config,
 ) -> anyhow::Result<bool> {
@@ -666,7 +664,6 @@ pub async fn maybe_liquidate_account(
         .health_cache(&account)
         .await
         .context("creating health cache 1")?;
-
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);
