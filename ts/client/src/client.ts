@@ -2240,13 +2240,18 @@ export class MangoClient {
     externalMarketPk: PublicKey,
     limit?: number,
   ): Promise<MangoSignatureStatus> {
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      await this.serum3CancelAllOrdersIx(
+    const [cancelAllIx, settle] = await Promise.all([
+      this.serum3CancelAllOrdersIx(
         group,
         mangoAccount,
         externalMarketPk,
         limit,
       ),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      cancelAllIx,
+      settle,
     ]);
   }
 
