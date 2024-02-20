@@ -9,9 +9,7 @@ use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOT
 use mango_v4_client::{chain_data, MangoClient, PreparedInstructions};
 use solana_sdk::signature::Signature;
 
-use anchor_lang::error::Error::AnchorError;
 use futures::{stream, StreamExt, TryStreamExt};
-use mango_v4::error::MangoError;
 use mango_v4_client::chain_data::AccountFetcher;
 use mango_v4_client::error_tracking::ErrorTracking;
 use rand::seq::SliceRandom;
