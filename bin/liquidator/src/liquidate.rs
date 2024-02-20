@@ -11,14 +11,11 @@ use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
 use mango_v4_client::chain_data::AccountFetcher;
-use mango_v4_client::error_tracking::ErrorTracking;
 use rand::seq::SliceRandom;
-use std::time::Instant;
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::unwrappable_oracle_error::UnwrappableOracleError;
-use crate::{util, LiqErrorType};
+use crate::util;
 
 #[derive(Clone)]
 pub struct Config {
@@ -661,36 +658,15 @@ pub async fn maybe_liquidate_account(
     account_fetcher: &Arc<AccountFetcher>,
     pubkey: &Pubkey,
     config: &Config,
-    oracle_errors: &mut ErrorTracking<TokenIndex, LiqErrorType>,
 ) -> anyhow::Result<bool> {
     let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     let account = account_fetcher.fetch_mango_account(pubkey)?;
-    let health_cache_opt = mango_client
+    let health_cache = mango_client
         .health_cache(&account)
         .await
-        .context("creating health cache 1")
-        .unwrap_unless_oracle_error(|ti, ti_name, error| {
-            if oracle_errors
-                .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
-                .is_some()
-            {
-                println!(
-                    "{:?} recording oracle error for token {} {}",
-                    chrono::offset::Utc::now(),
-                    ti_name,
-                    ti
-                );
-            }
+        .context("creating health cache 1")?;
 
-            oracle_errors.record(LiqErrorType::Liq, &ti, error.to_string());
-        })?;
-
-    if health_cache_opt.is_none() {
-        return Ok(false);
-    }
-
-    let health_cache = health_cache_opt.unwrap();
     let maint_health = health_cache.health(HealthType::Maint);
     if !health_cache.is_liquidatable() {
         return Ok(false);

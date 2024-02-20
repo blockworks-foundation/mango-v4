@@ -1,30 +1,18 @@
 use anchor_lang::error::Error::AnchorError;
 use mango_v4::state::TokenIndex;
 
-pub trait UnwrappableOracleError<T> {
-    /// Returns
-    /// - Ok(Some(..)) on success
-    /// - Ok(None) on oracle error (and call callback)
-    /// - Err(..) on any other error
-    fn unwrap_unless_oracle_error<F>(self, on_oracle_error: F) -> anyhow::Result<Option<T>>
-    where
-        F: FnOnce(TokenIndex, String, anyhow::Error);
+pub trait UnwrappableOracleError {
+    fn try_unwrap_oracle_error(&self) -> Option<(TokenIndex, String)>;
 }
 
-impl<T: std::fmt::Debug> UnwrappableOracleError<T> for anyhow::Result<T> {
-    fn unwrap_unless_oracle_error<F>(self, on_oracle_error: F) -> anyhow::Result<Option<T>>
-    where
-        F: FnOnce(TokenIndex, String, anyhow::Error),
-    {
-        if self.is_ok() {
-            return Ok(Some(self.unwrap()));
-        }
-
-        let e = self.unwrap_err();
-        let root_cause = e.root_cause().downcast_ref::<anchor_lang::error::Error>();
+impl UnwrappableOracleError for anyhow::Error {
+    fn try_unwrap_oracle_error(&self) -> Option<(TokenIndex, String)> {
+        let root_cause = self
+            .root_cause()
+            .downcast_ref::<anchor_lang::error::Error>();
 
         if root_cause.is_none() {
-            return Err(e);
+            return None;
         }
 
         if let AnchorError(ae) = root_cause.unwrap() {
@@ -33,7 +21,7 @@ impl<T: std::fmt::Debug> UnwrappableOracleError<T> for anyhow::Result<T> {
             let error_str = ae.to_string();
 
             if !is_oracle_error || !error_str.contains("token index ") {
-                return Err(e);
+                return None;
             }
             use mango_v4::error::MangoError;
             use std::str::FromStr;
@@ -48,11 +36,10 @@ impl<T: std::fmt::Debug> UnwrappableOracleError<T> for anyhow::Result<T> {
                 .to_string();
 
             if !ti_res.is_err() {
-                on_oracle_error(TokenIndex::from(ti_res.unwrap()), ti_name, e);
-                return Ok(None);
+                return Some((TokenIndex::from(ti_res.unwrap()), ti_name));
             }
         }
 
-        return Err(e);
+        return None;
     }
 }

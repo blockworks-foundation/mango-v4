@@ -30,6 +30,7 @@ pub mod trigger_tcs;
 mod unwrappable_oracle_error;
 pub mod util;
 
+use crate::unwrappable_oracle_error::UnwrappableOracleError;
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
@@ -557,11 +558,30 @@ impl LiquidationState {
             &self.account_fetcher,
             pubkey,
             &self.liquidation_config,
-            &mut self.oracle_errors,
         )
         .await;
 
         if let Err(err) = result.as_ref() {
+            if let Some((ti, ti_name)) = err.try_unwrap_oracle_error() {
+                if self
+                    .oracle_errors
+                    .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
+                    .is_some()
+                {
+                    println!(
+                        "{:?} recording oracle error for token {} {}",
+                        chrono::offset::Utc::now(),
+                        ti_name,
+                        ti
+                    );
+                }
+
+                self.oracle_errors
+                    .record(LiqErrorType::Liq, &ti, err.to_string());
+                return result;
+            } else {
+            }
+
             // Keep track of pubkeys that had errors
             error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
