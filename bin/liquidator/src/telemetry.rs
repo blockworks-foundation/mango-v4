@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tracing::*;
 
 pub async fn report_regularly(client: Arc<MangoClient>, min_health_ratio: f64) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(std::time::Duration::from_secs(600));
     loop {
         interval.tick().await;
         if let Err(e) = report(&client, min_health_ratio).await {

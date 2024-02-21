@@ -1,6 +1,8 @@
 use crate::error::*;
 use crate::logs::{emit_stack, FilledPerpOrderLog, PerpTakerTradeLog};
-use crate::state::{orderbook::bookside::*, EventQueue, MangoAccountRefMut, PerpMarket};
+use crate::state::{
+    orderbook::bookside::*, EventQueue, MangoAccountRefMut, PerpMarket, PerpMarketIndex,
+};
 use anchor_lang::prelude::*;
 use bytemuck::cast;
 use fixed::types::I80F48;
@@ -91,13 +93,11 @@ impl<'a> Orderbook<'a> {
                 // Remove the order from the book unless we've done that enough
                 if number_of_dropped_expired_orders < DROP_EXPIRED_ORDER_LIMIT {
                     number_of_dropped_expired_orders += 1;
-                    let event = OutEvent::new(
+                    let event = OutEvent::from_leaf_node(
                         other_side,
-                        best_opposing.node.owner_slot,
                         now_ts,
                         event_queue.header.seq_num,
-                        best_opposing.node.owner,
-                        best_opposing.node.quantity,
+                        best_opposing.node,
                     );
                     event_queue.push_back(cast(event)).unwrap();
                     orders_to_delete
@@ -140,13 +140,11 @@ impl<'a> Orderbook<'a> {
                         decremented_base_lots += match_base_lots;
                     }
                     SelfTradeBehavior::CancelProvide => {
-                        let event = OutEvent::new(
+                        let event = OutEvent::from_leaf_node(
                             other_side,
-                            best_opposing.node.owner_slot,
                             now_ts,
                             event_queue.header.seq_num,
-                            best_opposing.node.owner,
-                            best_opposing.node.quantity,
+                            best_opposing.node,
                         );
                         event_queue.push_back(cast(event)).unwrap();
                         orders_to_delete
@@ -181,6 +179,7 @@ impl<'a> Orderbook<'a> {
                 now_ts,
                 seq_num,
                 best_opposing.node.owner,
+                best_opposing.node.key,
                 best_opposing.node.client_order_id,
                 if order_would_self_trade {
                     I80F48::ZERO
@@ -272,13 +271,11 @@ impl<'a> Orderbook<'a> {
 
             // Drop an expired order if possible
             if let Some(expired_order) = bookside.remove_one_expired(order_tree_target, now_ts) {
-                let event = OutEvent::new(
+                let event = OutEvent::from_leaf_node(
                     side,
-                    expired_order.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
-                    expired_order.owner,
-                    expired_order.quantity,
+                    &expired_order,
                 );
                 event_queue.push_back(cast(event)).unwrap();
             }
@@ -292,13 +289,11 @@ impl<'a> Orderbook<'a> {
                     side.is_price_better(price_lots, worst_price),
                     MangoError::SomeError
                 );
-                let event = OutEvent::new(
+                let event = OutEvent::from_leaf_node(
                     side,
-                    worst_order.owner_slot,
                     now_ts,
                     event_queue.header.seq_num,
-                    worst_order.owner,
-                    worst_order.quantity,
+                    &worst_order,
                 );
                 event_queue.push_back(cast(event)).unwrap();
             }
@@ -334,7 +329,6 @@ impl<'a> Orderbook<'a> {
                 side,
                 order_tree_target,
                 &new_order,
-                order.client_order_id,
             )?;
         }
 
@@ -351,6 +345,7 @@ impl<'a> Orderbook<'a> {
     pub fn cancel_all_orders(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
+        mango_account_pk: &Pubkey,
         perp_market: &mut PerpMarket,
         mut limit: u8,
         side_to_cancel_option: Option<Side>,
@@ -371,8 +366,12 @@ impl<'a> Orderbook<'a> {
 
             let order_id = oo.id;
 
-            let cancel_result =
-                self.cancel_order(mango_account, order_id, order_side_and_tree, None);
+            let cancel_result = self.cancel_order_by_slot(
+                mango_account,
+                mango_account_pk,
+                i,
+                perp_market.perp_market_index,
+            );
             if cancel_result.is_anchor_error_with_code(MangoError::PerpOrderIdNotFound.into()) {
                 // It's possible for the order to be filled or expired already.
                 // There will be an event on the queue, the perp order slot is freed once
@@ -394,8 +393,53 @@ impl<'a> Orderbook<'a> {
         Ok(())
     }
 
+    /// Cancels an order in an open order slot, removing it from open orders list
+    /// and from the orderbook (unless already filled/expired)
+    pub fn cancel_order_by_slot(
+        &mut self,
+        mango_account: &mut MangoAccountRefMut,
+        mango_account_pk: &Pubkey,
+        slot: usize,
+        perp_market_index: PerpMarketIndex,
+    ) -> Result<()> {
+        let oo = mango_account.perp_order_by_raw_index(slot)?;
+        if !oo.is_active_for_market(perp_market_index) {
+            return Err(error_msg_typed!(
+                MangoError::SomeError,
+                "perp orders at slot {slot} is not active for perp market {perp_market_index}"
+            ));
+        }
+
+        let side_and_tree = oo.side_and_tree();
+        let side = side_and_tree.side();
+        let book_component = side_and_tree.order_tree();
+        let order_id = oo.id;
+        let leaf_node_opt = self
+            .bookside_mut(side)
+            .remove_by_key(book_component, order_id);
+
+        // If the order is still on the book, cancel it without an OutEvent and free up the order
+        // quantity immediately. If it's not on the book, the OutEvent or FillEvent is responsible
+        // for freeing up quantity, even if we already free up the slot itself here.
+        let on_book_quantity = if let Some(leaf_node) = leaf_node_opt {
+            require_eq!(leaf_node.owner_slot as usize, slot);
+            require_keys_eq!(leaf_node.owner, *mango_account_pk);
+            leaf_node.quantity
+        } else {
+            // Old orders didn't keep track of `quantity` on the oo slot. They are not allowed
+            // to be cancelled while a canceling Fill- or OutEvent is in flight.
+            if oo.quantity == 0 {
+                return Err(error_msg_typed!(MangoError::PerpOrderIdNotFound, "no perp order with id {order_id}, side {side:?}, component {book_component:?} found on the orderbook"));
+            }
+            0
+        };
+        mango_account.remove_perp_order(slot, on_book_quantity)?;
+
+        Ok(())
+    }
+
     /// Cancels an order on a side, removing it from the book and the mango account orders list
-    pub fn cancel_order(
+    pub fn cancel_order_by_id(
         &mut self,
         mango_account: &mut MangoAccountRefMut,
         order_id: u128,

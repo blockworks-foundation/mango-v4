@@ -143,6 +143,7 @@ async function registerTokens(): Promise<void> {
     group,
     usdcMainnetMint,
     usdcMainnetOracle,
+    PublicKey.default,
     0,
     'USDC',
     defaultTokenParams,
@@ -298,7 +299,7 @@ async function createAndPopulateAlt() {
     // TODO: dont extend for perps atm
     await extendTable(perpMarketAddresses);
 
-    // Well known addressess
+    // Well known addresses
     await extendTable([
       SystemProgram.programId,
       SYSVAR_RENT_PUBKEY,

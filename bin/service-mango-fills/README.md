@@ -80,7 +80,7 @@ Fill Event
 }
 ```
 
-If the fill ocurred on a fork, an event will be sent with the 'status' field set to 'revoke'.
+If the fill occurred on a fork, an event will be sent with the 'status' field set to 'revoke'.
 
 ## Setup
 

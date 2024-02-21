@@ -1,8 +1,9 @@
+use std::collections::HashSet;
 use std::{
     collections::HashMap,
     pin::Pin,
     sync::{Arc, RwLock},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use futures_core::Future;
@@ -11,14 +12,14 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, health_cache, jupiter, MangoClient, TransactionBuilder};
+use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
-use solana_sdk::{signature::Signature, signer::Signer};
+use solana_sdk::signature::Signature;
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::{token_swap_info, util, ErrorTracking};
+use crate::{token_swap_info, util, ErrorTracking, LiqErrorType};
 
 /// When computing the max possible swap for a liqee, assume the price is this fraction worse for them.
 ///
@@ -56,7 +57,6 @@ pub enum Mode {
 pub struct Config {
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
-    pub refresh_timeout: Duration,
     pub compute_limit_for_trigger: u32,
     pub collateral_token_index: TokenIndex,
 
@@ -65,7 +65,7 @@ pub struct Config {
     pub profit_fraction: f64,
 
     /// Minimum fraction of max_buy to buy for success when triggering,
-    /// useful in conjuction with jupiter swaps in same tx to avoid over-buying.
+    /// useful in conjunction with jupiter swaps in same tx to avoid over-buying.
     ///
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
@@ -73,6 +73,9 @@ pub struct Config {
     pub jupiter_version: jupiter::Version,
     pub jupiter_slippage_bps: u64,
     pub mode: Mode,
+
+    pub only_allowed_tokens: HashSet<TokenIndex>,
+    pub forbidden_tokens: HashSet<TokenIndex>,
 }
 
 pub enum JupiterQuoteCacheResult<T> {
@@ -401,10 +404,42 @@ impl Context {
         Ok(taker_price >= base_price * cost_over_oracle * (1.0 + self.config.profit_fraction))
     }
 
+    // excluded by config
+    fn tcs_pair_is_allowed(
+        &self,
+        buy_token_index: TokenIndex,
+        sell_token_index: TokenIndex,
+    ) -> bool {
+        if self.config.forbidden_tokens.contains(&buy_token_index) {
+            return false;
+        }
+
+        if self.config.forbidden_tokens.contains(&sell_token_index) {
+            return false;
+        }
+
+        if self.config.only_allowed_tokens.is_empty() {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&buy_token_index) {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&sell_token_index) {
+            return true;
+        }
+
+        return false;
+    }
+
     // Either expired or triggerable with ok-looking price.
     fn tcs_is_interesting(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
         if tcs.is_expired(self.now_ts) {
             return Ok(true);
+        }
+        if !self.tcs_pair_is_allowed(tcs.buy_token_index, tcs.buy_token_index) {
+            return Ok(false);
         }
 
         let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
@@ -665,8 +700,9 @@ impl Context {
         liqee_old: &MangoAccountValue,
         tcs_id: u64,
     ) -> anyhow::Result<Option<PreparedExecution>> {
-        let fetcher = self.account_fetcher.as_ref();
-        let health_cache = health_cache::new(&self.mango_client.context, fetcher, liqee_old)
+        let health_cache = self
+            .mango_client
+            .health_cache(liqee_old)
             .await
             .context("creating health cache 1")?;
         if health_cache.is_liquidatable() {
@@ -685,7 +721,9 @@ impl Context {
             return Ok(None);
         }
 
-        let health_cache = health_cache::new(&self.mango_client.context, fetcher, &liqee)
+        let health_cache = self
+            .mango_client
+            .health_cache(&liqee)
             .await
             .context("creating health cache 2")?;
         if health_cache.is_liquidatable() {
@@ -962,10 +1000,9 @@ impl Context {
     pub async fn execute_tcs(
         &self,
         tcs: &mut [(Pubkey, u64, u64)],
-        error_tracking: &mut ErrorTracking,
+        error_tracking: &mut ErrorTracking<Pubkey, LiqErrorType>,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
-        let now = Instant::now();
 
         let max_volume = self.config.max_trigger_quote_amount;
         let mut pending_volume = 0;
@@ -1012,7 +1049,11 @@ impl Context {
                     }
                     Err(e) => {
                         trace!(%result.pubkey, "preparation error {:?}", e);
-                        error_tracking.record_error(&result.pubkey, now, e.to_string());
+                        error_tracking.record(
+                            LiqErrorType::TcsExecution,
+                            &result.pubkey,
+                            e.to_string(),
+                        );
                     }
                 }
                 no_new_job = false;
@@ -1089,7 +1130,7 @@ impl Context {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
                     trace!(%pubkey, "execution error {:?}", err);
-                    error_tracking.record_error(&pubkey, Instant::now(), err.to_string());
+                    error_tracking.record(LiqErrorType::TcsExecution, &pubkey, err.to_string());
                     None
                 }
             });
@@ -1104,10 +1145,12 @@ impl Context {
         pubkey: &Pubkey,
         tcs_id: u64,
         volume: u64,
-        error_tracking: &ErrorTracking,
+        error_tracking: &ErrorTracking<Pubkey, LiqErrorType>,
     ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::TcsExecution, pubkey, Instant::now())
+        {
             trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count
@@ -1160,10 +1203,8 @@ impl Context {
             let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
-                address_lookup_tables: vec![],
-                payer: fee_payer.pubkey(),
                 signers: vec![self.mango_client.owner.clone(), fee_payer],
-                config: self.mango_client.client.transaction_builder_config,
+                ..self.mango_client.transaction_builder().await?
             }
         };
 

@@ -4,11 +4,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
-use mango_v4::state::{PerpMarket, PerpMarketIndex};
-use mango_v4_client::{
-    chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
-    TransactionBuilder,
-};
+use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
+use mango_v4_client::{chain_data, MangoClient, PreparedInstructions, TransactionBuilder};
 use solana_sdk::address_lookup_table_account::AddressLookupTableAccount;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Signature;
@@ -34,11 +31,10 @@ fn perp_markets_and_prices(
         .map(|(market_index, perp)| {
             let perp_market = account_fetcher.fetch::<PerpMarket>(&perp.address)?;
 
-            let oracle_acc = account_fetcher.fetch_raw(&perp_market.oracle)?;
-            let oracle_price = perp_market.oracle_price(
-                &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
-                None,
-            )?;
+            let oracle = account_fetcher.fetch_raw(&perp_market.oracle)?;
+            let oracle_acc = &KeyedAccountSharedData::new(perp_market.oracle, oracle);
+            let oracle_price =
+                perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
 
             let settle_token = mango_client.context.token(perp_market.settle_token_index);
             let settle_token_price =
@@ -121,11 +117,10 @@ impl SettlementState {
                 continue;
             }
 
-            let health_cache =
-                match health_cache::new(&mango_client.context, account_fetcher, &account).await {
-                    Ok(hc) => hc,
-                    Err(_) => continue, // Skip for stale/unconfident oracles
-                };
+            let health_cache = match mango_client.health_cache(&account).await {
+                Ok(hc) => hc,
+                Err(_) => continue, // Skip for stale/unconfident oracles
+            };
             let liq_end_health = health_cache.health(HealthType::LiquidationEnd);
 
             for perp_market_index in perp_indexes {
@@ -289,7 +284,7 @@ impl<'a> SettleBatchProcessor<'a> {
             address_lookup_tables: self.address_lookup_tables.clone(),
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
-            config: client.transaction_builder_config,
+            config: client.config().transaction_builder_config.clone(),
         }
         .transaction_with_blockhash(self.blockhash)
     }
@@ -302,13 +297,7 @@ impl<'a> SettleBatchProcessor<'a> {
         let tx = self.transaction()?;
         self.instructions.clear();
 
-        let send_result = self
-            .mango_client
-            .client
-            .rpc_async()
-            .send_transaction_with_config(&tx, self.mango_client.client.rpc_send_transaction_config)
-            .await
-            .map_err(prettify_solana_client_error);
+        let send_result = self.mango_client.client.send_transaction(&tx).await;
 
         match send_result {
             Ok(txsig) => {
@@ -329,11 +318,14 @@ impl<'a> SettleBatchProcessor<'a> {
     ) -> anyhow::Result<Option<Signature>> {
         let a_value = self.account_fetcher.fetch_mango_account(&account_a)?;
         let b_value = self.account_fetcher.fetch_mango_account(&account_b)?;
-        let new_ixs = self.mango_client.perp_settle_pnl_instruction(
-            self.perp_market_index,
-            (&account_a, &a_value),
-            (&account_b, &b_value),
-        )?;
+        let new_ixs = self
+            .mango_client
+            .perp_settle_pnl_instruction(
+                self.perp_market_index,
+                (&account_a, &a_value),
+                (&account_b, &b_value),
+            )
+            .await?;
         let previous = self.instructions.clone();
         self.instructions.append(new_ixs.clone());
 

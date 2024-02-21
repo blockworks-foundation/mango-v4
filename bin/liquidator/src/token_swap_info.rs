@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use itertools::Itertools;
+use mango_v4_client::error_tracking::ErrorTracking;
 use tracing::*;
 
 use mango_v4::state::TokenIndex;
@@ -10,7 +11,10 @@ use mango_v4_client::MangoClient;
 
 pub struct Config {
     pub quote_index: TokenIndex,
+
+    /// Size in quote_index-token native tokens to quote.
     pub quote_amount: u64,
+
     pub jupiter_version: jupiter::Version,
 }
 
@@ -37,21 +41,31 @@ impl TokenSwapInfo {
     }
 }
 
+struct TokenSwapInfoState {
+    swap_infos: HashMap<TokenIndex, TokenSwapInfo>,
+    errors: ErrorTracking<TokenIndex, &'static str>,
+}
+
 /// Track the buy/sell slippage for tokens
 ///
 /// Needed to evaluate whether a token conditional swap premium might be good enough
 /// without having to query each time.
 pub struct TokenSwapInfoUpdater {
     mango_client: Arc<MangoClient>,
-    swap_infos: RwLock<HashMap<TokenIndex, TokenSwapInfo>>,
+    state: RwLock<TokenSwapInfoState>,
     config: Config,
 }
+
+const ERROR_TYPE: &'static str = "tsi";
 
 impl TokenSwapInfoUpdater {
     pub fn new(mango_client: Arc<MangoClient>, config: Config) -> Self {
         Self {
             mango_client,
-            swap_infos: RwLock::new(HashMap::new()),
+            state: RwLock::new(TokenSwapInfoState {
+                swap_infos: HashMap::new(),
+                errors: ErrorTracking::builder().build().unwrap(),
+            }),
             config,
         }
     }
@@ -61,13 +75,13 @@ impl TokenSwapInfoUpdater {
     }
 
     fn update(&self, token_index: TokenIndex, slippage: TokenSwapInfo) {
-        let mut lock = self.swap_infos.write().unwrap();
-        lock.insert(token_index, slippage);
+        let mut lock = self.state.write().unwrap();
+        lock.swap_infos.insert(token_index, slippage);
     }
 
     pub fn swap_info(&self, token_index: TokenIndex) -> Option<TokenSwapInfo> {
-        let lock = self.swap_infos.read().unwrap();
-        lock.get(&token_index).cloned()
+        let lock = self.state.read().unwrap();
+        lock.swap_infos.get(&token_index).cloned()
     }
 
     fn in_per_out_price(route: &jupiter::Quote) -> f64 {
@@ -76,7 +90,26 @@ impl TokenSwapInfoUpdater {
         in_amount / out_amount
     }
 
-    pub async fn update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
+    pub async fn update_one(&self, token_index: TokenIndex) {
+        {
+            let lock = self.state.read().unwrap();
+            if lock
+                .errors
+                .had_too_many_errors(ERROR_TYPE, &token_index, std::time::Instant::now())
+                .is_some()
+            {
+                return;
+            }
+        }
+
+        if let Err(err) = self.try_update_one(token_index).await {
+            let mut lock = self.state.write().unwrap();
+            lock.errors
+                .record(ERROR_TYPE, &token_index, err.to_string());
+        }
+    }
+
+    async fn try_update_one(&self, token_index: TokenIndex) -> anyhow::Result<()> {
         // since we're only quoting, the slippage does not matter
         let slippage = 100;
 
@@ -155,6 +188,11 @@ impl TokenSwapInfoUpdater {
     }
 
     pub fn log_all(&self) {
+        {
+            let mut lock = self.state.write().unwrap();
+            lock.errors.update();
+        }
+
         let mut tokens = self
             .mango_client
             .context
@@ -163,11 +201,12 @@ impl TokenSwapInfoUpdater {
             .into_iter()
             .collect_vec();
         tokens.sort_by(|a, b| a.0.cmp(&b.0));
-        let infos = self.swap_infos.read().unwrap();
+        let lock = self.state.read().unwrap();
 
         let mut msg = String::new();
         for (token, token_index) in tokens {
-            let info = infos
+            let info = lock
+                .swap_infos
                 .get(&token_index)
                 .map(|info| {
                     format!(

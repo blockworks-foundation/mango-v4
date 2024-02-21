@@ -9,7 +9,7 @@ use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
-    account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
+    account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
     TransactionBuilderConfig,
 };
@@ -20,6 +20,7 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
 use tracing::*;
 
+pub mod cli_args;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
@@ -35,128 +36,6 @@ use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-#[derive(Parser, Debug)]
-#[clap()]
-struct CliDotenv {
-    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
-    #[clap(long)]
-    dotenv: std::path::PathBuf,
-
-    remaining_args: Vec<std::ffi::OsString>,
-}
-
-// Prefer "--rebalance false" over "--no-rebalance" because it works
-// better with REBALANCE=false env values.
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum BoolArg {
-    True,
-    False,
-}
-
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum JupiterVersionArg {
-    Mock,
-    V4,
-    V6,
-}
-
-impl From<JupiterVersionArg> for jupiter::Version {
-    fn from(a: JupiterVersionArg) -> Self {
-        match a {
-            JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V4 => jupiter::Version::V4,
-            JupiterVersionArg::V6 => jupiter::Version::V6,
-        }
-    }
-}
-
-#[derive(Parser)]
-#[clap()]
-struct Cli {
-    #[clap(short, long, env)]
-    rpc_url: String,
-
-    #[clap(long, env)]
-    liqor_mango_account: Pubkey,
-
-    #[clap(long, env)]
-    liqor_owner: String,
-
-    #[clap(long, env, default_value = "1000")]
-    check_interval_ms: u64,
-
-    #[clap(long, env, default_value = "300")]
-    snapshot_interval_secs: u64,
-
-    /// how many getMultipleAccounts requests to send in parallel
-    #[clap(long, env, default_value = "10")]
-    parallel_rpc_requests: usize,
-
-    /// typically 100 is the max number of accounts getMultipleAccounts will retrieve at once
-    #[clap(long, env, default_value = "100")]
-    get_multiple_accounts_count: usize,
-
-    /// liquidator health ratio should not fall below this value
-    #[clap(long, env, default_value = "50")]
-    min_health_ratio: f64,
-
-    /// if rebalancing is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    rebalance: BoolArg,
-
-    /// max slippage to request on swaps to rebalance spot tokens
-    #[clap(long, env, default_value = "100")]
-    rebalance_slippage_bps: u64,
-
-    /// tokens to not rebalance (in addition to USDC); use a comma separated list of names
-    #[clap(long, env, default_value = "")]
-    rebalance_skip_tokens: String,
-
-    /// if taking tcs orders is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    take_tcs: BoolArg,
-
-    /// profit margin at which to take tcs orders
-    #[clap(long, env, default_value = "0.0005")]
-    tcs_profit_fraction: f64,
-
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
-
-    /// compute limit requested for liquidation instructions
-    #[clap(long, env, default_value = "250000")]
-    compute_limit_for_liquidation: u32,
-
-    /// compute limit requested for tcs trigger instructions
-    #[clap(long, env, default_value = "300000")]
-    compute_limit_for_tcs: u32,
-
-    /// control which version of jupiter to use
-    #[clap(long, env, value_enum, default_value = "v6")]
-    jupiter_version: JupiterVersionArg,
-
-    /// override the url to jupiter v4
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v4")]
-    jupiter_v4_url: String,
-
-    /// override the url to jupiter v6
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
-    jupiter_v6_url: String,
-
-    /// provide a jupiter token, currently only for jup v6
-    #[clap(long, env, default_value = "")]
-    jupiter_token: String,
-
-    /// report liquidator's existence and pubkey
-    #[clap(long, env, value_enum, default_value = "true")]
-    telemetry: BoolArg,
-}
-
 pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
 }
@@ -165,20 +44,31 @@ pub fn encode_address(addr: &Pubkey) -> String {
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
 
-    let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
+    let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
-        cli_dotenv.remaining_args
+        std::env::args_os()
+            .take(1)
+            .chain(cli_dotenv.remaining_args.into_iter())
+            .collect()
     } else {
         dotenv::dotenv().ok();
         std::env::args_os().collect()
     };
     let cli = Cli::parse_from(args);
 
-    let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
+    //
+    // Priority fee setup
+    //
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
 
+    //
+    // Client setup
+    //
+    let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
     let rpc_url = cli.rpc_url;
     let ws_url = rpc_url.replace("https", "wss");
-
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
     let commitment = CommitmentConfig::processed();
@@ -186,16 +76,18 @@ async fn main() -> anyhow::Result<()> {
         .cluster(cluster.clone())
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
-        .timeout(Some(rpc_timeout))
-        .jupiter_v4_url(cli.jupiter_v4_url)
+        .timeout(rpc_timeout)
         .jupiter_v6_url(cli.jupiter_v6_url)
         .jupiter_token(cli.jupiter_token)
-        .transaction_builder_config(TransactionBuilderConfig {
-            prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                .then_some(cli.prioritization_micro_lamports),
-            // Liquidation and tcs triggers set their own budgets, this is a default for other tx
-            compute_budget_per_instruction: Some(250_000),
-        })
+        .transaction_builder_config(
+            TransactionBuilderConfig::builder()
+                .priority_fee_provider(prio_provider)
+                // Liquidation and tcs triggers set their own budgets, this is a default for other tx
+                .compute_budget_per_instruction(Some(250_000))
+                .build()
+                .unwrap(),
+        )
+        .override_send_transaction_urls(cli.override_send_transaction_url)
         .build()
         .unwrap();
 
@@ -204,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
     // Reading accounts from chain_data
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
+        rpc: client.new_rpc_async(),
     });
 
     let mango_account = account_fetcher
@@ -217,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
         warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
     }
 
-    let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens
@@ -298,8 +190,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let token_swap_info_config = token_swap_info::Config {
-        quote_index: 0,              // USDC
-        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        quote_index: 0, // USDC
+        quote_amount: (cli.jupiter_swap_info_amount * 1e6) as u64,
         jupiter_version: cli.jupiter_version.into(),
     };
 
@@ -311,25 +203,33 @@ async fn main() -> anyhow::Result<()> {
     let liq_config = liquidate::Config {
         min_health_ratio: cli.min_health_ratio,
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
+        max_cu_per_transaction: 1_000_000,
+        refresh_timeout: Duration::from_secs(cli.liquidation_refresh_timeout_secs as u64),
+        only_allowed_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.only_allow_tokens),
+        forbidden_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.forbidden_tokens),
+        only_allowed_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_only_allow_perp_markets,
+        ),
+        forbidden_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_forbidden_perp_markets,
+        ),
     };
 
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
-        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
+        max_trigger_quote_amount: (cli.tcs_max_trigger_amount * 1e6) as u64,
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
         collateral_token_index: 0, // USDC
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
 
         jupiter_version: cli.jupiter_version.into(),
         jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
-        // TODO: configurable
-        mode: trigger_tcs::Mode::SwapSellIntoBuy,
-        min_buy_fraction: 0.7,
+        mode: cli.tcs_mode.into(),
+        min_buy_fraction: cli.tcs_min_buy_fraction,
+
+        only_allowed_tokens: liq_config.only_allowed_tokens.clone(),
+        forbidden_tokens: liq_config.forbidden_tokens.clone(),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
@@ -337,16 +237,10 @@ async fn main() -> anyhow::Result<()> {
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
-        // TODO: config
-        borrow_settle_excess: 1.05,
-        refresh_timeout: Duration::from_secs(30),
+        borrow_settle_excess: (1f64 + cli.rebalance_borrow_settle_excess).max(1f64),
+        refresh_timeout: Duration::from_secs(cli.rebalance_refresh_timeout_secs),
         jupiter_version: cli.jupiter_version.into(),
-        skip_tokens: cli
-            .rebalance_skip_tokens
-            .split(',')
-            .filter(|v| !v.is_empty())
-            .map(|name| mango_client.context.token_by_name(name).token_index)
-            .collect(),
+        skip_tokens: cli.rebalance_skip_tokens.unwrap_or(Vec::new()),
         allow_withdraws: signer_is_owner,
     };
 
@@ -363,29 +257,11 @@ async fn main() -> anyhow::Result<()> {
         liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
         token_swap_info: token_swap_info_updater.clone(),
-        liq_errors: ErrorTracking {
-            skip_threshold: 5,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_hard_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_partial_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_execution_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        persistent_error_report_interval: Duration::from_secs(300),
-        persistent_error_min_duration: Duration::from_secs(300),
-        last_persistent_error_report: Instant::now(),
+        errors: ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_threshold_for_type(LiqErrorType::Liq, 5)
+            .skip_duration(Duration::from_secs(120))
+            .build()?,
     });
 
     info!("main loop");
@@ -483,7 +359,8 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
+        let mut interval =
+            mango_v4_client::delay_interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -497,7 +374,7 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
-                liquidation.log_persistent_errors();
+                liquidation.errors.update();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -505,16 +382,13 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    took_tcs = match liquidation
+                    took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
-                    {
-                        Ok(v) => v,
-                        Err(err) => {
+                        .unwrap_or_else(|err| {
                             error!("error during maybe_take_token_conditional_swap: {err}");
                             false
-                        }
-                    }
+                        })
                 }
 
                 if liquidated || took_tcs {
@@ -525,14 +399,15 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let token_swap_info_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
-        let mut startup_wait = tokio::time::interval(Duration::from_secs(1));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(
+            cli.token_swap_refresh_interval_secs,
+        ));
+        let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                startup_wait.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
+                    startup_wait.tick().await;
                     continue;
                 }
 
@@ -544,17 +419,10 @@ async fn main() -> anyhow::Result<()> {
                     .keys()
                     .copied()
                     .collect_vec();
-                let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+                let mut min_delay = mango_v4_client::delay_interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
-                    match token_swap_info_updater.update_one(token_index).await {
-                        Ok(()) => {}
-                        Err(err) => {
-                            warn!(
-                                "failed to update token swap info for token {token_index}: {err:?}",
-                            );
-                        }
-                    }
+                    token_swap_info_updater.update_one(token_index).await;
                 }
                 token_swap_info_updater.log_all();
             }
@@ -574,6 +442,7 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    use cli_args::{BoolArg, Cli, CliDotenv};
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
@@ -583,6 +452,7 @@ async fn main() -> anyhow::Result<()> {
         check_changes_for_abort_job,
     ]
     .into_iter()
+    .chain(prio_jobs.into_iter())
     .collect();
     jobs.next().await;
 
@@ -600,6 +470,27 @@ struct SharedState {
     one_snapshot_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LiqErrorType {
+    Liq,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    TcsCollectionHard,
+    /// Recording errors when some tcs have errors during collection but others don't
+    TcsCollectionPartial,
+    TcsExecution,
+}
+
+impl std::fmt::Display for LiqErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Liq => write!(f, "liq"),
+            Self::TcsCollectionHard => write!(f, "tcs-collection-hard"),
+            Self::TcsCollectionPartial => write!(f, "tcs-collection-partial"),
+            Self::TcsExecution => write!(f, "tcs-execution"),
+        }
+    }
+}
+
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
@@ -607,15 +498,7 @@ struct LiquidationState {
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
 
-    liq_errors: ErrorTracking,
-    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
-    tcs_collection_hard_errors: ErrorTracking,
-    /// Recording errors when some tcs have errors during collection but others don't
-    tcs_collection_partial_errors: ErrorTracking,
-    tcs_execution_errors: ErrorTracking,
-    persistent_error_report_interval: Duration,
-    last_persistent_error_report: Instant,
-    persistent_error_min_duration: Duration,
+    errors: ErrorTracking<Pubkey, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -646,10 +529,12 @@ impl LiquidationState {
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = Instant::now();
-        let error_tracking = &mut self.liq_errors;
+        let error_tracking = &mut self.errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::Liq, pubkey, now)
+        {
             trace!(
                 %pubkey,
                 error_entry.count,
@@ -668,7 +553,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now, err.to_string());
+            error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
             // Not all errors need to be raised to the user's attention.
             let mut is_error = true;
@@ -691,7 +576,7 @@ impl LiquidationState {
                 trace!("liquidating account {}: {:?}", pubkey, err);
             }
         } else {
-            error_tracking.clear_errors(pubkey);
+            error_tracking.clear(LiqErrorType::Liq, pubkey);
         }
 
         result
@@ -720,9 +605,9 @@ impl LiquidationState {
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
-            if let Some(error_entry) = self
-                .tcs_collection_hard_errors
-                .had_too_many_errors(pubkey, now)
+            if let Some(error_entry) =
+                self.errors
+                    .had_too_many_errors(LiqErrorType::TcsCollectionHard, pubkey, now)
             {
                 trace!(
                     %pubkey,
@@ -734,19 +619,20 @@ impl LiquidationState {
 
             match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
-                    self.tcs_collection_hard_errors.clear_errors(pubkey);
+                    self.errors.clear(LiqErrorType::TcsCollectionHard, pubkey);
                     if v.is_empty() {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
-                        self.tcs_execution_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
+                        self.errors.clear(LiqErrorType::TcsExecution, pubkey);
                     } else if v.iter().all(|it| it.is_ok()) {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
-                                info!("error on tcs find_interesting: {:?}", e);
-                                self.tcs_collection_partial_errors.record_error(
+                                self.errors.record(
+                                    LiqErrorType::TcsCollectionPartial,
                                     pubkey,
-                                    now,
                                     e.to_string(),
                                 );
                             }
@@ -755,8 +641,8 @@ impl LiquidationState {
                     interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
                 }
                 Err(e) => {
-                    self.tcs_collection_hard_errors
-                        .record_error(pubkey, now, e.to_string());
+                    self.errors
+                        .record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
                 }
             }
         }
@@ -765,9 +651,11 @@ impl LiquidationState {
         }
 
         let (txsigs, mut changed_pubkeys) = tcs_context
-            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
-            .await
-            .context("execute_tcs")?;
+            .execute_tcs(&mut interesting_tcs, &mut self.errors)
+            .await?;
+        for pubkey in changed_pubkeys.iter() {
+            self.errors.clear(LiqErrorType::TcsExecution, pubkey);
+        }
         if txsigs.is_empty() {
             return Ok(false);
         }
@@ -793,30 +681,10 @@ impl LiquidationState {
 
         Ok(true)
     }
-
-    fn log_persistent_errors(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_persistent_error_report)
-            < self.persistent_error_report_interval
-        {
-            return;
-        }
-        self.last_persistent_error_report = now;
-
-        let min_duration = self.persistent_error_min_duration;
-        self.liq_errors
-            .log_persistent_errors("liquidation", min_duration);
-        self.tcs_execution_errors
-            .log_persistent_errors("tcs execution", min_duration);
-        self.tcs_collection_hard_errors
-            .log_persistent_errors("tcs collection hard", min_duration);
-        self.tcs_collection_partial_errors
-            .log_persistent_errors("tcs collection partial", min_duration);
-    }
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

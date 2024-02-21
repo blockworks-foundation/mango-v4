@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoClient, MangoGroupContext, TransactionBuilderConfig,
+    account_update_stream, chain_data, keypair_from_cli, priority_fees_cli, snapshot_source,
+    websocket_source, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
 };
 use tracing::*;
 
@@ -61,9 +61,12 @@ struct Cli {
     #[clap(long, env, default_value = "100")]
     get_multiple_accounts_count: usize,
 
-    /// prioritize each transaction with this many microlamports/cu
-    #[clap(long, env, default_value = "0")]
-    prioritization_micro_lamports: u64,
+    #[clap(flatten)]
+    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
+
+    /// url to the lite-rpc websocket, optional
+    #[clap(long, env, default_value = "")]
+    lite_rpc_url: String,
 
     /// compute budget for each instruction
     #[clap(long, env, default_value = "250000")]
@@ -87,6 +90,10 @@ async fn main() -> anyhow::Result<()> {
     };
     let cli = Cli::parse_from(args);
 
+    let (prio_provider, prio_jobs) = cli
+        .prioritization_fee_cli
+        .make_prio_provider(cli.lite_rpc_url.clone())?;
+
     let settler_owner = Arc::new(keypair_from_cli(&cli.settler_owner));
 
     let rpc_url = cli.rpc_url;
@@ -100,11 +107,11 @@ async fn main() -> anyhow::Result<()> {
         commitment,
         settler_owner.clone(),
         Some(rpc_timeout),
-        TransactionBuilderConfig {
-            prioritization_micro_lamports: (cli.prioritization_micro_lamports > 0)
-                .then_some(cli.prioritization_micro_lamports),
-            compute_budget_per_instruction: Some(cli.compute_budget_per_instruction),
-        },
+        TransactionBuilderConfig::builder()
+            .compute_budget_per_instruction(Some(cli.compute_budget_per_instruction))
+            .priority_fee_provider(prio_provider)
+            .build()
+            .unwrap(),
     );
 
     // The representation of current on-chain account data
@@ -112,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
     // Reading accounts from chain_data
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
+        rpc: client.new_rpc_async(),
     });
 
     let mango_account = account_fetcher
@@ -120,7 +127,7 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
-    let group_context = MangoGroupContext::new_from_rpc(&client.rpc_async(), mango_group).await?;
+    let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens
@@ -216,15 +223,12 @@ async fn main() -> anyhow::Result<()> {
         mango_client: mango_client.clone(),
         account_fetcher: account_fetcher.clone(),
         config: tcs_start::Config {
-            persistent_error_min_duration: Duration::from_secs(300),
             persistent_error_report_interval: Duration::from_secs(300),
         },
-        errors: mango_v4_client::error_tracking::ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(60),
-            ..Default::default()
-        },
-        last_persistent_error_report: Instant::now(),
+        errors: mango_v4_client::error_tracking::ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_duration(Duration::from_secs(60))
+            .build()?,
     };
 
     info!("main loop");
@@ -296,7 +300,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let settle_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_millis(100));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -319,7 +323,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let tcs_start_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_millis(100));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -355,6 +359,7 @@ async fn main() -> anyhow::Result<()> {
         check_changes_for_abort_job,
     ]
     .into_iter()
+    .chain(prio_jobs.into_iter())
     .collect();
     jobs.next().await;
 
@@ -373,7 +378,7 @@ struct SharedState {
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(std::time::Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

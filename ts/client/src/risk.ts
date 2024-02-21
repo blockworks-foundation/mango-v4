@@ -147,7 +147,7 @@ export async function getPriceImpactForLiqor(
           // Max liab of a particular token that would be liquidated to bring health above 0
           mangoAccountsWithHealth.reduce((sum, a) => {
             // How much would health increase for every unit liab moved to liqor
-            // liabprice * (liabweight - (1+fee)*assetweight)
+            // liabprice * (liabweight - (1+liabfees)*(1+assetfees)*assetweight)
             // Choose the most valuable asset the user has
             const assetBank = Array.from(group.banksMapByTokenIndex.values())
               .flat()
@@ -165,12 +165,16 @@ export async function getPriceImpactForLiqor(
                   ? prev
                   : curr,
               );
-            const tokenLiabHealthContrib = bank.price.mul(
-              bank.initLiabWeight.sub(
+            const feeFactor = ONE_I80F48()
+              .add(bank.liquidationFee)
+              .add(bank.platformLiquidationFee)
+              .mul(
                 ONE_I80F48()
-                  .add(bank.liquidationFee)
-                  .mul(assetBank.initAssetWeight),
-              ),
+                  .add(assetBank.liquidationFee)
+                  .add(assetBank.platformLiquidationFee),
+              );
+            const tokenLiabHealthContrib = bank.price.mul(
+              bank.initLiabWeight.sub(feeFactor.mul(assetBank.initAssetWeight)),
             );
             // Abs liab/borrow
             const maxTokenLiab = a.account

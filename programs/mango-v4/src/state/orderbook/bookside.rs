@@ -180,6 +180,58 @@ impl BookSide {
         }
         None
     }
+
+    /// Walk up the book given base units and return the amount in quote lots an order would
+    /// be filled at. If not enough liquidity is on book, return None
+    pub fn matched_amount(
+        &self,
+        quantity: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<i64> {
+        if quantity <= 0 {
+            return None;
+        }
+        let mut sum_qty: i64 = 0;
+        let mut sum_amt: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            sum_qty += order.node.quantity;
+            sum_amt += order.node.quantity * order.price_lots;
+            let extra_qty = sum_qty - quantity;
+            if extra_qty >= 0 {
+                sum_amt -= extra_qty * order.price_lots;
+                return Some(sum_amt);
+            }
+        }
+        None
+    }
+
+    /// Walk up the book given quote units and return the quantity in base lots
+    /// an order would need to request to match at least the requested amount.
+    /// If not enough liquidity is on book, return None
+    pub fn matched_quantity(
+        &self,
+        amount: i64,
+        now_ts: u64,
+        oracle_price_lots: i64,
+    ) -> Option<i64> {
+        if amount <= 0 {
+            return None;
+        }
+        let mut sum_qty: i64 = 0;
+        let mut sum_amt: i64 = 0;
+        for order in self.iter_valid(now_ts, oracle_price_lots) {
+            sum_qty += order.node.quantity;
+            sum_amt += order.node.quantity * order.price_lots;
+            let extra_amt = sum_amt - amount;
+            if extra_amt >= 0 {
+                // adding n-1 before dividing through n to force rounding up
+                sum_qty -= (extra_amt + order.price_lots - 1) / order.price_lots;
+                return Some(sum_qty);
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]

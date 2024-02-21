@@ -90,8 +90,9 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
 
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
+        let oracle_ref = &AccountInfoRef::borrow(self.oracle.as_ref())?;
         let unsafe_oracle_state = oracle_state_unchecked(
-            &AccountInfoRef::borrow(self.oracle.as_ref())?,
+            &OracleAccountInfos::from_reader(oracle_ref),
             bank.mint_decimals,
         )?;
         let unsafe_oracle_price = unsafe_oracle_state.price;
@@ -129,16 +130,14 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
         // Being in a health region always means being_liquidated is false, so it's safe to gate the check.
-        if !account.fixed.is_in_health_region() {
+        let was_being_liquidated = account.being_liquidated();
+        if !account.fixed.is_in_health_region() && was_being_liquidated {
             let health = cache.health(HealthType::LiquidationEnd);
             msg!("health: {}", health);
+            // Only compute health and check for recovery if not already being liquidated
 
-            let was_being_liquidated = account.being_liquidated();
             let recovered = account.fixed.maybe_recover_from_being_liquidated(health);
-            require!(
-                !was_being_liquidated || recovered,
-                MangoError::DepositsIntoLiquidatingMustRecover
-            );
+            require!(recovered, MangoError::DepositsIntoLiquidatingMustRecover);
         }
 
         // Group level deposit limit on account
@@ -168,19 +167,6 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             account.deactivate_token_position_and_log(raw_token_index, self.account.key());
         }
 
-        unsafe {
-            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
-            msg!("heap {}", *POS_PTR);
-        }
-
-        // emit_stack(DepositLog {
-        //     mango_group: self.group.key(),
-        //     mango_account: self.account.key(),
-        //     signer: self.token_authority.key(),
-        //     token_index,
-        //     quantity: amount_i80f48.to_num::<u64>(),
-        //     price: unsafe_oracle_price.to_bits(),
-        // });
         emit_stack(DepositLog {
             mango_group: self.group.key(),
             mango_account: self.account.key(),
@@ -189,11 +175,6 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
             quantity: amount_i80f48.to_num::<u64>(),
             price: unsafe_oracle_price.to_bits(),
         });
-
-        unsafe {
-            const POS_PTR: *mut usize = 0x300000000 as usize as *mut usize;
-            msg!("heap {}", *POS_PTR);
-        }
 
         Ok(())
     }
@@ -214,10 +195,9 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool)
             let now_slot = Clock::get()?.slot;
             let bank = ctx.accounts.bank.load()?;
 
-            let oracle_result = bank.oracle_price(
-                &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
-                Some(now_slot),
-            );
+            let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+            let oracle_result =
+                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot));
             if let Err(e) = oracle_result {
                 msg!("oracle must be valid when creating a new token position");
                 return Err(e);

@@ -92,14 +92,38 @@ pub struct Group {
     /// in seconds since epoch
     pub fast_listing_interval_start: u64,
 
+    /// Number of fast listings that happened this interval
     pub fast_listings_in_interval: u16,
+
+    /// Number of fast listings that are allowed per interval
     pub allowed_fast_listings_per_interval: u16,
 
-    pub reserved: [u8; 1812],
+    pub padding2: [u8; 4],
+
+    /// Intervals in which collateral fee is applied
+    pub collateral_fee_interval: u64,
+
+    pub reserved: [u8; 1800],
 }
 const_assert_eq!(
     size_of::<Group>(),
-    32 + 4 + 32 * 2 + 4 + 32 * 2 + 4 + 4 + 20 * 32 + 32 + 8 + 16 + 32 + 8 + 8 + 2 * 2 + 1812
+    32 + 4
+        + 32 * 2
+        + 4
+        + 32 * 2
+        + 4
+        + 4
+        + 20 * 32
+        + 32
+        + 8
+        + 16
+        + 32
+        + 8
+        + 8
+        + 2 * 2
+        + 4
+        + 8
+        + 1800
 );
 const_assert_eq!(size_of::<Group>(), 2736);
 const_assert_eq!(size_of::<Group>() % 8, 0);
@@ -221,6 +245,7 @@ pub enum IxGate {
     TokenConditionalSwapCreatePremiumAuction = 69,
     TokenConditionalSwapCreateLinearAuction = 70,
     Serum3PlaceOrderV2 = 71,
+    TokenForceWithdraw = 72,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

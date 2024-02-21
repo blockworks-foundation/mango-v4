@@ -60,31 +60,31 @@ async function buildClient(): Promise<MangoClient> {
   );
 }
 
-async function groupEdit(): Promise<void> {
-  const client = await buildClient();
-  const group = await client.getGroup(new PublicKey(GROUP_PK));
-  const ix = await client.program.methods
-    .groupEdit(
-      null, // admin
-      null, // fastListingAdmin
-      null, // securityAdmin
-      null, // testing
-      null, // version
-      null, // depositLimitQuote
-      null, // feesPayWithMngo
-      null, // feesMngoBonusRate
-      null, // feesSwapMangoAccount
-      6, // feesMngoTokenIndex
-      null, // feesExpiryInterval
-      5, // allowedFastListingsPerInterval
-    )
-    .accounts({
-      group: group.publicKey,
-      admin: group.admin,
-    })
-    .instruction();
-  console.log(serializeInstructionToBase64(ix));
-}
+// async function groupEdit(): Promise<void> {
+//   const client = await buildClient();
+//   const group = await client.getGroup(new PublicKey(GROUP_PK));
+//   const ix = await client.program.methods
+//     .groupEdit(
+//       null, // admin
+//       null, // fastListingAdmin
+//       null, // securityAdmin
+//       null, // testing
+//       null, // version
+//       null, // depositLimitQuote
+//       null, // feesPayWithMngo
+//       null, // feesMngoBonusRate
+//       null, // feesSwapMangoAccount
+//       6, // feesMngoTokenIndex
+//       null, // feesExpiryInterval
+//       5, // allowedFastListingsPerInterval
+//     )
+//     .accounts({
+//       group: group.publicKey,
+//       admin: group.admin,
+//     })
+//     .instruction();
+//   console.log(serializeInstructionToBase64(ix));
+// }
 
 // async function tokenRegister(): Promise<void> {
 //   const client = await buildClient();
@@ -265,6 +265,7 @@ async function perpCreate(): Promise<void> {
       1,
       new BN(60 * 60),
       percentageToDecimal(10),
+      0,
     )
     .accounts({
       group: group.publicKey,
@@ -358,6 +359,7 @@ async function perpEdit(): Promise<void> {
       params.positivePnlLiquidationFee,
       params.name,
       params.forceClose,
+      0,
     )
     .accounts({
       group: group.publicKey,
@@ -466,7 +468,7 @@ async function idlSetAuthority(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    await groupEdit();
+    // await groupEdit();
     // await tokenRegister();
     // await tokenEdit();
     // await perpCreate();

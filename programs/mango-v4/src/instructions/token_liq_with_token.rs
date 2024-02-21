@@ -5,7 +5,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::logs::{
-    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqWithTokenLogV2,
     WithdrawLoanLog,
 };
 use crate::state::*;
@@ -112,23 +112,36 @@ pub(crate) fn liquidation_action(
         liqee.token_position_and_raw_index(asset_token_index)?;
     let liqee_asset_native = liqee_asset_position.native(asset_bank);
     require_gt!(liqee_asset_native, 0);
+    require!(
+        asset_bank.allows_asset_liquidation(),
+        MangoError::TokenAssetLiquidationDisabled
+    );
 
     let (liqee_liab_position, liqee_liab_raw_index) =
         liqee.token_position_and_raw_index(liab_token_index)?;
     let liqee_liab_native = liqee_liab_position.native(liab_bank);
     require_gt!(0, liqee_liab_native);
 
-    // Liquidation fees work by giving the liqor more assets than the oracle price would
-    // indicate. Specifically we choose
+    // The liqor will likely close the borrow by buying liab tokens somewhere and get rid of the
+    // asset tokens by selling them. Both transactions may incur slippage, so to make sure liqors
+    // are willing to perform the liquidation, they receive a liquidation fee.
+    //
+    // Liquidation fees work by giving the liqor more assets than the oracle price would indicate.
+    //
+    // Specifically we choose
     //   assets =
-    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee)
-    // Which means that we use a increased liab oracle price for the conversion.
+    //     liabs * liab_oracle_price/asset_oracle_price * (1 + liab_liq_fee) * (1 + asset_liq_fee)
+    // Which is equivalent to using an increased liab oracle price for the conversion.
     // For simplicity we write
     //   assets = liabs * liab_oracle_price / asset_oracle_price * fee_factor
     //   assets = liabs * liab_oracle_price_adjusted / asset_oracle_price
     //          = liabs * lopa / aop
-    let fee_factor = I80F48::ONE + liab_bank.liquidation_fee;
-    let liab_oracle_price_adjusted = liab_oracle_price * fee_factor;
+    let fee_factor_liqor =
+        (I80F48::ONE + liab_bank.liquidation_fee) * (I80F48::ONE + asset_bank.liquidation_fee);
+    let fee_factor_total =
+        (I80F48::ONE + liab_bank.liquidation_fee + liab_bank.platform_liquidation_fee)
+            * (I80F48::ONE + asset_bank.liquidation_fee + asset_bank.platform_liquidation_fee);
+    let liab_oracle_price_adjusted = liab_oracle_price * fee_factor_total;
 
     let init_asset_weight = asset_bank.init_asset_weight;
     let init_liab_weight = liab_bank.init_liab_weight;
@@ -212,7 +225,13 @@ pub(crate) fn liquidation_action(
         .max(I80F48::ZERO);
 
     // The amount of asset native tokens we will give up for them
-    let asset_transfer = liab_transfer * liab_oracle_price_adjusted / asset_oracle_price;
+    let asset_transfer_base = liab_transfer * liab_oracle_price / asset_oracle_price;
+    let asset_transfer_to_liqor = asset_transfer_base * fee_factor_liqor;
+    let asset_transfer_from_liqee = asset_transfer_base * fee_factor_total;
+
+    let asset_liquidation_fee = asset_transfer_from_liqee - asset_transfer_to_liqor;
+    asset_bank.collected_fees_native += asset_liquidation_fee;
+    asset_bank.collected_liquidation_fees += asset_liquidation_fee;
 
     // During liquidation, we mustn't leave small positive balances in the liqee. Those
     // could break bankruptcy-detection. Thus we dust them even if the token position
@@ -233,13 +252,14 @@ pub(crate) fn liquidation_action(
 
     let (liqor_asset_position, liqor_asset_raw_index, _) =
         liqor.ensure_token_position(asset_token_index)?;
-    let liqor_asset_active = asset_bank.deposit(liqor_asset_position, asset_transfer, now_ts)?;
+    let liqor_asset_active =
+        asset_bank.deposit(liqor_asset_position, asset_transfer_to_liqor, now_ts)?;
     let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
 
     let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
     let liqee_asset_active = asset_bank.withdraw_without_fee_with_dusting(
         liqee_asset_position,
-        asset_transfer,
+        asset_transfer_from_liqee,
         now_ts,
     )?;
     let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
@@ -254,7 +274,7 @@ pub(crate) fn liquidation_action(
     msg!(
         "liquidated {} liab for {} asset",
         liab_transfer,
-        asset_transfer
+        asset_transfer_from_liqee,
     );
 
     // liqee asset
@@ -329,13 +349,15 @@ pub(crate) fn liquidation_action(
         .fixed
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
 
-    emit_stack(TokenLiqWithTokenLog {
+    emit_stack(TokenLiqWithTokenLogV2 {
         mango_group: liqee.fixed.group,
         liqee: liqee_key,
         liqor: liqor_key,
         asset_token_index,
         liab_token_index,
-        asset_transfer: asset_transfer.to_bits(),
+        asset_transfer_from_liqee: asset_transfer_from_liqee.to_bits(),
+        asset_transfer_to_liqor: asset_transfer_to_liqor.to_bits(),
+        asset_liquidation_fee: asset_liquidation_fee.to_bits(),
         liab_transfer: liab_transfer.to_bits(),
         asset_price: asset_oracle_price.to_bits(),
         liab_price: liab_oracle_price.to_bits(),

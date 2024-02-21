@@ -10,15 +10,15 @@ use mango_v4::{
     accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side},
     state::TokenIndex,
 };
+use tokio::task::JoinHandle;
 use tracing::*;
-
-use tokio::time;
 
 use crate::MangoClient;
 
 pub async fn runner(
     mango_client: Arc<MangoClient>,
-    _debugging_handle: impl Future,
+    debugging_handle: impl Future,
+    extra_jobs: Vec<JoinHandle<()>>,
 ) -> Result<(), anyhow::Error> {
     ensure_deposit(&mango_client).await?;
     ensure_oo(&mango_client).await?;
@@ -55,7 +55,9 @@ pub async fn runner(
 
     futures::join!(
         futures::future::join_all(handles1),
-        futures::future::join_all(handles2)
+        futures::future::join_all(handles2),
+        debugging_handle,
+        futures::future::join_all(extra_jobs),
     );
 
     Ok(())
@@ -117,7 +119,7 @@ pub async fn loop_blocking_price_update(
     token_index: TokenIndex,
     price: Arc<RwLock<I80F48>>,
 ) {
-    let mut interval = time::interval(Duration::from_secs(1));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(1));
     let token_name = &mango_client.context.token(token_index).name;
     loop {
         interval.tick().await;
@@ -135,7 +137,7 @@ pub async fn loop_blocking_orders(
     market_name: String,
     price: Arc<RwLock<I80F48>>,
 ) {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(5));
 
     // Cancel existing orders
     let orders: Vec<u128> = mango_client

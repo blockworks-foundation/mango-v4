@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.21.2",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -277,6 +277,12 @@ export type MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -486,6 +492,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -618,6 +629,22 @@ export type MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "disableAssetLiquidation",
+          "type": "bool"
+        },
+        {
+          "name": "collateralFeePerDay",
+          "type": "f32"
         }
       ]
     },
@@ -728,6 +755,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -786,6 +818,15 @@ export type MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -1001,6 +1042,36 @@ export type MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "forceWithdrawOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -1703,27 +1774,7 @@ export type MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -2014,8 +2065,7 @@ export type MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -2998,6 +3048,75 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "serum3CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelAllOrders",
       "accounts": [
         {
@@ -3677,6 +3796,63 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -3865,6 +4041,10 @@ export type MangoV4 = {
         },
         {
           "name": "positivePnlLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
           "type": "f32"
         }
       ]
@@ -4079,6 +4259,12 @@ export type MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -5857,6 +6043,25 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenChargeCollateralFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -7070,6 +7275,16 @@ export type MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7094,12 +7309,24 @@ export type MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7142,6 +7369,15 @@ export type MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7246,11 +7482,23 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "disableAssetLiquidation",
+            "docs": [
+              "If set to 1, deposits cannot be liquidated when an account is liquidatable.",
+              "That means bankrupt accounts may still have assets of this type deposited."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                6
+                4
               ]
             }
           },
@@ -7300,20 +7548,35 @@ export type MangoV4 = {
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -7326,6 +7589,10 @@ export type MangoV4 = {
           },
           {
             "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
             "type": "publicKey"
           },
           {
@@ -7336,11 +7603,60 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Platform fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1968
+                1900
               ]
             }
           }
@@ -7456,18 +7772,40 @@ export type MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -7590,11 +7928,26 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -7740,11 +8093,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -8385,11 +8742,32 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -9125,36 +9503,44 @@ export type MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "realizedTradePnlNative",
+            "name": "deprecatedRealizedTradePnlNative",
             "docs": [
-              "Amount of pnl that was realized by bringing the base position closer to 0.",
-              "",
-              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
-              "Settling pnl reduces this value once other_pnl below is exhausted."
+              "Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "realizedOtherPnlNative",
+            "name": "oneshotSettlePnlAllowance",
             "docs": [
-              "Amount of pnl realized from fees, funding and liquidation.",
+              "Amount of pnl that can be settled once.",
               "",
-              "This type of realized pnl is always settleable.",
-              "Settling pnl reduces this value first."
+              "- The value is signed: a negative number means negative pnl can be settled.",
+              "- A settlement in the right direction will decrease this amount.",
+              "",
+              "Typically added for fees, funding and liquidation."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "settlePnlLimitRealizedTrade",
+            "name": "recurringSettlePnlAllowance",
             "docs": [
-              "Settle limit contribution from realized pnl.",
+              "Amount of pnl that can be settled in each settle window.",
               "",
-              "Every time pnl is realized, this is increased by a fraction of the stable",
-              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+              "- Unsigned, the settlement can happen in both directions. Value is >= 0.",
+              "- Previously stored a similar value that was signed, so in migration cases",
+              "this value can be negative and should be .abs()ed.",
+              "- If this value exceeds the current stable-upnl, it should be decreased,",
+              "see apply_recurring_settle_pnl_allowance_constraint()",
+              "",
+              "When the base position is reduced, the settle limit contribution from the reduced",
+              "base position is materialized into this value. When the base position increases,",
+              "some of the allowance is taken away.",
+              "",
+              "This also gets increased when a liquidator takes over pnl."
             ],
             "type": "i64"
           },
@@ -9225,11 +9611,15 @@ export type MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -9328,11 +9718,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -9784,13 +10178,8 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -9867,11 +10256,15 @@ export type MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -10254,6 +10647,9 @@ export type MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
@@ -10609,6 +11005,9 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }
@@ -10646,6 +11045,9 @@ export type MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -11824,6 +12226,71 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -12175,6 +12642,46 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpMarketMetaDataLog",
       "fields": [
         {
@@ -12284,6 +12791,66 @@ export type MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },
@@ -12634,6 +13201,71 @@ export type MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
@@ -13228,6 +13860,36 @@ export type MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -13545,12 +14207,47 @@ export type MangoV4 = {
       "code": 6062,
       "name": "BankDepositLimit",
       "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
+    },
+    {
+      "code": 6069,
+      "name": "TokenAssetLiquidationDisabled",
+      "msg": "the asset does not allow liquidation"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.21.2",
+  "version": "0.22.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -13828,6 +14525,12 @@ export const IDL: MangoV4 = {
           "type": {
             "option": "u16"
           }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
+          }
         }
       ]
     },
@@ -14037,6 +14740,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14169,6 +14877,22 @@ export const IDL: MangoV4 = {
         {
           "name": "depositLimit",
           "type": "u64"
+        },
+        {
+          "name": "zeroUtilRate",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "disableAssetLiquidation",
+          "type": "bool"
+        },
+        {
+          "name": "collateralFeePerDay",
+          "type": "f32"
         }
       ]
     },
@@ -14279,6 +15003,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -14337,6 +15066,15 @@ export const IDL: MangoV4 = {
           "isSigner": false,
           "docs": [
             "The oracle account is optional and only used when reset_stable_price is set.",
+            ""
+          ]
+        },
+        {
+          "name": "fallbackOracle",
+          "isMut": false,
+          "isSigner": false,
+          "docs": [
+            "The fallback oracle account is optional and only used when set_fallback_oracle is true.",
             ""
           ]
         }
@@ -14552,6 +15290,36 @@ export const IDL: MangoV4 = {
           "name": "depositLimitOpt",
           "type": {
             "option": "u64"
+          }
+        },
+        {
+          "name": "zeroUtilRateOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "forceWithdrawOpt",
+          "type": {
+            "option": "bool"
           }
         }
       ]
@@ -15254,27 +16022,7 @@ export const IDL: MangoV4 = {
         {
           "name": "oracle",
           "isMut": true,
-          "isSigner": false,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "type": "string",
-                "value": "StubOracle"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "path": "group"
-              },
-              {
-                "kind": "account",
-                "type": "publicKey",
-                "account": "Mint",
-                "path": "mint"
-              }
-            ]
-          }
+          "isSigner": true
         },
         {
           "name": "admin",
@@ -15565,8 +16313,7 @@ export const IDL: MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
         },
         {
@@ -16549,6 +17296,75 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "serum3CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarket",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "serum_program",
+            "serum_market_external"
+          ]
+        },
+        {
+          "name": "serumProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "serumMarketExternal",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketBids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketAsks",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "marketEventQueue",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "serum3CancelAllOrders",
       "accounts": [
         {
@@ -17228,6 +18044,63 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -17416,6 +18289,10 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "positivePnlLiquidationFee",
+          "type": "f32"
+        },
+        {
+          "name": "platformLiquidationFee",
           "type": "f32"
         }
       ]
@@ -17630,6 +18507,12 @@ export const IDL: MangoV4 = {
           "name": "forceCloseOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "platformLiquidationFeeOpt",
+          "type": {
+            "option": "f32"
           }
         }
       ]
@@ -19408,6 +20291,25 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenChargeCollateralFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -20621,6 +21523,16 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "util0",
+            "docs": [
+              "The unscaled borrow interest curve is defined as continuous piecewise linear with the points:",
+              "",
+              "- 0% util: zero_util_rate",
+              "- util0% util: rate0",
+              "- util1% util: rate1",
+              "- 100% util: max_rate",
+              "",
+              "The final rate is this unscaled curve multiplied by interest_curve_scaling."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20645,12 +21557,24 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maxRate",
+            "docs": [
+              "the 100% utilization rate",
+              "",
+              "This isn't the max_rate, since this still gets scaled by interest_curve_scaling,",
+              "which is >=1."
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "collectedFeesNative",
+            "docs": [
+              "Fees collected over the lifetime of the bank",
+              "",
+              "See fees_withdrawn for how much of the fees was withdrawn.",
+              "See collected_liquidation_fees for the (included) subtotal for liquidation related fees."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20693,6 +21617,15 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "liquidationFee",
+            "docs": [
+              "Liquidation fee that goes to the liqor.",
+              "",
+              "Liquidation always involves two tokens, and the sum of the two configured fees is used.",
+              "",
+              "A fraction of the price, like 0.05 for a 5% fee during liquidation.",
+              "",
+              "See also platform_liquidation_fee."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20797,11 +21730,23 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "disableAssetLiquidation",
+            "docs": [
+              "If set to 1, deposits cannot be liquidated when an account is liquidatable.",
+              "That means bankrupt accounts may still have assets of this type deposited."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                6
+                4
               ]
             }
           },
@@ -20851,20 +21796,35 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "maintWeightShiftStart",
+            "docs": [
+              "Start timestamp in seconds at which maint weights should start to change away",
+              "from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.",
+              "If _start and _end and _duration_inv are 0, no shift is configured."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftEnd",
+            "docs": [
+              "End timestamp in seconds until which the maint weights should reach the configured targets."
+            ],
             "type": "u64"
           },
           {
             "name": "maintWeightShiftDurationInv",
+            "docs": [
+              "Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,",
+              "or zero if no shift is configured"
+            ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
             "name": "maintWeightShiftAssetTarget",
+            "docs": [
+              "Maint asset weight to reach at _shift_end."
+            ],
             "type": {
               "defined": "I80F48"
             }
@@ -20877,6 +21837,10 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fallbackOracle",
+            "docs": [
+              "Oracle that may be used if the main oracle is stale or not confident enough.",
+              "If this is Pubkey::default(), no fallback is available."
+            ],
             "type": "publicKey"
           },
           {
@@ -20887,11 +21851,60 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "zeroUtilRate",
+            "docs": [
+              "The unscaled borrow interest curve point for zero utilization.",
+              "",
+              "See util0, rate0, util1, rate1, max_rate"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedLiquidationFees",
+            "docs": [
+              "Platform fees that were collected during liquidation (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1968
+                1900
               ]
             }
           }
@@ -21007,18 +22020,40 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "fastListingsInInterval",
+            "docs": [
+              "Number of fast listings that happened this interval"
+            ],
             "type": "u16"
           },
           {
             "name": "allowedFastListingsPerInterval",
+            "docs": [
+              "Number of fast listings that are allowed per interval"
+            ],
             "type": "u16"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -21141,11 +22176,26 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -21291,11 +22341,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "fallbackOracle",
+            "type": "publicKey"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                2560
+                2528
               ]
             }
           }
@@ -21936,11 +22990,32 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "platformLiquidationFee",
+            "docs": [
+              "Additional to liquidation_fee, but goes to the group owner instead of the liqor"
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "accruedLiquidationFees",
+            "docs": [
+              "Platform fees that were accrued during liquidation (in native tokens)",
+              "",
+              "These fees are also added to fees_accrued, this is just for bookkeeping the total",
+              "liquidation fees that happened. So never decreases (different to fees_accrued)."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1880
+                1848
               ]
             }
           }
@@ -22676,36 +23751,44 @@ export const IDL: MangoV4 = {
             "type": "f64"
           },
           {
-            "name": "realizedTradePnlNative",
+            "name": "deprecatedRealizedTradePnlNative",
             "docs": [
-              "Amount of pnl that was realized by bringing the base position closer to 0.",
-              "",
-              "The settlement of this type of pnl is limited by settle_pnl_limit_realized_trade.",
-              "Settling pnl reduces this value once other_pnl below is exhausted."
+              "Deprecated field: Amount of pnl that was realized by bringing the base position closer to 0."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "realizedOtherPnlNative",
+            "name": "oneshotSettlePnlAllowance",
             "docs": [
-              "Amount of pnl realized from fees, funding and liquidation.",
+              "Amount of pnl that can be settled once.",
               "",
-              "This type of realized pnl is always settleable.",
-              "Settling pnl reduces this value first."
+              "- The value is signed: a negative number means negative pnl can be settled.",
+              "- A settlement in the right direction will decrease this amount.",
+              "",
+              "Typically added for fees, funding and liquidation."
             ],
             "type": {
               "defined": "I80F48"
             }
           },
           {
-            "name": "settlePnlLimitRealizedTrade",
+            "name": "recurringSettlePnlAllowance",
             "docs": [
-              "Settle limit contribution from realized pnl.",
+              "Amount of pnl that can be settled in each settle window.",
               "",
-              "Every time pnl is realized, this is increased by a fraction of the stable",
-              "value of the realization. It magnitude decreases when realized pnl drops below its value."
+              "- Unsigned, the settlement can happen in both directions. Value is >= 0.",
+              "- Previously stored a similar value that was signed, so in migration cases",
+              "this value can be negative and should be .abs()ed.",
+              "- If this value exceeds the current stable-upnl, it should be decreased,",
+              "see apply_recurring_settle_pnl_allowance_constraint()",
+              "",
+              "When the base position is reduced, the settle limit contribution from the reduced",
+              "base position is materialized into this value. When the base position increases,",
+              "some of the allowance is taken away.",
+              "",
+              "This also gets increased when a liquidator takes over pnl."
             ],
             "type": "i64"
           },
@@ -22776,11 +23859,15 @@ export const IDL: MangoV4 = {
             "type": "u128"
           },
           {
+            "name": "quantity",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                64
+                56
               ]
             }
           }
@@ -22879,11 +23966,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -23335,13 +24426,8 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "padding4",
-            "type": {
-              "array": [
-                "u8",
-                16
-              ]
-            }
+            "name": "makerOrderId",
+            "type": "u128"
           },
           {
             "name": "price",
@@ -23418,11 +24504,15 @@ export const IDL: MangoV4 = {
             "type": "i64"
           },
           {
+            "name": "orderId",
+            "type": "u128"
+          },
+          {
             "name": "padding1",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }
@@ -23805,6 +24895,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
@@ -24160,6 +25253,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }
@@ -24197,6 +25293,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwitchboardV2"
+          },
+          {
+            "name": "OrcaCLMM"
           }
         ]
       }
@@ -25375,6 +26474,71 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenLiqWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "bankruptcy",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "Serum3OpenOrdersBalanceLog",
       "fields": [
         {
@@ -25726,6 +26890,46 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "TokenMetaDataLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mint",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "mintDecimals",
+          "type": "u8",
+          "index": false
+        },
+        {
+          "name": "oracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "fallbackOracle",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mintInfo",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpMarketMetaDataLog",
       "fields": [
         {
@@ -25835,6 +27039,66 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "quoteTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "PerpLiqBaseOrPositivePnlLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
           "type": "i128",
           "index": false
         },
@@ -26185,6 +27449,71 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "assetTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "liabPrice",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "feeFactor",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenForceCloseBorrowsWithTokenLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "assetTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liabTokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetTransferFromLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetTransferToLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "assetLiquidationFee",
           "type": "i128",
           "index": false
         },
@@ -26779,6 +28108,36 @@ export const IDL: MangoV4 = {
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -27096,6 +28455,41 @@ export const IDL: MangoV4 = {
       "code": 6062,
       "name": "BankDepositLimit",
       "msg": "deposit crosses the token's deposit limit"
+    },
+    {
+      "code": 6063,
+      "name": "DelegateWithdrawOnlyToOwnerAta",
+      "msg": "delegates can only withdraw to the owner's associated token account"
+    },
+    {
+      "code": 6064,
+      "name": "DelegateWithdrawMustClosePosition",
+      "msg": "delegates can only withdraw if they close the token position"
+    },
+    {
+      "code": 6065,
+      "name": "DelegateWithdrawSmall",
+      "msg": "delegates can only withdraw small amounts"
+    },
+    {
+      "code": 6066,
+      "name": "InvalidCLMMOracle",
+      "msg": "The provided CLMM oracle is not valid"
+    },
+    {
+      "code": 6067,
+      "name": "InvalidFeedForCLMMOracle",
+      "msg": "invalid usdc/usd feed provided for the CLMM oracle"
+    },
+    {
+      "code": 6068,
+      "name": "MissingFeedForCLMMOracle",
+      "msg": "Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)"
+    },
+    {
+      "code": 6069,
+      "name": "TokenAssetLiquidationDisabled",
+      "msg": "the asset does not allow liquidation"
     }
   ]
 };

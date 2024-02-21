@@ -371,6 +371,11 @@ async function updateTokenParams(): Promise<void> {
               params.maintWeightShiftAbort ?? false,
               false, // setFallbackOracle, unused
               params.depositLimit,
+              params.zeroUtilRate,
+              params.platformLiquidationFee,
+              params.disableAssetLiquidation,
+              params.collateralFeePerDay,
+              params.forceWithdraw,
             )
             .accounts({
               group: group.publicKey,

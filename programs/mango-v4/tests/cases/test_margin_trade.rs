@@ -244,7 +244,7 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
 #[tokio::test]
 async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(105_000);
+    test_builder.test().set_compute_max_units(150_000);
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -278,6 +278,7 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
             group,
             admin,
             mint: tokens[1].mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 flash_loan_swap_fee_rate_opt: Some(swap_fee_rate as f32),
                 ..token_edit_instruction_default()
@@ -523,16 +524,19 @@ async fn test_flash_loan_creates_ata_accounts() -> Result<(), BanksClientError> 
     }
 
     //
-    // SETUP: Verify atas are empty
+    // SETUP: Wipe owner ATAs that are set up by default
     //
-    let owner_token0_ata = anchor_spl::associated_token::get_associated_token_address(
-        &owner.pubkey(),
-        &mints[0].pubkey,
-    );
-    let owner_token1_ata = anchor_spl::associated_token::get_associated_token_address(
-        &owner.pubkey(),
-        &mints[1].pubkey,
-    );
+    use solana_sdk::account::AccountSharedData;
+    let owner_token0_ata = context.users[0].token_accounts[0];
+    let owner_token1_ata = context.users[0].token_accounts[1];
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&owner_token0_ata, &AccountSharedData::default());
+    solana
+        .context
+        .borrow_mut()
+        .set_account(&owner_token1_ata, &AccountSharedData::default());
     assert!(solana.get_account_data(owner_token0_ata).await.is_none());
     assert!(solana.get_account_data(owner_token1_ata).await.is_none());
 
@@ -650,6 +654,7 @@ async fn test_margin_trade_deposit_limit() -> Result<(), BanksClientError> {
             group,
             admin,
             mint: tokens[0].mint.pubkey,
+            fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
                 deposit_limit_opt: Some(1000),
                 ..token_edit_instruction_default()

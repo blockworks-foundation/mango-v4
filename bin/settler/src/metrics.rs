@@ -125,7 +125,7 @@ impl Metrics {
 }
 
 pub fn start() -> Metrics {
-    let mut write_interval = time::interval(time::Duration::from_secs(60));
+    let mut write_interval = mango_v4_client::delay_interval(time::Duration::from_secs(60));
 
     let registry = Arc::new(RwLock::new(HashMap::<String, Value>::new()));
     let registry_c = Arc::clone(&registry);

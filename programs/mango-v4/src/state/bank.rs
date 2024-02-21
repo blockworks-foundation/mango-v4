@@ -1,4 +1,4 @@
-use super::{OracleConfig, TokenIndex, TokenPosition};
+use super::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 use crate::accounts_zerocopy::KeyedAccountReader;
 use crate::error::*;
 use crate::i80f48::ClampToInt;
@@ -8,6 +8,7 @@ use crate::util;
 use anchor_lang::prelude::*;
 use derivative::Derivative;
 use fixed::types::I80F48;
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use std::mem::size_of;
@@ -58,14 +59,32 @@ pub struct Bank {
     pub avg_utilization: I80F48,
 
     pub adjustment_factor: I80F48,
+
+    /// The unscaled borrow interest curve is defined as continuous piecewise linear with the points:
+    ///
+    /// - 0% util: zero_util_rate
+    /// - util0% util: rate0
+    /// - util1% util: rate1
+    /// - 100% util: max_rate
+    ///
+    /// The final rate is this unscaled curve multiplied by interest_curve_scaling.
     pub util0: I80F48,
     pub rate0: I80F48,
     pub util1: I80F48,
     pub rate1: I80F48,
+
+    /// the 100% utilization rate
+    ///
+    /// This isn't the max_rate, since this still gets scaled by interest_curve_scaling,
+    /// which is >=1.
     pub max_rate: I80F48,
 
-    // TODO: add ix/logic to regular send this to DAO
+    /// Fees collected over the lifetime of the bank
+    ///
+    /// See fees_withdrawn for how much of the fees was withdrawn.
+    /// See collected_liquidation_fees for the (included) subtotal for liquidation related fees.
     pub collected_fees_native: I80F48,
+
     pub loan_origination_fee_rate: I80F48,
     pub loan_fee_rate: I80F48,
 
@@ -77,9 +96,13 @@ pub struct Bank {
     pub maint_liab_weight: I80F48,
     pub init_liab_weight: I80F48,
 
-    // a fraction of the price, like 0.05 for a 5% fee during liquidation
-    //
-    // Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    /// Liquidation fee that goes to the liqor.
+    ///
+    /// Liquidation always involves two tokens, and the sum of the two configured fees is used.
+    ///
+    /// A fraction of the price, like 0.05 for a 5% fee during liquidation.
+    ///
+    /// See also platform_liquidation_fee.
     pub liquidation_fee: I80F48,
 
     // Collection of all fractions-of-native-tokens that got rounded away
@@ -135,8 +158,14 @@ pub struct Bank {
     pub reduce_only: u8,
     pub force_close: u8,
 
+    /// If set to 1, deposits cannot be liquidated when an account is liquidatable.
+    /// That means bankrupt accounts may still have assets of this type deposited.
+    pub disable_asset_liquidation: u8,
+
+    pub force_withdraw: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 6],
+    pub padding: [u8; 4],
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -161,18 +190,49 @@ pub struct Bank {
     /// serum open order execution.
     pub potential_serum_tokens: u64,
 
+    /// Start timestamp in seconds at which maint weights should start to change away
+    /// from maint_asset_weight, maint_liab_weight towards _asset_target and _liab_target.
+    /// If _start and _end and _duration_inv are 0, no shift is configured.
     pub maint_weight_shift_start: u64,
+    /// End timestamp in seconds until which the maint weights should reach the configured targets.
     pub maint_weight_shift_end: u64,
+    /// Cache of the inverse of maint_weight_shift_end - maint_weight_shift_start,
+    /// or zero if no shift is configured
     pub maint_weight_shift_duration_inv: I80F48,
+    /// Maint asset weight to reach at _shift_end.
     pub maint_weight_shift_asset_target: I80F48,
     pub maint_weight_shift_liab_target: I80F48,
 
-    pub fallback_oracle: Pubkey, // unused, introduced in v0.22
+    /// Oracle that may be used if the main oracle is stale or not confident enough.
+    /// If this is Pubkey::default(), no fallback is available.
+    pub fallback_oracle: Pubkey,
 
     /// zero means none, in token native
     pub deposit_limit: u64,
 
-    pub reserved: [u8; 1968],
+    /// The unscaled borrow interest curve point for zero utilization.
+    ///
+    /// See util0, rate0, util1, rate1, max_rate
+    pub zero_util_rate: I80F48,
+
+    /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    pub platform_liquidation_fee: I80F48,
+
+    /// Platform fees that were collected during liquidation (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    pub collected_liquidation_fees: I80F48,
+
+    /// Collateral fees that have been collected (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    pub collected_collateral_fees: I80F48,
+
+    /// The daily collateral fees rate for fully utilized collateral.
+    pub collateral_fee_per_day: f32,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 1900],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -209,7 +269,9 @@ const_assert_eq!(
         + 16 * 3
         + 32
         + 8
-        + 1968
+        + 16 * 4
+        + 4
+        + 1900
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -252,6 +314,8 @@ impl Bank {
             indexed_deposits: I80F48::ZERO,
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
+            collected_liquidation_fees: I80F48::ZERO,
+            collected_collateral_fees: I80F48::ZERO,
             fees_withdrawn: 0,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
@@ -298,7 +362,9 @@ impl Bank {
             deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
             reduce_only: existing_bank.reduce_only,
             force_close: existing_bank.force_close,
-            padding: [0; 6],
+            disable_asset_liquidation: existing_bank.disable_asset_liquidation,
+            force_withdraw: existing_bank.force_withdraw,
+            padding: [0; 4],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -313,15 +379,19 @@ impl Bank {
             maint_weight_shift_liab_target: existing_bank.maint_weight_shift_liab_target,
             fallback_oracle: existing_bank.oracle,
             deposit_limit: existing_bank.deposit_limit,
-            reserved: [0; 1968],
+            zero_util_rate: existing_bank.zero_util_rate,
+            platform_liquidation_fee: existing_bank.platform_liquidation_fee,
+            collateral_fee_per_day: existing_bank.collateral_fee_per_day,
+            reserved: [0; 1900],
         }
     }
 
     pub fn verify(&self) -> Result<()> {
         require_gte!(self.oracle_config.conf_filter, 0.0);
         require_gte!(self.util0, I80F48::ZERO);
+        require_gte!(self.util1, self.util0);
+        require_gte!(I80F48::ONE, self.util1);
         require_gte!(self.rate0, I80F48::ZERO);
-        require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
         require_gte!(self.max_rate, I80F48::ZERO);
         require_gte!(self.loan_fee_rate, 0.0);
@@ -344,6 +414,18 @@ impl Bank {
         require_gte!(self.maint_weight_shift_duration_inv, 0.0);
         require_gte!(self.maint_weight_shift_asset_target, 0.0);
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
+        require_gte!(self.zero_util_rate, I80F48::ZERO);
+        require_gte!(self.platform_liquidation_fee, 0.0);
+        if !self.allows_asset_liquidation() {
+            require!(self.are_borrows_reduce_only(), MangoError::SomeError);
+            require_eq!(self.maint_asset_weight, I80F48::ZERO);
+        }
+        require_gte!(self.collateral_fee_per_day, 0.0);
+        if self.is_force_withdraw() {
+            require!(self.are_deposits_reduce_only(), MangoError::SomeError);
+            require!(!self.allows_asset_liquidation(), MangoError::SomeError);
+            require_eq!(self.maint_asset_weight, I80F48::ZERO);
+        }
         Ok(())
     }
 
@@ -363,6 +445,14 @@ impl Bank {
 
     pub fn is_force_close(&self) -> bool {
         self.force_close == 1
+    }
+
+    pub fn is_force_withdraw(&self) -> bool {
+        self.force_withdraw == 1
+    }
+
+    pub fn allows_asset_liquidation(&self) -> bool {
+        self.disable_asset_liquidation == 0
     }
 
     #[inline(always)]
@@ -679,7 +769,7 @@ impl Bank {
         })
     }
 
-    // withdraw the loan origination fee for a borrow that happenend earlier
+    // withdraw the loan origination fee for a borrow that happened earlier
     pub fn withdraw_loan_origination_fee(
         &mut self,
         position: &mut TokenPosition,
@@ -989,6 +1079,7 @@ impl Bank {
     pub fn compute_interest_rate(&self, utilization: I80F48) -> I80F48 {
         Bank::interest_rate_curve_calculator(
             utilization,
+            self.zero_util_rate,
             self.util0,
             self.rate0,
             self.util1,
@@ -998,11 +1089,12 @@ impl Bank {
         )
     }
 
-    /// calcualtor function that can be used to compute an interest
+    /// calculator function that can be used to compute an interest
     /// rate based on the given parameters
     #[inline(always)]
     pub fn interest_rate_curve_calculator(
         utilization: I80F48,
+        zero_util_rate: I80F48,
         util0: I80F48,
         rate0: I80F48,
         util1: I80F48,
@@ -1014,8 +1106,8 @@ impl Bank {
         let utilization = utilization.max(I80F48::ZERO).min(I80F48::ONE);
 
         let v = if utilization <= util0 {
-            let slope = rate0 / util0;
-            slope * utilization
+            let slope = (rate0 - zero_util_rate) / util0;
+            zero_util_rate + slope * utilization
         } else if utilization <= util1 {
             let extra_util = utilization - util0;
             let slope = (rate1 - rate0) / (util1 - util0);
@@ -1083,19 +1175,52 @@ impl Bank {
         self.interest_curve_scaling = (self.interest_curve_scaling * adjustment).max(1.0)
     }
 
-    pub fn oracle_price(
+    /// Tries to return the primary oracle price, and if there is a confidence or staleness issue returns the fallback oracle price if possible.
+    pub fn oracle_price<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.mint_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
-        Ok(state.price)
+        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
+        let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
+        let primary_ok =
+            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+        if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
+            let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            let fallback_state =
+                oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
+            let fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            fallback_ok.with_context(|| {
+                format!(
+                    "{} {}",
+                    oracle_log_context(
+                        self.name(),
+                        &primary_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    ),
+                    oracle_log_context(
+                        self.name(),
+                        &fallback_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    )
+                )
+            })?;
+            Ok(fallback_state.price)
+        } else {
+            primary_ok.with_context(|| {
+                oracle_log_context(
+                    self.name(),
+                    &primary_state,
+                    &self.oracle_config,
+                    staleness_slot,
+                )
+            })?;
+            Ok(primary_state.price)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -1588,5 +1713,96 @@ mod tests {
         assert!(abs_diff(l, 9.0) < 1e-8);
 
         Ok(())
+    }
+
+    #[test]
+    pub fn test_bank_interest() -> Result<()> {
+        let index_start = I80F48::from(1_000_000);
+
+        let mut bank = Bank::zeroed();
+        bank.util0 = I80F48::from_num(0.5);
+        bank.rate0 = I80F48::from_num(0.02);
+        bank.util1 = I80F48::from_num(0.75);
+        bank.rate1 = I80F48::from_num(0.05);
+        bank.max_rate = I80F48::from_num(0.5);
+        bank.interest_curve_scaling = 4.0;
+        bank.deposit_index = index_start;
+        bank.borrow_index = index_start;
+        bank.net_borrow_limit_window_size_ts = 1;
+
+        let mut position0 = TokenPosition::default();
+        let mut position1 = TokenPosition::default();
+
+        // create 100% utilization, meaning 0.5 * 4 = 200% interest
+        bank.deposit(&mut position0, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+        bank.withdraw_without_fee(&mut position1, I80F48::from(1_000_000_000), 0)
+            .unwrap();
+
+        // accumulate interest for a day at 5s intervals
+        let interval = 5;
+        for i in 0..24 * 60 * 60 / interval {
+            let (deposit_index, borrow_index, borrow_fees, borrow_rate, deposit_rate) = bank
+                .compute_index(
+                    bank.indexed_deposits,
+                    bank.indexed_borrows,
+                    I80F48::from(interval),
+                )
+                .unwrap();
+            bank.deposit_index = deposit_index;
+            bank.borrow_index = borrow_index;
+        }
+
+        // the 5s rate is 2/(365*24*60*60/5), so
+        // expected is (1+five_sec_rate)^(24*60*60/5)
+        assert!(
+            ((bank.deposit_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
+        assert!(
+            ((bank.borrow_index / index_start).to_num::<f64>() - 1.0054944908).abs() < 0.0000001
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_bank_interest_rate_curve() {
+        let mut bank = Bank::zeroed();
+        bank.zero_util_rate = I80F48::from(1);
+        bank.rate0 = I80F48::from(3);
+        bank.rate1 = I80F48::from(7);
+        bank.max_rate = I80F48::from(13);
+
+        bank.util0 = I80F48::from_num(0.5);
+        bank.util1 = I80F48::from_num(0.75);
+
+        let interest = |v: f64| {
+            bank.compute_interest_rate(I80F48::from_num(v))
+                .to_num::<f64>()
+        };
+        let d = |a: f64, b: f64| (a - b).abs();
+
+        // the points
+        let eps = 0.0001;
+        assert!(d(interest(-0.5), 1.0) <= eps);
+        assert!(d(interest(0.0), 1.0) <= eps);
+        assert!(d(interest(0.5), 3.0) <= eps);
+        assert!(d(interest(0.75), 7.0) <= eps);
+        assert!(d(interest(1.0), 13.0) <= eps);
+        assert!(d(interest(1.5), 13.0) <= eps);
+
+        // midpoints
+        assert!(d(interest(0.25), 2.0) <= eps);
+        assert!(d(interest((0.5 + 0.75) / 2.0), 5.0) <= eps);
+        assert!(d(interest((0.75 + 1.0) / 2.0), 10.0) <= eps);
+
+        // around the points
+        let delta = 0.000001;
+        assert!(d(interest(0.0 + delta), 1.0) <= eps);
+        assert!(d(interest(0.5 - delta), 3.0) <= eps);
+        assert!(d(interest(0.5 + delta), 3.0) <= eps);
+        assert!(d(interest(0.75 - delta), 7.0) <= eps);
+        assert!(d(interest(0.75 + delta), 7.0) <= eps);
+        assert!(d(interest(1.0 - delta), 13.0) <= eps);
     }
 }

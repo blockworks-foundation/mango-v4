@@ -1,8 +1,8 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, PerpMarket, PerpPosition, PlaceOrderType, Side, TokenIndex,
-    QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
+    PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
     chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
@@ -151,18 +151,7 @@ impl Rebalancer {
         let direct_sol_route_job =
             self.jupiter_quote(sol_mint, output_mint, in_amount_sol, true, jupiter_version);
 
-        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
-
-        // for v6, add a v4 fallback
-        if self.config.jupiter_version == jupiter::Version::V6 {
-            jobs.push(self.jupiter_quote(
-                quote_mint,
-                output_mint,
-                in_amount_quote,
-                false,
-                jupiter::Version::V4,
-            ));
-        }
+        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -211,18 +200,7 @@ impl Rebalancer {
         let direct_sol_route_job =
             self.jupiter_quote(input_mint, sol_mint, in_amount, true, jupiter_version);
 
-        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
-
-        // for v6, add a v4 fallback
-        if self.config.jupiter_version == jupiter::Version::V6 {
-            jobs.push(self.jupiter_quote(
-                input_mint,
-                quote_mint,
-                in_amount,
-                false,
-                jupiter::Version::V4,
-            ));
-        }
+        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -446,7 +424,8 @@ impl Rebalancer {
             // send an ioc order to reduce the base position
             let oracle_account_data = self.account_fetcher.fetch_raw(&perp.oracle)?;
             let oracle_account = KeyedAccountSharedData::new(perp.oracle, oracle_account_data);
-            let oracle_price = perp_market.oracle_price(&oracle_account, None)?;
+            let oracle_price = perp_market
+                .oracle_price(&OracleAccountInfos::from_reader(&oracle_account), None)?;
             let oracle_price_lots = perp_market.native_price_to_lot(oracle_price);
             let (side, order_price, oo_lots) = if effective_lots > 0 {
                 (
@@ -519,6 +498,7 @@ impl Rebalancer {
             };
             let counters = perp_pnl::fetch_top(
                 &self.mango_client.context,
+                &self.mango_client.client.config().fallback_oracle_config,
                 self.account_fetcher.as_ref(),
                 perp_position.market_index,
                 direction,

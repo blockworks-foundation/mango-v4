@@ -345,6 +345,22 @@ pub struct TokenLiqWithTokenLog {
 }
 
 #[event]
+pub struct TokenLiqWithTokenLogV2 {
+    pub mango_group: Pubkey,
+    pub liqee: Pubkey,
+    pub liqor: Pubkey,
+    pub asset_token_index: u16,
+    pub liab_token_index: u16,
+    pub asset_transfer_from_liqee: i128, // I80F48
+    pub asset_transfer_to_liqor: i128,   // I80F48
+    pub asset_liquidation_fee: i128,     // I80F48
+    pub liab_transfer: i128,             // I80F48
+    pub asset_price: i128,               // I80F48
+    pub liab_price: i128,                // I80F48
+    pub bankruptcy: bool,
+}
+
+#[event]
 pub struct Serum3OpenOrdersBalanceLog {
     pub mango_group: Pubkey,
     pub mango_account: Pubkey,
@@ -451,6 +467,17 @@ pub struct TokenMetaDataLog {
 }
 
 #[event]
+pub struct TokenMetaDataLogV2 {
+    pub mango_group: Pubkey,
+    pub mint: Pubkey,
+    pub token_index: u16,
+    pub mint_decimals: u8,
+    pub oracle: Pubkey,
+    pub fallback_oracle: Pubkey,
+    pub mint_info: Pubkey,
+}
+
+#[event]
 pub struct PerpMarketMetaDataLog {
     pub mango_group: Pubkey,
     pub perp_market: Pubkey,
@@ -482,6 +509,37 @@ pub struct PerpLiqBaseOrPositivePnlLog {
     pub quote_transfer: i128,
     pub pnl_transfer: i128,
     pub pnl_settle_limit_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct PerpLiqBaseOrPositivePnlLogV2 {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer_liqee: i64,
+    pub quote_transfer_liqee: i128,
+    pub quote_transfer_liqor: i128,
+    pub quote_platform_fee: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct PerpLiqBaseOrPositivePnlLogV3 {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer_liqee: i64,
+    pub quote_transfer_liqee: i128,
+    pub quote_transfer_liqor: i128,
+    pub quote_platform_fee: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer_recurring: i64,
+    pub pnl_settle_limit_transfer_oneshot: i64,
     pub price: i128,
 }
 
@@ -581,6 +639,23 @@ pub struct TokenForceCloseBorrowsWithTokenLog {
     pub asset_price: i128,
     pub liab_price: i128,
     pub fee_factor: i128,
+}
+
+#[event]
+pub struct TokenForceCloseBorrowsWithTokenLogV2 {
+    pub mango_group: Pubkey,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub asset_token_index: u16,
+    pub liab_token_index: u16,
+    pub asset_transfer_from_liqee: i128, // I80F48
+    pub asset_transfer_to_liqor: i128,   // I80F48
+    pub asset_liquidation_fee: i128,     // I80F48
+    pub liab_transfer: i128,             // I80F48
+    pub asset_price: i128,               // I80F48
+    pub liab_price: i128,                // I80F48
+    /// including liqor and platform liquidation fees
+    pub fee_factor: i128, // I80F48
 }
 
 #[event]
@@ -719,4 +794,23 @@ pub struct TokenConditionalSwapStartLog {
     pub token_conditional_swap_id: u64,
     pub incentive_token_index: u16,
     pub incentive_amount: u64,
+}
+
+#[event]
+pub struct TokenCollateralFeeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub asset_usage_fraction: i128,
+    pub fee: i128,
+}
+
+#[event]
+pub struct ForceWithdrawLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub quantity: u64,
+    pub price: i128, // I80F48
+    pub to_token_account: Pubkey,
 }

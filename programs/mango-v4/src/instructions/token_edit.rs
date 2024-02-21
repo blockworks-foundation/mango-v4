@@ -8,7 +8,7 @@ use crate::error::MangoError;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, TokenMetaDataLog};
+use crate::logs::{emit_stack, TokenMetaDataLogV2};
 use crate::util::fill_from_str;
 
 #[allow(unused_variables)]
@@ -49,8 +49,13 @@ pub fn token_edit(
     maint_weight_shift_asset_target_opt: Option<f32>,
     maint_weight_shift_liab_target_opt: Option<f32>,
     maint_weight_shift_abort: bool,
-    set_fallback_oracle: bool, // unused, introduced in v0.22
+    set_fallback_oracle: bool,
     deposit_limit_opt: Option<u64>,
+    zero_util_rate: Option<f32>,
+    platform_liquidation_fee: Option<f32>,
+    disable_asset_liquidation_opt: Option<bool>,
+    collateral_fee_per_day: Option<f32>,
+    force_withdraw_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -78,11 +83,25 @@ pub fn token_edit(
             mint_info.oracle = oracle;
             require_group_admin = true;
         }
+        if set_fallback_oracle {
+            msg!(
+                "Fallback oracle old {:?}, new {:?}",
+                bank.fallback_oracle,
+                ctx.accounts.fallback_oracle.key()
+            );
+            check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+                ctx.accounts.fallback_oracle.as_ref(),
+            )?)?;
+            bank.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            mint_info.fallback_oracle = ctx.accounts.fallback_oracle.key();
+            require_group_admin = true;
+        }
         if reset_stable_price {
             msg!("Stable price reset");
             require_keys_eq!(bank.oracle, ctx.accounts.oracle.key());
+            let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
             let oracle_price =
-                bank.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)?;
             bank.stable_price_model.reset_to_price(
                 oracle_price.to_num(),
                 Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -448,6 +467,60 @@ pub fn token_edit(
             bank.deposit_limit = deposit_limit;
             require_group_admin = true;
         }
+
+        if let Some(zero_util_rate) = zero_util_rate {
+            msg!(
+                "Zero utilization rate old {:?}, new {:?}",
+                bank.zero_util_rate,
+                zero_util_rate
+            );
+            bank.zero_util_rate = I80F48::from_num(zero_util_rate);
+            require_group_admin = true;
+        }
+
+        if let Some(platform_liquidation_fee) = platform_liquidation_fee {
+            msg!(
+                "Platform liquidation fee old {:?}, new {:?}",
+                bank.platform_liquidation_fee,
+                platform_liquidation_fee
+            );
+            bank.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
+            if platform_liquidation_fee != 0.0 {
+                require_group_admin = true;
+            }
+        }
+
+        if let Some(collateral_fee_per_day) = collateral_fee_per_day {
+            msg!(
+                "Collateral fee per day old {:?}, new {:?}",
+                bank.collateral_fee_per_day,
+                collateral_fee_per_day
+            );
+            bank.collateral_fee_per_day = collateral_fee_per_day;
+            if collateral_fee_per_day != 0.0 {
+                require_group_admin = true;
+            }
+        }
+
+        if let Some(disable_asset_liquidation) = disable_asset_liquidation_opt {
+            msg!(
+                "Asset liquidation disabled old {:?}, new {:?}",
+                bank.disable_asset_liquidation,
+                disable_asset_liquidation
+            );
+            bank.disable_asset_liquidation = u8::from(disable_asset_liquidation);
+            require_group_admin = true;
+        }
+
+        if let Some(force_withdraw) = force_withdraw_opt {
+            msg!(
+                "Force withdraw old {:?}, new {:?}",
+                bank.force_withdraw,
+                force_withdraw
+            );
+            bank.force_withdraw = u8::from(force_withdraw);
+            require_group_admin = true;
+        }
     }
 
     // account constraint #1
@@ -468,12 +541,13 @@ pub fn token_edit(
     let bank = ctx.remaining_accounts.first().unwrap().load_mut::<Bank>()?;
     bank.verify()?;
 
-    emit_stack(TokenMetaDataLog {
+    emit_stack(TokenMetaDataLogV2 {
         mango_group: ctx.accounts.group.key(),
         mint: mint_info.mint.key(),
         token_index: bank.token_index,
         mint_decimals: bank.mint_decimals,
         oracle: mint_info.oracle.key(),
+        fallback_oracle: ctx.accounts.fallback_oracle.key(),
         mint_info: ctx.accounts.mint_info.key(),
     });
 

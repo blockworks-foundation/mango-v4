@@ -1,6 +1,7 @@
 import { BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
+import { format } from 'path';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
@@ -79,6 +80,10 @@ export class Bank implements BankForHealth {
   public maintWeightShiftDurationInv: I80F48;
   public maintWeightShiftAssetTarget: I80F48;
   public maintWeightShiftLiabTarget: I80F48;
+  public zeroUtilRate: I80F48;
+  public platformLiquidationFee: I80F48;
+  public collectedLiquidationFees: I80F48;
+  public collectedCollateralFees: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -126,6 +131,8 @@ export class Bank implements BankForHealth {
       depositWeightScaleStartQuote: number;
       reduceOnly: number;
       forceClose: number;
+      disableAssetLiquidation: number;
+      forceWithdraw: number;
       feesWithdrawn: BN;
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
@@ -138,7 +145,13 @@ export class Bank implements BankForHealth {
       maintWeightShiftDurationInv: I80F48Dto;
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
+      fallbackOracle: PublicKey;
       depositLimit: BN;
+      zeroUtilRate: I80F48Dto;
+      platformLiquidationFee: I80F48Dto;
+      collectedLiquidationFees: I80F48Dto;
+      collectedCollateralFees: I80F48Dto;
+      collateralFeePerDay: number;
     },
   ): Bank {
     return new Bank(
@@ -198,7 +211,15 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftDurationInv,
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
+      obj.fallbackOracle,
       obj.depositLimit,
+      obj.zeroUtilRate,
+      obj.platformLiquidationFee,
+      obj.collectedLiquidationFees,
+      obj.disableAssetLiquidation == 0,
+      obj.collectedCollateralFees,
+      obj.collateralFeePerDay,
+      obj.forceWithdraw == 1,
     );
   }
 
@@ -259,7 +280,15 @@ export class Bank implements BankForHealth {
     maintWeightShiftDurationInv: I80F48Dto,
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
+    public fallbackOracle: PublicKey,
     public depositLimit: BN,
+    zeroUtilRate: I80F48Dto,
+    platformLiquidationFee: I80F48Dto,
+    collectedLiquidationFees: I80F48Dto,
+    public allowAssetLiquidation: boolean,
+    collectedCollateralFees: I80F48Dto,
+    public collateralFeePerDay: number,
+    public forceWithdraw: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -289,6 +318,10 @@ export class Bank implements BankForHealth {
     this.maintWeightShiftDurationInv = I80F48.from(maintWeightShiftDurationInv);
     this.maintWeightShiftAssetTarget = I80F48.from(maintWeightShiftAssetTarget);
     this.maintWeightShiftLiabTarget = I80F48.from(maintWeightShiftLiabTarget);
+    this.zeroUtilRate = I80F48.from(zeroUtilRate);
+    this.platformLiquidationFee = I80F48.from(platformLiquidationFee);
+    this.collectedLiquidationFees = I80F48.from(collectedLiquidationFees);
+    this.collectedCollateralFees = I80F48.from(collectedCollateralFees);
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
@@ -510,13 +543,16 @@ export class Bank implements BankForHealth {
       return ZERO_I80F48();
     }
 
-    const utilization = totalBorrows.div(totalDeposits);
+    const utilization = totalBorrows
+      .div(totalDeposits)
+      .max(ZERO_I80F48())
+      .min(ONE_I80F48());
     const scaling = I80F48.fromNumber(
       this.interestCurveScaling == 0.0 ? 1.0 : this.interestCurveScaling,
     );
     if (utilization.lt(this.util0)) {
-      const slope = this.rate0.div(this.util0);
-      return slope.mul(utilization).mul(scaling);
+      const slope = this.rate0.sub(this.zeroUtilRate).div(this.util0);
+      return this.zeroUtilRate.add(slope.mul(utilization)).mul(scaling);
     } else if (utilization.lt(this.util1)) {
       const extraUtil = utilization.sub(this.util0);
       const slope = this.rate1.sub(this.rate0).div(this.util1.sub(this.util0));

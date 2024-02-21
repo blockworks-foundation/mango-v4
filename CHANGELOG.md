@@ -4,11 +4,11 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+## mainnet
+
 ### v0.21.2, 2024-1-
 
 - Allow fast-listing of Openbook v1 markets (#839, #841)
-
-## mainnet
 
 ### v0.21.1, 2024-1-
 

@@ -86,7 +86,7 @@ impl MangoAccountPdaSeeds {
 // When not reading via idl, MangoAccount binary data is backwards compatible: when ignoring trailing bytes,
 // a v2 account can be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
-#[derive(Derivative)]
+#[derive(Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct MangoAccount {
     // fixed
@@ -151,8 +151,14 @@ pub struct MangoAccount {
     /// Next id to use when adding a token condition swap
     pub next_token_conditional_swap_id: u64,
 
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+
+    /// Time at which the last collateral fee was charged
+    pub last_collateral_fee_charge: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 200],
+    pub reserved: [u8; 152],
 
     // dynamic
     pub header_version: u8,
@@ -203,7 +209,10 @@ impl MangoAccount {
             buyback_fees_accrued_previous: 0,
             buyback_fees_expiry_timestamp: 0,
             next_token_conditional_swap_id: 0,
-            reserved: [0; 200],
+            temporary_delegate: Pubkey::default(),
+            temporary_delegate_expiry: 0,
+            last_collateral_fee_charge: 0,
+            reserved: [0; 152],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -327,11 +336,12 @@ pub struct MangoAccountFixed {
     pub next_token_conditional_swap_id: u64,
     pub temporary_delegate: Pubkey,
     pub temporary_delegate_expiry: u64,
-    pub reserved: [u8; 160],
+    pub last_collateral_fee_charge: u64,
+    pub reserved: [u8; 152],
 }
 const_assert_eq!(
     size_of::<MangoAccountFixed>(),
-    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 152
 );
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
@@ -737,6 +747,12 @@ impl<
         self.dynamic.deref_or_borrow()
     }
 
+    #[allow(dead_code)]
+    fn dynamic_reserved_bytes(&self) -> &[u8] {
+        let reserved_offset = self.header().reserved_bytes_offset();
+        &self.dynamic()[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
+    }
+
     /// Returns
     /// - the position
     /// - the raw index into the token positions list (for use with get_raw/deactivate)
@@ -850,18 +866,20 @@ impl<
         &self,
         market_index: PerpMarketIndex,
         client_order_id: u64,
-    ) -> Option<&PerpOpenOrder> {
-        self.all_perp_orders()
-            .find(|&oo| oo.is_active_for_market(market_index) && oo.client_id == client_order_id)
+    ) -> Option<(usize, &PerpOpenOrder)> {
+        self.all_perp_orders().enumerate().find(|(_, &oo)| {
+            oo.is_active_for_market(market_index) && oo.client_id == client_order_id
+        })
     }
 
     pub fn perp_find_order_with_order_id(
         &self,
         market_index: PerpMarketIndex,
         order_id: u128,
-    ) -> Option<&PerpOpenOrder> {
+    ) -> Option<(usize, &PerpOpenOrder)> {
         self.all_perp_orders()
-            .find(|&oo| oo.is_active_for_market(market_index) && oo.id == order_id)
+            .enumerate()
+            .find(|(_, &oo)| oo.is_active_for_market(market_index) && oo.id == order_id)
     }
 
     pub fn being_liquidated(&self) -> bool {
@@ -1153,6 +1171,7 @@ impl<
         }
     }
 
+    // Only used in unit tests
     pub fn deactivate_perp_position(
         &mut self,
         perp_market_index: PerpMarketIndex,
@@ -1194,68 +1213,68 @@ impl<
         Ok(())
     }
 
+    pub fn find_first_active_unused_perp_position(&self) -> Option<&PerpPosition> {
+        let first_unused_position_opt = self.all_perp_positions().find(|p| {
+            p.is_active()
+                && p.base_position_lots == 0
+                && p.quote_position_native == 0
+                && p.bids_base_lots == 0
+                && p.asks_base_lots == 0
+                && p.taker_base_lots == 0
+                && p.taker_quote_lots == 0
+        });
+        first_unused_position_opt
+    }
+
     pub fn add_perp_order(
         &mut self,
         perp_market_index: PerpMarketIndex,
         side: Side,
         order_tree: BookSideOrderTree,
         order: &LeafNode,
-        client_order_id: u64,
     ) -> Result<()> {
-        let mut perp_account = self.perp_position_mut(perp_market_index)?;
-        match side {
-            Side::Bid => {
-                perp_account.bids_base_lots += order.quantity;
-            }
-            Side::Ask => {
-                perp_account.asks_base_lots += order.quantity;
-            }
-        };
+        let perp_account = self.perp_position_mut(perp_market_index)?;
+        perp_account.adjust_maker_lots(side, order.quantity);
         let slot = order.owner_slot as usize;
 
-        let mut oo = self.perp_order_mut_by_raw_index(slot);
+        let oo = self.perp_order_mut_by_raw_index(slot);
         oo.market = perp_market_index;
         oo.side_and_tree = SideAndOrderTree::new(side, order_tree).into();
         oo.id = order.key;
-        oo.client_id = client_order_id;
+        oo.client_id = order.client_order_id;
+        oo.quantity = order.quantity;
         Ok(())
     }
 
+    /// Removes the perp order and updates the maker bids/asks tracking
+    ///
+    /// The passed in `quantity` may differ from the quantity stored on the
+    /// perp open order slot, because maybe we're cancelling an order slot
+    /// for quantity 10 where 3 are in-flight in a FillEvent and 7 were left
+    /// on the book.
     pub fn remove_perp_order(&mut self, slot: usize, quantity: i64) -> Result<()> {
-        {
-            let oo = self.perp_order_mut_by_raw_index(slot);
-            require_neq!(oo.market, FREE_ORDER_SLOT);
-            let order_side = oo.side_and_tree().side();
-            let perp_market_index = oo.market;
-            let perp_account = self.perp_position_mut(perp_market_index)?;
+        let oo = self.perp_order_by_raw_index(slot)?;
+        require_neq!(oo.market, FREE_ORDER_SLOT);
+        let perp_market_index = oo.market;
+        let order_side = oo.side_and_tree().side();
 
-            // accounting
-            match order_side {
-                Side::Bid => {
-                    perp_account.bids_base_lots -= quantity;
-                }
-                Side::Ask => {
-                    perp_account.asks_base_lots -= quantity;
-                }
-            }
-        }
+        let perp_account = self.perp_position_mut(perp_market_index)?;
+        perp_account.adjust_maker_lots(order_side, -quantity);
 
-        // release space
         let oo = self.perp_order_mut_by_raw_index(slot);
-        oo.market = FREE_ORDER_SLOT;
-        oo.side_and_tree = SideAndOrderTree::BidFixed.into();
-        oo.id = 0;
-        oo.client_id = 0;
+        oo.clear();
+
         Ok(())
     }
 
+    /// Returns amount of realized trade pnl for the maker
     pub fn execute_perp_maker(
         &mut self,
         perp_market_index: PerpMarketIndex,
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
         group: &Group,
-    ) -> Result<()> {
+    ) -> Result<I80F48> {
         let side = fill.taker_side().invert_side();
         let (base_change, quote_change) = fill.base_quote_change(side);
         let quote = I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
@@ -1269,31 +1288,47 @@ impl<
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
         pa.record_trading_fee(fees);
-        pa.record_trade(perp_market, base_change, quote);
+        let realized_pnl = pa.record_trade(perp_market, base_change, quote);
 
         pa.maker_volume += quote.abs().to_num::<u64>();
 
-        if fill.maker_out() {
-            self.remove_perp_order(fill.maker_slot as usize, base_change.abs())
-        } else {
-            match side {
-                Side::Bid => {
-                    pa.bids_base_lots -= base_change.abs();
-                }
-                Side::Ask => {
-                    pa.asks_base_lots -= base_change.abs();
-                }
+        let quantity_filled = base_change.abs();
+        let maker_slot = fill.maker_slot as usize;
+
+        // Always adjust the bids/asks_base_lots for the filled amount.
+        // Because any early cancels only adjust it for the amount that was on the book,
+        // so even fill events that come after the slot was freed still need to clear
+        // the pending maker lots.
+        pa.adjust_maker_lots(side, -quantity_filled);
+
+        let oo = self.perp_order_mut_by_raw_index(maker_slot);
+        let is_active = oo.is_active_for_market(perp_market_index);
+
+        // Old fill events have no maker order id and match against any order.
+        // (this works safely because we don't allow old order's slots to be
+        // prematurely freed - and new orders can only have new fill events)
+        let is_old_fill = fill.maker_order_id == 0;
+        let order_id_match = is_old_fill || oo.id == fill.maker_order_id;
+
+        if is_active && order_id_match {
+            // Old orders have quantity=0
+            oo.quantity = (oo.quantity - quantity_filled).max(0);
+
+            if fill.maker_out() {
+                oo.clear();
             }
-            Ok(())
         }
+
+        Ok(realized_pnl)
     }
 
+    /// Returns amount of realized trade pnl for the taker
     pub fn execute_perp_taker(
         &mut self,
         perp_market_index: PerpMarketIndex,
         perp_market: &mut PerpMarket,
         fill: &FillEvent,
-    ) -> Result<()> {
+    ) -> Result<I80F48> {
         let pa = self.perp_position_mut(perp_market_index)?;
         pa.settle_funding(perp_market);
 
@@ -1302,9 +1337,40 @@ impl<
         // fees are assessed at time of trade; no need to assess fees here
         let quote_change_native =
             I80F48::from(perp_market.quote_lot_size) * I80F48::from(quote_change);
-        pa.record_trade(perp_market, base_change, quote_change_native);
+        let realized_pnl = pa.record_trade(perp_market, base_change, quote_change_native);
 
         pa.taker_volume += quote_change_native.abs().to_num::<u64>();
+
+        Ok(realized_pnl)
+    }
+
+    pub fn execute_perp_out_event(
+        &mut self,
+        perp_market_index: PerpMarketIndex,
+        side: Side,
+        slot: usize,
+        quantity: i64,
+        order_id: u128,
+    ) -> Result<()> {
+        // Always free up the maker lots tracking, regardless of whether the
+        // order slot is still on the account or not
+        let pa = self.perp_position_mut(perp_market_index)?;
+        pa.adjust_maker_lots(side, -quantity);
+
+        let oo = self.perp_order_mut_by_raw_index(slot);
+        let is_active = oo.is_active_for_market(perp_market_index);
+
+        // Old events have no order id and match against any order.
+        // (this works safely because we don't allow old order's slots to be
+        // prematurely freed - and new orders can only have new events)
+        let is_old_event = order_id == 0;
+        let order_id_match = is_old_event || oo.id == order_id;
+
+        // This may be a delayed out event (slot may be empty or reused), so make
+        // sure it's the right one before canceling.
+        if is_active && order_id_match {
+            oo.clear();
+        }
 
         Ok(())
     }
@@ -1814,7 +1880,11 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 
 #[cfg(test)]
 mod tests {
+    use bytemuck::Zeroable;
     use itertools::Itertools;
+    use std::path::PathBuf;
+
+    use crate::state::PostOrderType;
 
     use super::*;
 
@@ -2339,12 +2409,7 @@ mod tests {
             );
         }
 
-        let reserved_offset = account.header.reserved_bytes_offset();
-        assert!(
-            account.dynamic[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
-                .iter()
-                .all(|&v| v == 0)
-        );
+        assert!(account.dynamic_reserved_bytes().iter().all(|&v| v == 0));
 
         Ok(())
     }
@@ -2559,6 +2624,328 @@ mod tests {
 
             check_account_active_and_order(&account, &active).unwrap();
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_perp_order_events() -> Result<()> {
+        let group = Group::zeroed();
+
+        let perp_market_index = 0;
+        let mut perp_market = PerpMarket::zeroed();
+
+        let mut account = make_test_account();
+        account.ensure_token_position(0)?;
+        account.ensure_perp_position(perp_market_index, 0)?;
+
+        let owner = Pubkey::new_unique();
+        let slot = account.perp_next_order_slot()?;
+        let order_id = 127;
+        let quantity = 42;
+        let order = LeafNode::new(
+            slot as u8,
+            order_id,
+            owner,
+            quantity,
+            1,
+            PostOrderType::Limit,
+            0,
+            0,
+            0,
+        );
+        let side = Side::Bid;
+        account.add_perp_order(0, side, BookSideOrderTree::Fixed, &order)?;
+
+        let make_fill = |quantity, out, order_id| {
+            FillEvent::new(
+                side.invert_side(),
+                out,
+                slot as u8,
+                0,
+                0,
+                owner,
+                order_id,
+                0,
+                I80F48::ZERO,
+                0,
+                owner,
+                0,
+                I80F48::ZERO,
+                1,
+                quantity,
+            )
+        };
+
+        let pp = |a: &MangoAccountValue| a.perp_position(perp_market_index).unwrap().clone();
+
+        {
+            // full fill
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity, true, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // full fill, no order id
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity, true, 0);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // out event
+            let mut account = account.clone();
+
+            account.execute_perp_out_event(perp_market_index, side, slot, quantity, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // out event, no order id
+            let mut account = account.clone();
+
+            account.execute_perp_out_event(perp_market_index, side, slot, quantity, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // cancel
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, quantity)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // partial fill event, user closes rest, following out event has no effect
+            let mut account = account.clone();
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, 10);
+
+            // out event happens but is delayed
+
+            account.remove_perp_order(slot, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // partial fill and out are delayed, user closes first
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, 0)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, order_id)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // partial fill and cancel, cancel before outevent
+            let mut account = account.clone();
+
+            account.remove_perp_order(slot, 10)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+
+            let fill = make_fill(quantity - 10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+        }
+
+        {
+            // several fills
+            let mut account = account.clone();
+
+            let fill = make_fill(10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(
+                account.perp_order_by_raw_index(slot)?.quantity,
+                quantity - 10
+            );
+
+            let fill = make_fill(10, false, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 20);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(
+                account.perp_order_by_raw_index(slot)?.quantity,
+                quantity - 20
+            );
+
+            let fill = make_fill(quantity - 20, true, order_id);
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, 0);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert!(!account.perp_order_by_raw_index(0)?.is_active());
+        }
+
+        {
+            // mismatched fill and out
+            let mut account = account.clone();
+
+            let mut fill = make_fill(10, false, order_id);
+            fill.maker_order_id = 1;
+            account.execute_perp_maker(perp_market_index, &mut perp_market, &fill, &group)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 10);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, quantity);
+
+            account.execute_perp_out_event(perp_market_index, side, slot, 10, 1)?;
+            assert_eq!(pp(&account).bids_base_lots, quantity - 20);
+            assert_eq!(pp(&account).asks_base_lots, 0);
+            assert_eq!(account.perp_order_by_raw_index(slot)?.quantity, quantity);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_perp_auto_close_first_unused() {
+        let mut account = make_test_account();
+
+        // Fill all perp slots
+        assert_eq!(account.header.perp_count, 4);
+        account.ensure_perp_position(1, 0).unwrap();
+        account.ensure_perp_position(2, 0).unwrap();
+        account.ensure_perp_position(3, 0).unwrap();
+        account.ensure_perp_position(4, 0).unwrap();
+        assert_eq!(account.active_perp_positions().count(), 4);
+
+        // Force usage of some perp slot (leaves 3 unused)
+        account.perp_position_mut(1).unwrap().taker_base_lots = 10;
+        account.perp_position_mut(2).unwrap().base_position_lots = 10;
+        account.perp_position_mut(4).unwrap().quote_position_native = I80F48::from_num(10);
+        assert!(account.perp_position(3).ok().is_some());
+
+        // Should not succeed anymore
+        {
+            let e = account.ensure_perp_position(5, 0);
+            assert!(e.is_anchor_error_with_code(MangoError::NoFreePerpPositionIndex.error_code()));
+        }
+
+        // Act
+        let to_be_closed_account_opt = account.find_first_active_unused_perp_position();
+
+        assert_eq!(to_be_closed_account_opt.unwrap().market_index, 3)
+    }
+
+    // Attempts reading old mango account data with borsh and with zerocopy
+    #[test]
+    fn test_mango_account_backwards_compatibility() -> Result<()> {
+        use solana_program_test::{find_file, read_file};
+
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        // Grab live accounts with
+        // solana account CZGf1qbYPaSoabuA1EmdN8W5UHvH5CeXcNZ7RTx65aVQ --output-file programs/mango-v4/resources/test/mangoaccount-v0.21.3.bin
+        let fixtures = vec!["mangoaccount-v0.21.3"];
+
+        for fixture in fixtures {
+            let filename = format!("resources/test/{}.bin", fixture);
+            let account_bytes = read_file(find_file(&filename).unwrap());
+
+            // Read with borsh
+            let mut account_bytes_slice: &[u8] = &account_bytes;
+            let borsh_account = MangoAccount::try_deserialize(&mut account_bytes_slice)?;
+
+            // Read with zerocopy
+            let zerocopy_reader = MangoAccountValue::from_bytes(&account_bytes[8..])?;
+            let fixed = &zerocopy_reader.fixed;
+            let zerocopy_account = MangoAccount {
+                group: fixed.group,
+                owner: fixed.owner,
+                name: fixed.name,
+                delegate: fixed.delegate,
+                account_num: fixed.account_num,
+                being_liquidated: fixed.being_liquidated,
+                in_health_region: fixed.in_health_region,
+                bump: fixed.bump,
+                padding: Default::default(),
+                net_deposits: fixed.net_deposits,
+                perp_spot_transfers: fixed.perp_spot_transfers,
+                health_region_begin_init_health: fixed.health_region_begin_init_health,
+                frozen_until: fixed.frozen_until,
+                buyback_fees_accrued_current: fixed.buyback_fees_accrued_current,
+                buyback_fees_accrued_previous: fixed.buyback_fees_accrued_previous,
+                buyback_fees_expiry_timestamp: fixed.buyback_fees_expiry_timestamp,
+                next_token_conditional_swap_id: fixed.next_token_conditional_swap_id,
+                temporary_delegate: fixed.temporary_delegate,
+                temporary_delegate_expiry: fixed.temporary_delegate_expiry,
+                last_collateral_fee_charge: fixed.last_collateral_fee_charge,
+                reserved: [0u8; 152],
+
+                header_version: *zerocopy_reader.header_version(),
+                padding3: Default::default(),
+
+                padding4: Default::default(),
+                tokens: zerocopy_reader.all_token_positions().cloned().collect_vec(),
+
+                padding5: Default::default(),
+                serum3: zerocopy_reader.all_serum3_orders().cloned().collect_vec(),
+
+                padding6: Default::default(),
+                perps: zerocopy_reader.all_perp_positions().cloned().collect_vec(),
+
+                padding7: Default::default(),
+                perp_open_orders: zerocopy_reader.all_perp_orders().cloned().collect_vec(),
+
+                padding8: Default::default(),
+                token_conditional_swaps: zerocopy_reader
+                    .all_token_conditional_swaps()
+                    .cloned()
+                    .collect_vec(),
+
+                reserved_dynamic: zerocopy_reader.dynamic_reserved_bytes().try_into().unwrap(),
+            };
+
+            // Both methods agree?
+            assert_eq!(borsh_account, zerocopy_account);
+
+            // Serializing and deserializing produces the same data?
+            let mut borsh_bytes = Vec::new();
+            borsh_account.try_serialize(&mut borsh_bytes)?;
+            let mut slice: &[u8] = &borsh_bytes;
+            let roundtrip_account = MangoAccount::try_deserialize(&mut slice)?;
+            assert_eq!(borsh_account, roundtrip_account);
+        }
+
         Ok(())
     }
 }

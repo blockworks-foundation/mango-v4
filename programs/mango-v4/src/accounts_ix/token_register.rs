@@ -51,6 +51,9 @@ pub struct TokenRegister<'info> {
     /// CHECK: The oracle can be one of several different account types
     pub oracle: UncheckedAccount<'info>,
 
+    /// CHECK: The oracle can be one of several different account types
+    pub fallback_oracle: UncheckedAccount<'info>,
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
