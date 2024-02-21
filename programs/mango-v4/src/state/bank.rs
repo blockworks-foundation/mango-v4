@@ -370,8 +370,9 @@ impl Bank {
     pub fn verify(&self) -> Result<()> {
         require_gte!(self.oracle_config.conf_filter, 0.0);
         require_gte!(self.util0, I80F48::ZERO);
+        require_gte!(self.util1, self.util0);
+        require_gte!(I80F48::ONE, self.util1);
         require_gte!(self.rate0, I80F48::ZERO);
-        require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
         require_gte!(self.max_rate, I80F48::ZERO);
         require_gte!(self.loan_fee_rate, 0.0);
