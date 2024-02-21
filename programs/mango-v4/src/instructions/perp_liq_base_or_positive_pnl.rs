@@ -8,7 +8,7 @@ use crate::health::*;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLogV2, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLogV3, TokenBalanceLog};
 
 /// This instruction deals with increasing health by:
 /// - reducing the liqee's base position
@@ -100,7 +100,8 @@ pub fn perp_liq_base_or_positive_pnl(
         quote_transfer_liqor,
         platform_fee,
         pnl_transfer,
-        pnl_settle_limit_transfer,
+        pnl_settle_limit_transfer_recurring,
+        pnl_settle_limit_transfer_oneshot,
     ) = liquidation_action(
         &mut perp_market,
         &mut settle_bank,
@@ -158,7 +159,7 @@ pub fn perp_liq_base_or_positive_pnl(
     }
 
     if base_transfer != 0 || pnl_transfer != 0 {
-        emit_stack(PerpLiqBaseOrPositivePnlLogV2 {
+        emit_stack(PerpLiqBaseOrPositivePnlLogV3 {
             mango_group: ctx.accounts.group.key(),
             perp_market_index: perp_market.perp_market_index,
             liqor: ctx.accounts.liqor.key(),
@@ -168,7 +169,8 @@ pub fn perp_liq_base_or_positive_pnl(
             quote_transfer_liqor: quote_transfer_liqor.to_bits(),
             quote_platform_fee: platform_fee.to_bits(),
             pnl_transfer: pnl_transfer.to_bits(),
-            pnl_settle_limit_transfer: pnl_settle_limit_transfer.to_bits(),
+            pnl_settle_limit_transfer_recurring,
+            pnl_settle_limit_transfer_oneshot,
             price: oracle_price.to_bits(),
         });
     }
@@ -215,7 +217,7 @@ pub(crate) fn liquidation_action(
     now_ts: u64,
     max_base_transfer: i64,
     max_pnl_transfer: u64,
-) -> Result<(i64, I80F48, I80F48, I80F48, I80F48, I80F48)> {
+) -> Result<(i64, I80F48, I80F48, I80F48, I80F48, i64, i64)> {
     let liq_end_type = HealthType::LiquidationEnd;
 
     let perp_market_index = perp_market.perp_market_index;
@@ -574,7 +576,9 @@ pub(crate) fn liquidation_action(
     // Let the liqor take over positive pnl until the account health is positive,
     // but only while the health_unsettled_pnl is positive (otherwise it would decrease liqee health!)
     //
-    let limit_transfer = if pnl_transfer > 0 {
+    let limit_transfer_recurring: i64;
+    let limit_transfer_oneshot: i64;
+    if pnl_transfer > 0 {
         // Allow taking over *more* than the liqee_positive_settle_limit. In exchange, the liqor
         // also can't settle fully immediately and just takes over a fractional chunk of the limit.
         //
@@ -582,22 +586,45 @@ pub(crate) fn liquidation_action(
         // base position to zero and would need to deal with that in bankruptcy. Also, the settle
         // limit changes with the base position price, so it'd be hard to say when this liquidation
         // step is done.
-        let limit_transfer = {
+        {
             // take care, liqee_limit may be i64::MAX
             let liqee_limit: i128 = liqee_positive_settle_limit.into();
+            let liqee_oneshot_positive = liqee_perp_position
+                .oneshot_settle_pnl_allowance
+                .ceil()
+                .to_num::<i128>()
+                .max(0);
+            let liqee_recurring = (liqee_limit - liqee_oneshot_positive).max(0);
             let liqee_pnl = liqee_perp_position
                 .unsettled_pnl(perp_market, oracle_price)?
-                .max(I80F48::ONE);
+                .ceil()
+                .to_num::<i128>()
+                .max(1);
             let settle = pnl_transfer.floor().to_num::<i128>();
-            let total = liqee_pnl.ceil().to_num::<i128>();
-            let liqor_limit: i64 = (liqee_limit * settle / total).try_into().unwrap();
-            I80F48::from(liqor_limit).min(pnl_transfer).max(I80F48::ONE)
+            let total = liqee_pnl.max(settle);
+            let transfer_recurring: i64 = (liqee_recurring * settle / total).try_into().unwrap();
+            let transfer_oneshot: i64 = (liqee_oneshot_positive * settle / total)
+                .try_into()
+                .unwrap();
+
+            // never transfer more than pnl_transfer rounded up
+            // and transfer at least 1, to compensate for rounding down `settle` and int div
+            let max_transfer = pnl_transfer.ceil().to_num::<i64>();
+            limit_transfer_recurring = transfer_recurring.min(max_transfer).max(1);
+            // make is so the sum of recurring and oneshot doesn't exceed max_transfer
+            limit_transfer_oneshot = transfer_oneshot
+                .min(max_transfer - limit_transfer_recurring)
+                .max(0);
         };
 
         // The liqor pays less than the full amount to receive the positive pnl
         let token_transfer = pnl_transfer * spot_gain_per_settled;
 
-        liqor_perp_position.record_liquidation_pnl_takeover(pnl_transfer, limit_transfer);
+        liqor_perp_position.record_liquidation_pnl_takeover(
+            pnl_transfer,
+            limit_transfer_recurring,
+            limit_transfer_oneshot,
+        );
         liqee_perp_position.record_settle(pnl_transfer, &perp_market);
 
         // Update the accounts' perp_spot_transfer statistics.
@@ -615,15 +642,15 @@ pub(crate) fn liquidation_action(
         liqee_health_cache.adjust_token_balance(&settle_bank, token_transfer)?;
 
         msg!(
-            "pnl {} was transferred to liqor for quote {} with settle limit {}",
+            "pnl {} was transferred to liqor for quote {} with settle limit {} recurring/{} oneshot",
             pnl_transfer,
             token_transfer,
-            limit_transfer
+            limit_transfer_recurring,
+            limit_transfer_oneshot,
         );
-
-        limit_transfer
     } else {
-        I80F48::ZERO
+        limit_transfer_oneshot = 0;
+        limit_transfer_recurring = 0;
     };
 
     let liqee_perp_position = liqee.perp_position_mut(perp_market_index)?;
@@ -635,7 +662,8 @@ pub(crate) fn liquidation_action(
         quote_transfer_liqor,
         platform_fee,
         pnl_transfer,
-        limit_transfer,
+        limit_transfer_recurring,
+        limit_transfer_oneshot,
     ))
 }
 
@@ -1072,7 +1100,8 @@ mod tests {
             // The settle limit taken over matches the quote pos when removing the
             // quote gains from giving away base lots
             assert_eq_f!(
-                I80F48::from_num(liqor_perp.recurring_settle_pnl_allowance),
+                I80F48::from_num(liqor_perp.recurring_settle_pnl_allowance)
+                    + liqor_perp.oneshot_settle_pnl_allowance,
                 liqor_perp.quote_position_native.to_num::<f64>()
                     + liqor_perp.base_position_lots as f64,
                 1.1
