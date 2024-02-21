@@ -29,7 +29,7 @@ impl UnwrappableOracleError for anyhow::Error {
             return parse_oracle_error_string(&error_str);
         }
 
-        return None;
+        None
     }
 }
 

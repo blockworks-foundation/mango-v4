@@ -568,7 +568,7 @@ impl LiquidationState {
                     .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
                     .is_none()
                 {
-                    println!(
+                    warn!(
                         "{:?} recording oracle error for token {} {}",
                         chrono::offset::Utc::now(),
                         ti_name,
@@ -579,7 +579,6 @@ impl LiquidationState {
                 self.oracle_errors
                     .record(LiqErrorType::Liq, &ti, err.to_string());
                 return result;
-            } else {
             }
 
             // Keep track of pubkeys that had errors
