@@ -1,5 +1,6 @@
 use crate::configuration::Configuration;
 use crate::processors::data::DataEvent;
+use chrono::Utc;
 use fixed::types::I80F48;
 use log::warn;
 use mango_v4::health::HealthType;
@@ -21,7 +22,7 @@ pub struct HealthProcessor {
 
 #[derive(Clone, Debug)]
 pub struct HealthEvent {
-    pub computed_at: Instant,
+    pub computed_at: chrono::DateTime<Utc>,
     pub components: Vec<HealthComponent>,
 }
 
@@ -120,7 +121,7 @@ impl HealthProcessor {
         account_fetcher: &AccountFetcher,
         accounts: &HashSet<Pubkey>,
     ) -> HealthEvent {
-        let computed_at = Instant::now();
+        let computed_at = Utc::now();
         let mut components = Vec::new();
 
         for account in accounts {

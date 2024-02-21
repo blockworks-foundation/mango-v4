@@ -1,11 +1,12 @@
 mod configuration;
 mod processors;
+mod utils;
 
 use futures_util::StreamExt;
-use mango_feeds_connector::metrics;
+// use mango_feeds_connector::metrics;
 use std::fs::File;
 use std::io::Read;
-use std::sync::atomic::{Ordering};
+use std::sync::atomic::Ordering;
 
 use crate::configuration::Configuration;
 use crate::processors::data::DataProcessor;
@@ -33,7 +34,7 @@ async fn main() -> anyhow::Result<()> {
     solana_logger::setup_with_default("info");
 
     // TODO FAS Add metrics
-    let metrics_tx = metrics::start(configuration.metrics.clone(), "health".into());
+    // let metrics_tx = metrics::start(configuration.metrics.clone(), "health".into());
 
     let exit_processor = ExitProcessor::init().await?;
 

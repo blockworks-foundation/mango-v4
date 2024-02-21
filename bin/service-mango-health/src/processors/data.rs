@@ -1,13 +1,13 @@
 use crate::configuration::Configuration;
 use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
 use async_channel::Receiver;
+use chrono::Utc;
 use itertools::Itertools;
 use log::warn;
 use mango_v4_client::account_update_stream::Message;
 use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{
-    account_update_stream, chain_data, snapshot_source, websocket_source,
-    MangoGroupContext,
+    account_update_stream, chain_data, snapshot_source, websocket_source, MangoGroupContext,
 };
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::commitment_config::CommitmentConfig;
@@ -15,7 +15,7 @@ use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::task::JoinHandle;
 
 pub struct DataProcessor {
@@ -33,13 +33,13 @@ pub enum DataEvent {
 
 #[derive(Clone, Debug)]
 pub struct SnapshotEvent {
-    pub received_at: Instant,
+    pub received_at: chrono::DateTime<Utc>,
     pub accounts: Vec<Pubkey>,
 }
 
 #[derive(Clone, Debug)]
 pub struct AccountUpdateEvent {
-    pub received_at: Instant,
+    pub received_at: chrono::DateTime<Utc>,
     pub account: Pubkey,
 }
 
@@ -66,7 +66,7 @@ impl DataProcessor {
                 }
                 tokio::select! {
                     Ok(msg) = mango_stream.recv() => {
-                        let received_at = Instant::now();
+                        let received_at = Utc::now();
 
                         msg.update_chain_data(&mut chain_data_clone.write().unwrap());
 
@@ -96,7 +96,7 @@ impl DataProcessor {
         let result = DataProcessor {
             channel: sender,
             job,
-            chain_data: chain_data.clone(),
+            chain_data,
         };
 
         Ok(result)
@@ -113,7 +113,7 @@ impl DataProcessor {
 
     fn parse_message(
         message: Message,
-        received_at: Instant,
+        received_at: chrono::DateTime<Utc>,
         mango_group: Pubkey,
     ) -> Option<DataEvent> {
         match message {
