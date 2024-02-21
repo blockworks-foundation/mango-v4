@@ -27,8 +27,10 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     // Health check _after_ the token position is guaranteed to exist
     let pre_health_opt = if !account.fixed.is_in_health_region() {
-        let retriever =
-            new_fixed_order_account_retriever2(ctx.remaining_accounts, &account.borrow())?;
+        let retriever = new_fixed_order_account_retriever_with_optional_banks(
+            ctx.remaining_accounts,
+            &account.borrow(),
+        )?;
         let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
             &account.borrow(),
             &retriever,

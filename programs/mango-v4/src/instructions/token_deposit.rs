@@ -119,7 +119,10 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         //
         // Health computation
         //
-        let retriever = new_fixed_order_account_retriever2(remaining_accounts, &account.borrow())?;
+        let retriever = new_fixed_order_account_retriever_with_optional_banks(
+            remaining_accounts,
+            &account.borrow(),
+        )?;
         let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
         // We only compute health to check if the account leaves the being_liquidated state.
