@@ -14,7 +14,7 @@ use crate::processors::data::DataProcessor;
 use crate::processors::exit::ExitProcessor;
 use crate::processors::health::HealthProcessor;
 use crate::processors::persister::PersisterProcessor;
-use crate::processors::publisher::PublisherProcessor;
+use crate::processors::logger::LoggerProcessor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
 
-    let publisher = PublisherProcessor::init(
+    let logger = LoggerProcessor::init(
         &health_processor.channel,
         &configuration,
         exit_processor.exit.clone(),
@@ -69,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
         exit_processor.job,
         data_processor.job,
         health_processor.job,
-        publisher.job,
+        logger.job,
         persister.job,
     ]
     .into_iter()

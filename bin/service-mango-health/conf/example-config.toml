@@ -36,3 +36,7 @@ program_id = "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg"
 
 [computing_configuration]
 recompute_interval_ms = 100
+
+[logging_configuration]
+log_health_to_stdout = true
+#log_health_for_accounts = ["xxx"]

@@ -1,20 +1,28 @@
+use std::collections::HashSet;
 use mango_feeds_connector::{MetricsConfig, SourceConfig};
 use serde_derive::Deserialize;
+use solana_sdk::pubkey::Pubkey;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Configuration {
     pub source: SourceConfig,
     pub metrics: MetricsConfig,
     pub postgres: Option<PostgresConfiguration>,
-    pub bind_ws_addr: String,
     pub rpc_http_url: String,
     pub mango_group: String,
     pub computing_configuration: ComputingConfiguration,
+    pub logging_configuration: LoggingConfiguration,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ComputingConfiguration {
     pub recompute_interval_ms: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct LoggingConfiguration {
+    pub log_health_to_stdout: bool,
+    pub log_health_for_accounts: Option<HashSet<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
