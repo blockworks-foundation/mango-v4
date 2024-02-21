@@ -15,10 +15,12 @@ pub struct PublisherProcessor {
 
 impl PublisherProcessor {
     pub async fn init(
-        data: async_channel::Receiver<HealthEvent>,
+        data_sender: &tokio::sync::broadcast::Sender<HealthEvent>,
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<PublisherProcessor> {
+        let mut data = data_sender.subscribe();
+
         let job = tokio::spawn(async move {
             // TODO FAS
             loop {

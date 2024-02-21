@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Interval;
 
 pub struct HealthProcessor {
-    pub receiver: async_channel::Receiver<HealthEvent>,
+    pub channel: tokio::sync::broadcast::Sender<HealthEvent>,
     pub job: JoinHandle<()>,
 }
 
@@ -40,7 +40,8 @@ impl HealthProcessor {
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<HealthProcessor> {
-        let (sender, receiver) = async_channel::unbounded::<HealthEvent>();
+        let (sender, receiver) = tokio::sync::broadcast::channel(8192);
+        let sender_clone = sender.clone();
         let mut accounts = HashSet::<Pubkey>::new();
         let mut snapshot_received = false;
         let mut last_recompute = Instant::now();
@@ -82,6 +83,10 @@ impl HealthProcessor {
                             }
                         }
 
+                        if sender_clone.receiver_count() == 0 {
+                            continue;
+                        }
+
                         if snapshot_received && last_recompute.elapsed() >= recompute_interval {
                             last_recompute = Instant::now();
                             let health_event_res = Self::compute_health(&mango_group_context,
@@ -93,7 +98,7 @@ impl HealthProcessor {
                                 continue;
                             }
 
-                            let res = sender.try_send(health_event_res.unwrap());
+                            let res = sender_clone.send(health_event_res.unwrap());
                             if res.is_err() {
                                 break;
                             }
@@ -107,7 +112,7 @@ impl HealthProcessor {
             }
         });
 
-        let result = HealthProcessor { receiver, job };
+        let result = HealthProcessor { channel: sender, job };
 
         Ok(result)
     }

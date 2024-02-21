@@ -10,7 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::configuration::Configuration;
-use crate::processors::composite_channel::CompositeChannelProcessor;
 use crate::processors::data::DataProcessor;
 use crate::processors::exit::ExitProcessor;
 use crate::processors::health::HealthProcessor;
@@ -51,23 +50,16 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    let mut composite_channel = CompositeChannelProcessor::init(
-        health_processor.receiver,
-        2,
-        &configuration,
-        exit_processor.exit.clone(),
-    )
-    .await?;
 
     let publisher = PublisherProcessor::init(
-        composite_channel.get_receiver()?,
+        &health_processor.channel,
         &configuration,
         exit_processor.exit.clone(),
     )
     .await?;
 
     let persister = PersisterProcessor::init(
-        composite_channel.get_receiver()?,
+        &health_processor.channel,
         &configuration,
         exit_processor.exit.clone(),
     )
@@ -77,7 +69,6 @@ async fn main() -> anyhow::Result<()> {
         exit_processor.job,
         data_processor.job,
         health_processor.job,
-        composite_channel.job,
         publisher.job,
         persister.job,
     ]
