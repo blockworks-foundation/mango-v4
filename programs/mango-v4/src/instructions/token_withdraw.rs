@@ -28,20 +28,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Health check _after_ the token position is guaranteed to exist
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let hc_result = new_health_cache(&account.borrow(), &retriever, now_ts)
-            .context("pre-withdraw health cache");
-        if hc_result.is_oracle_error() {
-            // We allow NOT checking the pre init health. That means later on the health
-            // check will be stricter (post_init > 0, without the post_init >= pre_init option)
-            // Then later we can compute the health while ignoring potential nonnegative
-            // health contributions from tokens with stale oracles.
-            None
-        } else {
-            let health_cache = hc_result?;
-            let pre_init_health = account.check_health_pre(&health_cache)?;
-            Some((health_cache, pre_init_health))
-        }
+            new_fixed_order_account_retriever2(ctx.remaining_accounts, &account.borrow())?;
+        let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+            &account.borrow(),
+            &retriever,
+            now_ts,
+        )
+        .context("pre-withdraw health cache")?;
+        let pre_init_health = account.check_health_pre(&health_cache)?;
+        Some((health_cache, pre_init_health))
     } else {
         None
     };
@@ -156,26 +151,20 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    if !account.fixed.is_in_health_region() {
-        if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
-            // This is the normal case
+    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
+        if health_cache.token_info_index(token_index).is_ok() {
+            // This is the normal case: the health cache knows about the token, we can
+            // compute the health for the new state by adjusting its balance
             health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
             account.check_health_post(&health_cache, pre_init_health)?;
         } else {
-            // Some oracle was stale/not confident enough above.
-            //
-            // Try computing health while ignoring nonnegative contributions from bad oracles.
-            // If the health is good enough without those, we can pass.
-            //
-            // Note that this must include the normal pre and post health checks.
-            let retriever =
-                new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-            let health_cache =
-                new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever, now_ts)
-                    .context("special post-withdraw health-cache")?;
-            let post_init_health = health_cache.health(HealthType::Init);
-            account.check_health_pre_checks(&health_cache, post_init_health)?;
-            account.check_health_post_checks(I80F48::MAX, post_init_health)?;
+            // The health cache does not know about the token! It has a bad oracle or wasn't
+            // provided in the health accounts. Borrows are out of the question!
+            require!(!is_borrow, MangoError::SomeError); // TODO: error
+
+            // But decreasing deposits is ok if health looked good
+            let post_init_health = pre_init_health;
+            account.check_health_post_checks(pre_init_health, post_init_health)?;
         }
     }
 
