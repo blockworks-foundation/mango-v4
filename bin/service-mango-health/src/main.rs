@@ -41,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
         DataProcessor::init(&configuration, exit_processor.exit.clone()).await?;
 
     let health_processor = HealthProcessor::init(
-        data_processor.receiver,
+        &data_processor.channel,
         data_processor.chain_data.clone(),
         &configuration,
         exit_processor.exit.clone(),

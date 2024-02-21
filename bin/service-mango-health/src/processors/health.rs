@@ -33,13 +33,14 @@ pub struct HealthComponent {
 
 impl HealthProcessor {
     pub async fn init(
-        data: async_channel::Receiver<DataEvent>,
+        data_sender: &tokio::sync::broadcast::Sender<DataEvent>,
         chain_data: Arc<RwLock<chain_data::ChainData>>,
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<HealthProcessor> {
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
+        let mut data = data_sender.subscribe();
         let mut accounts = HashSet::<Pubkey>::new();
         let mut snapshot_received = false;
         let mut last_recompute = Instant::now();

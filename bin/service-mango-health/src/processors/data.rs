@@ -19,22 +19,25 @@ use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
 
 pub struct DataProcessor {
-    pub receiver: async_channel::Receiver<DataEvent>,
+    pub channel: tokio::sync::broadcast::Sender<DataEvent>,
     pub job: JoinHandle<()>,
     pub chain_data: Arc<RwLock<chain_data::ChainData>>,
 }
 
+#[derive(Clone, Debug)]
 pub enum DataEvent {
     Other,
     Snapshot(SnapshotEvent),
     AccountUpdate(AccountUpdateEvent),
 }
 
+#[derive(Clone, Debug)]
 pub struct SnapshotEvent {
     pub received_at: Instant,
     pub accounts: Vec<Pubkey>,
 }
 
+#[derive(Clone, Debug)]
 pub struct AccountUpdateEvent {
     pub received_at: Instant,
     pub account: Pubkey,
@@ -47,7 +50,8 @@ impl DataProcessor {
     ) -> anyhow::Result<DataProcessor> {
         let mango_group = Pubkey::from_str(&configuration.mango_group)?;
         let mango_stream = Self::init_mango_source(configuration).await?;
-        let (sender, receiver) = async_channel::unbounded::<DataEvent>();
+        let (sender, _) = tokio::sync::broadcast::channel(8192);
+        let sender_clone = sender.clone();
 
         // The representation of current on-chain account data
         let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
@@ -65,13 +69,18 @@ impl DataProcessor {
                         let received_at = Instant::now();
 
                         msg.update_chain_data(&mut chain_data_clone.write().unwrap());
+
+                        if sender_clone.receiver_count() == 0 {
+                            continue;
+                        }
+
                         let event = Self::parse_message(msg, received_at, mango_group);
 
                         if event.is_none() {
                             continue;
                         }
 
-                        let res = sender.try_send(event.unwrap());
+                        let res = sender_clone.send(event.unwrap());
                         if res.is_err() {
                             break;
                         }
@@ -85,7 +94,7 @@ impl DataProcessor {
         });
 
         let result = DataProcessor {
-            receiver,
+            channel: sender,
             job,
             chain_data: chain_data.clone(),
         };
