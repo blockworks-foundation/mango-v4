@@ -2,19 +2,17 @@ mod configuration;
 mod processors;
 
 use futures_util::StreamExt;
-use log::info;
 use mango_feeds_connector::metrics;
 use std::fs::File;
 use std::io::Read;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{Ordering};
 
 use crate::configuration::Configuration;
 use crate::processors::data::DataProcessor;
 use crate::processors::exit::ExitProcessor;
 use crate::processors::health::HealthProcessor;
-use crate::processors::persister::PersisterProcessor;
 use crate::processors::logger::LoggerProcessor;
+use crate::processors::persister::PersisterProcessor;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -49,7 +47,6 @@ async fn main() -> anyhow::Result<()> {
         exit_processor.exit.clone(),
     )
     .await?;
-
 
     let logger = LoggerProcessor::init(
         &health_processor.channel,

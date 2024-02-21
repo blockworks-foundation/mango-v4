@@ -1,17 +1,14 @@
 use crate::configuration::Configuration;
 use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
-use anchor_client::Cluster;
 use async_channel::Receiver;
 use itertools::Itertools;
 use log::warn;
-use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4_client::account_update_stream::Message;
 use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{
-    account_update_stream, chain_data, keypair_from_cli, snapshot_source, websocket_source, Client,
-    MangoGroupContext, TransactionBuilderConfig,
+    account_update_stream, chain_data, snapshot_source, websocket_source,
+    MangoGroupContext,
 };
-use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
@@ -135,7 +132,7 @@ impl DataProcessor {
             _ => {}
         };
 
-        return return Some(Other);
+        return Some(Other);
     }
 
     async fn init_mango_source(configuration: &Configuration) -> anyhow::Result<Receiver<Message>> {

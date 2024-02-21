@@ -1,10 +1,8 @@
-use std::collections::HashSet;
 use crate::configuration::Configuration;
-use crate::processors::data::DataEvent;
 use crate::processors::health::HealthEvent;
 use log::warn;
-use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use solana_sdk::pubkey::Pubkey;
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -21,7 +19,10 @@ impl LoggerProcessor {
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<LoggerProcessor> {
         let mut data = data_sender.subscribe();
-        let filter: HashSet<Pubkey> = configuration.logging_configuration.log_health_for_accounts.clone()
+        let filter: HashSet<Pubkey> = configuration
+            .logging_configuration
+            .log_health_for_accounts
+            .clone()
             .unwrap_or_default()
             .iter()
             .map(|s| Pubkey::from_str(s).unwrap())
@@ -44,10 +45,16 @@ impl LoggerProcessor {
                             continue;
                         }
 
-                        println!(
-                            "PUB {:?} {} -> {}%",
-                            msg.computed_at, component.account, component.health_ratio
-                        );
+                        if component.health_ratio.is_some() {
+                            println!(
+                                "PUB {:?} {} -> {}%",
+                                msg.computed_at,
+                                component.account,
+                                component.health_ratio.unwrap()
+                            );
+                        } else {
+                            println!("PUB {:?} {} -> ERROR%", msg.computed_at, component.account);
+                        }
                     }
                 }
             }

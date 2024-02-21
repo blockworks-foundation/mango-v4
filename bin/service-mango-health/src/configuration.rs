@@ -1,7 +1,6 @@
-use std::collections::HashSet;
 use mango_feeds_connector::{MetricsConfig, SourceConfig};
 use serde_derive::Deserialize;
-use solana_sdk::pubkey::Pubkey;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Configuration {

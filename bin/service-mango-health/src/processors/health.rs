@@ -2,7 +2,6 @@ use crate::configuration::Configuration;
 use crate::processors::data::DataEvent;
 use fixed::types::I80F48;
 use log::warn;
-use mango_v4::accounts_zerocopy::LoadZeroCopy;
 use mango_v4::health::HealthType;
 use mango_v4_client::chain_data::AccountFetcher;
 use mango_v4_client::{chain_data, health_cache, FallbackOracleConfig, MangoGroupContext};
@@ -12,9 +11,8 @@ use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::task::JoinHandle;
-use tokio::time::Interval;
 
 pub struct HealthProcessor {
     pub channel: tokio::sync::broadcast::Sender<HealthEvent>,
@@ -30,7 +28,7 @@ pub struct HealthEvent {
 #[derive(Clone, Debug)]
 pub struct HealthComponent {
     pub account: Pubkey,
-    pub health_ratio: I80F48,
+    pub health_ratio: Option<I80F48>,
 }
 
 impl HealthProcessor {
@@ -40,7 +38,7 @@ impl HealthProcessor {
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<HealthProcessor> {
-        let (sender, receiver) = tokio::sync::broadcast::channel(8192);
+        let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
         let mut accounts = HashSet::<Pubkey>::new();
         let mut snapshot_received = false;
@@ -89,16 +87,12 @@ impl HealthProcessor {
 
                         if snapshot_received && last_recompute.elapsed() >= recompute_interval {
                             last_recompute = Instant::now();
-                            let health_event_res = Self::compute_health(&mango_group_context,
+
+                            let health_event = Self::compute_health(&mango_group_context,
                                 &account_fetcher,
                                 &accounts).await;
-                            if health_event_res.is_err(){
-                                // TODO FAS Log ? Fail ?
-                                warn!("Error while fetching health: {}", health_event_res.unwrap_err());
-                                continue;
-                            }
 
-                            let res = sender_clone.send(health_event_res.unwrap());
+                            let res = sender_clone.send(health_event);
                             if res.is_err() {
                                 break;
                             }
@@ -112,7 +106,10 @@ impl HealthProcessor {
             }
         });
 
-        let result = HealthProcessor { channel: sender, job };
+        let result = HealthProcessor {
+            channel: sender,
+            job,
+        };
 
         Ok(result)
     }
@@ -121,31 +118,42 @@ impl HealthProcessor {
         mango_group_context: &MangoGroupContext,
         account_fetcher: &AccountFetcher,
         accounts: &HashSet<Pubkey>,
-    ) -> anyhow::Result<HealthEvent> {
+    ) -> HealthEvent {
         let computed_at = Instant::now();
         let mut components = Vec::new();
 
         for account in accounts {
-            let mango_account = account_fetcher.fetch_mango_account(account)?;
-            let health_cache = health_cache::new(
-                &mango_group_context,
-                &FallbackOracleConfig::Never,
-                &*account_fetcher,
-                &mango_account,
-            )
-            .await?;
+            let health_ratio =
+                Self::compute_account_health(&mango_group_context, account_fetcher, &account).await;
 
             components.push({
                 HealthComponent {
                     account: *account,
-                    health_ratio: health_cache.health_ratio(HealthType::Maint),
+                    health_ratio: health_ratio.ok(),
                 }
             })
         }
 
-        Ok(HealthEvent {
+        HealthEvent {
             computed_at,
             components,
-        })
+        }
+    }
+
+    async fn compute_account_health(
+        mango_group_context: &&MangoGroupContext,
+        account_fetcher: &AccountFetcher,
+        account: &Pubkey,
+    ) -> anyhow::Result<I80F48> {
+        let mango_account = account_fetcher.fetch_mango_account(account)?;
+        let health_cache = health_cache::new(
+            &mango_group_context,
+            &FallbackOracleConfig::Never,
+            &*account_fetcher,
+            &mango_account,
+        )
+        .await?;
+
+        Ok(health_cache.health_ratio(HealthType::Maint))
     }
 }

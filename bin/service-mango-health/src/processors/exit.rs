@@ -1,6 +1,3 @@
-use crate::configuration::Configuration;
-use crate::processors::data::DataEvent;
-use crate::processors::health::HealthEvent;
 use log::info;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
