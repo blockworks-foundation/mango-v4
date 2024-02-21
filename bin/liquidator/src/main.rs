@@ -27,8 +27,10 @@ pub mod rebalance;
 pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
+mod unwrappable_oracle_error;
 pub mod util;
 
+use crate::unwrappable_oracle_error::UnwrappableOracleError;
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
@@ -262,6 +264,12 @@ async fn main() -> anyhow::Result<()> {
             .skip_threshold_for_type(LiqErrorType::Liq, 5)
             .skip_duration(Duration::from_secs(120))
             .build()?,
+        oracle_errors: ErrorTracking::builder()
+            .skip_threshold(1)
+            .skip_duration(Duration::from_secs(
+                cli.skip_oracle_error_in_logs_duration_secs,
+            ))
+            .build()?,
     });
 
     info!("main loop");
@@ -375,6 +383,7 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 liquidation.errors.update();
+                liquidation.oracle_errors.update();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -499,6 +508,7 @@ struct LiquidationState {
     trigger_tcs_config: trigger_tcs::Config,
 
     errors: ErrorTracking<Pubkey, LiqErrorType>,
+    oracle_errors: ErrorTracking<TokenIndex, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -552,6 +562,25 @@ impl LiquidationState {
         .await;
 
         if let Err(err) = result.as_ref() {
+            if let Some((ti, ti_name)) = err.try_unwrap_oracle_error() {
+                if self
+                    .oracle_errors
+                    .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
+                    .is_none()
+                {
+                    warn!(
+                        "{:?} recording oracle error for token {} {}",
+                        chrono::offset::Utc::now(),
+                        ti_name,
+                        ti
+                    );
+                }
+
+                self.oracle_errors
+                    .record(LiqErrorType::Liq, &ti, err.to_string());
+                return result;
+            }
+
             // Keep track of pubkeys that had errors
             error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
