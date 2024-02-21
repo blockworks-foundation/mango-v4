@@ -237,6 +237,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
     }
 }
 
+// TODO: This can be the same as FixedOrderAccountRetriever actually, just with different ctor fns
 /// TODO: Assumes the account infos needed for the health computation follow a strict order.
 ///
 /// 1. n_banks Bank account, in the order of account.token_iter_active()

@@ -1246,6 +1246,14 @@ pub fn new_health_cache_skipping_bad_oracles(
     new_health_cache_impl(account, retriever, now_ts, true, false)
 }
 
+pub fn new_health_cache_skipping_missing_banks_and_bad_oracles(
+    account: &MangoAccountRef,
+    retriever: &impl AccountRetriever,
+    now_ts: u64,
+) -> Result<HealthCache> {
+    new_health_cache_impl(account, retriever, now_ts, true, true)
+}
+
 fn new_health_cache_impl(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
@@ -1266,18 +1274,20 @@ fn new_health_cache_impl(
     };
 
     for (i, position) in account.active_token_positions().enumerate() {
+        // Allow skipping of missing banks if the account has a nonnegative balance
         let bank_is_available = available_banks
             .as_ref()
             .map(|ab| ab.contains(&position.token_index))
             .unwrap_or(true);
         if skip_missing_banks && !bank_is_available {
-            // Allow skipping of missing banks only if they have a nonnegative balance
             require!(position.indexed_position >= 0, MangoError::SomeError); // TODO: error
             continue;
         }
 
         let bank_oracle_result =
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index);
+
+        // Allow skipping of bad-oracle banks if the account has a nonnegative balance
         if skip_bad_oracles
             && bank_oracle_result.is_oracle_error()
             && position.indexed_position >= 0
@@ -1318,9 +1328,21 @@ fn new_health_cache_impl(
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_info_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
-        let quote_info_index =
-            find_token_info_index(&token_infos, serum_account.quote_token_index)?;
+        // and potentially skip the whole serum contribution if they are not available
+        let info_index_results = (
+            find_token_info_index(&token_infos, serum_account.base_token_index),
+            find_token_info_index(&token_infos, serum_account.quote_token_index),
+        );
+        let (base_info_index, quote_info_index) = match info_index_results {
+            (Ok(base), Ok(quote)) => (base, quote),
+            _ => {
+                require!(
+                    skip_bad_oracles || skip_missing_banks,
+                    MangoError::SomeError
+                ); // TODO error type
+                continue;
+            }
+        };
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
@@ -1346,6 +1368,12 @@ fn new_health_cache_impl(
             i,
             perp_position.market_index,
         )?;
+
+        // Ensure the settle token is available in the health cache
+        if skip_bad_oracles || skip_missing_banks {
+            find_token_info_index(&token_infos, perp_market.settle_token_index)?;
+        }
+
         perp_infos.push(PerpInfo::new(
             perp_position,
             perp_market,
