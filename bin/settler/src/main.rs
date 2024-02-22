@@ -217,6 +217,7 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher: account_fetcher.clone(),
         config: settle_config,
         recently_settled: Default::default(),
+        metrics: &metrics
     };
 
     let mut tcs_start = tcs_start::State {

@@ -61,6 +61,7 @@ pub struct SettlementState {
     pub config: Config,
 
     pub recently_settled: HashMap<Pubkey, Instant>,
+    pub metrics: &metrics::Metrics,
 }
 
 impl SettlementState {
@@ -353,6 +354,7 @@ impl<'a> SettleBatchProcessor<'a> {
             self.instructions = previous;
             let txsig = self.send().await?;
             self.instructions.append(new_ixs);
+            self.metrics.
             return Ok(txsig);
         }
 

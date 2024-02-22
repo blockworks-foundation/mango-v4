@@ -31,6 +31,12 @@ mod unwrappable_oracle_error;
 pub mod util;
 
 use crate::unwrappable_oracle_error::UnwrappableOracleError;
+use crate::metrics::serve_metrics;
+use crate::metrics::METRIC_CHAIN_DATA_SLOTS;
+use crate::metrics::METRIC_CHAIN_DATA_ACCOUNTS;
+use crate::metrics::METRIC_CHAIN_DATA_ACCOUNT_WRITE;
+use crate::metrics::METRIC_MANGO_ACCOUNTS;
+use crate::metrics::METRIC_ACCOUNT_UPDATE_QUEUE_LEN;
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
@@ -136,8 +142,6 @@ async fn main() -> anyhow::Result<()> {
 
     info!("startup");
 
-    let metrics = metrics::start();
-
     let (account_update_sender, account_update_receiver) =
         async_channel::unbounded::<account_update_stream::Message>();
 
@@ -174,7 +178,7 @@ async fn main() -> anyhow::Result<()> {
         account_update_sender,
     );
 
-    start_chain_data_metrics(chain_data.clone(), &metrics);
+    start_chain_data_metrics(chain_data.clone());
 
     let shared_state = Arc::new(RwLock::new(SharedState::default()));
 
@@ -297,7 +301,7 @@ async fn main() -> anyhow::Result<()> {
                     .await
                     .expect("channel not closed");
                 let current_time = Instant::now();
-                metric_account_update_queue_len.set(account_update_receiver.len() as u64);
+                METRIC_ACCOUNT_UPDATE_QUEUE_LEN.set(account_update_receiver.len().try_into().unwrap());
 
                 message.update_chain_data(&mut chain_data.write().unwrap());
 
@@ -322,7 +326,7 @@ async fn main() -> anyhow::Result<()> {
 
                             // Track all MangoAccounts: we need to iterate over them later
                             state.mango_accounts.insert(account_write.pubkey);
-                            metric_mango_accounts.set(state.mango_accounts.len() as u64);
+                            METRIC_MANGO_ACCOUNTS.set(state.mango_accounts.len().try_into().unwrap());
                         }
                     }
                     Message::Snapshot(snapshot) => {
@@ -360,7 +364,7 @@ async fn main() -> anyhow::Result<()> {
                             metric_chain_update_latency
                                 .push(current_time - reception_time.unwrap());
                         }
-                        metric_mango_accounts.set(state.mango_accounts.len() as u64);
+                        METRIC_MANGO_ACCOUNTS.set(state.mango_accounts.len().try_into().unwrap());
 
                         state.one_snapshot_done = true;
                     }
@@ -528,7 +532,8 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
-    use cli_args::{BoolArg, Cli, CliDotenv};
+    let serve_metrics_job = tokio::spawn(serve_metrics());
+
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
@@ -536,6 +541,7 @@ async fn main() -> anyhow::Result<()> {
         liquidation_job,
         token_swap_info_job,
         check_changes_for_abort_job,
+        serve_metrics_job,
     ]
     .into_iter()
     .chain(prio_jobs.into_iter())
@@ -792,21 +798,17 @@ impl LiquidationState {
     }
 }
 
-fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
+fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>) {
     let mut interval = mango_v4_client::delay_interval(Duration::from_secs(600));
-
-    let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
-    let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());
-    let mut metric_account_write_count =
-        metrics.register_u64("chain_data_account_write_count".into());
 
     tokio::spawn(async move {
         loop {
             interval.tick().await;
             let chain_lock = chain.read().unwrap();
-            metric_slots_count.set(chain_lock.slots_count() as u64);
-            metric_accounts_count.set(chain_lock.accounts_count() as u64);
-            metric_account_write_count.set(chain_lock.account_writes_count() as u64);
+
+            METRIC_CHAIN_DATA_SLOTS.set(chain_lock.slots_count().try_into().unwrap());
+            METRIC_CHAIN_DATA_ACCOUNTS.set(chain_lock.accounts_count().try_into().unwrap());
+            METRIC_CHAIN_DATA_ACCOUNT_WRITE.set(chain_lock.account_writes_count().try_into().unwrap());
         }
     });
 }

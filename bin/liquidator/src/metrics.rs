@@ -13,23 +13,73 @@ enum Value {
     I64(Arc<atomic::AtomicI64>),
     String(Arc<Mutex<String>>),
     Latency(Arc<Mutex<Histogram<u64>>>),
+use prometheus::{Encoder, IntCounter, IntGauge, Registry};
+use warp::Filter;
+
+lazy_static::lazy_static! {
+    pub static ref METRICS_REGISTRY: Registry = Registry::new_custom(Some("liquidator".to_string()), None).unwrap();
+    pub static ref METRIC_TOTAL_LIQUIDATION_TRANSACTIONS: IntCounter =
+        IntCounter::new("total_liquidation_transactions", "Total liquidation transactions").unwrap();
+    pub static ref METRIC_TOTAL_TOKEN_LIQ_WITH_TOKEN_TRANSACTIONS: IntCounter =
+        IntCounter::new("total_token_liq_with_token_transactions", "Total token_liq_with_token transactions").unwrap();
+    pub static ref METRIC_TOTAL_TOKEN_LIQ_BANKRUPTCY_TRANSACTIONS: IntCounter =
+        IntCounter::new("total_token_liq_bankruptcy_transactions", "Total token_liq_bankruptcy transactions").unwrap();
+    pub static ref METRIC_TOTAL_PERP_LIQ_BASE_OR_POS_PNL_TRANSACTIONS: IntCounter =
+        IntCounter::new("total_perp_liq_base_or_positive_pnl_transactions", "Total perp_liq_base_or_positive_pnl transactions").unwrap();
+    pub static ref METRIC_TOTAL_PERP_LIQ_NEG_PNL_OR_BANKRUPTCY_TRANSACTIONS: IntCounter =
+        IntCounter::new("total_perp_liq_base_or_positive_pnl_transactions", "Total perp_liq_negative_pnl_or_bankruptcy transactions").unwrap();
+    pub static ref METRIC_CHAIN_DATA_SLOTS: IntGauge =
+        IntGauge::new("chain_data_slots_count", "chain_data_slots_count").unwrap();
+    pub static ref METRIC_CHAIN_DATA_ACCOUNTS: IntGauge =
+        IntGauge::new("chain_data_accounts_count", "chain_data_accounts_count").unwrap();
+    pub static ref METRIC_CHAIN_DATA_ACCOUNT_WRITE: IntGauge =
+        IntGauge::new("chain_data_account_write_count", "chain_data_account_write_count").unwrap();
+    pub static ref METRIC_ACCOUNT_UPDATE_QUEUE_LEN: IntGauge = 
+        IntGauge::new("account_update_queue_len", "account_update_queue_len").unwrap();
+    pub static ref METRIC_MANGO_ACCOUNTS: IntGauge = 
+        IntGauge::new("mango_accounts", "mango_accounts").unwrap();
 }
 
-#[derive(Debug)]
-enum PrevValue {
-    U64(u64),
-    I64(i64),
-    String(String),
-}
+pub async fn serve_metrics() {
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_TOTAL_LIQUIDATION_TRANSACTIONS.clone()))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(
+            METRIC_TOTAL_TOKEN_LIQ_WITH_TOKEN_TRANSACTIONS.clone(),
+        ))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(
+            METRIC_TOTAL_TOKEN_LIQ_BANKRUPTCY_TRANSACTIONS.clone(),
+        ))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(
+            METRIC_TOTAL_PERP_LIQ_BASE_OR_POS_PNL_TRANSACTIONS.clone(),
+        ))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(
+            METRIC_TOTAL_PERP_LIQ_NEG_PNL_OR_BANKRUPTCY_TRANSACTIONS.clone(),
+        ))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CHAIN_DATA_SLOTS.clone()))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CHAIN_DATA_ACCOUNTS.clone()))
+        .unwrap();
+    METRICS_REGISTRY
+        .register(Box::new(METRIC_CHAIN_DATA_ACCOUNT_WRITE.clone()))
+        .unwrap();
 
-#[derive(Clone)]
-pub struct MetricU64 {
-    value: Arc<atomic::AtomicU64>,
-}
-impl MetricU64 {
-    pub fn value(&self) -> u64 {
-        self.value.load(atomic::Ordering::Acquire)
-    }
+    let metrics_route = warp::path!("metrics").map(|| {
+        let mut buffer = Vec::<u8>::new();
+        let encoder = prometheus::TextEncoder::new();
+        encoder
+            .encode(&METRICS_REGISTRY.gather(), &mut buffer)
+            .unwrap();
 
     pub fn set(&mut self, value: u64) {
         self.value.store(value, atomic::Ordering::Release);
@@ -228,7 +278,8 @@ pub fn start() -> Metrics {
                 }
             }
         }
+        String::from_utf8(buffer.clone()).unwrap()
     });
-
-    Metrics { registry }
+    println!("Metrics server starting on port 9091");
+    warp::serve(metrics_route).run(([0, 0, 0, 0], 9091)).await;
 }

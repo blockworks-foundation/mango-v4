@@ -562,7 +562,7 @@ impl<'a> LiquidateHelper<'a> {
             .client
             .send_and_confirm_owner_tx(liq_ixs.to_instructions())
             .await
-            .context("sending liq_token_with_token")?;
+            .context("sending liq_token_bankruptcy")?;
         info!(
             liab_token_index,
             %txsig,

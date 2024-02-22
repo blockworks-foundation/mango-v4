@@ -3544,9 +3544,11 @@ dependencies = [
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
+ "lazy_static",
  "mango-v4",
  "mango-v4-client",
  "once_cell",
+ "prometheus",
  "pyth-sdk-solana",
  "rand 0.7.3",
  "regex",
@@ -3564,6 +3566,7 @@ dependencies = [
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
  "tracing",
+ "warp",
 ]
 
 [[package]]
