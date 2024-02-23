@@ -1,16 +1,20 @@
 use crate::configuration::Configuration;
+use crate::fail_or_retry_async;
 use crate::processors::health::{HealthComponent, HealthEvent};
 use crate::utils::postgres_connection;
+use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
 use chrono::Utc;
 use fixed::types::I80F48;
+use futures_util::TryStreamExt;
 use log::warn;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tokio_postgres::Client;
+use tokio_postgres::{Client, Transaction};
+use ws::Handler;
 
 pub struct PersisterProcessor {
     pub job: JoinHandle<()>,
@@ -32,7 +36,12 @@ impl PersisterProcessor {
                 return;
             }
 
-            let connection = match postgres_connection::connect(&postgres_configuration).await {
+            let mut retry_counter = RetryCounter::new(postgres_configuration.max_retry_count);
+
+            let mut connection = match fail_or_retry_async!(
+                retry_counter,
+                postgres_connection::connect(&postgres_configuration).await
+            ) {
                 Err(e) => {
                     log::error!("Failed to connect to postgres sql: {}", e);
                     return;
@@ -47,14 +56,27 @@ impl PersisterProcessor {
                 }
 
                 if previous.is_empty() {
-                    previous = Self::load_previous(&connection).await.unwrap();
+                    let previous_res =
+                        fail_or_retry_async!(retry_counter, Self::load_previous(&connection).await);
+                    match previous_res {
+                        Ok(prv) => {
+                            previous = prv;
+                        }
+                        Err(e) => {
+                            log::error!("loading of previous state failed: {}", e);
+                            break;
+                        }
+                    }
                 }
 
                 let event = data.recv().await.unwrap();
 
-                Self::persist(&connection, &mut previous, event)
-                    .await
-                    .unwrap();
+                if let Err(e) = retry_counter
+                    .fail_or_ignore(Self::persist(&mut connection, &mut previous, event).await)
+                {
+                    log::error!("persistence failed: {}", e);
+                    break;
+                }
             }
         });
 
@@ -90,7 +112,7 @@ impl PersisterProcessor {
     }
 
     async fn persist(
-        client: &Client,
+        client: &mut Client,
         previous: &mut HashMap<Pubkey, PersistedData>,
         event: HealthEvent,
     ) -> anyhow::Result<()> {
@@ -110,10 +132,12 @@ impl PersisterProcessor {
             );
         }
 
-        Self::insert_history(client, &updates).await?;
-        Self::update_current(client, &updates, &previous).await?; // <- updated & present in previous
-        Self::insert_current(client, &updates, &previous).await?; // <- updated & not present in previous
-        Self::delete_old_history(client, event.computed_at).await?;
+        let tx = client.transaction().await?;
+        Self::insert_history(&tx, &updates).await?;
+        Self::update_current(&tx, &updates, &previous).await?; // <- updated & present in previous
+        Self::insert_current(&tx, &updates, &previous).await?; // <- updated & not present in previous
+        Self::delete_old_history(&tx, event.computed_at).await?;
+        tx.commit().await?;
 
         for (k, v) in updates {
             previous.insert(k, v);
@@ -122,8 +146,8 @@ impl PersisterProcessor {
         Ok(())
     }
 
-    async fn insert_history(
-        client: &Client,
+    async fn insert_history<'tx>(
+        client: &Transaction<'tx>,
         updates: &HashMap<Pubkey, PersistedData>,
     ) -> anyhow::Result<()> {
         for (key, value) in updates {
@@ -137,8 +161,8 @@ impl PersisterProcessor {
         Ok(())
     }
 
-    async fn update_current(
-        client: &Client,
+    async fn update_current<'tx>(
+        client: &Transaction<'tx>,
         updates: &HashMap<Pubkey, PersistedData>,
         previous: &HashMap<Pubkey, PersistedData>,
     ) -> anyhow::Result<()> {
@@ -157,8 +181,8 @@ impl PersisterProcessor {
         Ok(())
     }
 
-    async fn insert_current(
-        client: &Client,
+    async fn insert_current<'tx>(
+        client: &Transaction<'tx>,
         updates: &HashMap<Pubkey, PersistedData>,
         previous: &HashMap<Pubkey, PersistedData>,
     ) -> anyhow::Result<()> {
@@ -177,7 +201,10 @@ impl PersisterProcessor {
         Ok(())
     }
 
-    async fn delete_old_history(client: &Client, now: chrono::DateTime<Utc>) -> anyhow::Result<()> {
+    async fn delete_old_history<'tx>(
+        client: &Transaction<'tx>,
+        now: chrono::DateTime<Utc>,
+    ) -> anyhow::Result<()> {
         let min_ts = (now - chrono::Duration::days(31)).naive_utc();
         let query = postgres_query::query!(
             "DELETE FROM mango_monitoring.health_history WHERE timestamp < $min_ts",

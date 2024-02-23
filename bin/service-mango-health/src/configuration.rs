@@ -29,6 +29,7 @@ pub struct PostgresConfiguration {
     pub connection_string: String,
     pub allow_invalid_certs: bool,
     pub tls: Option<PostgresTlsConfig>,
+    pub max_retry_count: u64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
