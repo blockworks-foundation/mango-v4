@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::health::{new_fixed_order_account_retriever, new_health_cache};
+use crate::health::*;
 use crate::state::*;
 
 // TODO
@@ -66,10 +66,16 @@ pub fn perp_place_order(
     // Pre-health computation, _after_ perp position is created
     //
     let pre_health_opt = if !account.fixed.is_in_health_region() {
-        let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
-            .context("pre-withdraw init health")?;
+        let retriever = new_fixed_order_account_retriever_with_optional_banks(
+            ctx.remaining_accounts,
+            &account.borrow(),
+        )?;
+        let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+            &account.borrow(),
+            &retriever,
+            now_ts,
+        )
+        .context("pre-withdraw init health")?;
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_init_health))
     } else {
