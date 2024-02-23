@@ -8,13 +8,6 @@ output_http = false
 
 # [postgres]
 # connection_string = "$PG_CONNECTION_STRING"
-# connection_count = 1
-# max_batch_size = 1
-# max_queue_size = 50000
-# retry_query_max_count = 10
-# retry_query_sleep_secs = 2
-# retry_connection_sleep_secs = 10
-# fatal_connection_timeout_secs = 30
 # allow_invalid_certs = true
 
 # # [postgres.tls]
