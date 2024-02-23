@@ -164,7 +164,14 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             // provided in the health accounts. Borrows are out of the question!
             require!(!is_borrow, MangoError::SomeError); // TODO: error
 
-            // But decreasing deposits is ok if health looked good
+            // If health without the token is positive, then full health is positive and
+            // withdrawing all of the token would still keep it positive.
+            // However, if health without it is negative then full health could be negative
+            // and could be made worse by withdrawals.
+            require_gte!(pre_init_health, 0);
+
+            // This check is redundant with init_health >= 0 right now, but good to keep
+            // it consistent in case check_health_post_checks() gets additions.
             let post_init_health = pre_init_health;
             account.check_health_post_checks(pre_init_health, post_init_health)?;
         }
