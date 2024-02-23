@@ -1,12 +1,11 @@
 use crate::configuration::Configuration;
-use crate::fail_or_retry_async;
+use crate::fail_or_retry;
 use crate::processors::health::{HealthComponent, HealthEvent};
 use crate::utils::postgres_connection;
 use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
 use chrono::Utc;
 use fixed::types::I80F48;
-use futures_util::TryStreamExt;
 use log::warn;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -14,7 +13,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, Transaction};
-use ws::Handler;
 
 pub struct PersisterProcessor {
     pub job: JoinHandle<()>,
@@ -38,7 +36,7 @@ impl PersisterProcessor {
 
             let mut retry_counter = RetryCounter::new(postgres_configuration.max_retry_count);
 
-            let mut connection = match fail_or_retry_async!(
+            let mut connection = match fail_or_retry!(
                 retry_counter,
                 postgres_connection::connect(&postgres_configuration).await
             ) {
@@ -57,7 +55,7 @@ impl PersisterProcessor {
 
                 if previous.is_empty() {
                     let previous_res =
-                        fail_or_retry_async!(retry_counter, Self::load_previous(&connection).await);
+                        fail_or_retry!(retry_counter, Self::load_previous(&connection).await);
                     match previous_res {
                         Ok(prv) => {
                             previous = prv;

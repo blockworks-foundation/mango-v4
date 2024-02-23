@@ -1,5 +1,3 @@
-use std::future::Future;
-
 pub struct RetryCounter {
     error_count: u64,
     max_retry_count: u64,
@@ -35,20 +33,10 @@ impl RetryCounter {
             }
         }
     }
-
-    pub fn fail_or_retry<T>(&mut self, act: impl Fn() -> anyhow::Result<T>) -> anyhow::Result<T> {
-        loop {
-            let result = self.fail_or_ignore(act())?;
-
-            if let Some(value) = result {
-                return Ok(value);
-            }
-        }
-    }
 }
 
 #[macro_export]
-macro_rules! fail_or_retry_async {
+macro_rules! fail_or_retry {
     ($retry_counter:expr, $f:expr) => {{
         loop {
             let result = $retry_counter.fail_or_ignore($f);
