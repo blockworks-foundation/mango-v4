@@ -1280,7 +1280,12 @@ fn new_health_cache_impl(
             .map(|ab| ab.contains(&position.token_index))
             .unwrap_or(true);
         if skip_missing_banks && !bank_is_available {
-            require!(position.indexed_position >= 0, MangoError::SomeError); // TODO: error
+            require_msg_typed!(
+                position.indexed_position >= 0,
+                MangoError::InvalidBank,
+                "the bank for token index {} is a required health account when the account has a negative balance in it",
+                position.token_index
+            );
             continue;
         }
 
@@ -1336,10 +1341,14 @@ fn new_health_cache_impl(
         let (base_info_index, quote_info_index) = match info_index_results {
             (Ok(base), Ok(quote)) => (base, quote),
             _ => {
-                require!(
+                require_msg_typed!(
                     skip_bad_oracles || skip_missing_banks,
-                    MangoError::SomeError
-                ); // TODO error type
+                    MangoError::InvalidBank,
+                    "serum market {} misses health accounts for bank {} or {}",
+                    serum_account.market_index,
+                    serum_account.base_token_index,
+                    serum_account.quote_token_index,
+                );
                 continue;
             }
         };

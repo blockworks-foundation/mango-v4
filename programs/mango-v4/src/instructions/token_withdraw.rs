@@ -153,27 +153,29 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     //
     // Health check
     //
-    if let Some((mut health_cache, pre_init_health)) = pre_health_opt {
+    if let Some((mut health_cache, pre_init_health_lower_bound)) = pre_health_opt {
         if health_cache.token_info_index(token_index).is_ok() {
             // This is the normal case: the health cache knows about the token, we can
             // compute the health for the new state by adjusting its balance
             health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
-            account.check_health_post(&health_cache, pre_init_health)?;
+            account.check_health_post(&health_cache, pre_init_health_lower_bound)?;
         } else {
             // The health cache does not know about the token! It has a bad oracle or wasn't
             // provided in the health accounts. Borrows are out of the question!
-            require!(!is_borrow, MangoError::SomeError); // TODO: error
+            require!(!is_borrow, MangoError::BorrowsRequireHealthAccountBank);
+
+            // Since the health cache isn't aware of the bank we changed, the health
+            // estimation is the same.
+            let post_init_health_lower_bound = pre_init_health_lower_bound;
 
             // If health without the token is positive, then full health is positive and
             // withdrawing all of the token would still keep it positive.
             // However, if health without it is negative then full health could be negative
             // and could be made worse by withdrawals.
-            require_gte!(pre_init_health, 0);
-
-            // This check is redundant with init_health >= 0 right now, but good to keep
-            // it consistent in case check_health_post_checks() gets additions.
-            let post_init_health = pre_init_health;
-            account.check_health_post_checks(pre_init_health, post_init_health)?;
+            //
+            // We don't know the true pre_init_health, and substitute MAX. That way the check
+            // won't pass because post == pre.
+            account.check_health_post_checks(I80F48::MAX, post_init_health_lower_bound)?;
         }
     }
 

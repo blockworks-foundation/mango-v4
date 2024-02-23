@@ -145,6 +145,8 @@ pub enum MangoError {
     MissingFeedForCLMMOracle,
     #[msg("the asset does not allow liquidation")]
     TokenAssetLiquidationDisabled,
+    #[msg("for borrows the bank must be in the health account list")]
+    BorrowsRequireHealthAccountBank,
 }
 
 impl MangoError {
