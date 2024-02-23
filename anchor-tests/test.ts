@@ -29,7 +29,7 @@ enum MINTS {
   BTC = 'BTC',
 }
 const NUM_USERS = 4;
-const PROGRAM_ID = '4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg';
+const PROGRAM_ID = 'zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25';
 
 interface TestUser {
   keypair: anchor.web3.Keypair;

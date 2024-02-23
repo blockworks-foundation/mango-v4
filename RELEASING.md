@@ -4,7 +4,7 @@
 
   - $KEY as a path to a keypair (needs around 20 SOL for the buffer)
   - $RPC_URL as a url to an RPC node
-  - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg is the address of the Mango v4 Program
+  - zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25 is the address of the Mango v4 Program
   - FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw is the address of the Mango v4 Program Governance
 
 - Check out the latest version of the `dev` branch
@@ -47,13 +47,13 @@
 
 - Create IDL buffer
 
-  anchor idl write-buffer --provider.cluster $RPC_URL --provider.wallet $KEY --filepath target/idl/mango_v4_no_docs.json 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+  anchor idl write-buffer --provider.cluster $RPC_URL --provider.wallet $KEY --filepath target/idl/mango_v4_no_docs.json zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25
 
   Save the returned address as $IDL_BUFFER
 
 - Set IDL buffer authority
 
-  anchor idl set-authority --provider.cluster $RPC_URL --provider.wallet $KEY --program-id 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg --new-authority FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw $IDL_BUFFER
+  anchor idl set-authority --provider.cluster $RPC_URL --provider.wallet $KEY --program-id zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25 --new-authority FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw $IDL_BUFFER
 
 - Make a gist for the proposal description, ideally based on previous upgrade proposals
 
