@@ -7,6 +7,7 @@ import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
+  EmptyWallet,
   U64_MAX_BN,
   roundTo5,
   toNativeI80F48,
@@ -168,9 +169,13 @@ export class MangoAccount {
 
   async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
-        commitment: client.connection.commitment,
-      }),
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
     ); // readonly client for deserializing accounts
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return this;

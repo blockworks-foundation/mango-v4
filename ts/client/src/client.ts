@@ -87,6 +87,7 @@ import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
 import { FlashLoanType, OracleConfigParams } from './types';
 import {
+  EmptyWallet,
   I64_MAX_BN,
   U64_MAX_BN,
   createAssociatedTokenAccountIdempotentInstruction,
@@ -1284,9 +1285,13 @@ export class MangoClient {
 
     if (loadOpenbookV2Oo) {
       const openbookClient = new OpenBookV2Client(
-        new AnchorProvider(this.connection, new Wallet(Keypair.generate()), {
-          commitment: this.connection.commitment,
-        }),
+        new AnchorProvider(
+          this.connection,
+          new EmptyWallet(Keypair.generate()),
+          {
+            commitment: this.connection.commitment,
+          },
+        ),
       ); // readonly client for deserializing accounts
 
       const ooPks = accounts

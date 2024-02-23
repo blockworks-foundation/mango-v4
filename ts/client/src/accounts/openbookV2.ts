@@ -11,7 +11,7 @@ import BN from 'bn.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { As } from '../utils';
+import { As, EmptyWallet } from '../utils';
 import { TokenIndex } from './bank';
 import { Group } from './group';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
@@ -153,9 +153,13 @@ export class OpenbookV2Market {
     group: Group,
   ): Promise<BookSideAccount> {
     const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
-        commitment: client.connection.commitment,
-      }),
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
     ); // readonly client for deserializing accounts
     const openbookMarketExternal = group.getOpenbookV2ExternalMarket(
       this.openbookMarketExternal,
@@ -171,9 +175,13 @@ export class OpenbookV2Market {
     group: Group,
   ): Promise<BookSideAccount> {
     const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
-        commitment: client.connection.commitment,
-      }),
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
     ); // readonly client for deserializing accounts
     const openbookMarketExternal = group.getOpenbookV2ExternalMarket(
       this.openbookMarketExternal,
@@ -230,9 +238,13 @@ export class OpenbookV2Market {
     asksAccount?: BookSideAccount,
   ): [number, number][] {
     const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(client.connection, new Wallet(Keypair.generate()), {
-        commitment: client.connection.commitment,
-      }),
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
     ); // readonly client for deserializing accounts
     const bidNodes = bidsAccount
       ? openbookClient.getLeafNodes(bidsAccount)
