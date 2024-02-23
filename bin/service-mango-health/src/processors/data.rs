@@ -1,5 +1,7 @@
 use crate::configuration::Configuration;
+use crate::fail_or_retry;
 use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
+use crate::utils::retry_counter::RetryCounter;
 use async_channel::Receiver;
 use chrono::Utc;
 use itertools::Itertools;
@@ -48,14 +50,15 @@ impl DataProcessor {
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<DataProcessor> {
+        let mut retry_counter = RetryCounter::new(2);
         let mango_group = Pubkey::from_str(&configuration.mango_group)?;
-        let mango_stream = Self::init_mango_source(configuration).await?;
+        let mango_stream =
+            fail_or_retry!(retry_counter, Self::init_mango_source(configuration).await)?;
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
 
         // The representation of current on-chain account data
         let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-
         let chain_data_clone = chain_data.clone();
 
         let job = tokio::spawn(async move {
