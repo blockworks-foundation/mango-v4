@@ -73,6 +73,11 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_token_len = account.active_token_positions().count();
 
+    // Load the banks early to verify them
+    for ai in &ais[0..active_token_len] {
+        ai.load::<Bank>()?;
+    }
+
     new_fixed_order_account_retriever_inner(ais, account, active_token_len)
 }
 
@@ -83,11 +88,15 @@ pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
     account: &MangoAccountRef,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     // Scan for the number of banks provided
-    let n_banks = ais
-        .iter()
-        .enumerate()
-        .position(|i_ai| can_load_as::<Bank>(i_ai).is_none())
-        .unwrap_or(ais.len());
+    let mut n_banks = 0;
+    for ai in ais {
+        if let Some((_, bank_result)) = can_load_as::<Bank>((0, ai)) {
+            bank_result?;
+            n_banks += 1;
+        } else {
+            break;
+        }
+    }
 
     let active_token_len = account.active_token_positions().count();
     require_gte!(active_token_len, n_banks);
