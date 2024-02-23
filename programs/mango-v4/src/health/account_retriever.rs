@@ -45,14 +45,14 @@ pub trait AccountRetriever {
     ) -> Result<(&PerpMarket, I80F48)>;
 }
 
-// TODO: This can be the same as FixedOrderAccountRetriever actually, just with different ctor fns
-/// TODO: Assumes the account infos needed for the health computation follow a strict order.
+/// Assumes the account infos needed for the health computation follow a strict order.
 ///
-/// 1. n_banks Bank account, in the order of account.token_iter_active()
+/// 1. n_banks Bank account, in the order of account.active_token_positions() although it's
+///    allowed for some of the banks (and their oracles in 2.) to be skipped
 /// 2. n_banks oracle accounts, one for each bank in the same order
-/// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
+/// 3. PerpMarket accounts, in the order of account.perps.active_perp_positions()
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
-/// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 5. serum3 OpenOrders accounts, in the order of account.active_serum3_orders()
 /// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub ais: Vec<T>,
@@ -66,6 +66,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub sol_oracle_index: Option<usize>,
 }
 
+/// Creates a FixedOrderAccountRetriever where all banks are present
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
@@ -75,6 +76,8 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
     new_fixed_order_account_retriever_inner(ais, account, active_token_len)
 }
 
+/// A FixedOrderAccountRetriever with n_banks <= active_token_positions().count(),
+/// depending on which banks were passed.
 pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
@@ -134,6 +137,8 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         account_index: usize,
         token_index: TokenIndex,
     ) -> Result<(usize, &Bank)> {
+        // Maybe not all banks were passed: The desired bank must be at or
+        // to the left of account_index.
         for i in (0..=account_index).rev() {
             let ai = &self.ais[i];
             let bank = ai.load_fully_unchecked::<Bank>()?;
