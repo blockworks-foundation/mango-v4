@@ -663,6 +663,15 @@ export class MangoAccount {
       maxSource = maxSource.min(equivalentSourceAmount);
     }
 
+    // Apply max swap fee
+    const maxSwapFeeRate = I80F48.fromNumber(
+      Math.max(
+        sourceBank.flashLoanSwapFeeRate,
+        targetBank.flashLoanSwapFeeRate,
+      ),
+    );
+    maxSource = maxSource.div(ONE_I80F48().add(maxSwapFeeRate));
+
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
 
