@@ -2,7 +2,7 @@ use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
-use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
+use crate::health::*;
 use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
 
@@ -387,9 +387,15 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     }
 
     // Check health before balance adjustments
-    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
+    // The vault-to-bank matching above ensures that the banks for the affected tokens are available.
+    let retriever =
+        new_fixed_order_account_retriever_with_optional_banks(health_ais, &account.borrow())?;
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+    let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )?;
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
@@ -502,8 +508,13 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     });
 
     // Check health after account position changes
-    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+    let retriever =
+        new_fixed_order_account_retriever_with_optional_banks(health_ais, &account.borrow())?;
+    let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )?;
     account.check_health_post(&health_cache, pre_init_health)?;
 
     // Deactivate inactive token accounts after health check
