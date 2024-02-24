@@ -138,7 +138,7 @@ async fn main() -> Result<(), anyhow::Error> {
             interval.tick().await;
             let client = mango_client.clone();
             tokio::task::spawn_blocking(move || {
-                info!(
+                debug!(
                     "Arc<MangoClient>::strong_count() {}",
                     Arc::<MangoClient>::strong_count(&client)
                 )
