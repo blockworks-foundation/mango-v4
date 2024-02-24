@@ -1,0 +1,9 @@
+app = "boost-liquidator-1"
+kill_signal = "SIGTERM"
+kill_timeout = 30
+
+[build]
+  dockerfile = "../Dockerfile"
+
+[experimental]
+  cmd = ["liquidator"]
