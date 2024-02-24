@@ -98,6 +98,7 @@ pub async fn runner(
     interval_update_funding: u64,
     interval_check_for_changes_and_abort: u64,
     interval_charge_collateral_fees: u64,
+    max_cu_when_batching: u32,
     extra_jobs: Vec<JoinHandle<()>>,
 ) -> Result<(), anyhow::Error> {
     let handles1 = mango_client
@@ -157,7 +158,11 @@ pub async fn runner(
         futures::future::join_all(handles1),
         futures::future::join_all(handles2),
         futures::future::join_all(handles3),
-        loop_charge_collateral_fees(mango_client.clone(), interval_charge_collateral_fees),
+        loop_charge_collateral_fees(
+            mango_client.clone(),
+            interval_charge_collateral_fees,
+            max_cu_when_batching
+        ),
         MangoClient::loop_check_for_context_changes_and_abort(
             mango_client.clone(),
             Duration::from_secs(interval_check_for_changes_and_abort),
@@ -431,7 +436,11 @@ pub async fn loop_update_funding(
     }
 }
 
-pub async fn loop_charge_collateral_fees(mango_client: Arc<MangoClient>, interval: u64) {
+pub async fn loop_charge_collateral_fees(
+    mango_client: Arc<MangoClient>,
+    interval: u64,
+    max_cu_when_batching: u32,
+) {
     if interval == 0 {
         return;
     }
@@ -451,7 +460,14 @@ pub async fn loop_charge_collateral_fees(mango_client: Arc<MangoClient>, interva
     loop {
         interval.tick().await;
 
-        match charge_collateral_fees_inner(&mango_client, &fetcher, collateral_fee_interval).await {
+        match charge_collateral_fees_inner(
+            &mango_client,
+            &fetcher,
+            collateral_fee_interval,
+            max_cu_when_batching,
+        )
+        .await
+        {
             Ok(()) => {}
             Err(err) => {
                 error!("charge_collateral_fees error: {err:?}");
@@ -464,6 +480,7 @@ async fn charge_collateral_fees_inner(
     client: &MangoClient,
     fetcher: &RpcAccountFetcher,
     collateral_fee_interval: u64,
+    max_cu_when_batching: u32,
 ) -> anyhow::Result<()> {
     let mango_accounts = fetcher
         .fetch_program_accounts(&mango_v4::id(), MangoAccount::DISCRIMINATOR)
@@ -512,6 +529,7 @@ async fn charge_collateral_fees_inner(
         client.transaction_builder().await?,
         &client.client,
         &ix_to_send,
+        max_cu_when_batching,
     )
     .await;
     info!("charge collateral fees: {:?}", txsigs);
@@ -524,6 +542,7 @@ async fn send_batched_log_errors_no_confirm(
     mut tx_builder: TransactionBuilder,
     client: &mango_v4_client::Client,
     ixs_list: &[PreparedInstructions],
+    max_cu: u32,
 ) -> Vec<Signature> {
     let mut txsigs = Vec::new();
 
@@ -533,7 +552,7 @@ async fn send_batched_log_errors_no_confirm(
         current_batch.append(ixs.clone());
 
         tx_builder.instructions = current_batch.clone().to_instructions();
-        if !tx_builder.transaction_size().is_ok() {
+        if !tx_builder.transaction_size().is_ok() || current_batch.cu > max_cu {
             tx_builder.instructions = previous_batch.to_instructions();
             match tx_builder.send(client).await {
                 Err(err) => error!("could not send transaction: {err:?}"),
