@@ -2418,8 +2418,8 @@ impl TransactionBuilder {
                         .sum()
                 })
                 .unwrap_or(0);
-        let length = bytes.len();
-        if length > 1644 {
+        let length: usize = bytes.len();
+        if length > 1232 {
             Err(anyhow::format_err!("Transaction too large: {length} bytes"))
         } else {
             Ok(TransactionSize {
