@@ -1933,4 +1933,170 @@ mod tests {
             test_health1_runner(testcase);
         }
     }
+
+    #[test]
+    fn test_health_with_skips() {
+        let testcase = TestHealth1Case {
+            // 6, reserved oo funds
+            token1: 100,
+            token2: 10,
+            token3: -10,
+            oo_1_2: (5, 1),
+            oo_1_3: (0, 0),
+            ..Default::default()
+        };
+
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
+        let group = Pubkey::new_unique();
+        account.fixed.group = group;
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        let (mut bank3, mut oracle3) = mock_bank_and_oracle(group, 5, 10.0, 0.5, 0.3);
+        bank1
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(0).unwrap().0,
+                I80F48::from(testcase.token1),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+        bank2
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(4).unwrap().0,
+                I80F48::from(testcase.token2),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+        bank3
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(5).unwrap().0,
+                I80F48::from(testcase.token3),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let serum3account1 = account.create_serum3_orders(2).unwrap();
+        serum3account1.open_orders = oo1.pubkey;
+        serum3account1.base_token_index = 4;
+        serum3account1.quote_token_index = 0;
+        oo1.data().native_pc_total = testcase.oo_1_2.0;
+        oo1.data().native_coin_total = testcase.oo_1_2.1;
+
+        fn compute_health_with_retriever<'a, 'info>(
+            ais: &[AccountInfo],
+            account: &MangoAccountValue,
+            group: Pubkey,
+            kind: bool,
+        ) -> Result<I80F48> {
+            let hc = if kind {
+                let retriever =
+                    ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
+                new_health_cache_skipping_missing_banks_and_bad_oracles(
+                    &account.borrow(),
+                    &retriever,
+                    DUMMY_NOW_TS,
+                )?
+            } else {
+                let retriever = new_fixed_order_account_retriever_with_optional_banks(
+                    &ais,
+                    &account.borrow(),
+                    0,
+                )
+                .unwrap();
+                new_health_cache_skipping_missing_banks_and_bad_oracles(
+                    &account.borrow(),
+                    &retriever,
+                    DUMMY_NOW_TS,
+                )?
+            };
+            Ok(hc.health(HealthType::Init))
+        }
+
+        for retriever_kind in [false, true] {
+            // baseline with everything
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank2.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle2.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(
+                    health,
+                    0.8 * 100.0 + 0.5 * 5.0 * (10.0 + 2.0) - 1.5 * 10.0 * 10.0
+                ));
+            }
+
+            // missing bank1
+            {
+                let ais = vec![
+                    bank2.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle2.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, 0.5 * 5.0 * 10.0 - 1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank2
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, 0.8 * 100.0 - 1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank1 and 2
+            {
+                let ais = vec![
+                    bank3.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, -1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank3
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank2.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle2.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                // bank3 has a negative balance and can't be skipped!
+                assert!(
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).is_err()
+                );
+            }
+        }
+    }
 }
