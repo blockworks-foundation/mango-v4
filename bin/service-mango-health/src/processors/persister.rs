@@ -30,6 +30,8 @@ impl PersisterProcessor {
         let mut data = data_sender.subscribe();
         let postgres_configuration = configuration.postgres.clone().unwrap_or_default();
         let persistence_configuration = configuration.persistence_configuration.clone();
+        let time_to_live = Duration::seconds(persistence_configuration.history_time_to_live_secs);
+        let periodicity = Duration::seconds(persistence_configuration.persist_max_periodicity_secs);
 
         let job = tokio::spawn(async move {
             if !persistence_configuration.enabled {
@@ -71,7 +73,8 @@ impl PersisterProcessor {
                         &mut connection,
                         &mut previous,
                         event,
-                        Duration::seconds(persistence_configuration.history_time_to_live_secs),
+                        time_to_live,
+                        periodicity,
                     )
                     .await,
                 ) {
@@ -124,11 +127,12 @@ impl PersisterProcessor {
         previous: &mut HashMap<Pubkey, PersistedData>,
         event: HealthEvent,
         ttl: Duration,
+        periodicity: Duration,
     ) -> anyhow::Result<()> {
         let mut updates = HashMap::new();
 
         for component in &event.components {
-            if !Self::should_insert(&previous, event.computed_at, component.clone()) {
+            if !Self::should_insert(&previous, event.computed_at, component.clone(), periodicity) {
                 continue;
             }
 
@@ -193,14 +197,7 @@ impl PersisterProcessor {
             let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
             let ibl = value.is_being_liquidated;
 
-            let mut row: Vec<&'_ (dyn ToSql + Sync)> = Vec::new();
-            row.push(&key);
-            row.push(&ts);
-            row.push(&mr);
-            row.push(&i);
-            row.push(&m);
-            row.push(&le);
-            row.push(&ibl);
+            let row: Vec<&'_ (dyn ToSql + Sync)> = vec![&key, &ts, &mr, &i, &m, &le, &ibl];
             writer.as_mut().write(&row).await?;
         }
 
@@ -238,11 +235,12 @@ impl PersisterProcessor {
         persisted_data: &HashMap<Pubkey, PersistedData>,
         computed_at: chrono::DateTime<Utc>,
         health_component: HealthComponent,
+        periodicity: Duration,
     ) -> bool {
         match persisted_data.get(&health_component.account) {
             None => true,
             Some(previous) => {
-                let is_old = computed_at - previous.computed_at >= chrono::Duration::seconds(60);
+                let is_old = computed_at - previous.computed_at >= periodicity;
                 let between_none_and_some = previous.is_some() != health_component.value.is_some();
 
                 if is_old || between_none_and_some {
@@ -320,7 +318,8 @@ mod tests {
             HealthComponent {
                 account: Pubkey::new_unique(),
                 value: make_value(123f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         assert!(PersisterProcessor::should_insert(
@@ -329,7 +328,8 @@ mod tests {
             HealthComponent {
                 account: Pubkey::new_unique(),
                 value: make_value(0f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         assert!(PersisterProcessor::should_insert(
@@ -338,7 +338,8 @@ mod tests {
             HealthComponent {
                 account: Pubkey::new_unique(),
                 value: None
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
     }
 
@@ -356,7 +357,8 @@ mod tests {
             HealthComponent {
                 account: pk1,
                 value: make_value(124f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         assert!(!PersisterProcessor::should_insert(
@@ -365,7 +367,8 @@ mod tests {
             HealthComponent {
                 account: pk2,
                 value: make_value(124f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
     }
 
@@ -386,7 +389,8 @@ mod tests {
             HealthComponent {
                 account: pk1,
                 value: make_value(124f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         // big move, insert
@@ -396,7 +400,8 @@ mod tests {
             HealthComponent {
                 account: pk1,
                 value: make_value(100f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         // small move, but cross 0, insert
@@ -406,7 +411,8 @@ mod tests {
             HealthComponent {
                 account: pk2,
                 value: make_value(-1f64 / 1000f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         // small move, does not cross 0, nop
@@ -416,7 +422,8 @@ mod tests {
             HealthComponent {
                 account: pk2,
                 value: make_value(1f64 / 100f64 + 1f64 / 1000f64, 1000, 1000, 1, false)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
 
         // no change except flag being liquidated change
@@ -426,7 +433,8 @@ mod tests {
             HealthComponent {
                 account: pk2,
                 value: make_value(1f64 / 100f64, 1000, 1000, 1, true)
-            }
+            },
+            chrono::Duration::seconds(60)
         ));
     }
 }
