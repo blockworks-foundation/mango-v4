@@ -176,7 +176,7 @@ impl DataProcessor {
 
         websocket_source::start(
             websocket_source::Config {
-                rpc_ws_url: configuration.source.rpc_ws_url.clone(),
+                rpc_ws_url: configuration.rpc_ws_url.clone(),
                 serum_programs,
                 open_orders_authority: mango_group,
             },
@@ -194,7 +194,7 @@ impl DataProcessor {
         // FUTURE: of what to fetch a snapshot - should probably take as an input
         snapshot_source::start(
             snapshot_source::Config {
-                rpc_http_url: configuration.source.snapshot.rpc_http_url.clone(),
+                rpc_http_url: configuration.rpc_http_url.clone(),
                 mango_group,
                 get_multiple_accounts_count: 100,
                 parallel_rpc_requests: 10,

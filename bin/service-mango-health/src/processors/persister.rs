@@ -1,10 +1,10 @@
 use crate::configuration::Configuration;
 use crate::fail_or_retry;
-use crate::processors::health::{HealthComponent, HealthComponentValue, HealthEvent};
+use crate::processors::health::{HealthComponent, HealthEvent};
 use crate::utils::postgres_connection;
 use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use fixed::types::I80F48;
 use log::warn;
 use std::collections::HashMap;
@@ -25,12 +25,11 @@ impl PersisterProcessor {
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<PersisterProcessor> {
         let mut data = data_sender.subscribe();
-        let mut previous = HashMap::<Pubkey, PersistedData>::new();
-        let is_enabled = configuration.postgres.is_some();
         let postgres_configuration = configuration.postgres.clone().unwrap_or_default();
+        let persistence_configuration = configuration.persistence_configuration.clone();
 
         let job = tokio::spawn(async move {
-            if !is_enabled {
+            if !persistence_configuration.enabled {
                 return;
             }
 
@@ -47,31 +46,32 @@ impl PersisterProcessor {
                 Ok(cnt) => cnt,
             };
 
+            let mut previous = match
+                fail_or_retry!(retry_counter, Self::load_previous(&connection).await) {
+                Ok(prv) => prv,
+                Err(e) => {
+                    log::error!("loading of previous state failed: {}", e);
+                    return;
+                }
+            };
+
             loop {
                 if exit.load(Ordering::Relaxed) {
                     warn!("shutting down persister processor...");
                     break;
                 }
 
-                if previous.is_empty() {
-                    let previous_res =
-                        fail_or_retry!(retry_counter, Self::load_previous(&connection).await);
-                    match previous_res {
-                        Ok(prv) => {
-                            previous = prv;
-                        }
-                        Err(e) => {
-                            log::error!("loading of previous state failed: {}", e);
-                            break;
-                        }
-                    }
-                }
-
                 let event = data.recv().await.unwrap();
 
-                if let Err(e) = retry_counter
-                    .fail_or_ignore(Self::persist(&mut connection, &mut previous, event).await)
-                {
+                if let Err(e) = retry_counter.fail_or_ignore(
+                    Self::persist(
+                        &mut connection,
+                        &mut previous,
+                        event,
+                        Duration::seconds(persistence_configuration.history_time_to_live_secs),
+                    )
+                    .await,
+                ) {
                     log::error!("persistence failed: {}", e);
                     break;
                 }
@@ -121,6 +121,7 @@ impl PersisterProcessor {
         client: &mut Client,
         previous: &mut HashMap<Pubkey, PersistedData>,
         event: HealthEvent,
+        ttl: chrono::Duration,
     ) -> anyhow::Result<()> {
         let mut updates = HashMap::new();
 
@@ -148,17 +149,14 @@ impl PersisterProcessor {
                 },
             };
 
-            updates.insert(
-                component.account,
-                persisted_data,
-            );
+            updates.insert(component.account, persisted_data);
         }
 
         let tx = client.transaction().await?;
         Self::insert_history(&tx, &updates).await?;
         Self::update_current(&tx, &updates, &previous).await?; // <- updated & present in previous
         Self::insert_current(&tx, &updates, &previous).await?; // <- updated & not present in previous
-        Self::delete_old_history(&tx, event.computed_at).await?;
+        Self::delete_old_history(&tx, event.computed_at, ttl).await?;
         tx.commit().await?;
 
         for (k, v) in updates {
@@ -240,8 +238,9 @@ impl PersisterProcessor {
     async fn delete_old_history<'tx>(
         client: &Transaction<'tx>,
         now: chrono::DateTime<Utc>,
+        ttl: chrono::Duration,
     ) -> anyhow::Result<()> {
-        let min_ts = (now - chrono::Duration::days(31)).naive_utc();
+        let min_ts = (now - ttl).naive_utc();
         let query = postgres_query::query!(
             "DELETE FROM mango_monitoring.health_history WHERE timestamp < $min_ts",
             min_ts
@@ -262,15 +261,14 @@ impl PersisterProcessor {
             None => true,
             Some(previous) => {
                 let is_old = computed_at - previous.computed_at >= chrono::Duration::seconds(60);
-                let between_none_and_some =
-                    previous.is_some() != health_component.value.is_some();
+                let between_none_and_some = previous.is_some() != health_component.value.is_some();
 
                 if is_old || between_none_and_some {
                     true
-                } else if previous.is_some() && health_component.value.is_some()
-                {
+                } else if previous.is_some() && health_component.value.is_some() {
                     let current_value = health_component.value.unwrap();
-                    let changing_flag = current_value.is_being_liquidated != previous.is_being_liquidated.unwrap();
+                    let changing_flag =
+                        current_value.is_being_liquidated != previous.is_being_liquidated.unwrap();
 
                     let curr = current_value.maintenance_ratio;
                     let prev = previous.maintenance_ratio.unwrap();
@@ -298,10 +296,10 @@ struct PersistedData {
 impl PersistedData {
     pub fn is_some(&self) -> bool {
         self.maintenance_ratio.is_some()
-        && self.initial_health.is_some()
-        && self.maintenance_health.is_some()
-        && self.liquidation_end_health.is_some()
-        && self.is_being_liquidated.is_some()
+            && self.initial_health.is_some()
+            && self.maintenance_health.is_some()
+            && self.liquidation_end_health.is_some()
+            && self.is_being_liquidated.is_some()
     }
 }
 
@@ -367,14 +365,8 @@ mod tests {
         let mut previous = HashMap::new();
         let pk1 = Pubkey::new_unique();
         let pk2 = Pubkey::new_unique();
-        previous.insert(
-            pk1,
-            make_persisted(120, 123f64),
-        );
-        previous.insert(
-            pk2,
-            make_persisted(3, 123f64),
-        );
+        previous.insert(pk1, make_persisted(120, 123f64));
+        previous.insert(pk2, make_persisted(3, 123f64));
 
         assert!(PersisterProcessor::should_insert(
             &previous,
@@ -401,15 +393,9 @@ mod tests {
         let pk1 = Pubkey::new_unique();
         let pk2 = Pubkey::new_unique();
 
-        previous.insert(
-            pk1,
-            make_persisted(0, 123f64),
-        );
+        previous.insert(pk1, make_persisted(0, 123f64));
 
-        previous.insert(
-            pk2,
-            make_persisted(0, 1f64/100f64),
-        );
+        previous.insert(pk2, make_persisted(0, 1f64 / 100f64));
 
         // small move, nop
         assert!(!PersisterProcessor::should_insert(
@@ -437,7 +423,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                value: make_value(-1f64/1000f64, 1000, 1000, 1, false)
+                value: make_value(-1f64 / 1000f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -447,7 +433,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                value: make_value(1f64/100f64 + 1f64/1000f64, 1000, 1000, 1, false)
+                value: make_value(1f64 / 100f64 + 1f64 / 1000f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -457,7 +443,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                value: make_value(1f64/100f64, 1000, 1000, 1, true)
+                value: make_value(1f64 / 100f64, 1000, 1000, 1, true)
             }
         ));
     }
