@@ -854,6 +854,95 @@ impl ClientInstruction for TokenWithdrawInstruction {
 }
 
 #[derive(Clone)]
+pub struct TokenWithdrawSkipBanks {
+    pub amount: u64,
+    pub allow_borrow: bool,
+
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub token_account: Pubkey,
+    pub bank_index: usize,
+
+    pub skip_banks: Vec<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenWithdrawSkipBanks {
+    type Accounts = mango_v4::accounts::TokenWithdraw;
+    type Instruction = mango_v4::instruction::TokenWithdraw;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            amount: self.amount,
+            allow_borrow: self.allow_borrow,
+        };
+
+        // load accounts, find PDAs, find remainingAccounts
+        let token_account: TokenAccount = account_loader.load(&self.token_account).await.unwrap();
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                account.fixed.group.as_ref(),
+                token_account.mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
+
+        let mut health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            Some(mint_info.banks[self.bank_index]),
+            false,
+            None,
+        )
+        .await;
+
+        let mut n_banks = account.active_token_positions().count()
+            + account
+                .token_position(mint_info.token_index)
+                .map(|_| 0)
+                .unwrap_or(1);
+        for skip_bank in &self.skip_banks {
+            let pos = health_check_metas
+                .iter()
+                .position(|m| m.pubkey == *skip_bank)
+                .unwrap();
+            health_check_metas.remove(pos);
+            n_banks -= 1;
+            health_check_metas.remove(n_banks + pos); // also the oracle
+        }
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank: mint_info.banks[self.bank_index],
+            vault: mint_info.vaults[self.bank_index],
+            oracle: mint_info.oracle,
+            token_account: self.token_account,
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
 pub struct TokenDepositInstruction {
     pub amount: u64,
     pub reduce_only: bool,
