@@ -3,7 +3,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
-use fixed::types::{I80F48, U64F64};
+use fixed::types::I80F48;
 
 use static_assertions::const_assert_eq;
 use switchboard_program::FastRoundResultAccountData;
@@ -12,9 +12,9 @@ use switchboard_v2::AggregatorAccountData;
 use crate::accounts_zerocopy::*;
 
 use crate::error::*;
-use crate::state::load_whirlpool_state;
+use crate::state::load_orca_pool_state;
 
-use super::orca_mainnet_whirlpool;
+use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -117,6 +117,7 @@ pub enum OracleType {
     SwitchboardV1,
     SwitchboardV2,
     OrcaCLMM,
+    RaydiumCLMM,
 }
 
 pub struct OracleState {
@@ -195,6 +196,8 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         return Ok(OracleType::SwitchboardV1);
     } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
         return Ok(OracleType::OrcaCLMM);
+    } else if acc_info.owner() == &raydium_mainnet::ID {
+        return Ok(OracleType::RaydiumCLMM);
     }
 
     Err(MangoError::UnknownOracleType.into())
@@ -205,18 +208,19 @@ pub fn check_is_valid_fallback_oracle(acc_info: &impl KeyedAccountReader) -> Res
         return Ok(());
     };
     let oracle_type = determine_oracle_type(acc_info)?;
-    if oracle_type == OracleType::OrcaCLMM {
-        let whirlpool = load_whirlpool_state(acc_info)?;
+    let valid_oracle = match oracle_type {
+        OracleType::OrcaCLMM => {
+            let whirlpool = load_orca_pool_state(acc_info)?;
+            whirlpool.has_quote_token()
+        }
+        OracleType::RaydiumCLMM => {
+            let pool = load_raydium_pool_state(acc_info)?;
+            pool.has_quote_token()
+        }
+        _ => true,
+    };
 
-        let has_usdc_token = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-            || whirlpool.token_mint_b == usdc_mint_mainnet::ID;
-        let has_sol_token = whirlpool.token_mint_a == sol_mint_mainnet::ID
-            || whirlpool.token_mint_b == sol_mint_mainnet::ID;
-        require!(
-            has_usdc_token || has_sol_token,
-            MangoError::InvalidCLMMOracle
-        );
-    }
+    require!(valid_oracle, MangoError::UnexpectedOracle);
     Ok(())
 }
 
@@ -253,7 +257,7 @@ fn pyth_get_price(
     }
 }
 
-fn get_pyth_state(
+pub fn get_pyth_state(
     acc_info: &(impl KeyedAccountReader + ?Sized),
     base_decimals: u8,
 ) -> Result<OracleState> {
@@ -404,54 +408,30 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::OrcaCLMM => {
-            let whirlpool = load_whirlpool_state(oracle_info)?;
-
-            let inverted = whirlpool.is_inverted();
-            let quote_state = if inverted {
-                quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
-            } else {
-                quote_state_unchecked(acc_infos, &whirlpool.token_mint_b)?
-            };
-
-            let clmm_price = if inverted {
-                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price).to_num::<f64>();
-                let inverted_price = sqrt_price * sqrt_price;
-                I80F48::from_num(1.0f64 / inverted_price)
-            } else {
-                let sqrt_price = U64F64::from_bits(whirlpool.sqrt_price);
-                I80F48::from_num(sqrt_price * sqrt_price)
-            };
-
-            let price = clmm_price * quote_state.price;
+            let whirlpool = load_orca_pool_state(oracle_info)?;
+            let clmm_price = whirlpool.get_clmm_price();
+            let quote_oracle_state = whirlpool.quote_state_unchecked(acc_infos)?;
+            let price = clmm_price * quote_oracle_state.price;
             OracleState {
                 price,
-                last_update_slot: quote_state.last_update_slot,
-                deviation: quote_state.deviation,
+                last_update_slot: quote_oracle_state.last_update_slot,
+                deviation: quote_oracle_state.deviation,
                 oracle_type: OracleType::OrcaCLMM,
             }
         }
+        OracleType::RaydiumCLMM => {
+            let whirlpool = load_raydium_pool_state(oracle_info)?;
+            let clmm_price = whirlpool.get_clmm_price();
+            let quote_oracle_state = whirlpool.quote_state_unchecked(acc_infos)?;
+            let price = clmm_price * quote_oracle_state.price;
+            OracleState {
+                price,
+                last_update_slot: quote_oracle_state.last_update_slot,
+                deviation: quote_oracle_state.deviation,
+                oracle_type: OracleType::RaydiumCLMM,
+            }
+        }
     })
-}
-
-fn quote_state_unchecked<T: KeyedAccountReader>(
-    acc_infos: &OracleAccountInfos<T>,
-    quote_mint: &Pubkey,
-) -> Result<OracleState> {
-    if quote_mint == &usdc_mint_mainnet::ID {
-        let usd_feed = acc_infos
-            .usdc_opt
-            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
-        let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
-        return Ok(usd_state);
-    } else if quote_mint == &sol_mint_mainnet::ID {
-        let sol_feed = acc_infos
-            .sol_opt
-            .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
-        let sol_state = get_pyth_state(sol_feed, SOL_DECIMALS as u8)?;
-        return Ok(sol_state);
-    } else {
-        return Err(MangoError::MissingFeedForCLMMOracle.into());
-    }
 }
 
 pub fn oracle_log_context(
@@ -545,7 +525,87 @@ mod tests {
     }
 
     #[test]
-    pub fn test_clmm_price() -> Result<()> {
+    pub fn test_clmm_prices() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let usdc_fixture = (
+            "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+            OracleType::Pyth,
+            Pubkey::default(),
+            6,
+        );
+
+        let clmm_fixtures = vec![
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+                OracleType::RaydiumCLMM,
+                raydium_mainnet::ID,
+                9, // SOL/USDC pool
+            ),
+        ];
+
+        for fixture in clmm_fixtures {
+            let clmm_file = format!("resources/test/{}.bin", fixture.0);
+            let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+            let data = RefCell::new(&mut clmm_data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+
+            let pyth_file = format!("resources/test/{}.bin", usdc_fixture.0);
+            let mut pyth_data = read_file(find_file(&pyth_file).unwrap());
+            let pyth_data_cell = RefCell::new(&mut pyth_data[..]);
+            let usdc_ai = &AccountInfoRef {
+                key: &Pubkey::from_str(usdc_fixture.0).unwrap(),
+                owner: &usdc_fixture.2,
+                data: pyth_data_cell.borrow(),
+            };
+            let base_decimals = fixture.3;
+            let usdc_decimals = usdc_fixture.3;
+
+            let usdc_ais = OracleAccountInfos {
+                oracle: usdc_ai,
+                fallback_opt: None,
+                usdc_opt: None,
+                sol_opt: None,
+            };
+            let clmm_ais = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usdc_opt: Some(usdc_ai),
+                sol_opt: None,
+            };
+            let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
+            let clmm = oracle_state_unchecked(&clmm_ais, base_decimals).unwrap();
+            assert!(usdc.price == I80F48::from_num(1.00000758274099));
+
+            match fixture.1 {
+                OracleType::OrcaCLMM => {
+                    // 63.006792786538313 * 1.00000758274099 (but in native/native)
+                    assert!(clmm.price == I80F48::from_num(0.06300727055072872))
+                }
+                OracleType::RaydiumCLMM => {
+                    // 83.551469620431 * 1.00000758274099 (but in native/native)
+                    assert!(clmm.price == I80F48::from_num(0.083552103169584))
+                }
+                _ => unimplemented!(),
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_clmm_price_missing_usdc() -> Result<()> {
         // add ability to find fixtures
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         d.push("resources/test");
@@ -558,66 +618,12 @@ mod tests {
                 9, // SOL/USDC pool
             ),
             (
-                "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
-                OracleType::Pyth,
-                Pubkey::default(),
-                6,
+                "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+                OracleType::RaydiumCLMM,
+                raydium_mainnet::ID,
+                9, // SOL/USDC pool
             ),
         ];
-
-        let clmm_file = format!("resources/test/{}.bin", fixtures[0].0);
-        let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
-        let data = RefCell::new(&mut clmm_data[..]);
-        let ai = &AccountInfoRef {
-            key: &Pubkey::from_str(fixtures[0].0).unwrap(),
-            owner: &fixtures[0].2,
-            data: data.borrow(),
-        };
-
-        let pyth_file = format!("resources/test/{}.bin", fixtures[1].0);
-        let mut pyth_data = read_file(find_file(&pyth_file).unwrap());
-        let pyth_data_cell = RefCell::new(&mut pyth_data[..]);
-        let usdc_ai = &AccountInfoRef {
-            key: &Pubkey::from_str(fixtures[1].0).unwrap(),
-            owner: &fixtures[1].2,
-            data: pyth_data_cell.borrow(),
-        };
-        let base_decimals = fixtures[0].3;
-        let usdc_decimals = fixtures[1].3;
-
-        let usdc_ais = OracleAccountInfos {
-            oracle: usdc_ai,
-            fallback_opt: None,
-            usdc_opt: None,
-            sol_opt: None,
-        };
-        let orca_ais = OracleAccountInfos {
-            oracle: ai,
-            fallback_opt: None,
-            usdc_opt: Some(usdc_ai),
-            sol_opt: None,
-        };
-        let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
-        let orca = oracle_state_unchecked(&orca_ais, base_decimals).unwrap();
-        assert!(usdc.price == I80F48::from_num(1.00000758274099));
-        // 63.006792786538313 * 1.00000758274099 (but in native/native)
-        assert!(orca.price == I80F48::from_num(0.06300727055072872));
-
-        Ok(())
-    }
-
-    #[test]
-    pub fn test_clmm_price_missing_usdc() -> Result<()> {
-        // add ability to find fixtures
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("resources/test");
-
-        let fixtures = vec![(
-            "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
-            OracleType::OrcaCLMM,
-            orca_mainnet_whirlpool::ID,
-            9, // SOL/USDC pool
-        )];
 
         for fixture in fixtures {
             let filename = format!("resources/test/{}.bin", fixture.0);
@@ -640,6 +646,49 @@ mod tests {
                 .is_anchor_error_with_code(6068));
         }
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_valid_fallbacks() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let usdc_fixture = (
+            "Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD",
+            OracleType::Pyth,
+            Pubkey::default(),
+            6,
+        );
+
+        let clmm_fixtures = vec![
+            (
+                "83v8iPyZihDEjDdY8RdZddyZNyUtXngz69Lgo9Kt5d6d",
+                OracleType::OrcaCLMM,
+                orca_mainnet_whirlpool::ID,
+                9, // SOL/USDC pool
+            ),
+            (
+                "Ds33rQ1d4AXwxqyeXX6Pc3G4pFNr6iWb3dd8YfBBQMPr",
+                OracleType::RaydiumCLMM,
+                raydium_mainnet::ID,
+                9, // SOL/USDC pool
+            ),
+        ];
+
+        for fixture in clmm_fixtures {
+            let clmm_file = format!("resources/test/{}.bin", fixture.0);
+            let mut clmm_data = read_file(find_file(&clmm_file).unwrap());
+            let data = RefCell::new(&mut clmm_data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+
+            check_is_valid_fallback_oracle(ai)?;
+        }
         Ok(())
     }
 }
