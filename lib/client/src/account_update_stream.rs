@@ -1,6 +1,7 @@
 use solana_client::rpc_response::{Response, RpcKeyedAccount};
 use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
+use std::time::Instant;
 use std::{str::FromStr, sync::Arc};
 use tracing::*;
 
@@ -11,6 +12,7 @@ pub struct AccountUpdate {
     pub pubkey: Pubkey,
     pub slot: u64,
     pub account: AccountSharedData,
+    pub reception_time: Instant,
 }
 
 impl AccountUpdate {
@@ -25,15 +27,22 @@ impl AccountUpdate {
             pubkey,
             slot: rpc.context.slot,
             account,
+            reception_time: Instant::now(),
         })
     }
+}
+
+#[derive(Clone)]
+pub struct ChainSlotUpdate {
+    pub slot_update: Arc<solana_client::rpc_response::SlotUpdate>,
+    pub reception_time: Instant,
 }
 
 #[derive(Clone)]
 pub enum Message {
     Account(AccountUpdate),
     Snapshot(Vec<AccountUpdate>),
-    Slot(Arc<solana_client::rpc_response::SlotUpdate>),
+    Slot(ChainSlotUpdate),
 }
 
 impl Message {
@@ -65,7 +74,7 @@ impl Message {
             }
             Message::Slot(slot_update) => {
                 trace!("websocket slot message");
-                let slot_update = match **slot_update {
+                let slot_update = match *(slot_update.slot_update) {
                     solana_client::rpc_response::SlotUpdate::CreatedBank {
                         slot, parent, ..
                     } => Some(SlotData {

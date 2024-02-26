@@ -282,6 +282,8 @@ async fn main() -> anyhow::Result<()> {
 
         let mut metric_account_update_queue_len =
             metrics.register_u64("account_update_queue_length".into());
+        let mut metric_chain_update_latency =
+            metrics.register_latency("in-memory chain update".into());
         let mut metric_mango_accounts = metrics.register_u64("mango_accounts".into());
 
         let mut mint_infos = HashMap::<TokenIndex, Pubkey>::new();
@@ -294,6 +296,7 @@ async fn main() -> anyhow::Result<()> {
                     .recv()
                     .await
                     .expect("channel not closed");
+                let current_time = Instant::now();
                 metric_account_update_queue_len.set(account_update_receiver.len() as u64);
 
                 message.update_chain_data(&mut chain_data.write().unwrap());
@@ -301,6 +304,15 @@ async fn main() -> anyhow::Result<()> {
                 match message {
                     Message::Account(account_write) => {
                         let mut state = shared_state.write().unwrap();
+                        let reception_time = account_write.reception_time;
+                        state.oldest_chain_event_reception_time = Some(
+                            state
+                                .oldest_chain_event_reception_time
+                                .unwrap_or(reception_time),
+                        );
+
+                        metric_chain_update_latency.push(current_time - reception_time);
+
                         if is_mango_account(&account_write.account, &mango_group).is_some() {
                             // e.g. to render debug logs RUST_LOG="liquidator=debug"
                             debug!(
@@ -315,8 +327,21 @@ async fn main() -> anyhow::Result<()> {
                     }
                     Message::Snapshot(snapshot) => {
                         let mut state = shared_state.write().unwrap();
+                        let mut reception_time = None;
+
                         // Track all mango account pubkeys
                         for update in snapshot.iter() {
+                            reception_time = Some(
+                                update
+                                    .reception_time
+                                    .min(reception_time.unwrap_or(update.reception_time)),
+                            );
+                            state.oldest_chain_event_reception_time = Some(
+                                state
+                                    .oldest_chain_event_reception_time
+                                    .unwrap_or(update.reception_time),
+                            );
+
                             if is_mango_account(&update.account, &mango_group).is_some() {
                                 state.mango_accounts.insert(update.pubkey);
                             }
@@ -329,6 +354,11 @@ async fn main() -> anyhow::Result<()> {
                                 perp_markets.insert(perp_market.perp_market_index, update.pubkey);
                                 oracles.insert(perp_market.oracle);
                             }
+                        }
+
+                        if reception_time.is_some() {
+                            metric_chain_update_latency
+                                .push(current_time - reception_time.unwrap());
                         }
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
@@ -369,16 +399,33 @@ async fn main() -> anyhow::Result<()> {
     let liquidation_job = tokio::spawn({
         let mut interval =
             mango_v4_client::delay_interval(Duration::from_millis(cli.check_interval_ms));
+        let mut metric_liquidation_check = metrics.register_latency("liquidation_check".into());
+        let mut metric_liquidation_start_end =
+            metrics.register_latency("liquidation_start_end".into());
+
         let shared_state = shared_state.clone();
         async move {
             loop {
                 interval.tick().await;
 
                 let account_addresses = {
-                    let state = shared_state.write().unwrap();
+                    let mut state = shared_state.write().unwrap();
                     if !state.one_snapshot_done {
+                        // discard first latency info as it will skew data too much
+                        state.oldest_chain_event_reception_time = None;
                         continue;
                     }
+                    if state.oldest_chain_event_reception_time.is_none()
+                        && state.liquidation_start_time.is_none()
+                    {
+                        // no new update, skip computing
+                        continue;
+                    }
+
+                    if state.liquidation_start_time.is_none() {
+                        state.liquidation_start_time = Some(Instant::now());
+                    }
+
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
@@ -389,15 +436,47 @@ async fn main() -> anyhow::Result<()> {
                     .maybe_liquidate_one(account_addresses.iter())
                     .await;
 
+                if !liquidated {
+                    // This will be incorrect if we liquidate the last checked account
+                    // (We will wait for next full run, skewing latency metrics)
+                    // Probability is very low, might not need to be fixed
+
+                    let mut state = shared_state.write().unwrap();
+                    let reception_time = state.oldest_chain_event_reception_time.unwrap();
+                    let liquidation_start_time = state.liquidation_start_time.unwrap();
+                    let current_time = Instant::now();
+
+                    state.liquidation_start_time = None;
+                    state.oldest_chain_event_reception_time = None;
+
+                    metric_liquidation_check.push(current_time - reception_time);
+                    metric_liquidation_start_end.push(current_time - liquidation_start_time);
+                }
+
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
+                    let tcs_start_time = {
+                        let mut state = shared_state.write().unwrap();
+                        state.tcs_start_time = Some(state.tcs_start_time.unwrap_or(Instant::now()));
+                        state.tcs_start_time
+                    };
+
                     took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
                         .unwrap_or_else(|err| {
                             error!("error during maybe_take_token_conditional_swap: {err}");
                             false
-                        })
+                        });
+
+                    if !took_tcs {
+                        let current_time = Instant::now();
+                        let mut metric_tcs_start_end =
+                            metrics.register_latency("tcs_start_end".into());
+                        let mut state = shared_state.write().unwrap();
+                        state.tcs_start_time = None;
+                        metric_tcs_start_end.push(current_time - tcs_start_time.unwrap());
+                    }
                 }
 
                 if liquidated || took_tcs {
@@ -477,6 +556,17 @@ struct SharedState {
 
     /// Is the first snapshot done? Only start checking account health when it is.
     one_snapshot_done: bool,
+
+    /// Oldest chain event not processed yet
+    oldest_chain_event_reception_time: Option<Instant>,
+
+    /// When did current liquidation loop start
+    /// Will not change until we do a full loop over all accounts
+    /// (might need several tries as we exit computation as soon as we find a liquidation candidate)
+    liquidation_start_time: Option<Instant>,
+
+    /// When did current tcs loop start
+    tcs_start_time: Option<Instant>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
