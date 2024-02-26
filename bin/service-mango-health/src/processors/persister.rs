@@ -121,7 +121,7 @@ impl PersisterProcessor {
         client: &mut Client,
         previous: &mut HashMap<Pubkey, PersistedData>,
         event: HealthEvent,
-        ttl: chrono::Duration,
+        ttl: Duration,
     ) -> anyhow::Result<()> {
         let mut updates = HashMap::new();
 
@@ -154,9 +154,8 @@ impl PersisterProcessor {
 
         let tx = client.transaction().await?;
         Self::insert_history(&tx, &updates).await?;
-        Self::update_current(&tx, &updates, &previous).await?; // <- updated & present in previous
-        Self::insert_current(&tx, &updates, &previous).await?; // <- updated & not present in previous
         Self::delete_old_history(&tx, event.computed_at, ttl).await?;
+        Self::update_current(&tx).await?;
         tx.commit().await?;
 
         for (k, v) in updates {
@@ -187,50 +186,9 @@ impl PersisterProcessor {
 
     async fn update_current<'tx>(
         client: &Transaction<'tx>,
-        updates: &HashMap<Pubkey, PersistedData>,
-        previous: &HashMap<Pubkey, PersistedData>,
     ) -> anyhow::Result<()> {
-        let to_update = updates
-            .into_iter()
-            .filter(|(key, _)| previous.contains_key(&key));
-
-        for (key, value) in to_update {
-            let key = key.to_string();
-            let ts = value.computed_at.naive_utc();
-            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
-            let i = value.initial_health.map(|x| x.to_num::<f64>());
-            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
-            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
-            let ibl = value.is_being_liquidated;
-
-            let query = postgres_query::query!("UPDATE mango_monitoring.health_current SET Timestamp=$ts, MaintenanceRatio=$mr, Maintenance=$m, Initial=$i, LiquidationEnd=$le, IsBeingLiquidated=$ibl WHERE Pubkey = $key", key, ts, mr, m, i, le, ibl);
+            let query = postgres_query::query!("REFRESH MATERIALIZED VIEW mango_monitoring.health_current");
             query.execute(client).await.expect("Update failed");
-        }
-
-        Ok(())
-    }
-
-    async fn insert_current<'tx>(
-        client: &Transaction<'tx>,
-        updates: &HashMap<Pubkey, PersistedData>,
-        previous: &HashMap<Pubkey, PersistedData>,
-    ) -> anyhow::Result<()> {
-        let to_insert = updates
-            .iter()
-            .filter(|(key, _)| !previous.contains_key(key));
-
-        for (key, value) in to_insert {
-            let key = key.to_string();
-            let ts = value.computed_at.naive_utc();
-            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
-            let i = value.initial_health.map(|x| x.to_num::<f64>());
-            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
-            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
-            let ibl = value.is_being_liquidated;
-
-            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_current (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) VALUES ($key, $ts, $mr, $m, $i, $le, $ibl)", key, ts, mr, m, i, le, ibl);
-            query.execute(client).await.expect("Insertion failed");
-        }
 
         Ok(())
     }
