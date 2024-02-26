@@ -6,12 +6,15 @@ use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
 use chrono::{Duration, Utc};
 use fixed::types::I80F48;
+use futures_util::pin_mut;
 use log::warn;
+use postgres_types::{ToSql, Type};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use tokio_postgres::binary_copy::BinaryCopyInWriter;
 use tokio_postgres::{Client, Transaction};
 
 pub struct PersisterProcessor {
@@ -46,14 +49,14 @@ impl PersisterProcessor {
                 Ok(cnt) => cnt,
             };
 
-            let mut previous = match
-                fail_or_retry!(retry_counter, Self::load_previous(&connection).await) {
-                Ok(prv) => prv,
-                Err(e) => {
-                    log::error!("loading of previous state failed: {}", e);
-                    return;
-                }
-            };
+            let mut previous =
+                match fail_or_retry!(retry_counter, Self::load_previous(&connection).await) {
+                    Ok(prv) => prv,
+                    Err(e) => {
+                        log::error!("loading of previous state failed: {}", e);
+                        return;
+                    }
+                };
 
             loop {
                 if exit.load(Ordering::Relaxed) {
@@ -169,6 +172,19 @@ impl PersisterProcessor {
         client: &Transaction<'tx>,
         updates: &HashMap<Pubkey, PersistedData>,
     ) -> anyhow::Result<()> {
+        let col_types = [
+            Type::VARCHAR,
+            Type::TIMESTAMP,
+            Type::FLOAT8,
+            Type::FLOAT8,
+            Type::FLOAT8,
+            Type::FLOAT8,
+            Type::BOOL,
+        ];
+        let sink = client.copy_in("COPY mango_monitoring.health_history (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) FROM STDIN BINARY").await?;
+        let writer = BinaryCopyInWriter::new(sink, &col_types);
+        pin_mut!(writer);
+
         for (key, value) in updates {
             let key = key.to_string();
             let ts = value.computed_at.naive_utc();
@@ -177,18 +193,27 @@ impl PersisterProcessor {
             let m = value.maintenance_health.map(|x| x.to_num::<f64>());
             let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
             let ibl = value.is_being_liquidated;
-            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_history (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) VALUES ($key, $ts, $mr, $m, $i, $le, $ibl)", key, ts, mr, m, i, le, ibl);
-            query.execute(client).await.expect("Insertion failed");
+
+            let mut row: Vec<&'_ (dyn ToSql + Sync)> = Vec::new();
+            row.push(&key);
+            row.push(&ts);
+            row.push(&mr);
+            row.push(&i);
+            row.push(&m);
+            row.push(&le);
+            row.push(&ibl);
+            writer.as_mut().write(&row).await?;
         }
+
+        writer.finish().await?;
 
         Ok(())
     }
 
-    async fn update_current<'tx>(
-        client: &Transaction<'tx>,
-    ) -> anyhow::Result<()> {
-            let query = postgres_query::query!("REFRESH MATERIALIZED VIEW mango_monitoring.health_current");
-            query.execute(client).await.expect("Update failed");
+    async fn update_current<'tx>(client: &Transaction<'tx>) -> anyhow::Result<()> {
+        let query =
+            postgres_query::query!("REFRESH MATERIALIZED VIEW mango_monitoring.health_current");
+        query.execute(client).await.expect("Update failed");
 
         Ok(())
     }
