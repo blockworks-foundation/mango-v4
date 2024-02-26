@@ -9,6 +9,7 @@ use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{
     load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
 };
+use crate::util::clock_now;
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
@@ -76,11 +77,12 @@ pub fn serum3_place_order(
     // Pre-health computation
     //
     let mut account = ctx.accounts.account.load_full_mut()?;
+    let (now_ts, now_slot) = clock_now();
     let retriever = new_fixed_order_account_retriever_with_optional_banks(
         ctx.remaining_accounts,
         &account.borrow(),
+        now_slot,
     )?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let mut health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
         &retriever,

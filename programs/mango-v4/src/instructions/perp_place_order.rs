@@ -5,6 +5,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
+use crate::util::clock_now;
 
 // TODO
 #[allow(clippy::too_many_arguments)]
@@ -16,7 +17,7 @@ pub fn perp_place_order(
     require_gte!(order.max_base_lots, 0);
     require_gte!(order.max_quote_lots, 0);
 
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
     let oracle_price;
 
     // Update funding if possible.
@@ -69,6 +70,7 @@ pub fn perp_place_order(
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             ctx.remaining_accounts,
             &account.borrow(),
+            now_slot,
         )?;
         let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
             &account.borrow(),

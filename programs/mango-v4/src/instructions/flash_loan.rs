@@ -5,6 +5,7 @@ use crate::group_seeds;
 use crate::health::*;
 use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
+use crate::util::clock_now;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
@@ -388,9 +389,12 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // Check health before balance adjustments
     // The vault-to-bank matching above ensures that the banks for the affected tokens are available.
-    let retriever =
-        new_fixed_order_account_retriever_with_optional_banks(health_ais, &account.borrow())?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        health_ais,
+        &account.borrow(),
+        now_slot,
+    )?;
     let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
         &retriever,
@@ -508,8 +512,11 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     });
 
     // Check health after account position changes
-    let retriever =
-        new_fixed_order_account_retriever_with_optional_banks(health_ais, &account.borrow())?;
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        health_ais,
+        &account.borrow(),
+        now_slot,
+    )?;
     let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
         &retriever,

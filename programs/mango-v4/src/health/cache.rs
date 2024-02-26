@@ -96,7 +96,7 @@ pub fn compute_health_from_fixed_accounts(
     ais: &[AccountInfo],
     now_ts: u64,
 ) -> Result<I80F48> {
-    let retriever = new_fixed_order_account_retriever(ais, account)?;
+    let retriever = new_fixed_order_account_retriever(ais, account, Clock::get()?.slot)?;
     Ok(new_health_cache(account, &retriever, now_ts)?.health(health_type))
 }
 

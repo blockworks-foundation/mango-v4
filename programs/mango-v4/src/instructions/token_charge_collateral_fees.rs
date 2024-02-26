@@ -1,6 +1,7 @@
 use crate::accounts_zerocopy::*;
 use crate::health::*;
 use crate::state::*;
+use crate::util::clock_now;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
@@ -10,7 +11,7 @@ use crate::logs::{emit_stack, TokenCollateralFeeLog};
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
     let mut account = ctx.accounts.account.load_full_mut()?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
 
     if group.collateral_fee_interval == 0 {
         // By resetting, a new enabling of collateral fees will not immediately create a charge
@@ -42,7 +43,7 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
 
     let health_cache = {
         let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
         new_health_cache(&account.borrow(), &retriever, now_ts)?
     };
 

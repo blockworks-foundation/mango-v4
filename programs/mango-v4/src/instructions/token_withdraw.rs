@@ -2,6 +2,7 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
+use crate::util::clock_now;
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token;
 use anchor_spl::token;
@@ -19,7 +20,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
     let group = ctx.accounts.group.load()?;
     let token_index = ctx.accounts.bank.load()?.token_index;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
 
     // Create the account's position for that token index
     let mut account = ctx.accounts.account.load_full_mut()?;
@@ -30,6 +31,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             ctx.remaining_accounts,
             &account.borrow(),
+            now_slot,
         )?;
         let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
             &account.borrow(),

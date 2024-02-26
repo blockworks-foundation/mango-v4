@@ -4,6 +4,7 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::state::*;
+use crate::util::clock_now;
 
 pub fn perp_liq_force_cancel_orders(
     ctx: Context<PerpLiqForceCancelOrders>,
@@ -11,10 +12,10 @@ pub fn perp_liq_force_cancel_orders(
 ) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
 
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
     let mut health_cache = {
         let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
         new_health_cache(&account.borrow(), &retriever, now_ts).context("create health cache")?
     };
 

@@ -11,6 +11,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::*;
+use crate::util::clock_now;
 
 struct DepositCommon<'a, 'info> {
     pub group: &'a AccountLoader<'info, Group>,
@@ -119,11 +120,12 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         //
         // Health computation
         //
+        let (now_ts, now_slot) = clock_now();
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             remaining_accounts,
             &account.borrow(),
+            now_slot,
         )?;
-        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
         // We only compute health to check if the account leaves the being_liquidated state.
         // So it's ok to possibly skip nonnegative token positions and compute a health
