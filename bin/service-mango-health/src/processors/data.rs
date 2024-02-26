@@ -5,7 +5,7 @@ use crate::utils::retry_counter::RetryCounter;
 use async_channel::Receiver;
 use chrono::Utc;
 use itertools::Itertools;
-use log::warn;
+use tracing::warn;
 use mango_v4_client::account_update_stream::Message;
 use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{

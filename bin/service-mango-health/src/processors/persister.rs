@@ -7,7 +7,6 @@ use anchor_lang::prelude::Pubkey;
 use chrono::{Duration, Utc};
 use fixed::types::I80F48;
 use futures_util::pin_mut;
-use log::warn;
 use postgres_types::{ToSql, Type};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -16,6 +15,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_postgres::binary_copy::BinaryCopyInWriter;
 use tokio_postgres::{Client, Transaction};
+use tracing::{warn, error};
 
 pub struct PersisterProcessor {
     pub job: JoinHandle<()>,
@@ -43,7 +43,7 @@ impl PersisterProcessor {
                 postgres_connection::connect(&postgres_configuration).await
             ) {
                 Err(e) => {
-                    log::error!("Failed to connect to postgres sql: {}", e);
+                    tracing::error!("Failed to connect to postgres sql: {}", e);
                     return;
                 }
                 Ok(cnt) => cnt,
@@ -53,7 +53,7 @@ impl PersisterProcessor {
                 match fail_or_retry!(retry_counter, Self::load_previous(&connection).await) {
                     Ok(prv) => prv,
                     Err(e) => {
-                        log::error!("loading of previous state failed: {}", e);
+                        error!("loading of previous state failed: {}", e);
                         return;
                     }
                 };
@@ -75,7 +75,7 @@ impl PersisterProcessor {
                     )
                     .await,
                 ) {
-                    log::error!("persistence failed: {}", e);
+                    error!("persistence failed: {}", e);
                     break;
                 }
             }

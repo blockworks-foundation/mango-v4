@@ -41,11 +41,12 @@ macro_rules! fail_or_retry {
         loop {
             let result = $retry_counter.fail_or_ignore($f);
             match result {
-                Ok(opt) => {
-                    if let Some(value) = opt {
-                        break Ok(value);
-                    }
-                }
+                Ok(Some(value)) => {
+                    break Ok(value);
+                },
+                Ok(None) => {
+                    continue;
+                },
                 Err(e) => {
                     break Err(e);
                 }

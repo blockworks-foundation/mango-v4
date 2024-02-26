@@ -3,6 +3,7 @@ use native_tls::{Certificate, Identity, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::{env, fs};
 use tokio_postgres::Client;
+use tracing::error;
 
 pub async fn connect(config: &PostgresConfiguration) -> anyhow::Result<Client> {
     // openssl pkcs12 -export -in client.cer -inkey client-key.cer -out client.pks
@@ -59,7 +60,7 @@ pub async fn connect(config: &PostgresConfiguration) -> anyhow::Result<Client> {
 
     tokio::spawn(async move {
         if let Err(e) = connection.await {
-            log::error!("connection error: {}", e);
+            error!("connection error: {}", e);
         }
     });
 

@@ -1,6 +1,6 @@
 use crate::configuration::Configuration;
 use crate::processors::health::{HealthComponentValue, HealthEvent};
-use log::warn;
+use tracing::warn;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
 use std::str::FromStr;

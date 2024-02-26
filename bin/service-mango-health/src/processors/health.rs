@@ -2,7 +2,7 @@ use crate::configuration::Configuration;
 use crate::processors::data::DataEvent;
 use chrono::Utc;
 use fixed::types::I80F48;
-use log::warn;
+use tracing::warn;
 use mango_v4::health::HealthType;
 use mango_v4_client::chain_data::AccountFetcher;
 use mango_v4_client::{chain_data, health_cache, FallbackOracleConfig, MangoGroupContext};

@@ -58,4 +58,5 @@ native-tls = "0.2"
 rustls = "0.20.8"
 # postgres_query hasn't updated its crate in a while
 postgres_query = { git = "https://github.com/nolanderc/rust-postgres-query", rev = "b4422051c8a31fbba4a35f88004c1cefb1878dd5" }
+tracing = { version = "0.1", features = ["log"] }
 

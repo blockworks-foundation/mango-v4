@@ -7,6 +7,7 @@ use futures_util::StreamExt;
 use std::fs::File;
 use std::io::Read;
 use std::sync::atomic::Ordering;
+use mango_v4_client::tracing_subscriber_init;
 
 use crate::configuration::Configuration;
 use crate::processors::data::DataProcessor;
@@ -31,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
         toml::from_str(&contents).unwrap()
     };
 
-    solana_logger::setup_with_default("info");
+    tracing_subscriber_init();
 
     // TODO FAS Add metrics
     // let metrics_tx = metrics::start(configuration.metrics.clone(), "health".into());
