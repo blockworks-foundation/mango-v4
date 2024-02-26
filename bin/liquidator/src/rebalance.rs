@@ -231,7 +231,7 @@ impl Rebalancer {
             .prepare_swap_transaction(full)
             .await?;
         let tx_size = builder.transaction_size()?;
-        if tx_size.is_ok() {
+        if tx_size.is_within_limit() {
             return Ok((builder, full.clone()));
         }
         trace!(
