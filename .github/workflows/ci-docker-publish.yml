@@ -15,6 +15,7 @@ on:
         'bin/service-mango-fills/**',
         'bin/service-mango-orderbook/**',
         'bin/service-mango-pnl/**',
+        'bin/service-mango-health/**',
       ]
   workflow_dispatch:
 
