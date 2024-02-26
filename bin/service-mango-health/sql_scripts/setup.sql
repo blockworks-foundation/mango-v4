@@ -2,7 +2,7 @@ CREATE SCHEMA IF NOT EXISTS mango_monitoring AUTHORIZATION CURRENT_ROLE;
 CREATE TABLE IF NOT EXISTS mango_monitoring.health_history
 (
     Pubkey VARCHAR(44) NOT NULL,
-    Timestamp TIMESTAMP NOT NULL,
+    Timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
     MaintenanceRatio DOUBLE PRECISION,
     Maintenance DOUBLE PRECISION,
     Initial DOUBLE PRECISION,

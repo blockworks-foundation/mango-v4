@@ -1,7 +1,7 @@
-use tracing::info;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
+use tracing::info;
 
 pub struct ExitProcessor {
     pub job: JoinHandle<()>,

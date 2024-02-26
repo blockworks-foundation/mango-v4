@@ -4,10 +4,10 @@ mod utils;
 
 use futures_util::StreamExt;
 // use mango_feeds_connector::metrics;
+use mango_v4_client::tracing_subscriber_init;
 use std::fs::File;
 use std::io::Read;
 use std::sync::atomic::Ordering;
-use mango_v4_client::tracing_subscriber_init;
 
 use crate::configuration::Configuration;
 use crate::processors::data::DataProcessor;

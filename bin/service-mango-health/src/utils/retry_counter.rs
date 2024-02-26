@@ -43,10 +43,10 @@ macro_rules! fail_or_retry {
             match result {
                 Ok(Some(value)) => {
                     break Ok(value);
-                },
+                }
                 Ok(None) => {
                     continue;
-                },
+                }
                 Err(e) => {
                     break Err(e);
                 }

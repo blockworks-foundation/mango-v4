@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_postgres::binary_copy::BinaryCopyInWriter;
 use tokio_postgres::{Client, Transaction};
-use tracing::{warn, error};
+use tracing::{error, warn};
 
 pub struct PersisterProcessor {
     pub job: JoinHandle<()>,
@@ -97,8 +97,7 @@ impl PersisterProcessor {
         let mut result = HashMap::<Pubkey, PersistedData>::new();
         for row in rows {
             let key = Pubkey::from_str(row.get(0))?;
-            let ts: chrono::NaiveDateTime = row.get(1);
-            let ts_utc = chrono::DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
+            let ts_utc: chrono::DateTime<Utc> = row.get(1);
             let mr: Option<f64> = row.get(2);
             let i: Option<f64> = row.get(3);
             let m: Option<f64> = row.get(4);
@@ -174,7 +173,7 @@ impl PersisterProcessor {
     ) -> anyhow::Result<()> {
         let col_types = [
             Type::VARCHAR,
-            Type::TIMESTAMP,
+            Type::TIMESTAMPTZ,
             Type::FLOAT8,
             Type::FLOAT8,
             Type::FLOAT8,
@@ -187,7 +186,7 @@ impl PersisterProcessor {
 
         for (key, value) in updates {
             let key = key.to_string();
-            let ts = value.computed_at.naive_utc();
+            let ts = value.computed_at.clone();
             let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
             let i = value.initial_health.map(|x| x.to_num::<f64>());
             let m = value.maintenance_health.map(|x| x.to_num::<f64>());
@@ -223,7 +222,7 @@ impl PersisterProcessor {
         now: chrono::DateTime<Utc>,
         ttl: chrono::Duration,
     ) -> anyhow::Result<()> {
-        let min_ts = (now - ttl).naive_utc();
+        let min_ts = now - ttl;
         let query = postgres_query::query!(
             "DELETE FROM mango_monitoring.health_history WHERE timestamp < $min_ts",
             min_ts
