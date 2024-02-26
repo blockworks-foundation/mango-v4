@@ -1,6 +1,6 @@
 use crate::configuration::Configuration;
 use crate::fail_or_retry;
-use crate::processors::health::{HealthComponent, HealthEvent};
+use crate::processors::health::{HealthComponent, HealthComponentValue, HealthEvent};
 use crate::utils::postgres_connection;
 use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
@@ -86,7 +86,7 @@ impl PersisterProcessor {
     async fn load_previous(client: &Client) -> anyhow::Result<HashMap<Pubkey, PersistedData>> {
         let rows = client
             .query(
-                "SELECT Pubkey, Timestamp, healthRatio FROM mango_monitoring.health_current",
+                "SELECT Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated FROM mango_monitoring.health_current",
                 &[],
             )
             .await?;
@@ -96,12 +96,20 @@ impl PersisterProcessor {
             let key = Pubkey::from_str(row.get(0))?;
             let ts: chrono::NaiveDateTime = row.get(1);
             let ts_utc = chrono::DateTime::<Utc>::from_naive_utc_and_offset(ts, Utc);
-            let hr: Option<f64> = row.get(2);
+            let mr: Option<f64> = row.get(2);
+            let i: Option<f64> = row.get(3);
+            let m: Option<f64> = row.get(4);
+            let le: Option<f64> = row.get(5);
+            let is_being_liquidated: Option<bool> = row.get(6);
             result.insert(
                 key,
                 PersistedData {
                     computed_at: ts_utc,
-                    health_ratio: hr.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
+                    maintenance_ratio: mr.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
+                    initial_health: i.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
+                    maintenance_health: m.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
+                    liquidation_end_health: le.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
+                    is_being_liquidated: is_being_liquidated, // TODO FAS What conversion should we use there ?
                 },
             );
         }
@@ -121,12 +129,28 @@ impl PersisterProcessor {
                 continue;
             }
 
+            let persisted_data = match &component.value {
+                Some(value) => PersistedData {
+                    computed_at: event.computed_at,
+                    maintenance_ratio: Some(value.maintenance_ratio),
+                    initial_health: Some(value.initial_health),
+                    maintenance_health: Some(value.maintenance_health),
+                    liquidation_end_health: Some(value.liquidation_end_health),
+                    is_being_liquidated: Some(value.is_being_liquidated),
+                },
+                None => PersistedData {
+                    computed_at: event.computed_at,
+                    maintenance_ratio: None,
+                    initial_health: None,
+                    maintenance_health: None,
+                    liquidation_end_health: None,
+                    is_being_liquidated: None,
+                },
+            };
+
             updates.insert(
                 component.account,
-                PersistedData {
-                    computed_at: event.computed_at,
-                    health_ratio: component.health_ratio,
-                },
+                persisted_data,
             );
         }
 
@@ -151,8 +175,12 @@ impl PersisterProcessor {
         for (key, value) in updates {
             let key = key.to_string();
             let ts = value.computed_at.naive_utc();
-            let hr = value.health_ratio.map(|x| x.to_num::<f64>());
-            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_history (Pubkey, Timestamp, HealthRatio) VALUES ($key, $ts, $hr)", key, ts, hr);
+            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
+            let i = value.initial_health.map(|x| x.to_num::<f64>());
+            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
+            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
+            let ibl = value.is_being_liquidated;
+            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_history (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) VALUES ($key, $ts, $mr, $m, $i, $le, $ibl)", key, ts, mr, m, i, le, ibl);
             query.execute(client).await.expect("Insertion failed");
         }
 
@@ -171,8 +199,13 @@ impl PersisterProcessor {
         for (key, value) in to_update {
             let key = key.to_string();
             let ts = value.computed_at.naive_utc();
-            let hr = value.health_ratio.map(|x| x.to_num::<f64>());
-            let query = postgres_query::query!("UPDATE mango_monitoring.health_current SET Timestamp=$ts, HealthRatio=$hr WHERE Pubkey = $key", key, ts, hr);
+            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
+            let i = value.initial_health.map(|x| x.to_num::<f64>());
+            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
+            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
+            let ibl = value.is_being_liquidated;
+
+            let query = postgres_query::query!("UPDATE mango_monitoring.health_current SET Timestamp=$ts, MaintenanceRatio=$mr, Maintenance=$m, Initial=$i, LiquidationEnd=$le, IsBeingLiquidated=$ibl WHERE Pubkey = $key", key, ts, mr, m, i, le, ibl);
             query.execute(client).await.expect("Update failed");
         }
 
@@ -191,8 +224,13 @@ impl PersisterProcessor {
         for (key, value) in to_insert {
             let key = key.to_string();
             let ts = value.computed_at.naive_utc();
-            let hr = value.health_ratio.map(|x| x.to_num::<f64>());
-            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_current (Pubkey, Timestamp, HealthRatio) VALUES ($key, $ts, $hr)", key, ts, hr);
+            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
+            let i = value.initial_health.map(|x| x.to_num::<f64>());
+            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
+            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
+            let ibl = value.is_being_liquidated;
+
+            let query = postgres_query::query!("INSERT INTO mango_monitoring.health_current (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) VALUES ($key, $ts, $mr, $m, $i, $le, $ibl)", key, ts, mr, m, i, le, ibl);
             query.execute(client).await.expect("Insertion failed");
         }
 
@@ -225,18 +263,21 @@ impl PersisterProcessor {
             Some(previous) => {
                 let is_old = computed_at - previous.computed_at >= chrono::Duration::seconds(60);
                 let between_none_and_some =
-                    previous.health_ratio.is_some() != health_component.health_ratio.is_some();
+                    previous.is_some() != health_component.value.is_some();
 
                 if is_old || between_none_and_some {
                     true
-                } else if previous.health_ratio.is_some() && health_component.health_ratio.is_some()
+                } else if previous.is_some() && health_component.value.is_some()
                 {
-                    let prev = previous.health_ratio.unwrap();
-                    let curr = health_component.health_ratio.unwrap();
+                    let current_value = health_component.value.unwrap();
+                    let changing_flag = current_value.is_being_liquidated != previous.is_being_liquidated.unwrap();
+
+                    let curr = current_value.maintenance_ratio;
+                    let prev = previous.maintenance_ratio.unwrap();
                     let changing_side = (prev <= 0 && curr > 0) || (prev > 0 && curr <= 0);
                     let big_move = prev != 0 && (prev - curr).abs() / prev > 0.1;
 
-                    changing_side || big_move
+                    changing_side || changing_flag || big_move
                 } else {
                     false
                 }
@@ -247,12 +288,47 @@ impl PersisterProcessor {
 
 struct PersistedData {
     pub computed_at: chrono::DateTime<Utc>,
-    pub health_ratio: Option<I80F48>,
+    pub maintenance_ratio: Option<I80F48>,
+    pub initial_health: Option<I80F48>,
+    pub maintenance_health: Option<I80F48>,
+    pub liquidation_end_health: Option<I80F48>,
+    pub is_being_liquidated: Option<bool>,
+}
+
+impl PersistedData {
+    pub fn is_some(&self) -> bool {
+        self.maintenance_ratio.is_some()
+        && self.initial_health.is_some()
+        && self.maintenance_health.is_some()
+        && self.liquidation_end_health.is_some()
+        && self.is_being_liquidated.is_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn make_value(hr: f64, i: u64, m: u64, le: u64, ibl: bool) -> Option<HealthComponentValue> {
+        Some(HealthComponentValue {
+            maintenance_ratio: I80F48::wrapping_from_num(hr),
+            initial_health: I80F48::from(i),
+            maintenance_health: I80F48::from(m),
+            liquidation_end_health: I80F48::from(le),
+            is_being_liquidated: ibl,
+        })
+    }
+
+    fn make_persisted(t_secs: i64, mr: f64) -> PersistedData {
+        PersistedData {
+            computed_at: chrono::Utc::now() - chrono::Duration::seconds(t_secs),
+            maintenance_ratio: Some(I80F48::wrapping_from_num(mr)),
+            initial_health: Some(I80F48::from(1000)),
+            maintenance_health: Some(I80F48::from(1000)),
+            liquidation_end_health: Some(I80F48::from(1)),
+            is_being_liquidated: Some(false),
+        }
+    }
 
     #[test]
     fn should_persist_if_there_is_no_previous_point() {
@@ -263,7 +339,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: Pubkey::new_unique(),
-                health_ratio: Some(I80F48::from(123))
+                value: make_value(123f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -272,7 +348,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: Pubkey::new_unique(),
-                health_ratio: Some(I80F48::ZERO)
+                value: make_value(0f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -281,7 +357,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: Pubkey::new_unique(),
-                health_ratio: None
+                value: None
             }
         ));
     }
@@ -293,17 +369,11 @@ mod tests {
         let pk2 = Pubkey::new_unique();
         previous.insert(
             pk1,
-            PersistedData {
-                computed_at: chrono::Utc::now() - chrono::Duration::seconds(120),
-                health_ratio: Some(I80F48::from(123)),
-            },
+            make_persisted(120, 123f64),
         );
         previous.insert(
             pk2,
-            PersistedData {
-                computed_at: chrono::Utc::now() - chrono::Duration::seconds(3),
-                health_ratio: Some(I80F48::from(123)),
-            },
+            make_persisted(3, 123f64),
         );
 
         assert!(PersisterProcessor::should_insert(
@@ -311,7 +381,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk1,
-                health_ratio: Some(I80F48::from(124))
+                value: make_value(124f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -320,7 +390,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                health_ratio: Some(I80F48::from(124))
+                value: make_value(124f64, 1000, 1000, 1, false)
             }
         ));
     }
@@ -333,18 +403,12 @@ mod tests {
 
         previous.insert(
             pk1,
-            PersistedData {
-                computed_at: chrono::Utc::now() - chrono::Duration::seconds(0),
-                health_ratio: Some(I80F48::from(123)),
-            },
+            make_persisted(0, 123f64),
         );
 
         previous.insert(
             pk2,
-            PersistedData {
-                computed_at: chrono::Utc::now() - chrono::Duration::seconds(0),
-                health_ratio: Some(I80F48::from(1) / I80F48::from(100)),
-            },
+            make_persisted(0, 1f64/100f64),
         );
 
         // small move, nop
@@ -353,7 +417,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk1,
-                health_ratio: Some(I80F48::from(124))
+                value: make_value(124f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -363,7 +427,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk1,
-                health_ratio: Some(I80F48::from(100))
+                value: make_value(100f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -373,7 +437,7 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                health_ratio: Some(I80F48::from(-1) / I80F48::from(1000))
+                value: make_value(-1f64/1000f64, 1000, 1000, 1, false)
             }
         ));
 
@@ -383,9 +447,17 @@ mod tests {
             chrono::Utc::now(),
             HealthComponent {
                 account: pk2,
-                health_ratio: Some(
-                    I80F48::from(1) / I80F48::from(100) + I80F48::from(1) / I80F48::from(1000)
-                )
+                value: make_value(1f64/100f64 + 1f64/1000f64, 1000, 1000, 1, false)
+            }
+        ));
+
+        // no change except flag being liquidated change
+        assert!(PersisterProcessor::should_insert(
+            &previous,
+            chrono::Utc::now(),
+            HealthComponent {
+                account: pk2,
+                value: make_value(1f64/100f64, 1000, 1000, 1, true)
             }
         ));
     }

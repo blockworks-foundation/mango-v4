@@ -1,5 +1,5 @@
 use crate::configuration::Configuration;
-use crate::processors::health::HealthEvent;
+use crate::processors::health::{HealthComponentValue, HealthEvent};
 use log::warn;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
@@ -45,12 +45,18 @@ impl LoggerProcessor {
                             continue;
                         }
 
-                        if component.health_ratio.is_some() {
+                        if component.value.is_some() {
+                            let value: HealthComponentValue = component.value.unwrap();
+
                             println!(
-                                "PUB {:?} {} -> {}%",
+                                "PUB {:?} {} -> {}% (init: {}, maint: {}, liquidationEnd: {}, beingLiquidated: {})",
                                 msg.computed_at,
                                 component.account,
-                                component.health_ratio.unwrap()
+                                value.maintenance_ratio,
+                                value.initial_health,
+                                value.maintenance_health,
+                                value.liquidation_end_health,
+                                value.is_being_liquidated as u8,
                             );
                         } else {
                             println!("PUB {:?} {} -> ERROR%", msg.computed_at, component.account);

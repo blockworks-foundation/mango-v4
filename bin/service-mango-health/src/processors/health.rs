@@ -29,7 +29,16 @@ pub struct HealthEvent {
 #[derive(Clone, Debug)]
 pub struct HealthComponent {
     pub account: Pubkey,
-    pub health_ratio: Option<I80F48>,
+    pub value: Option<HealthComponentValue>,
+}
+
+#[derive(Clone, Debug)]
+pub struct HealthComponentValue {
+    pub maintenance_ratio: I80F48,
+    pub initial_health: I80F48,
+    pub maintenance_health: I80F48,
+    pub liquidation_end_health: I80F48,
+    pub is_being_liquidated: bool,
 }
 
 impl HealthProcessor {
@@ -125,13 +134,13 @@ impl HealthProcessor {
         let mut components = Vec::new();
 
         for account in accounts {
-            let health_ratio =
+            let value =
                 Self::compute_account_health(&mango_group_context, account_fetcher, &account).await;
 
             components.push({
                 HealthComponent {
                     account: *account,
-                    health_ratio: health_ratio.ok(),
+                    value: value.ok(),
                 }
             })
         }
@@ -146,7 +155,7 @@ impl HealthProcessor {
         mango_group_context: &&MangoGroupContext,
         account_fetcher: &AccountFetcher,
         account: &Pubkey,
-    ) -> anyhow::Result<I80F48> {
+    ) -> anyhow::Result<HealthComponentValue> {
         let mango_account = account_fetcher.fetch_mango_account(account)?;
         let health_cache = health_cache::new(
             &mango_group_context,
@@ -156,6 +165,14 @@ impl HealthProcessor {
         )
         .await?;
 
-        Ok(health_cache.health_ratio(HealthType::Maint))
+        let res = HealthComponentValue {
+            maintenance_ratio: health_cache.health_ratio(HealthType::Maint),
+            initial_health: health_cache.health(HealthType::Init),
+            maintenance_health: health_cache.health(HealthType::Maint),
+            liquidation_end_health: health_cache.health(HealthType::LiquidationEnd),
+            is_being_liquidated: mango_account.fixed.being_liquidated(),
+        };
+
+        Ok(res)
     }
 }
