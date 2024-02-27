@@ -297,22 +297,22 @@ async fn test_liq_perps_positive_pnl() -> Result<(), TransportError> {
 
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         100.0 + 600.0 - 2100.0 * 0.95,
         0.1
-    ));
+    );
     assert_eq!(
         account_position(solana, liqor, settle_token.bank).await,
         10000 - 95 - 570
     );
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 9);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         -10000.0 - 100.0 - 600.0 + 2100.0 * 0.95,
         0.1
-    ));
+    );
     assert_eq!(
         account_position(solana, account_0, settle_token.bank).await,
         95 + 570

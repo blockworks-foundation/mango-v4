@@ -450,7 +450,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+    assert_eq_f64!(maint_health, 1000.0, 1e-2);
 
     let start_time = solana.clock_timestamp().await;
 
@@ -474,17 +474,17 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .unwrap();
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+    assert_eq_f64!(maint_health, 1000.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 1500).await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 750.0, 1e-2));
+    assert_eq_f64!(maint_health, 750.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 3000).await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 500.0, 1e-2));
+    assert_eq_f64!(maint_health, 500.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 1600).await;
 
@@ -505,11 +505,11 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .unwrap();
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 700.0, 1e-2));
+    assert_eq_f64!(maint_health, 700.0, 1e-2);
 
     let bank: Bank = solana.get_account(tokens[0].bank).await;
-    assert!(assert_equal_fixed_f64(bank.maint_asset_weight, 0.7, 1e-4));
-    assert!(assert_equal_fixed_f64(bank.maint_liab_weight, 1.3, 1e-4));
+    assert_eq_fixed_f64!(bank.maint_asset_weight, 0.7, 1e-4);
+    assert_eq_fixed_f64!(bank.maint_liab_weight, 1.3, 1e-4);
     assert_eq!(bank.maint_weight_shift_duration_inv, I80F48::ZERO);
 
     Ok(())

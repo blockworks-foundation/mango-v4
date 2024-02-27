@@ -177,11 +177,11 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
         .await
         .unwrap();
     last_time = solana.clock_timestamp().await;
-    assert!(assert_equal_f64_f64(
+    assert_eq_f64!(
         account_position_f64(solana, account, tokens[0].bank).await,
         1500.0 * (1.0 - 0.1 * (9.0 / 24.0) * (600.0 / 1200.0)),
         0.01
-    ));
+    );
     let last_balance = account_position_f64(solana, account, tokens[0].bank).await;
 
     //
@@ -208,11 +208,11 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
         .await
         .unwrap();
     //last_time = solana.clock_timestamp().await;
-    assert!(assert_equal_f64_f64(
+    assert_eq_f64!(
         account_position_f64(solana, account, tokens[0].bank).await,
         last_balance * (1.0 - 0.1 * (7.0 / 24.0) * (720.0 / (last_balance * 0.8))),
         0.01
-    ));
+    );
 
     Ok(())
 }

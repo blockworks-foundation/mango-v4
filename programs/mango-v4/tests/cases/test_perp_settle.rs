@@ -176,7 +176,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     }
 
     // Cannot settle with yourself
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -185,17 +185,11 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
             account_b: account_0,
             perp_market,
         },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::CannotSettleWithSelf.into(),
-        "Cannot settle with yourself".to_string(),
+        MangoError::CannotSettleWithSelf
     );
 
     // Cannot settle position that does not exist
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -204,13 +198,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
             account_b: account_1,
             perp_market: perp_market_2,
         },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::PerpPositionDoesNotExist.into(),
-        "Cannot settle a position that does not exist".to_string(),
+        MangoError::PerpPositionDoesNotExist
     );
 
     // TODO: Test funding settlement
@@ -235,7 +223,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
     set_perp_stub_oracle_price(solana, group, perp_market, &tokens[1], admin, 1200.0).await;
 
     // Account a must be the profitable one
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -244,13 +232,7 @@ async fn test_perp_settle_pnl_basic() -> Result<(), TransportError> {
             account_b: account_0,
             perp_market,
         },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::ProfitabilityMismatch.into(),
-        "Account a must be the profitable one".to_string(),
+        MangoError::ProfitabilityMismatch
     );
 
     // Change the oracle to a more reasonable price
@@ -1038,7 +1020,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
     // Test 2: Once the settle limit is exhausted, we can't settle more
     //
     // we are in the same window, and we settled max. possible in previous attempt
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettlePnlInstruction {
             settler,
@@ -1047,12 +1029,7 @@ async fn test_perp_pnl_settle_limit() -> Result<(), TransportError> {
             account_b: account_1,
             perp_market,
         },
-    )
-    .await;
-    assert_mango_error(
-        &result,
-        MangoError::ProfitabilityMismatch.into(),
-        "Account A has no settleable positive pnl left".to_string(),
+        MangoError::ProfitabilityMismatch
     );
 
     //

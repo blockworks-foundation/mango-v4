@@ -185,16 +185,16 @@ async fn test_fees_buyback_with_mngo() -> Result<(), TransportError> {
     assert_eq!(before_fees_accrued - after_fees_accrued, 19);
 
     // token[1] swapped at discount for token[0]
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         fees_token_position_after - fees_token_position_before,
         19.0 / 2.0,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         mngo_token_position_after - mngo_token_position_before,
         -19.0 / 3.0 / 1.2,
         0.1
-    ));
+    );
 
     Ok(())
 }

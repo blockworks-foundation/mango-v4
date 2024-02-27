@@ -579,7 +579,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(quote_fees2 - quote_fees1, 0.0, 0.1));
+        assert_eq_fixed_f64!(quote_fees2 - quote_fees1, 0.0, 0.1);
 
         // check account2 balances too
         context
@@ -610,11 +610,11 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             quote_fees3 - quote_fees1,
             loan_origination_fee(fill_amount - deposit_amount) as f64,
             0.1
-        ));
+        );
 
         order_placer.settle().await;
 
@@ -623,11 +623,11 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             quote_fees4 - quote_fees3,
             serum_fee(fill_amount) as f64,
             0.1
-        ));
+        );
 
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
@@ -720,11 +720,11 @@ async fn test_serum_settle_v1() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         quote_fees_end - quote_fees_start,
         (lof + serum_referrer_fee(amount)) as f64,
         0.1
-    ));
+    );
 
     Ok(())
 }
@@ -817,11 +817,11 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         quote_fees_end - quote_fees_start,
         (lof + serum_referrer_fee(amount)) as f64,
         0.1
-    ));
+    );
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(
@@ -913,11 +913,7 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
-        quote_fees_end - quote_fees_start,
-        lof as f64,
-        0.1
-    ));
+    assert_eq_fixed_f64!(quote_fees_end - quote_fees_start, lof as f64, 0.1);
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(account_data.buyback_fees_accrued_current, 0);
