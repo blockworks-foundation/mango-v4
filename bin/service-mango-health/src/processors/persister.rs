@@ -400,9 +400,9 @@ struct PersisterSnapshot {
 
 #[cfg(test)]
 mod tests {
-    use chrono::SubsecRound;
     use super::*;
     use crate::processors::health::HealthComponentValue;
+    use chrono::SubsecRound;
 
     fn make_value(hr: f64, i: u64, m: u64, le: u64, ibl: bool) -> Option<HealthComponentValue> {
         Some(HealthComponentValue {
@@ -592,48 +592,131 @@ mod tests {
             computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(300),
             components: vec![HealthComponent {
                 account: Pubkey::new_unique(),
-                value: make_value(50.25f64,2,3,4,false),
+                value: make_value(50.25f64, 2, 3, 4, false),
             }],
         };
         let event2 = HealthEvent {
             computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(290),
             components: vec![HealthComponent {
                 account: Pubkey::new_unique(),
-                value: make_value(502.5f64,20,30,40,false),
+                value: make_value(502.5f64, 20, 30, 40, false),
             }],
         };
         let event3 = HealthEvent {
             computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(200),
             components: vec![HealthComponent {
                 account: Pubkey::new_unique(),
-                value: make_value(5025.0f64,200,300,400,false),
+                value: make_value(5025.0f64, 200, 300, 400, false),
             }],
         };
         let event4 = HealthEvent {
             computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(100),
             components: vec![HealthComponent {
                 account: Pubkey::new_unique(),
-                value: make_value(50250.0f64,2000,3000,4000,false),
+                value: make_value(50250.0f64, 2000, 3000, 4000, false),
             }],
         };
 
-        PersisterProcessor::store_snapshot(&mut snapshots, &event1, event1.computed_at, Duration::seconds(60), 2);
+        PersisterProcessor::store_snapshot(
+            &mut snapshots,
+            &event1,
+            event1.computed_at,
+            Duration::seconds(60),
+            2,
+        );
         assert_eq!(snapshots.len(), 1);
-        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 3);
+        assert_eq!(
+            snapshots[0]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            3
+        );
 
-        PersisterProcessor::store_snapshot(&mut snapshots, &event2, event2.computed_at, Duration::seconds(60), 2);
+        PersisterProcessor::store_snapshot(
+            &mut snapshots,
+            &event2,
+            event2.computed_at,
+            Duration::seconds(60),
+            2,
+        );
         assert_eq!(snapshots.len(), 1);
-        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 30);
+        assert_eq!(
+            snapshots[0]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            30
+        );
 
-        PersisterProcessor::store_snapshot(&mut snapshots, &event3, event3.computed_at, Duration::seconds(60), 2);
+        PersisterProcessor::store_snapshot(
+            &mut snapshots,
+            &event3,
+            event3.computed_at,
+            Duration::seconds(60),
+            2,
+        );
         assert_eq!(snapshots.len(), 2);
-        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 30);
-        assert_eq!(snapshots[1].value.iter().next().unwrap().1.maintenance_health.unwrap(), 300);
+        assert_eq!(
+            snapshots[0]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            30
+        );
+        assert_eq!(
+            snapshots[1]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            300
+        );
 
-        PersisterProcessor::store_snapshot(&mut snapshots, &event4, event4.computed_at, Duration::seconds(60), 2);
+        PersisterProcessor::store_snapshot(
+            &mut snapshots,
+            &event4,
+            event4.computed_at,
+            Duration::seconds(60),
+            2,
+        );
         assert_eq!(snapshots.len(), 2);
-        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 300);
-        assert_eq!(snapshots[1].value.iter().next().unwrap().1.maintenance_health.unwrap(), 3000);
-
+        assert_eq!(
+            snapshots[0]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            300
+        );
+        assert_eq!(
+            snapshots[1]
+                .value
+                .iter()
+                .next()
+                .unwrap()
+                .1
+                .maintenance_health
+                .unwrap(),
+            3000
+        );
     }
 }
