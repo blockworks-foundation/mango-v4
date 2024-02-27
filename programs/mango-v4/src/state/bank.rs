@@ -394,14 +394,18 @@ impl Bank {
         require_gte!(self.rate0, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
         require_gte!(self.max_rate, I80F48::ZERO);
+        require_gte!(self.adjustment_factor, 0.0);
         require_gte!(self.loan_fee_rate, 0.0);
         require_gte!(self.loan_origination_fee_rate, 0.0);
-        require_gte!(self.maint_asset_weight, 0.0);
+        require_gte!(self.stable_price_model.delay_growth_limit, 0.0);
+        require_gte!(self.stable_price_model.stable_growth_limit, 0.0);
         require_gte!(self.init_asset_weight, 0.0);
+        require_gte!(self.maint_asset_weight, self.init_asset_weight);
         require_gte!(self.maint_liab_weight, 0.0);
-        require_gte!(self.init_liab_weight, 0.0);
+        require_gte!(self.init_liab_weight, self.maint_liab_weight);
         require_gte!(self.liquidation_fee, 0.0);
         require_gte!(self.min_vault_to_deposits_ratio, 0.0);
+        require_gte!(1.0, self.min_vault_to_deposits_ratio);
         require_gte!(self.net_borrow_limit_per_window_quote, -1);
         require_gt!(self.borrow_weight_scale_start_quote, 0.0);
         require_gt!(self.deposit_weight_scale_start_quote, 0.0);
@@ -411,6 +415,7 @@ impl Bank {
         require_gte!(self.flash_loan_swap_fee_rate, 0.0);
         require_gte!(self.interest_curve_scaling, 1.0);
         require_gte!(self.interest_target_utilization, 0.0);
+        require_gte!(1.0, self.interest_target_utilization);
         require_gte!(self.maint_weight_shift_duration_inv, 0.0);
         require_gte!(self.maint_weight_shift_asset_target, 0.0);
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
