@@ -287,19 +287,19 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -99.99,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         99.98,
         0.001
-    ));
+    );
 
     //
     // TEST: closing perp positions
@@ -364,19 +364,19 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         0.02,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         -0.04,
         0.001
-    ));
+    );
 
     // settle pnl and fees to bring quote_position_native fully to 0
     send_tx(
@@ -644,19 +644,19 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 2);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -19998.0,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -2);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         19996.0,
         0.001
-    ));
+    );
 
     //
     // TEST: Place a pegged order and check how it behaves with oracle changes
@@ -1008,30 +1008,18 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let perp_0 = mango_account_0.perps[0];
     assert_eq!(perp_0.base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         perp_0.quote_position_native(),
         -200_000.0 + 150_000.0,
         0.001
-    ));
-    assert!(assert_equal(
-        perp_0.realized_pnl_for_position_native,
-        50_000.0,
-        0.001
-    ));
+    );
+    assert_eq_fixed_f64!(perp_0.realized_pnl_for_position_native, 50_000.0, 0.001);
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     let perp_1 = mango_account_1.perps[0];
     assert_eq!(perp_1.base_position_lots(), -1);
-    assert!(assert_equal(
-        perp_1.quote_position_native(),
-        200_000.0 - 150_000.0,
-        0.001
-    ));
-    assert!(assert_equal(
-        perp_1.realized_pnl_for_position_native,
-        -50_000.0,
-        0.001
-    ));
+    assert_eq_fixed_f64!(perp_1.quote_position_native(), 200_000.0 - 150_000.0, 0.001);
+    assert_eq_fixed_f64!(perp_1.realized_pnl_for_position_native, -50_000.0, 0.001);
 
     Ok(())
 }

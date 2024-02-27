@@ -10,7 +10,8 @@ pub use program_test::*;
 
 pub use super::program_test;
 
-pub use utils::assert_equal_fixed_f64 as assert_equal;
+pub use crate::assert_eq_f64;
+pub use crate::assert_eq_fixed_f64;
 
 mod test_alt;
 mod test_bankrupt_tokens;

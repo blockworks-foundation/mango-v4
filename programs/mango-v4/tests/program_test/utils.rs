@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use bytemuck::{bytes_of, Contiguous};
-use fixed::types::I80F48;
 use solana_program::instruction::InstructionError;
 use solana_program::program_error::ProgramError;
 use solana_sdk::pubkey::Pubkey;
@@ -97,18 +96,22 @@ pub fn assert_mango_error<T>(
     }
 }
 
-pub fn assert_equal_fixed_f64(value: I80F48, expected: f64, max_error: f64) -> bool {
-    let ok = (value.to_num::<f64>() - expected).abs() < max_error;
-    if !ok {
-        println!("comparison failed: value: {value}, expected: {expected}");
-    }
-    ok
+#[macro_export]
+macro_rules! assert_eq_f64 {
+    ($value:expr, $expected:expr, $max_error:expr $(,)?) => {
+        let value = $value;
+        let expected = $expected;
+        let ok = (value - expected).abs() < $max_error;
+        if !ok {
+            println!("comparison failed: value: {value}, expected: {expected}");
+        }
+        assert!(ok);
+    };
 }
 
-pub fn assert_equal_f64_f64(value: f64, expected: f64, max_error: f64) -> bool {
-    let ok = (value - expected).abs() < max_error;
-    if !ok {
-        println!("comparison failed: value: {value}, expected: {expected}");
-    }
-    ok
+#[macro_export]
+macro_rules! assert_eq_fixed_f64 {
+    ($value:expr, $expected:expr, $max_error:expr $(,)?) => {
+        assert_eq_f64!($value.to_num::<f64>(), $expected, $max_error);
+    };
 }

@@ -217,35 +217,35 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_amount = 10.0 * 100.0 * 0.6 * (1.0 - 0.05);
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), 10);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         -liqor_amount,
         0.1
-    ));
+    );
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 10);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         -20.0 * 100.0 + liqee_amount,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].realized_pnl_for_position_native,
         liqee_amount - 1000.0,
         0.1
-    ));
+    );
     // stable price is 1.0, so 0.2 * 1000
     assert_eq!(liqee_data.perps[0].recurring_settle_pnl_allowance, 201);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         perp_market_after.fees_accrued - perp_market_before.fees_accrued,
         liqor_amount - liqee_amount,
         0.1,
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         perp_market_after.accrued_liquidation_fees - perp_market_before.accrued_liquidation_fees,
         liqor_amount - liqee_amount,
         0.1,
-    ));
+    );
 
     //
     // TEST: Liquidate base position max
@@ -268,18 +268,18 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_amount_2 = 6.0 * 100.0 * 0.6 * (1.0 - 0.05);
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), 10 + 6);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         -liqor_amount - liqor_amount_2,
         0.1
-    ));
+    );
     let liqee_data = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 4);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         -20.0 * 100.0 + liqee_amount + liqee_amount_2,
         0.1
-    ));
+    );
 
     // verify health is good again
     send_tx(
@@ -339,28 +339,28 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_amount_3 = 10.0 * 100.0 * 1.32 * (1.0 + 0.05);
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), 16 - 10);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         -liqor_amount - liqor_amount_2 + liqor_amount_3,
         0.1
-    ));
+    );
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), -10);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         20.0 * 100.0 - liqee_amount_3,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         perp_market_after.fees_accrued - perp_market_before.fees_accrued,
         liqee_amount_3 - liqor_amount_3,
         0.1,
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         perp_market_after.accrued_liquidation_fees - perp_market_before.accrued_liquidation_fees,
         liqee_amount_3 - liqor_amount_3,
         0.1,
-    ));
+    );
 
     //
     // TEST: Liquidate base position max
@@ -383,18 +383,18 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_amount_4 = 7.0 * 100.0 * 1.32 * (1.0 + 0.05);
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), 6 - 7);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         -liqor_amount - liqor_amount_2 + liqor_amount_3 + liqor_amount_4,
         0.1
-    ));
+    );
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), -3);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         20.0 * 100.0 - liqee_amount_3 - liqee_amount_4,
         0.1
-    ));
+    );
 
     // verify health is good again
     send_tx(
@@ -438,18 +438,18 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     let liqee_amount_5 = 3.0 * 100.0 * 2.0 * (1.0 + 0.05);
     let liqor_data = solana.get_account::<MangoAccount>(liqor).await;
     assert_eq!(liqor_data.perps[0].base_position_lots(), -1 - 3);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         -liqor_amount - liqor_amount_2 + liqor_amount_3 + liqor_amount_4 + liqor_amount_5,
         0.1
-    ));
+    );
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         20.0 * 100.0 - liqee_amount_3 - liqee_amount_4 - liqee_amount_5,
         0.1
-    ));
+    );
 
     //
     // TEST: Can settle-pnl even though health is negative
@@ -481,11 +481,11 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
     assert!(remaining_pnl < 0.0);
     let liqee_data = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(liqee_data.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqee_data.perps[0].quote_position_native(),
         remaining_pnl,
         0.1
-    ));
+    );
     assert_eq!(
         account_position(solana, account_1, quote_token.bank).await,
         liqee_quote_deposits_before as i64
@@ -566,27 +566,27 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
 
     // insurance fund was depleted and the liqor received it
     assert_eq!(solana.token_account_balance(insurance_vault).await, 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.tokens[0].native(&quote_bank),
         liqor_before.tokens[0].native(&quote_bank).to_num::<f64>() + insurance_vault_funding as f64,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         liqor_data.tokens[1].native(&settle_bank),
         liqor_before.tokens[1].native(&settle_bank).to_num::<f64>()
             - liqee_settle_limit_before as f64,
         0.1
-    ));
+    );
 
     // liqor took over the max possible negative pnl
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         liqor_data.perps[0].quote_position_native(),
         liqor_before.perps[0]
             .quote_position_native()
             .to_num::<f64>()
             - liq_perp_quote_amount,
         0.1
-    ));
+    );
 
     // liqee exited liquidation
     assert!(account_init_health(solana, account_1).await >= 0.0);
@@ -602,21 +602,21 @@ async fn test_liq_perps_base_and_bankruptcy() -> Result<(), TransportError> {
         .unwrap();
     let socialized_amount = (pnl_after - pnl_before).to_num::<f64>() - liq_perp_quote_amount;
     let open_interest = 2 * liqor_data.perps[0].base_position_lots.abs();
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         perp_market.long_funding,
         socialized_amount / open_interest as f64,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         perp_market.short_funding,
         -socialized_amount / open_interest as f64,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         account0_before.perps[0].unsettled_funding(&perp_market),
         socialized_amount / 2.0,
         0.1
-    ));
+    );
 
     Ok(())
 }

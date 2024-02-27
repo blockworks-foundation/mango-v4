@@ -2,8 +2,6 @@ use super::*;
 
 #[tokio::test]
 async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
-    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
-
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -263,17 +261,17 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
 
     let liqee_quote = account_position_f64(solana, account, quote_token.bank).await;
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f_f(
+    assert_eq_f64!(
         liqee_quote,
         deposit_amount + 42.0, // roughly 50 / (1.1 * 1.1)
         0.01
-    ));
-    assert!(assert_equal_f_f(liqee_base, deposit_amount - 50.0, 0.01));
+    );
+    assert_eq_f64!(liqee_base, deposit_amount - 50.0, 0.01);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, deposit_amount - 42.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, deposit_amount + 44.0, 0.01)); // roughly 42*1.1*0.95
+    assert_eq_f64!(liqor_quote, deposit_amount - 42.0, 0.01);
+    assert_eq_f64!(liqor_base, deposit_amount + 44.0, 0.01); // roughly 42*1.1*0.95
 
     //
     // TEST: requiring a too-high min buy token execution makes it fail
@@ -315,13 +313,13 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
 
     let liqee_quote = account_position_f64(solana, account, quote_token.bank).await;
     let liqee_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f_f(liqee_quote, deposit_amount + 84.0, 0.01));
-    assert!(assert_equal_f_f(liqee_base, deposit_amount - 100.0, 0.01));
+    assert_eq_f64!(liqee_quote, deposit_amount + 84.0, 0.01);
+    assert_eq_f64!(liqee_base, deposit_amount - 100.0, 0.01);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f_f(liqor_quote, deposit_amount - 84.0, 0.01));
-    assert!(assert_equal_f_f(liqor_base, deposit_amount + 88.0, 0.01));
+    assert_eq_f64!(liqor_quote, deposit_amount - 84.0, 0.01);
+    assert_eq_f64!(liqor_base, deposit_amount + 88.0, 0.01);
 
     let account_data = get_mango_account(solana, account).await;
     assert!(!account_data
@@ -334,8 +332,6 @@ async fn test_token_conditional_swap_basic() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportError> {
-    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
-
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -460,7 +456,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
     // TEST: Can't take an auction at any price when it's not started yet
     //
 
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -472,12 +468,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             min_buy_token: 0,
             min_taker_price: 0.0,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapNotStarted.into(),
-        "tcs should not be started yet".to_string(),
+        MangoError::TokenConditionalSwapNotStarted
     );
 
     //
@@ -507,21 +498,13 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f64_f64(
-        account_quote,
-        account_quote_expected,
-        0.1
-    ));
-    assert!(assert_equal_f64_f64(
-        account_base,
-        account_base_expected,
-        0.1
-    ));
+    assert_eq_f64!(account_quote, account_quote_expected, 0.1);
+    assert_eq_f64!(account_base, account_base_expected, 0.1);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
-    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+    assert_eq_f64!(liqor_quote, liqor_quote_expected, 0.1);
+    assert_eq_f64!(liqor_base, liqor_base_expected, 0.1);
 
     //
     // TEST: Stays at end price after end and before expiry
@@ -550,27 +533,19 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f64_f64(
-        account_quote,
-        account_quote_expected,
-        0.1
-    ));
-    assert!(assert_equal_f64_f64(
-        account_base,
-        account_base_expected,
-        0.1
-    ));
+    assert_eq_f64!(account_quote, account_quote_expected, 0.1);
+    assert_eq_f64!(account_base, account_base_expected, 0.1);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
-    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+    assert_eq_f64!(liqor_quote, liqor_quote_expected, 0.1);
+    assert_eq_f64!(liqor_base, liqor_base_expected, 0.1);
 
     //
     // TEST: Can't take when expired
     //
     solana.set_clock_timestamp(initial_time + 22).await;
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -582,12 +557,7 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
             min_buy_token: 1,
             min_taker_price: 0.0,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapExpired.into(),
-        "tcs should be expired".to_string(),
+        MangoError::TokenConditionalSwapExpired
     );
 
     Ok(())
@@ -595,8 +565,6 @@ async fn test_token_conditional_swap_linear_auction() -> Result<(), TransportErr
 
 #[tokio::test]
 async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportError> {
-    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
-
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
@@ -720,7 +688,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     //
 
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 10.0).await;
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -732,15 +700,10 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             min_buy_token: 0,
             min_taker_price: 0.0,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapNotStarted.into(),
-        "not started yet".to_string(),
+        MangoError::TokenConditionalSwapNotStarted
     );
 
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -748,19 +711,14 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             liqor_owner: owner,
             index: 0,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapPriceNotInRange.into(),
-        "price not in range".to_string(),
+        MangoError::TokenConditionalSwapPriceNotInRange
     );
 
     //
     // TEST: Cannot trigger without start
     //
     set_bank_stub_oracle_price(solana, group, &base_token, admin, 1.0).await;
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapTriggerInstruction {
             liqee: account,
@@ -772,12 +730,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             min_buy_token: 1,
             min_taker_price: 0.0,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapNotStarted.into(),
-        "not started yet".to_string(),
+        MangoError::TokenConditionalSwapNotStarted
     );
 
     send_tx(
@@ -815,21 +768,13 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f64_f64(
-        account_quote,
-        account_quote_expected,
-        0.1
-    ));
-    assert!(assert_equal_f64_f64(
-        account_base,
-        account_base_expected,
-        0.1
-    ));
+    assert_eq_f64!(account_quote, account_quote_expected, 0.1);
+    assert_eq_f64!(account_base, account_base_expected, 0.1);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
-    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+    assert_eq_f64!(liqor_quote, liqor_quote_expected, 0.1);
+    assert_eq_f64!(liqor_base, liqor_base_expected, 0.1);
 
     let account_data = get_mango_account(solana, account).await;
     let tcs = account_data
@@ -866,21 +811,13 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f64_f64(
-        account_quote,
-        account_quote_expected,
-        0.1
-    ));
-    assert!(assert_equal_f64_f64(
-        account_base,
-        account_base_expected,
-        0.1
-    ));
+    assert_eq_f64!(account_quote, account_quote_expected, 0.1);
+    assert_eq_f64!(account_base, account_base_expected, 0.1);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
-    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+    assert_eq_f64!(liqor_quote, liqor_quote_expected, 0.1);
+    assert_eq_f64!(liqor_base, liqor_base_expected, 0.1);
 
     //
     // TEST: Premium stops at max increases
@@ -910,21 +847,13 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
 
     let account_quote = account_position_f64(solana, account, quote_token.bank).await;
     let account_base = account_position_f64(solana, account, base_token.bank).await;
-    assert!(assert_equal_f64_f64(
-        account_quote,
-        account_quote_expected,
-        0.1
-    ));
-    assert!(assert_equal_f64_f64(
-        account_base,
-        account_base_expected,
-        0.1
-    ));
+    assert_eq_f64!(account_quote, account_quote_expected, 0.1);
+    assert_eq_f64!(account_base, account_base_expected, 0.1);
 
     let liqor_quote = account_position_f64(solana, liqor, quote_token.bank).await;
     let liqor_base = account_position_f64(solana, liqor, base_token.bank).await;
-    assert!(assert_equal_f64_f64(liqor_quote, liqor_quote_expected, 0.1));
-    assert!(assert_equal_f64_f64(liqor_base, liqor_base_expected, 0.1));
+    assert_eq_f64!(liqor_quote, liqor_quote_expected, 0.1);
+    assert_eq_f64!(liqor_base, liqor_base_expected, 0.1);
 
     //
     // SETUP: make another premium auction to test starting
@@ -954,7 +883,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Can't start if oracle not in range
     //
 
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -962,12 +891,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             liqor_owner: owner,
             index: 1,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapPriceNotInRange.into(),
-        "price is not in range".to_string(),
+        MangoError::TokenConditionalSwapPriceNotInRange
     );
 
     //
@@ -998,7 +922,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
     // TEST: Can't start a second time
     //
 
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenConditionalSwapStartInstruction {
             liqee: account,
@@ -1006,12 +930,7 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
             liqor_owner: owner,
             index: 1,
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenConditionalSwapAlreadyStarted.into(),
-        "already started".to_string(),
+        MangoError::TokenConditionalSwapAlreadyStarted
     );
 
     Ok(())
@@ -1019,8 +938,6 @@ async fn test_token_conditional_swap_premium_auction() -> Result<(), TransportEr
 
 #[tokio::test]
 async fn test_token_conditional_swap_deposit_limit() -> Result<(), TransportError> {
-    pub use utils::assert_equal_f64_f64 as assert_equal_f_f;
-
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 
