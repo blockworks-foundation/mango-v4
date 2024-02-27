@@ -1,14 +1,14 @@
-use crate::configuration::Configuration;
+use crate::configuration::{Configuration, PostgresConfiguration};
 use crate::fail_or_retry;
 use crate::processors::health::{HealthComponent, HealthEvent};
 use crate::utils::postgres_connection;
 use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
-use chrono::{Duration, Utc};
+use chrono::{Duration, DurationRound, Utc};
 use fixed::types::I80F48;
 use futures_util::pin_mut;
 use postgres_types::{ToSql, Type};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -32,6 +32,9 @@ impl PersisterProcessor {
         let persistence_configuration = configuration.persistence_configuration.clone();
         let time_to_live = Duration::seconds(persistence_configuration.history_time_to_live_secs);
         let periodicity = Duration::seconds(persistence_configuration.persist_max_periodicity_secs);
+        let max_snapshot_count = persistence_configuration.retry_queue_length;
+
+        let mut unpersisted_snapshots = VecDeque::new();
 
         let job = tokio::spawn(async move {
             if !persistence_configuration.enabled {
@@ -69,17 +72,42 @@ impl PersisterProcessor {
                 let event = data.recv().await.unwrap();
 
                 if let Err(e) = retry_counter.fail_or_ignore(
-                    Self::persist(
+                    Self::persist_and_update_state(
                         &mut connection,
                         &mut previous,
-                        event,
+                        &event,
                         time_to_live,
                         periodicity,
                     )
                     .await,
                 ) {
-                    error!("persistence failed: {}", e);
-                    break;
+                    error!(
+                        "persistence failed: {}, saving snapshot for later retries..",
+                        e
+                    );
+
+                    Self::store_snapshot(
+                        &mut unpersisted_snapshots,
+                        &event,
+                        chrono::Utc::now(),
+                        periodicity,
+                        max_snapshot_count,
+                    );
+
+                    if connection.is_closed() {
+                        match Self::try_to_reconnect_and_persist_snapshots(
+                            &postgres_configuration,
+                            &mut unpersisted_snapshots,
+                            time_to_live,
+                        )
+                        .await
+                        {
+                            Ok(client) => connection = client,
+                            Err(e) => error!("failed to reconnect & persist: {}", e),
+                        }
+                    }
+
+                    retry_counter.reset();
                 }
             }
         });
@@ -87,6 +115,90 @@ impl PersisterProcessor {
         let result = PersisterProcessor { job };
 
         Ok(result)
+    }
+
+    fn build_persisted_data(
+        computed_at: chrono::DateTime<Utc>,
+        component: &HealthComponent,
+    ) -> PersistedData {
+        match &component.value {
+            Some(value) => PersistedData {
+                computed_at: computed_at,
+                maintenance_ratio: Some(value.maintenance_ratio),
+                initial_health: Some(value.initial_health),
+                maintenance_health: Some(value.maintenance_health),
+                liquidation_end_health: Some(value.liquidation_end_health),
+                is_being_liquidated: Some(value.is_being_liquidated),
+            },
+            None => PersistedData {
+                computed_at: computed_at,
+                maintenance_ratio: None,
+                initial_health: None,
+                maintenance_health: None,
+                liquidation_end_health: None,
+                is_being_liquidated: None,
+            },
+        }
+    }
+
+    fn store_snapshot(
+        snapshots: &mut VecDeque<PersisterSnapshot>,
+        event: &HealthEvent,
+        now: chrono::DateTime<Utc>,
+        periodicity: chrono::Duration,
+        max_snapshot_count: usize,
+    ) {
+        let updates = event
+            .components
+            .iter()
+            .map(|component| {
+                let persisted_data = Self::build_persisted_data(event.computed_at, &component);
+                (component.account, persisted_data)
+            })
+            .collect::<HashMap<Pubkey, PersistedData>>();
+
+        let snapshot = PersisterSnapshot {
+            snapshoted_at: now,
+            value: updates,
+        };
+
+        let bucket = snapshot.snapshoted_at.duration_round(periodicity);
+        for b in &mut *snapshots {
+            if b.snapshoted_at.duration_round(periodicity) != bucket {
+                continue;
+            }
+
+            b.snapshoted_at = snapshot.snapshoted_at;
+            b.value = snapshot.value;
+            return;
+        }
+
+        if snapshots.len() >= max_snapshot_count {
+            snapshots.pop_front();
+        }
+
+        snapshots.push_back(snapshot);
+    }
+
+    async fn try_to_reconnect_and_persist_snapshots(
+        postgres_configuration: &PostgresConfiguration,
+        snapshots: &mut VecDeque<PersisterSnapshot>,
+        ttl: chrono::Duration,
+    ) -> anyhow::Result<Client> {
+        let mut client = postgres_connection::connect(&postgres_configuration).await?;
+
+        loop {
+            let snapshot_opt = snapshots.pop_front();
+            match snapshot_opt {
+                Some(snapshot) => {
+                    Self::persist_batch(&mut client, &snapshot.value, snapshot.snapshoted_at, ttl)
+                        .await?;
+                }
+                None => break,
+            };
+        }
+
+        Ok(client)
     }
 
     async fn load_previous(client: &Client) -> anyhow::Result<HashMap<Pubkey, PersistedData>> {
@@ -122,10 +234,10 @@ impl PersisterProcessor {
         Ok(result)
     }
 
-    async fn persist(
+    async fn persist_and_update_state(
         client: &mut Client,
         previous: &mut HashMap<Pubkey, PersistedData>,
-        event: HealthEvent,
+        event: &HealthEvent,
         ttl: Duration,
         periodicity: Duration,
     ) -> anyhow::Result<()> {
@@ -136,37 +248,35 @@ impl PersisterProcessor {
                 continue;
             }
 
-            let persisted_data = match &component.value {
-                Some(value) => PersistedData {
-                    computed_at: event.computed_at,
-                    maintenance_ratio: Some(value.maintenance_ratio),
-                    initial_health: Some(value.initial_health),
-                    maintenance_health: Some(value.maintenance_health),
-                    liquidation_end_health: Some(value.liquidation_end_health),
-                    is_being_liquidated: Some(value.is_being_liquidated),
-                },
-                None => PersistedData {
-                    computed_at: event.computed_at,
-                    maintenance_ratio: None,
-                    initial_health: None,
-                    maintenance_health: None,
-                    liquidation_end_health: None,
-                    is_being_liquidated: None,
-                },
-            };
+            let persisted_data = Self::build_persisted_data(event.computed_at, &component);
 
             updates.insert(component.account, persisted_data);
         }
 
-        let tx = client.transaction().await?;
-        Self::insert_history(&tx, &updates).await?;
-        Self::delete_old_history(&tx, event.computed_at, ttl).await?;
-        Self::update_current(&tx).await?;
-        tx.commit().await?;
+        if updates.len() == 0 {
+            return Ok(());
+        }
+
+        Self::persist_batch(client, &updates, event.computed_at, ttl).await?;
 
         for (k, v) in updates {
             previous.insert(k, v);
         }
+
+        Ok(())
+    }
+
+    async fn persist_batch(
+        client: &mut Client,
+        updates: &HashMap<Pubkey, PersistedData>,
+        timestamp: chrono::DateTime<Utc>,
+        ttl: chrono::Duration,
+    ) -> anyhow::Result<()> {
+        let tx = client.transaction().await?;
+        Self::insert_history(&tx, &updates).await?;
+        Self::delete_old_history(&tx, timestamp, ttl).await?;
+        Self::update_current(&tx).await?;
+        tx.commit().await?;
 
         Ok(())
     }
@@ -283,9 +393,16 @@ impl PersistedData {
     }
 }
 
+struct PersisterSnapshot {
+    pub value: HashMap<Pubkey, PersistedData>,
+    pub snapshoted_at: chrono::DateTime<Utc>,
+}
+
 #[cfg(test)]
 mod tests {
+    use chrono::SubsecRound;
     use super::*;
+    use crate::processors::health::HealthComponentValue;
 
     fn make_value(hr: f64, i: u64, m: u64, le: u64, ibl: bool) -> Option<HealthComponentValue> {
         Some(HealthComponentValue {
@@ -436,5 +553,87 @@ mod tests {
             },
             chrono::Duration::seconds(60)
         ));
+    }
+
+    #[test]
+    fn should_correctly_convert_event_into_data() {
+        let computed_at = chrono::Utc::now();
+        let component = HealthComponent {
+            account: Pubkey::new_unique(),
+            value: Some(HealthComponentValue {
+                maintenance_ratio: I80F48::from_num(123),
+                initial_health: I80F48::from_num(1000),
+                maintenance_health: I80F48::from_num(2000),
+                liquidation_end_health: I80F48::from_num(3000),
+                is_being_liquidated: false,
+            }),
+        };
+
+        let converted = PersisterProcessor::build_persisted_data(computed_at, &component);
+
+        assert_eq!(converted.computed_at, computed_at);
+        assert_eq!(converted.maintenance_ratio.unwrap(), I80F48::from_num(123));
+        assert_eq!(converted.initial_health.unwrap(), I80F48::from_num(1000));
+        assert_eq!(
+            converted.maintenance_health.unwrap(),
+            I80F48::from_num(2000)
+        );
+        assert_eq!(
+            converted.liquidation_end_health.unwrap(),
+            I80F48::from_num(3000)
+        );
+        assert_eq!(converted.is_being_liquidated.unwrap(), false);
+    }
+
+    #[test]
+    fn should_store_or_replace_snapshot() {
+        let mut snapshots = VecDeque::new();
+        let event1 = HealthEvent {
+            computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(300),
+            components: vec![HealthComponent {
+                account: Pubkey::new_unique(),
+                value: make_value(50.25f64,2,3,4,false),
+            }],
+        };
+        let event2 = HealthEvent {
+            computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(290),
+            components: vec![HealthComponent {
+                account: Pubkey::new_unique(),
+                value: make_value(502.5f64,20,30,40,false),
+            }],
+        };
+        let event3 = HealthEvent {
+            computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(200),
+            components: vec![HealthComponent {
+                account: Pubkey::new_unique(),
+                value: make_value(5025.0f64,200,300,400,false),
+            }],
+        };
+        let event4 = HealthEvent {
+            computed_at: chrono::Utc::now().trunc_subsecs(0) - chrono::Duration::seconds(100),
+            components: vec![HealthComponent {
+                account: Pubkey::new_unique(),
+                value: make_value(50250.0f64,2000,3000,4000,false),
+            }],
+        };
+
+        PersisterProcessor::store_snapshot(&mut snapshots, &event1, event1.computed_at, Duration::seconds(60), 2);
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 3);
+
+        PersisterProcessor::store_snapshot(&mut snapshots, &event2, event2.computed_at, Duration::seconds(60), 2);
+        assert_eq!(snapshots.len(), 1);
+        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 30);
+
+        PersisterProcessor::store_snapshot(&mut snapshots, &event3, event3.computed_at, Duration::seconds(60), 2);
+        assert_eq!(snapshots.len(), 2);
+        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 30);
+        assert_eq!(snapshots[1].value.iter().next().unwrap().1.maintenance_health.unwrap(), 300);
+
+        PersisterProcessor::store_snapshot(&mut snapshots, &event4, event4.computed_at, Duration::seconds(60), 2);
+        assert_eq!(snapshots.len(), 2);
+        assert_eq!(snapshots[0].value.iter().next().unwrap().1.maintenance_health.unwrap(), 300);
+        assert_eq!(snapshots[1].value.iter().next().unwrap().1.maintenance_health.unwrap(), 3000);
+
     }
 }

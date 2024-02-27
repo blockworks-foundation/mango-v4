@@ -28,6 +28,7 @@ pub struct PersistenceConfiguration {
     pub enabled: bool,
     pub history_time_to_live_secs: i64,
     pub persist_max_periodicity_secs: i64,
+    pub retry_queue_length: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Default)]
