@@ -462,6 +462,8 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
             mint: mints[0].pubkey,
             fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
+                init_asset_weight_opt: Some(0.0),
+                init_liab_weight_opt: Some(2.0),
                 maint_weight_shift_start_opt: Some(start_time + 1000),
                 maint_weight_shift_end_opt: Some(start_time + 2000),
                 maint_weight_shift_asset_target_opt: Some(0.5),
