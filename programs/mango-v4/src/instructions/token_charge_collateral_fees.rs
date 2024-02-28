@@ -5,7 +5,7 @@ use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, TokenCollateralFeeLog};
+use crate::logs::{emit_stack, TokenBalanceLog, TokenCollateralFeeLog};
 
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -103,12 +103,25 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         bank.collected_fees_native += fee;
         bank.collected_collateral_fees += fee;
 
+        let token_info = health_cache.token_info(bank.token_index)?;
+        let token_position = account.token_position(bank.token_index)?;
+
         emit_stack(TokenCollateralFeeLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             token_index: bank.token_index,
             fee: fee.to_bits(),
             asset_usage_fraction: asset_usage_scaling.to_bits(),
+            price: token_info.prices.oracle.to_bits(),
+        });
+
+        emit_stack(TokenBalanceLog {
+            mango_group: ctx.accounts.group.key(),
+            mango_account: ctx.accounts.account.key(),
+            token_index: bank.token_index,
+            indexed_position: token_position.indexed_position.to_bits(),
+            deposit_index: bank.deposit_index.to_bits(),
+            borrow_index: bank.borrow_index.to_bits(),
         })
     }
 
