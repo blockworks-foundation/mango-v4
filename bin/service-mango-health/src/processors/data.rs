@@ -1,7 +1,5 @@
 use crate::configuration::Configuration;
-use crate::fail_or_retry;
 use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
-use crate::utils::retry_counter::RetryCounter;
 use async_channel::Receiver;
 use chrono::Utc;
 use itertools::Itertools;
@@ -10,6 +8,8 @@ use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{
     account_update_stream, chain_data, snapshot_source, websocket_source, MangoGroupContext,
 };
+use services_mango_lib::fail_or_retry;
+use services_mango_lib::retry_counter::RetryCounter;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;

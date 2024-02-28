@@ -1,13 +1,14 @@
-use crate::configuration::{Configuration, PostgresConfiguration};
-use crate::fail_or_retry;
+use crate::configuration::Configuration;
 use crate::processors::health::{HealthComponent, HealthEvent};
-use crate::utils::postgres_connection;
-use crate::utils::retry_counter::RetryCounter;
 use anchor_lang::prelude::Pubkey;
 use chrono::{Duration, DurationRound, Utc};
 use fixed::types::I80F48;
 use futures_util::pin_mut;
 use postgres_types::{ToSql, Type};
+use services_mango_lib::fail_or_retry;
+use services_mango_lib::postgres_configuration::PostgresConfiguration;
+use services_mango_lib::postgres_connection;
+use services_mango_lib::retry_counter::RetryCounter;
 use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,7 +33,7 @@ impl PersisterProcessor {
         let persistence_configuration = configuration.persistence_configuration.clone();
         let time_to_live = Duration::seconds(persistence_configuration.history_time_to_live_secs);
         let periodicity = Duration::seconds(persistence_configuration.persist_max_periodicity_secs);
-        let max_snapshot_count = persistence_configuration.retry_queue_length;
+        let max_snapshot_count = persistence_configuration.snapshot_queue_length;
 
         let mut unpersisted_snapshots = VecDeque::new();
 
@@ -41,7 +42,7 @@ impl PersisterProcessor {
                 return;
             }
 
-            let mut retry_counter = RetryCounter::new(postgres_configuration.max_retry_count);
+            let mut retry_counter = RetryCounter::new(persistence_configuration.max_retry_count);
 
             let mut connection = match fail_or_retry!(
                 retry_counter,
@@ -51,7 +52,7 @@ impl PersisterProcessor {
                     tracing::error!("Failed to connect to postgres sql: {}", e);
                     return;
                 }
-                Ok(cnt) => cnt,
+                Ok(cnt) => cnt.0,
             };
 
             let mut previous =
@@ -185,7 +186,9 @@ impl PersisterProcessor {
         snapshots: &mut VecDeque<PersisterSnapshot>,
         ttl: chrono::Duration,
     ) -> anyhow::Result<Client> {
-        let mut client = postgres_connection::connect(&postgres_configuration).await?;
+        let mut client = postgres_connection::connect(&postgres_configuration)
+            .await?
+            .0;
 
         loop {
             let snapshot_opt = snapshots.pop_front();

@@ -5986,6 +5986,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
+ "services-mango-lib",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -6031,6 +6032,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
+ "services-mango-lib",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -6099,6 +6101,24 @@ dependencies = [
  "solana-sdk",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "services-mango-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.4",
+ "native-tls",
+ "postgres-native-tls",
+ "postgres-types",
+ "postgres_query",
+ "rustls 0.20.9",
+ "serde",
+ "tokio",
+ "tokio-postgres",
+ "tokio-postgres-rustls",
+ "tracing",
 ]
 
 [[package]]

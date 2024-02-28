@@ -1,4 +1,5 @@
 use serde_derive::Deserialize;
+use services_mango_lib::postgres_configuration::PostgresConfiguration;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -28,21 +29,6 @@ pub struct PersistenceConfiguration {
     pub enabled: bool,
     pub history_time_to_live_secs: i64,
     pub persist_max_periodicity_secs: i64,
-    pub retry_queue_length: usize,
-}
-
-#[derive(Clone, Debug, Deserialize, Default)]
-pub struct PostgresConfiguration {
-    pub connection_string: String,
-    pub allow_invalid_certs: bool,
-    pub tls: Option<PostgresTlsConfig>,
     pub max_retry_count: u64,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct PostgresTlsConfig {
-    /// CA Cert file or env var
-    pub ca_cert_path: String,
-    /// PKCS12 client cert path
-    pub client_key_path: String,
+    pub snapshot_queue_length: usize,
 }

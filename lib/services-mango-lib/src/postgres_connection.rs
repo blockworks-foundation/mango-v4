@@ -1,11 +1,13 @@
-use crate::configuration::PostgresConfiguration;
+use crate::postgres_configuration::PostgresConfiguration;
 use native_tls::{Certificate, Identity, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::{env, fs};
+use tokio::task::JoinHandle;
 use tokio_postgres::Client;
-use tracing::error;
 
-pub async fn connect(config: &PostgresConfiguration) -> anyhow::Result<Client> {
+pub async fn connect(
+    config: &PostgresConfiguration,
+) -> anyhow::Result<(Client, JoinHandle<Result<(), tokio_postgres::Error>>)> {
     // openssl pkcs12 -export -in client.cer -inkey client-key.cer -out client.pks
     // base64 -i ca.cer -o ca.cer.b64 && base64 -i client.pks -o client.pks.b64
     // fly secrets set PG_CA_CERT=- < ./ca.cer.b64 -a mango-fills
@@ -58,11 +60,7 @@ pub async fn connect(config: &PostgresConfiguration) -> anyhow::Result<Client> {
 
     let (client, connection) = tokio_postgres::connect(&connection_string, tls).await?;
 
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            error!("connection error: {}", e);
-        }
-    });
+    let handle = tokio::spawn(async move { connection.await });
 
-    Ok(client)
+    Ok((client, handle))
 }

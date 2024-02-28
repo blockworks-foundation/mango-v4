@@ -8,6 +8,7 @@ license = "AGPL-3.0-or-later"
 [dependencies]
 mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
 mango-feeds-connector = { workspace = true }
+services-mango-lib = { path = "../../lib/services-mango-lib" }
 
 solana-client = { workspace = true }
 solana-logger = { workspace = true }
