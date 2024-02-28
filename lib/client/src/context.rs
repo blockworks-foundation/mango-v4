@@ -144,7 +144,7 @@ impl Default for ComputeEstimates {
             // the base cost is mostly the division
             cu_per_charge_collateral_fees: 20_000,
             // per-chargable-token cost
-            cu_per_charge_collateral_fees_token: 12_000,
+            cu_per_charge_collateral_fees_token: 15_000,
         }
     }
 }
