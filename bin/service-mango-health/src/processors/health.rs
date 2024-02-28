@@ -1,7 +1,6 @@
 use crate::configuration::Configuration;
 use crate::processors::data::DataEvent;
 use chrono::Utc;
-use fixed::types::I80F48;
 use mango_v4::health::HealthType;
 use mango_v4_client::chain_data::AccountFetcher;
 use mango_v4_client::{chain_data, health_cache, FallbackOracleConfig, MangoGroupContext};
@@ -34,10 +33,10 @@ pub struct HealthComponent {
 
 #[derive(Clone, Debug)]
 pub struct HealthComponentValue {
-    pub maintenance_ratio: I80F48,
-    pub initial_health: I80F48,
-    pub maintenance_health: I80F48,
-    pub liquidation_end_health: I80F48,
+    pub maintenance_ratio: f64,
+    pub initial_health: f64,
+    pub maintenance_health: f64,
+    pub liquidation_end_health: f64,
     pub is_being_liquidated: bool,
 }
 
@@ -166,10 +165,10 @@ impl HealthProcessor {
         .await?;
 
         let res = HealthComponentValue {
-            maintenance_ratio: health_cache.health_ratio(HealthType::Maint),
-            initial_health: health_cache.health(HealthType::Init),
-            maintenance_health: health_cache.health(HealthType::Maint),
-            liquidation_end_health: health_cache.health(HealthType::LiquidationEnd),
+            maintenance_ratio: health_cache.health_ratio(HealthType::Maint).to_num(),
+            initial_health: health_cache.health(HealthType::Init).to_num(),
+            maintenance_health: health_cache.health(HealthType::Maint).to_num(),
+            liquidation_end_health: health_cache.health(HealthType::LiquidationEnd).to_num(),
             is_being_liquidated: mango_account.fixed.being_liquidated(),
         };
 

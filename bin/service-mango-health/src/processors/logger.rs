@@ -6,7 +6,7 @@ use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::task::JoinHandle;
-use tracing::warn;
+use tracing::{info, warn};
 
 pub struct LoggerProcessor {
     pub job: JoinHandle<()>,
@@ -48,18 +48,21 @@ impl LoggerProcessor {
                         if component.value.is_some() {
                             let value: HealthComponentValue = component.value.unwrap();
 
-                            println!(
-                                "PUB {:?} {} -> {}% (init: {}, maint: {}, liquidationEnd: {}, beingLiquidated: {})",
-                                msg.computed_at,
-                                component.account,
-                                value.maintenance_ratio,
-                                value.initial_health,
-                                value.maintenance_health,
-                                value.liquidation_end_health,
-                                value.is_being_liquidated as u8,
-                            );
+                            info!(
+                                computed_at = %msg.computed_at,
+                                account = %component.account,
+                                maintenance_ratio = %value.maintenance_ratio,
+                                initial_health = %value.initial_health,
+                                maintenance_health = %value.maintenance_health,
+                                liquidation_end_health = %value.liquidation_end_health,
+                                is_being_liquidated = %value.is_being_liquidated,
+                            )
                         } else {
-                            println!("PUB {:?} {} -> ERROR%", msg.computed_at, component.account);
+                            info!(
+                            computed_at = %msg.computed_at,
+                            account = %component.account,
+                            error = "Missing health data"
+                            )
                         }
                     }
                 }

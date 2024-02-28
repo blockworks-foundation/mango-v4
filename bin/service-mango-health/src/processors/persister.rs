@@ -2,7 +2,6 @@ use crate::configuration::Configuration;
 use crate::processors::health::{HealthComponent, HealthEvent};
 use anchor_lang::prelude::Pubkey;
 use chrono::{Duration, DurationRound, Utc};
-use fixed::types::I80F48;
 use futures_util::pin_mut;
 use postgres_types::{ToSql, Type};
 use services_mango_lib::fail_or_retry;
@@ -207,7 +206,7 @@ impl PersisterProcessor {
     async fn load_previous(client: &Client) -> anyhow::Result<HashMap<Pubkey, PersistedData>> {
         let rows = client
             .query(
-                "SELECT Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated FROM mango_monitoring.health_current",
+                "SELECT Pubkey, Timestamp, MaintenanceRatio, Initial, Maintenance, LiquidationEnd, IsBeingLiquidated FROM mango_monitoring.health_current",
                 &[],
             )
             .await?;
@@ -215,21 +214,15 @@ impl PersisterProcessor {
         let mut result = HashMap::<Pubkey, PersistedData>::new();
         for row in rows {
             let key = Pubkey::from_str(row.get(0))?;
-            let ts_utc: chrono::DateTime<Utc> = row.get(1);
-            let mr: Option<f64> = row.get(2);
-            let i: Option<f64> = row.get(3);
-            let m: Option<f64> = row.get(4);
-            let le: Option<f64> = row.get(5);
-            let is_being_liquidated: Option<bool> = row.get(6);
             result.insert(
                 key,
                 PersistedData {
-                    computed_at: ts_utc,
-                    maintenance_ratio: mr.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
-                    initial_health: i.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
-                    maintenance_health: m.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
-                    liquidation_end_health: le.map(|x| I80F48::wrapping_from_num(x)), // TODO FAS What conversion should we use there ?
-                    is_being_liquidated: is_being_liquidated, // TODO FAS What conversion should we use there ?
+                    computed_at: row.get(1),
+                    maintenance_ratio: row.get(2),
+                    initial_health: row.get(3),
+                    maintenance_health: row.get(4),
+                    liquidation_end_health: row.get(5),
+                    is_being_liquidated: row.get(6),
                 },
             );
         }
@@ -280,7 +273,6 @@ impl PersisterProcessor {
         Self::delete_old_history(&tx, timestamp, ttl).await?;
         Self::update_current(&tx).await?;
         tx.commit().await?;
-
         Ok(())
     }
 
@@ -297,33 +289,32 @@ impl PersisterProcessor {
             Type::FLOAT8,
             Type::BOOL,
         ];
-        let sink = client.copy_in("COPY mango_monitoring.health_history (Pubkey, Timestamp, MaintenanceRatio, Maintenance, Initial, LiquidationEnd, IsBeingLiquidated) FROM STDIN BINARY").await?;
+        let sink = client.copy_in("COPY mango_monitoring.health_history (Pubkey, Timestamp, MaintenanceRatio, Initial, Maintenance, LiquidationEnd, IsBeingLiquidated) FROM STDIN BINARY").await?;
         let writer = BinaryCopyInWriter::new(sink, &col_types);
         pin_mut!(writer);
 
         for (key, value) in updates {
             let key = key.to_string();
-            let ts = value.computed_at.clone();
-            let mr = value.maintenance_ratio.map(|x| x.to_num::<f64>());
-            let i = value.initial_health.map(|x| x.to_num::<f64>());
-            let m = value.maintenance_health.map(|x| x.to_num::<f64>());
-            let le = value.liquidation_end_health.map(|x| x.to_num::<f64>());
-            let ibl = value.is_being_liquidated;
-
-            let row: Vec<&'_ (dyn ToSql + Sync)> = vec![&key, &ts, &mr, &i, &m, &le, &ibl];
+            let row: Vec<&'_ (dyn ToSql + Sync)> = vec![
+                &key,
+                &value.computed_at,
+                &value.maintenance_ratio,
+                &value.initial_health,
+                &value.maintenance_health,
+                &value.liquidation_end_health,
+                &value.is_being_liquidated,
+            ];
             writer.as_mut().write(&row).await?;
         }
 
         writer.finish().await?;
-
         Ok(())
     }
 
     async fn update_current<'tx>(client: &Transaction<'tx>) -> anyhow::Result<()> {
         let query =
             postgres_query::query!("REFRESH MATERIALIZED VIEW mango_monitoring.health_current");
-        query.execute(client).await.expect("Update failed");
-
+        query.execute(client).await?;
         Ok(())
     }
 
@@ -337,11 +328,8 @@ impl PersisterProcessor {
             "DELETE FROM mango_monitoring.health_history WHERE timestamp < $min_ts",
             min_ts
         );
-        if let Err(e) = query.execute(client).await {
-            Err(e.into())
-        } else {
-            Ok(())
-        }
+        query.execute(client).await?;
+        Ok(())
     }
 
     fn should_insert(
@@ -365,8 +353,8 @@ impl PersisterProcessor {
 
                     let curr = current_value.maintenance_ratio;
                     let prev = previous.maintenance_ratio.unwrap();
-                    let changing_side = (prev <= 0 && curr > 0) || (prev > 0 && curr <= 0);
-                    let big_move = prev != 0 && (prev - curr).abs() / prev > 0.1;
+                    let changing_side = (prev <= 0.0 && curr > 0.0) || (prev > 0.0 && curr <= 0.0);
+                    let big_move = prev != 0.0 && (prev - curr).abs() / prev > 0.1;
 
                     changing_side || changing_flag || big_move
                 } else {
@@ -379,10 +367,10 @@ impl PersisterProcessor {
 
 struct PersistedData {
     pub computed_at: chrono::DateTime<Utc>,
-    pub maintenance_ratio: Option<I80F48>,
-    pub initial_health: Option<I80F48>,
-    pub maintenance_health: Option<I80F48>,
-    pub liquidation_end_health: Option<I80F48>,
+    pub maintenance_ratio: Option<f64>,
+    pub initial_health: Option<f64>,
+    pub maintenance_health: Option<f64>,
+    pub liquidation_end_health: Option<f64>,
     pub is_being_liquidated: Option<bool>,
 }
 
@@ -409,10 +397,10 @@ mod tests {
 
     fn make_value(hr: f64, i: u64, m: u64, le: u64, ibl: bool) -> Option<HealthComponentValue> {
         Some(HealthComponentValue {
-            maintenance_ratio: I80F48::wrapping_from_num(hr),
-            initial_health: I80F48::from(i),
-            maintenance_health: I80F48::from(m),
-            liquidation_end_health: I80F48::from(le),
+            maintenance_ratio: hr,
+            initial_health: i as f64,
+            maintenance_health: m as f64,
+            liquidation_end_health: le as f64,
             is_being_liquidated: ibl,
         })
     }
@@ -420,10 +408,10 @@ mod tests {
     fn make_persisted(t_secs: i64, mr: f64) -> PersistedData {
         PersistedData {
             computed_at: chrono::Utc::now() - chrono::Duration::seconds(t_secs),
-            maintenance_ratio: Some(I80F48::wrapping_from_num(mr)),
-            initial_health: Some(I80F48::from(1000)),
-            maintenance_health: Some(I80F48::from(1000)),
-            liquidation_end_health: Some(I80F48::from(1)),
+            maintenance_ratio: Some(mr),
+            initial_health: Some(1000f64),
+            maintenance_health: Some(1000f64),
+            liquidation_end_health: Some(1f64),
             is_being_liquidated: Some(false),
         }
     }
@@ -564,10 +552,10 @@ mod tests {
         let component = HealthComponent {
             account: Pubkey::new_unique(),
             value: Some(HealthComponentValue {
-                maintenance_ratio: I80F48::from_num(123),
-                initial_health: I80F48::from_num(1000),
-                maintenance_health: I80F48::from_num(2000),
-                liquidation_end_health: I80F48::from_num(3000),
+                maintenance_ratio: 123.0,
+                initial_health: 1000.0,
+                maintenance_health: 2000.0,
+                liquidation_end_health: 3000.0,
                 is_being_liquidated: false,
             }),
         };
@@ -575,16 +563,10 @@ mod tests {
         let converted = PersisterProcessor::build_persisted_data(computed_at, &component);
 
         assert_eq!(converted.computed_at, computed_at);
-        assert_eq!(converted.maintenance_ratio.unwrap(), I80F48::from_num(123));
-        assert_eq!(converted.initial_health.unwrap(), I80F48::from_num(1000));
-        assert_eq!(
-            converted.maintenance_health.unwrap(),
-            I80F48::from_num(2000)
-        );
-        assert_eq!(
-            converted.liquidation_end_health.unwrap(),
-            I80F48::from_num(3000)
-        );
+        assert_eq!(converted.maintenance_ratio.unwrap(), 123.0);
+        assert_eq!(converted.initial_health.unwrap(), 1000.0);
+        assert_eq!(converted.maintenance_health.unwrap(), 2000.0);
+        assert_eq!(converted.liquidation_end_health.unwrap(), 3000.0);
         assert_eq!(converted.is_being_liquidated.unwrap(), false);
     }
 
