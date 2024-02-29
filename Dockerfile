@@ -27,6 +27,7 @@ COPY --from=build /app/target/release/service-mango-* /usr/local/bin/
 COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
 COPY --from=build /app/bin/service-mango-fills/conf/template-config.toml ./fills-config.toml
 COPY --from=build /app/bin/service-mango-orderbook/conf/template-config.toml ./orderbook-config.toml
+COPY --from=build /app/bin/service-mango-health/conf/template-config.toml ./health-config.toml
 
 COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
 COPY --from=build /app/bin/service-mango-fills/conf//template-config.toml ./fills-config.toml

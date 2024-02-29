@@ -1,15 +1,14 @@
 [package]
-name = "service-mango-fills"
+name = "service-mango-health"
 version = "0.1.0"
-authors = ["Christian Kamm <mail@ckamm.de>", "Maximilian Schneider <max@mango.markets>"]
+authors = ["Christian Kamm <mail@ckamm.de>", "Maximilian Schneider <max@mango.markets>", "Serge Farny <serge.farny@gmail.com>"]
 edition = "2018"
 license = "AGPL-3.0-or-later"
 
 [dependencies]
-services-mango-lib = { path = "../../lib/services-mango-lib" }
 mango-feeds-lib = { path = "../../lib/mango-feeds-lib" }
 mango-feeds-connector = { workspace = true }
-
+services-mango-lib = { path = "../../lib/services-mango-lib" }
 
 solana-client = { workspace = true }
 solana-logger = { workspace = true }
@@ -17,6 +16,8 @@ solana-sdk = { workspace = true }
 
 anchor-lang = { workspace = true }
 anchor-client = { workspace = true }
+
+fixed = { workspace = true, features = ["serde", "borsh"] }
 
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
@@ -47,9 +48,6 @@ base64 = "0.21"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.17"
 
-#jsonrpc-core = "18.0.0"
-#jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http"] }
-
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
 tokio-postgres-rustls = "0.9.0"
 postgres-types = { version = "0.2", features = ["array-impls", "derive", "with-chrono-0_4"] }
@@ -58,4 +56,5 @@ native-tls = "0.2"
 rustls = "0.20.8"
 # postgres_query hasn't updated its crate in a while
 postgres_query = { git = "https://github.com/nolanderc/rust-postgres-query", rev = "b4422051c8a31fbba4a35f88004c1cefb1878dd5" }
+tracing = { version = "0.1", features = ["log"] }
 

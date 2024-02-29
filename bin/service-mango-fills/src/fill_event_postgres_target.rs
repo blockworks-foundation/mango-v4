@@ -2,12 +2,10 @@ use crate::postgres_config::PostgresConfig;
 use chrono::{TimeZone, Utc};
 use log::*;
 use mango_feeds_connector::metrics::{MetricType, MetricU64, Metrics};
-use native_tls::{Certificate, Identity, TlsConnector};
-use postgres_native_tls::MakeTlsConnector;
 use postgres_query::Caching;
 use service_mango_fills::*;
+use services_mango_lib::postgres_configuration::PostgresConfiguration;
 use std::{
-    env, fs,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -24,56 +22,15 @@ async fn postgres_connection(
 ) -> anyhow::Result<async_channel::Receiver<Option<tokio_postgres::Client>>> {
     let (tx, rx) = async_channel::unbounded();
 
-    // openssl pkcs12 -export -in client.cer -inkey client-key.cer -out client.pks
-    // base64 -i ca.cer -o ca.cer.b64 && base64 -i client.pks -o client.pks.b64
-    // fly secrets set PG_CA_CERT=- < ./ca.cer.b64 -a mango-fills
-    // fly secrets set PG_CLIENT_KEY=- < ./client.pks.b64 -a mango-fills
-    let tls = match &config.tls {
-        Some(tls) => {
-            use base64::{engine::general_purpose, Engine as _};
-            let ca_cert = match &tls.ca_cert_path.chars().next().unwrap() {
-                '$' => general_purpose::STANDARD
-                    .decode(
-                        env::var(&tls.ca_cert_path[1..])
-                            .expect("reading client cert from env")
-                            .into_bytes(),
-                    )
-                    .expect("decoding client cert"),
-                _ => fs::read(&tls.ca_cert_path).expect("reading client cert from file"),
-            };
-            let client_key = match &tls.client_key_path.chars().next().unwrap() {
-                '$' => general_purpose::STANDARD
-                    .decode(
-                        env::var(&tls.client_key_path[1..])
-                            .expect("reading client key from env")
-                            .into_bytes(),
-                    )
-                    .expect("decoding client key"),
-                _ => fs::read(&tls.client_key_path).expect("reading client key from file"),
-            };
-            MakeTlsConnector::new(
-                TlsConnector::builder()
-                    .add_root_certificate(Certificate::from_pem(&ca_cert)?)
-                    .identity(Identity::from_pkcs12(&client_key, "pass")?)
-                    .danger_accept_invalid_certs(config.allow_invalid_certs)
-                    .build()?,
-            )
-        }
-        None => MakeTlsConnector::new(
-            TlsConnector::builder()
-                .danger_accept_invalid_certs(config.allow_invalid_certs)
-                .build()?,
-        ),
+    let config = config.clone();
+    let lib_config = PostgresConfiguration {
+        connection_string: config.connection_string.clone(),
+        allow_invalid_certs: config.allow_invalid_certs,
+        tls: config.tls.clone(),
     };
 
-    let config = config.clone();
-    let connection_string = match &config.connection_string.chars().next().unwrap() {
-        '$' => {
-            env::var(&config.connection_string[1..]).expect("reading connection string from env")
-        }
-        _ => config.connection_string.clone(),
-    };
-    let mut initial = Some(tokio_postgres::connect(&connection_string, tls.clone()).await?);
+    let mut initial = Some(services_mango_lib::postgres_connection::connect(&lib_config).await?);
+
     let mut metric_retries = metric_retries;
     let mut metric_live = metric_live;
     tokio::spawn(async move {
@@ -86,7 +43,8 @@ async fn postgres_connection(
             let (client, connection) = match initial.take() {
                 Some(v) => v,
                 None => {
-                    let result = tokio_postgres::connect(&connection_string, tls.clone()).await;
+                    let result =
+                        services_mango_lib::postgres_connection::connect(&lib_config).await;
                     match result {
                         Ok(v) => v,
                         Err(err) => {

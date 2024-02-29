@@ -5986,6 +5986,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
+ "services-mango-lib",
  "solana-client",
  "solana-logger",
  "solana-sdk",
@@ -5994,6 +5995,53 @@ dependencies = [
  "tokio-postgres-rustls",
  "tokio-tungstenite 0.17.2",
  "toml",
+ "ws",
+]
+
+[[package]]
+name = "service-mango-health"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anyhow",
+ "async-channel",
+ "async-trait",
+ "base64 0.21.4",
+ "bs58 0.3.1",
+ "bytemuck",
+ "chrono",
+ "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
+ "futures 0.3.28",
+ "futures-channel",
+ "futures-core",
+ "futures-util",
+ "itertools",
+ "jemallocator",
+ "log 0.4.20",
+ "mango-feeds-connector",
+ "mango-feeds-lib",
+ "mango-v4",
+ "mango-v4-client",
+ "native-tls",
+ "postgres-native-tls",
+ "postgres-types",
+ "postgres_query",
+ "rustls 0.20.9",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
+ "services-mango-lib",
+ "solana-client",
+ "solana-logger",
+ "solana-sdk",
+ "tokio",
+ "tokio-postgres",
+ "tokio-postgres-rustls",
+ "tokio-tungstenite 0.17.2",
+ "toml",
+ "tracing",
  "ws",
 ]
 
@@ -6053,6 +6101,24 @@ dependencies = [
  "solana-sdk",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "services-mango-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.4",
+ "native-tls",
+ "postgres-native-tls",
+ "postgres-types",
+ "postgres_query",
+ "rustls 0.20.9",
+ "serde",
+ "tokio",
+ "tokio-postgres",
+ "tokio-postgres-rustls",
+ "tracing",
 ]
 
 [[package]]
