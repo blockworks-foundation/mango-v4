@@ -1,4 +1,4 @@
-import { AnchorProvider, BN, Program, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Program, Provider, Wallet } from '@coral-xyz/anchor';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createAccount,
@@ -63,6 +63,7 @@ import {
 } from './accounts/serum3';
 import {
   IxGateParams,
+  PerpEditParams,
   TokenEditParams,
   TokenRegisterParams,
   buildIxGate,
