@@ -4,7 +4,7 @@ import * as dotenv from 'dotenv';
 import fs from 'fs';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
-import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
+
 dotenv.config();
 
 async function addSpotMarket() {
@@ -30,7 +30,7 @@ async function addSpotMarket() {
   console.log(`Admin ${admin.publicKey.toBase58()}`);
 
   // fetch group
-  const groupPk = 'DTenAtYztNUHZBvqXUFM5jCB4X8cUUfgkCaDVDPddm8M';
+  const groupPk = '7SDejCUPsF3g59GgMsmvxw8dJkkJbT3exoH4RZirwnkM';
   const group = await client.getGroup(new PublicKey(groupPk));
   console.log(`Found group ${group.publicKey.toBase58()}`);
 

@@ -6464,6 +6464,11 @@ export type MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -6598,7 +6603,12 @@ export type MangoV4 = {
         {
           "name": "openbookV2Market",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_market_external",
+            "openbook_v2_program"
+          ]
         },
         {
           "name": "openbookV2Program",
@@ -6703,6 +6713,12 @@ export type MangoV4 = {
           "name": "orderType",
           "type": {
             "defined": "OpenbookV2PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "OpenbookV2SelfTradeBehavior"
           }
         },
         {
@@ -6811,7 +6827,7 @@ export type MangoV4 = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
         },
         {
@@ -10848,6 +10864,26 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "SpotMarketIndex",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Serum3",
+            "fields": [
+              "u16"
+            ]
+          },
+          {
+            "name": "OpenbookV2",
+            "fields": [
+              "u16"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "LoanOriginationFeeInstruction",
       "type": {
         "kind": "enum",
@@ -11123,6 +11159,9 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "OpenbookV2CancelAllOrders"
           }
         ]
       }
@@ -20937,6 +20976,11 @@ export const IDL: MangoV4 = {
           "isSigner": false
         },
         {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
           "name": "payer",
           "isMut": true,
           "isSigner": true
@@ -21071,7 +21115,12 @@ export const IDL: MangoV4 = {
         {
           "name": "openbookV2Market",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_market_external",
+            "openbook_v2_program"
+          ]
         },
         {
           "name": "openbookV2Program",
@@ -21176,6 +21225,12 @@ export const IDL: MangoV4 = {
           "name": "orderType",
           "type": {
             "defined": "OpenbookV2PlaceOrderType"
+          }
+        },
+        {
+          "name": "selfTradeBehavior",
+          "type": {
+            "defined": "OpenbookV2SelfTradeBehavior"
           }
         },
         {
@@ -21284,7 +21339,7 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "authority",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
         },
         {
@@ -25321,6 +25376,26 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "SpotMarketIndex",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Serum3",
+            "fields": [
+              "u16"
+            ]
+          },
+          {
+            "name": "OpenbookV2",
+            "fields": [
+              "u16"
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "LoanOriginationFeeInstruction",
       "type": {
         "kind": "enum",
@@ -25596,6 +25671,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "OpenbookV2CancelAllOrders"
           }
         ]
       }

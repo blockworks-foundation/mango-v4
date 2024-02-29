@@ -9,7 +9,7 @@ import {
 import { Cluster, Keypair, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_PROGRAM_ID } from '../constants';
+import { OPENBOOK_V2_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, EmptyWallet } from '../utils';
 import { TokenIndex } from './bank';
@@ -70,12 +70,10 @@ export class OpenbookV2Market {
     programId: PublicKey,
     mangoAccount: PublicKey,
   ): PublicKey {
-    // todo-pan: use indexer here
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from('Serum3OO'),
+        Buffer.from('OpenOrdersIndexer'),
         mangoAccount.toBuffer(),
-        this.publicKey.toBuffer(),
       ],
       programId,
     );
@@ -83,19 +81,47 @@ export class OpenbookV2Market {
     return openOrderPublicKey;
   }
 
-  public findOoPda(programId: PublicKey, mangoAccount: PublicKey): PublicKey {
-    // todo-pan: use indexer here
+  public findOoPda(programId: PublicKey, mangoAccount: PublicKey, index: number): PublicKey {
+    const indexBuf = Buffer.alloc(4);
+    indexBuf.writeUInt32LE(index);
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from('Serum3OO'),
+        Buffer.from('OpenOrders'),
         mangoAccount.toBuffer(),
-        this.publicKey.toBuffer(),
+        indexBuf,
       ],
       programId,
     );
 
     return openOrderPublicKey;
   }
+
+  public async getNextOoPda(client: MangoClient, programId: PublicKey, mangoAccount: PublicKey): Promise<PublicKey> {
+    const openbookClient = new OpenBookV2Client(
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
+    );
+    const indexer = await openbookClient.program.account.openOrdersIndexer.fetchNullable(this.findOoIndexerPda(programId, mangoAccount));
+    const nextIndex = indexer ? indexer.createdCounter + 1 : 1;
+    const indexBuf = Buffer.alloc(4);
+    indexBuf.writeUInt32LE(nextIndex);
+    const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('OpenOrders'),
+        mangoAccount.toBuffer(),
+        indexBuf,
+      ],
+      programId,
+    );
+      console.log('nextoo', nextIndex, openOrderPublicKey.toBase58())
+    return openOrderPublicKey;
+  }
+
 
   public getFeeRates(taker = true): number {
     // todo-pan: fees are no longer hardcoded!!
@@ -327,7 +353,7 @@ export async function generateOpenbookV2MarketExternalVaultSignerAddress(
       openbookV2Market.openbookMarketExternal.toBuffer(),
       openbookV2MarketExternal.marketAuthority.toBytes(),
     ],
-    OPENBOOK_PROGRAM_ID[cluster],
+    OPENBOOK_V2_PROGRAM_ID[cluster],
   );
 }
 

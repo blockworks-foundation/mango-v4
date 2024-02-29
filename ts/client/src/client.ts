@@ -65,7 +65,6 @@ import {
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
-  Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
 import {
@@ -2064,7 +2063,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
@@ -2090,7 +2089,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
@@ -2157,7 +2156,7 @@ export class MangoClient {
     );
 
     const payerTokenIndex = ((): TokenIndex => {
-      if (side == Serum3Side.bid) {
+      if (side == OpenbookV2Side.bid) {
         return serum3Market.quoteTokenIndex;
       } else {
         return serum3Market.baseTokenIndex;
@@ -2214,7 +2213,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
@@ -2281,7 +2280,7 @@ export class MangoClient {
     );
 
     const payerTokenIndex = ((): TokenIndex => {
-      if (side == Serum3Side.bid) {
+      if (side == OpenbookV2Side.bid) {
         return serum3Market.quoteTokenIndex;
       } else {
         return serum3Market.baseTokenIndex;
@@ -2289,7 +2288,7 @@ export class MangoClient {
     })();
 
     const receiverTokenIndex = ((): TokenIndex => {
-      if (side == Serum3Side.bid) {
+      if (side == OpenbookV2Side.bid) {
         return serum3Market.baseTokenIndex;
       } else {
         return serum3Market.quoteTokenIndex;
@@ -2351,7 +2350,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
@@ -2530,7 +2529,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     orderId: BN,
   ): Promise<TransactionInstruction> {
     const serum3Market = group.serum3MarketsMapByExternal.get(
@@ -2564,7 +2563,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     orderId: BN,
   ): Promise<MangoSignatureStatus> {
     const ixs = await Promise.all([
@@ -2761,8 +2760,6 @@ export class MangoClient {
     const openbookV2Market: OpenbookV2Market =
       group.openbookV2MarketsMapByExternal.get(externalMarketPk.toBase58())!;
 
-    // todo-pan: setup pdas
-
     const ix = await this.program.methods
       .openbookV2CreateOpenOrders()
       .accounts({
@@ -2775,11 +2772,13 @@ export class MangoClient {
           this.programId,
           mangoAccount.publicKey,
         ),
-        openOrdersAccount: openbookV2Market.findOoPda(
-          this.programId,
+        openOrdersAccount: await openbookV2Market.getNextOoPda(
+          this,
+          openbookV2Market.openbookProgram,
           mangoAccount.publicKey,
         ),
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
@@ -2789,10 +2788,14 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-  ): Promise<TransactionInstruction> {
+  ): Promise<{ix: TransactionInstruction, openOrdersAccount: PublicKey}> {
     const openbookV2Market: OpenbookV2Market =
       group.openbookV2MarketsMapByExternal.get(externalMarketPk.toBase58())!;
-
+    const openOrdersAccount = await openbookV2Market.getNextOoPda(
+      this,
+      openbookV2Market.openbookProgram,
+      mangoAccount.publicKey,
+    );
     const ix = await this.program.methods
       .openbookV2CreateOpenOrders()
       .accounts({
@@ -2802,18 +2805,16 @@ export class MangoClient {
         openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         openOrdersIndexer: openbookV2Market.findOoIndexerPda(
-          this.programId,
+          openbookV2Market.openbookProgram,
           mangoAccount.publicKey,
         ),
-        openOrdersAccount: openbookV2Market.findOoPda(
-          this.programId,
-          mangoAccount.publicKey,
-        ),
+        openOrdersAccount,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
 
-    return ix;
+    return { ix , openOrdersAccount };
   }
 
   public async openbookV2CloseOpenOrdersIx(
@@ -2825,6 +2826,10 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
+    const openOrdersAccount = mangoAccount.getOpenbookV2Account(
+      openbookV2Market.marketIndex,
+    )?.openOrders!;
+
     return await this.program.methods
       .openbookV2CloseOpenOrders()
       .accounts({
@@ -2834,13 +2839,10 @@ export class MangoClient {
         openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         openOrdersIndexer: openbookV2Market.findOoIndexerPda(
-          this.programId,
+          openbookV2Market.openbookProgram,
           mangoAccount.publicKey,
         ),
-        openOrdersAccount: openbookV2Market.findOoPda(
-          this.programId,
-          mangoAccount.publicKey,
-        ),
+        openOrdersAccount,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -2880,10 +2882,9 @@ export class MangoClient {
     const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
-    const openOrders = openbookV2Market.findOoPda(
-      this.programId,
-      mangoAccount.publicKey,
-    );
+    const openOrders = mangoAccount.getOpenbookV2Account(
+      openbookV2Market.marketIndex,
+    )?.openOrders!;
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -2902,7 +2903,7 @@ export class MangoClient {
         account: mangoAccount.publicKey,
         openOrders,
         openbookV2Market: openbookV2Market.publicKey,
-        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         bids: openbookV2MarketExternal.bids,
         asks: openbookV2MarketExternal.asks,
@@ -2960,22 +2961,19 @@ export class MangoClient {
     const banks: Bank[] = [];
     const openOrdersForMarket: [OpenbookV2Market, PublicKey][] = [];
     if (!mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)) {
-      const ix = await this.openbookV2CreateOpenOrdersIx(
+      const { ix, openOrdersAccount } = await this.openbookV2CreateOpenOrdersIx(
         group,
         mangoAccount,
         openbookV2Market.openbookMarketExternal,
       );
       ixs.push(ix);
-      openOrderPk = openbookV2Market.findOoPda(
-        this.program.programId,
-        mangoAccount.publicKey,
-      );
+      openOrderPk = openOrdersAccount;
       openOrdersForMarket.push([openbookV2Market, openOrderPk]);
       const baseTokenIndex = openbookV2Market.baseTokenIndex;
       const quoteTokenIndex = openbookV2Market.quoteTokenIndex;
       // only include banks if no deposit has been previously made for same token
-      banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
       banks.push(group.getFirstBankByTokenIndex(baseTokenIndex));
+      banks.push(group.getFirstBankByTokenIndex(quoteTokenIndex));
     }
 
     const healthRemainingAccounts: PublicKey[] =
@@ -3027,6 +3025,16 @@ export class MangoClient {
       }
     })();
 
+
+  //   let receiver_token_index = match order.side {
+  //     OpenbookV2Side::Bid => openbook_market.base_token_index,
+  //     OpenbookV2Side::Ask => openbook_market.quote_token_index,
+  // };
+  // let payer_token_index = match order.side {
+  //     OpenbookV2Side::Bid => openbook_market.quote_token_index,
+  //     OpenbookV2Side::Ask => openbook_market.base_token_index,
+  // };
+    console.log('payerTOkenIndex', side, payerTokenIndex)
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
     const receiverBank = group.getFirstBankByTokenIndex(receiverTokenIndex);
     const ix = await this.program.methods
@@ -3037,6 +3045,7 @@ export class MangoClient {
         maxQuoteQuantity,
         new BN(clientOrderId),
         orderType,
+        selfTradeBehavior,
         false, // reduceOnly
         new BN(0), // expiryTimestamp
         limit,
@@ -3050,7 +3059,7 @@ export class MangoClient {
           mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)
             ?.openOrders,
         openbookV2Market: openbookV2Market.publicKey,
-        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         bids: openbookV2MarketExternal.bids,
         asks: openbookV2MarketExternal.asks,
@@ -3081,11 +3090,11 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
-    selfTradeBehavior: Serum3SelfTradeBehavior,
-    orderType: Serum3OrderType,
+    selfTradeBehavior: OpenbookV2SelfTradeBehavior,
+    orderType: OpenbookV2OrderType,
     clientOrderId: number,
     limit: number,
   ): Promise<MangoSignatureStatus> {
@@ -3128,18 +3137,19 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
+    const openOrders = mangoAccount.getOpenbookV2Account(
+      openbookV2Market.marketIndex,
+    )?.openOrders!;
+
     return await this.program.methods
       .openbookV2CancelAllOrders(limit ? limit : 10, side ? side : null)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
         authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: openbookV2Market.findOoPda(
-          this.programId,
-          mangoAccount.publicKey,
-        ),
+        openOrders,
         openbookV2Market: openbookV2Market.publicKey,
-        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         bids: openbookV2MarketExternal.bids,
         asks: openbookV2MarketExternal.asks,
@@ -3194,10 +3204,9 @@ export class MangoClient {
     const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
-    const openOrderPublicKey = openbookV2Market.findOoPda(
-      this.program.programId,
-      mangoAccount.publicKey,
-    );
+    const openOrders = mangoAccount.getOpenbookV2Account(
+      openbookV2Market.marketIndex,
+    )?.openOrders ?? openbookV2Market.findOoPda(openbookV2Market.openbookProgram, mangoAccount.publicKey, 1);
     const openbookV2MarketExternalVaultSigner =
       await generateOpenbookV2MarketExternalVaultSignerAddress(
         this.cluster,
@@ -3211,9 +3220,9 @@ export class MangoClient {
         group: group.publicKey,
         account: mangoAccount.publicKey,
         authority: (this.program.provider as AnchorProvider).wallet.publicKey,
-        openOrders: openOrderPublicKey,
+        openOrders,
         openbookV2Market: openbookV2Market.publicKey,
-        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         marketBaseVault: openbookV2MarketExternal.marketBaseVault,
         marketQuoteVault: openbookV2MarketExternal.marketQuoteVault,
@@ -3260,7 +3269,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     orderId: BN,
   ): Promise<TransactionInstruction> {
     const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
@@ -3281,7 +3290,7 @@ export class MangoClient {
           openbookV2Market.marketIndex,
         )?.openOrders,
         openbookV2Market: openbookV2Market.publicKey,
-        openbookV2Program: OPENBOOK_PROGRAM_ID[this.cluster],
+        openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         bids: openbookV2MarketExternal.bids,
         asks: openbookV2MarketExternal.asks,
@@ -3295,7 +3304,7 @@ export class MangoClient {
     group: Group,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     orderId: BN,
   ): Promise<MangoSignatureStatus> {
     const ixs = await Promise.all([
@@ -5981,7 +5990,7 @@ export class MangoClient {
     orderId: BN,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: Serum3Side,
+    side: OpenbookV2Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
