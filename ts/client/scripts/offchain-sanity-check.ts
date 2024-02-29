@@ -14,7 +14,7 @@ dotenv.config();
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
 const GROUP_PK =
-  process.env.GROUP_PK || '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
+  process.env.GROUP_PK || 'AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf';
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 

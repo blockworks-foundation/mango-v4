@@ -21,13 +21,13 @@ export const OPENBOOK_PROGRAM_ID = {
 };
 
 export const MANGO_V4_ID = {
-  testnet: new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
-  devnet: new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
-  'mainnet-beta': new PublicKey('4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg'),
+  testnet: new PublicKey('zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25'),
+  devnet: new PublicKey('zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25'),
+  'mainnet-beta': new PublicKey('zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25'),
 };
 
 export const MANGO_V4_MAIN_GROUP = new PublicKey(
-  '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX',
+  'AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf',
 );
 
 export const USDC_MINT = new PublicKey(

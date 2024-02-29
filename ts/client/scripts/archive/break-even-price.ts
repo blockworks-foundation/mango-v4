@@ -6,7 +6,7 @@ async function main(): Promise<void> {
   const client = MangoClient.connectDefault(process.env.MB_CLUSTER_URL!);
 
   const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+    new PublicKey('AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf'),
   );
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
   const solPerp = group.getPerpMarketByName('SOL-PERP');

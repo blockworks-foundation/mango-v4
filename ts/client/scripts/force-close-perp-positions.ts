@@ -13,7 +13,7 @@ const CLUSTER_URL =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP_PK =
-  process.env.GROUP_PK || '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
+  process.env.GROUP_PK || 'AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf';
 const PERP_MARKET_INDEX = Number(
   process.env.PERP_MARKET_INDEX,
 ) as PerpMarketIndex;

@@ -6,7 +6,7 @@ import { MANGO_V4_ID } from '../src/constants';
 
 const { MB_CLUSTER_URL } = process.env;
 
-const GROUP_PK = '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX';
+const GROUP_PK = 'AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf';
 
 async function buildClient(): Promise<MangoClient> {
   const clientKeypair = new Keypair();

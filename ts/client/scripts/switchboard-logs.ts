@@ -27,7 +27,7 @@ function getBankForOracle(group: Group, oracle: PublicKey): Bank | PerpMarket {
 async function main(): Promise<void> {
   const client = await MangoClient.connectDefault(process.env.MB_CLUSTER_URL!);
   const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+    new PublicKey('AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf'),
   );
 
   const oracles1 = Array.from(group.banksMapByName.values()).map(
