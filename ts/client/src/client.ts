@@ -2771,6 +2771,14 @@ export class MangoClient {
         openbookV2Market: openbookV2Market.publicKey,
         openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
+        openOrdersIndexer: openbookV2Market.findOoIndexerPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
+        openOrdersAccount: openbookV2Market.findOoPda(
+          this.programId,
+          mangoAccount.publicKey,
+        ),
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
@@ -2801,7 +2809,7 @@ export class MangoClient {
           this.programId,
           mangoAccount.publicKey,
         ),
-        // payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
 
