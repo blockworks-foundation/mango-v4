@@ -1754,11 +1754,12 @@ pub mod mango_v4 {
         max_quote_lots_including_fees: i64,
         client_order_id: u64,
         order_type: OpenbookV2PlaceOrderType,
+        self_trade_behavior: OpenbookV2SelfTradeBehavior,
         reduce_only: bool,
         expiry_timestamp: u64,
         limit: u8,
     ) -> Result<()> {
-        use openbook_v2::state::{Order, OrderParams, SelfTradeBehavior};
+        use openbook_v2::state::{Order, OrderParams};
         let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
             Some(t) => t,
             None => {
@@ -1772,7 +1773,7 @@ pub mod mango_v4 {
             max_quote_lots_including_fees,
             client_order_id,
             time_in_force,
-            self_trade_behavior: SelfTradeBehavior::default(),
+            self_trade_behavior: self_trade_behavior.to_external(),
             params: match order_type {
                 OpenbookV2PlaceOrderType::Market => OrderParams::Market {},
                 OpenbookV2PlaceOrderType::ImmediateOrCancel => {

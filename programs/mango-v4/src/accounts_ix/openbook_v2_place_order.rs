@@ -6,7 +6,7 @@ use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{BookSide, Market, OpenOrdersAccount, PostOrderType, Side},
+    state::{BookSide, Market, OpenOrdersAccount, PostOrderType, Side, SelfTradeBehavior},
 };
 
 #[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
@@ -45,6 +45,15 @@ pub enum OpenbookV2SelfTradeBehavior {
     DecrementTake = 0,
     CancelProvide = 1,
     AbortTransaction = 2,
+}
+impl OpenbookV2SelfTradeBehavior {
+    pub fn to_external(&self) -> SelfTradeBehavior {
+        match *self {
+            OpenbookV2SelfTradeBehavior::DecrementTake => SelfTradeBehavior::DecrementTake,
+            OpenbookV2SelfTradeBehavior::CancelProvide => SelfTradeBehavior::CancelProvide,
+            OpenbookV2SelfTradeBehavior::AbortTransaction => SelfTradeBehavior::AbortTransaction,
+        }
+    }
 }
 
 #[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]
