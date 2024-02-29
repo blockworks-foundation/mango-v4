@@ -71,32 +71,33 @@ export class OpenbookV2Market {
     mangoAccount: PublicKey,
   ): PublicKey {
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('OpenOrdersIndexer'),
-        mangoAccount.toBuffer(),
-      ],
+      [Buffer.from('OpenOrdersIndexer'), mangoAccount.toBuffer()],
       programId,
     );
 
     return openOrderPublicKey;
   }
 
-  public findOoPda(programId: PublicKey, mangoAccount: PublicKey, index: number): PublicKey {
+  public findOoPda(
+    programId: PublicKey,
+    mangoAccount: PublicKey,
+    index: number,
+  ): PublicKey {
     const indexBuf = Buffer.alloc(4);
     indexBuf.writeUInt32LE(index);
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('OpenOrders'),
-        mangoAccount.toBuffer(),
-        indexBuf,
-      ],
+      [Buffer.from('OpenOrders'), mangoAccount.toBuffer(), indexBuf],
       programId,
     );
 
     return openOrderPublicKey;
   }
 
-  public async getNextOoPda(client: MangoClient, programId: PublicKey, mangoAccount: PublicKey): Promise<PublicKey> {
+  public async getNextOoPda(
+    client: MangoClient,
+    programId: PublicKey,
+    mangoAccount: PublicKey,
+  ): Promise<PublicKey> {
     const openbookClient = new OpenBookV2Client(
       new AnchorProvider(
         client.connection,
@@ -106,22 +107,20 @@ export class OpenbookV2Market {
         },
       ),
     );
-    const indexer = await openbookClient.program.account.openOrdersIndexer.fetchNullable(this.findOoIndexerPda(programId, mangoAccount));
+    const indexer =
+      await openbookClient.program.account.openOrdersIndexer.fetchNullable(
+        this.findOoIndexerPda(programId, mangoAccount),
+      );
     const nextIndex = indexer ? indexer.createdCounter + 1 : 1;
     const indexBuf = Buffer.alloc(4);
     indexBuf.writeUInt32LE(nextIndex);
     const [openOrderPublicKey] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from('OpenOrders'),
-        mangoAccount.toBuffer(),
-        indexBuf,
-      ],
+      [Buffer.from('OpenOrders'), mangoAccount.toBuffer(), indexBuf],
       programId,
     );
-      console.log('nextoo', nextIndex, openOrderPublicKey.toBase58())
+    console.log('nextoo', nextIndex, openOrderPublicKey.toBase58());
     return openOrderPublicKey;
   }
-
 
   public getFeeRates(taker = true): number {
     // todo-pan: fees are no longer hardcoded!!
@@ -342,19 +341,13 @@ export namespace OpenbookV2Side {
   export const ask = { ask: {} };
 }
 
-export async function generateOpenbookV2MarketExternalVaultSignerAddress(
-  cluster: Cluster,
+export function generateOpenbookV2MarketExternalVaultSignerAddress(
   openbookV2Market: OpenbookV2Market,
-  openbookV2MarketExternal: MarketAccount,
-): Promise<PublicKey> {
-  // todo-pan: fix
-  return await PublicKey.createProgramAddress(
-    [
-      openbookV2Market.openbookMarketExternal.toBuffer(),
-      openbookV2MarketExternal.marketAuthority.toBytes(),
-    ],
-    OPENBOOK_V2_PROGRAM_ID[cluster],
-  );
+): PublicKey {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from('Market'), openbookV2Market.openbookMarketExternal.toBuffer()],
+    openbookV2Market.openbookProgram,
+  )[0];
 }
 
 export function priceNumberToLots(price: number, market: MarketAccount): BN {
