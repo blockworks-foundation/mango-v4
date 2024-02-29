@@ -64,15 +64,17 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
-        exit_processor.job,
-        data_processor.job,
-        health_processor.job,
-        logger.job,
-        persister.job,
-    ]
-    .into_iter()
-    .collect();
+    let mut jobs = vec![exit_processor.job, data_processor.job, health_processor.job];
+
+    if let Some(logger) = logger {
+        jobs.push(logger.job)
+    }
+
+    if let Some(persister) = persister {
+        jobs.push(persister.job)
+    }
+
+    let mut jobs: futures::stream::FuturesUnordered<_> = jobs.into_iter().collect();
 
     while let Some(_) = jobs.next().await {
         // if any job exit, stop the others threads & wait

@@ -26,8 +26,7 @@ impl PersisterProcessor {
         data_sender: &tokio::sync::broadcast::Sender<HealthEvent>,
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
-    ) -> anyhow::Result<PersisterProcessor> {
-        let mut data = data_sender.subscribe();
+    ) -> anyhow::Result<Option<PersisterProcessor>> {
         let postgres_configuration = configuration.postgres.clone().unwrap_or_default();
         let persistence_configuration = configuration.persistence_configuration.clone();
         let time_to_live = Duration::seconds(persistence_configuration.history_time_to_live_secs);
@@ -36,13 +35,14 @@ impl PersisterProcessor {
         let max_failure_duration =
             Duration::seconds(persistence_configuration.max_failure_duration_secs);
 
+        if !persistence_configuration.enabled {
+            return Ok(None);
+        }
+
+        let mut data = data_sender.subscribe();
         let mut unpersisted_snapshots = VecDeque::new();
 
         let job = tokio::spawn(async move {
-            if !persistence_configuration.enabled {
-                return;
-            }
-
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
             let mut retry_counter = RetryCounter::new(persistence_configuration.max_retry_count);
             let mut last_successful_persistence = chrono::Utc::now();
@@ -121,7 +121,7 @@ impl PersisterProcessor {
 
         let result = PersisterProcessor { job };
 
-        Ok(result)
+        Ok(Some(result))
     }
 
     fn build_persisted_data(

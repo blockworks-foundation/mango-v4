@@ -17,7 +17,12 @@ impl LoggerProcessor {
         data_sender: &tokio::sync::broadcast::Sender<HealthEvent>,
         configuration: &Configuration,
         exit: Arc<AtomicBool>,
-    ) -> anyhow::Result<LoggerProcessor> {
+    ) -> anyhow::Result<Option<LoggerProcessor>> {
+        let enable_logging = configuration.logging_configuration.log_health_to_stdout;
+        if !enable_logging {
+            return Ok(None);
+        }
+
         let mut data = data_sender.subscribe();
         let filter: HashSet<Pubkey> = configuration
             .logging_configuration
@@ -27,13 +32,8 @@ impl LoggerProcessor {
             .iter()
             .map(|s| Pubkey::from_str(s).unwrap())
             .collect();
-        let enable_logging = configuration.logging_configuration.log_health_to_stdout;
 
         let job = tokio::spawn(async move {
-            if !enable_logging {
-                return;
-            }
-
             let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
             loop {
                 if exit.load(Ordering::Relaxed) {
@@ -76,6 +76,6 @@ impl LoggerProcessor {
 
         let result = LoggerProcessor { job };
 
-        Ok(result)
+        Ok(Some(result))
     }
 }
