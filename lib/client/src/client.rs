@@ -2233,7 +2233,7 @@ pub struct TransactionSize {
 }
 
 impl TransactionSize {
-    pub fn is_ok(&self) -> bool {
+    pub fn is_within_limit(&self) -> bool {
         let limit = Self::limit();
         self.length <= limit.length && self.accounts <= limit.accounts
     }

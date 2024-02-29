@@ -73,6 +73,11 @@ struct Cli {
     /// url to the lite-rpc websocket, optional
     #[clap(long, env, default_value = "")]
     lite_rpc_url: String,
+
+    /// When batching multiple instructions into a transaction, don't exceed
+    /// this compute unit limit.
+    #[clap(long, env, default_value_t = 1_000_000)]
+    max_cu_when_batching: u32,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -157,6 +162,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 cli.interval_update_funding,
                 cli.interval_check_new_listings_and_abort,
                 cli.interval_charge_collateral_fees,
+                cli.max_cu_when_batching,
                 prio_jobs,
             )
             .await

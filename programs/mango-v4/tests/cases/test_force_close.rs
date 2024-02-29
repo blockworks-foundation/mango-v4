@@ -501,6 +501,7 @@ async fn test_force_withdraw_token() -> Result<(), TransportError> {
             mint: token.mint.pubkey,
             fallback_oracle: Pubkey::default(),
             options: mango_v4::instruction::TokenEdit {
+                init_asset_weight_opt: Some(0.0),
                 maint_asset_weight_opt: Some(0.0),
                 reduce_only_opt: Some(1),
                 disable_asset_liquidation_opt: Some(true),

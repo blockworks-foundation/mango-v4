@@ -3531,6 +3531,7 @@ dependencies = [
  "once_cell",
  "pyth-sdk-solana",
  "rand 0.7.3",
+ "regex",
  "serde",
  "serde_derive",
  "serde_json",
