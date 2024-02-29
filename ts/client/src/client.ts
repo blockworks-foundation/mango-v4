@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Provider, Wallet } from '@coral-xyz/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  Wallet,
+} from '@coral-xyz/anchor';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createAccount,
