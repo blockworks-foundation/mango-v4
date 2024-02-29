@@ -75,8 +75,11 @@ async fn main() -> anyhow::Result<()> {
     .collect();
 
     while let Some(_) = jobs.next().await {
+        // if any job exit, stop the others threads & wait
         exit_processor.exit.store(true, Ordering::Relaxed);
     }
 
-    Ok(())
+    // for now, we force exit here because websocket connection to RPC is not properly closed on exit
+    tracing::warn!("killing process");
+    std::process::exit(0x0100);
 }

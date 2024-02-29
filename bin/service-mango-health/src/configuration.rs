@@ -29,6 +29,7 @@ pub struct PersistenceConfiguration {
     pub enabled: bool,
     pub history_time_to_live_secs: i64,
     pub persist_max_periodicity_secs: i64,
+    pub max_failure_duration_secs: i64,
     pub max_retry_count: u64,
     pub snapshot_queue_length: usize,
 }

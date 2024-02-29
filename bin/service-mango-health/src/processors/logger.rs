@@ -34,37 +34,42 @@ impl LoggerProcessor {
                 return;
             }
 
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
             loop {
                 if exit.load(Ordering::Relaxed) {
                     warn!("shutting down logger processor...");
                     break;
                 }
-                if let Ok(msg) = data.recv().await {
-                    for component in msg.components {
-                        if !filter.is_empty() && !filter.contains(&component.account) {
-                            continue;
-                        }
+                tokio::select! {
+                    _ = interval.tick() => {
+                    },
+                    Ok(msg) = data.recv() => {
+                        for component in msg.components {
+                            if !filter.is_empty() && !filter.contains(&component.account) {
+                                continue;
+                            }
 
-                        if component.value.is_some() {
-                            let value: HealthComponentValue = component.value.unwrap();
+                            if component.value.is_some() {
+                                let value: HealthComponentValue = component.value.unwrap();
 
-                            info!(
+                                info!(
+                                    computed_at = %msg.computed_at,
+                                    account = %component.account,
+                                    maintenance_ratio = %value.maintenance_ratio,
+                                    initial_health = %value.initial_health,
+                                    maintenance_health = %value.maintenance_health,
+                                    liquidation_end_health = %value.liquidation_end_health,
+                                    is_being_liquidated = %value.is_being_liquidated,
+                                )
+                            } else {
+                                info!(
                                 computed_at = %msg.computed_at,
                                 account = %component.account,
-                                maintenance_ratio = %value.maintenance_ratio,
-                                initial_health = %value.initial_health,
-                                maintenance_health = %value.maintenance_health,
-                                liquidation_end_health = %value.liquidation_end_health,
-                                is_being_liquidated = %value.is_being_liquidated,
-                            )
-                        } else {
-                            info!(
-                            computed_at = %msg.computed_at,
-                            account = %component.account,
-                            error = "Missing health data"
-                            )
+                                error = "Missing health data"
+                                )
+                            }
                         }
-                    }
+                    },
                 }
             }
         });

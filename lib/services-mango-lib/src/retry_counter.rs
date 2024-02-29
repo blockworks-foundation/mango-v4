@@ -25,7 +25,10 @@ impl RetryCounter {
         match result {
             Err(e) => match self.on_new_error() {
                 true => Ok(None),
-                false => Err(e),
+                false => {
+                    self.reset();
+                    Err(e)
+                }
             },
             Ok(v) => {
                 self.reset();
