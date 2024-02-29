@@ -6,7 +6,6 @@ use crate::state::*;
 #[instruction(market_index: OpenbookV2MarketIndex)]
 pub struct OpenbookV2EditMarket<'info> {
     #[account(
-        constraint = group.load()?.openbook_v2_supported(),
         constraint = group.load()?.admin == admin.key(),
     )]
     pub group: AccountLoader<'info, Group>,

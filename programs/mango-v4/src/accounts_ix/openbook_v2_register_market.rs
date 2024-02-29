@@ -9,7 +9,6 @@ pub struct OpenbookV2RegisterMarket<'info> {
     #[account(
         mut,
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2RegisterMarket) @ MangoError::IxIsDisabled,
-        constraint = group.load()?.openbook_v2_supported()
     )]
     pub group: AccountLoader<'info, Group>,
     /// group admin or fast listing admin, checked at #1
