@@ -2801,7 +2801,7 @@ export class MangoClient {
           this.programId,
           mangoAccount.publicKey,
         ),
-        payer: (this.program.provider as AnchorProvider).wallet.publicKey,
+        // payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
 
