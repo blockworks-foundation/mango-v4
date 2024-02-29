@@ -83,11 +83,14 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     // Charge any open loan origination fees
     //
-    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
-    let base_lot_size: u64 = openbook_market_external.base_lot_size.try_into().unwrap();
-    let quote_lot_size: u64 = openbook_market_external.quote_lot_size.try_into().unwrap();
+    let base_lot_size: u64;
+    let quote_lot_size: u64;
     let before_oo;
     {
+        let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+        base_lot_size = openbook_market_external.base_lot_size.try_into().unwrap();
+        quote_lot_size = openbook_market_external.quote_lot_size.try_into().unwrap();
+
         let open_orders = ctx.accounts.open_orders.load()?;
         before_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
         let mut account = ctx.accounts.account.load_full_mut()?;
@@ -102,7 +105,7 @@ pub fn openbook_v2_settle_funds<'info>(
             &mut account.borrow_mut(),
             &before_oo,
             Some(&ctx.accounts.base_oracle.to_account_info()),
-            Some(&ctx.accounts.base_oracle.to_account_info()),
+            Some(&ctx.accounts.quote_oracle.to_account_info()),
         )?;
     }
 
@@ -111,9 +114,26 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     let before_base_vault = ctx.accounts.base_vault.amount;
     let before_quote_vault = ctx.accounts.quote_vault.amount;
-    let account = ctx.accounts.account.load()?;
-    let account_seeds = mango_account_seeds!(account);
-    cpi_settle_funds(ctx.accounts, &[account_seeds])?;
+    let group_key;
+    let owner_key;
+    let account_num;
+    let bump;
+    {
+        // this is so dumb how do i not do this
+        let account = ctx.accounts.account.load()?;
+        group_key = account.group;
+        owner_key = account.owner;
+        account_num = account.account_num;
+        bump = account.bump;
+    }
+    let seeds = &[
+        b"MangoAccount".as_ref(),
+        group_key.as_ref(),
+        owner_key.as_ref(),
+        &account_num.to_le_bytes(),
+        &[bump],
+    ];
+    cpi_settle_funds(ctx.accounts, &[seeds])?;
 
     //
     // After-settle tracking
@@ -267,7 +287,6 @@ pub fn charge_loan_origination_fees(
 }
 
 fn cpi_settle_funds<'info>(ctx: &OpenbookV2SettleFunds<'info>, seeds: &[&[&[u8]]]) -> Result<()> {
-    let group = ctx.group.load()?;
     let cpi_accounts = SettleFunds {
         penalty_payer: ctx.authority.to_account_info(),
         market: ctx.openbook_v2_market_external.to_account_info(),

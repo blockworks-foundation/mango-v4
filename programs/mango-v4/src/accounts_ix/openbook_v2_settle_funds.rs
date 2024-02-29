@@ -21,6 +21,7 @@ pub struct OpenbookV2SettleFunds<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
+    #[account(mut)]
     pub authority: Signer<'info>,
 
     #[account(mut)]
@@ -67,8 +68,9 @@ pub struct OpenbookV2SettleFunds<'info> {
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,
 
-    /// validated against banks at #4
+    /// CHECK: validated against banks at #4
     pub quote_oracle: UncheckedAccount<'info>,
+    /// CHECK: validated against banks at #4
     pub base_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
