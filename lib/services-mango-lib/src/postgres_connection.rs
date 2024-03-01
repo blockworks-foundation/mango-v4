@@ -51,14 +51,8 @@ pub async fn connect(
     };
 
     let config = config.clone();
-    let connection_string = match &config.connection_string.chars().next().unwrap() {
-        '$' => {
-            env::var(&config.connection_string[1..]).expect("reading connection string from env")
-        }
-        _ => config.connection_string.clone(),
-    };
 
-    let (client, connection) = tokio_postgres::connect(&connection_string, tls).await?;
+    let (client, connection) = tokio_postgres::connect(&config.connection_string, tls).await?;
 
     let handle = tokio::spawn(async move { connection.await });
 
