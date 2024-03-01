@@ -41,6 +41,7 @@ pub fn serum3_place_order(
     // Validation
     //
     let receiver_token_index;
+    let payer_token_index;
     {
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
@@ -61,7 +62,7 @@ pub fn serum3_place_order(
         // Validate bank and vault #3
         let payer_bank = ctx.accounts.payer_bank.load()?;
         require_keys_eq!(payer_bank.vault, ctx.accounts.payer_vault.key());
-        let payer_token_index = match side {
+        payer_token_index = match side {
             Serum3Side::Bid => serum_market.quote_token_index,
             Serum3Side::Ask => serum_market.base_token_index,
         };
@@ -89,6 +90,11 @@ pub fn serum3_place_order(
         now_ts,
     )
     .context("pre-withdraw init health")?;
+
+    // The payer and receiver token banks/oracles must be passed and be valid
+    health_cache.token_info_index(payer_token_index)?;
+    health_cache.token_info_index(receiver_token_index)?;
+
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some(pre_init_health)

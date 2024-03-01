@@ -400,9 +400,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         &retriever,
         now_ts,
     )?;
+
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
+    //
+    // This also verifies that all affected banks/oracles are available in health_cache:
+    // That is essential to avoid issues around withdrawing tokens when init health is negative
+    // (similar issue to token_withdraw)
     let mut oracle_prices = vec![];
     for change in &changes {
         let (_, oracle_price) = retriever.bank_and_oracle(
@@ -410,6 +415,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change.bank_index,
             change.token_index,
         )?;
+        // Sanity check
+        health_cache.token_info_index(change.token_index)?;
 
         oracle_prices.push(oracle_price);
     }

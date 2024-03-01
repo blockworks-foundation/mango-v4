@@ -78,6 +78,10 @@ pub fn perp_place_order(
             now_ts,
         )
         .context("pre-withdraw init health")?;
+
+        // The settle token banks/oracles must be passed and be valid
+        health_cache.token_info_index(settle_token_index)?;
+
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_init_health))
     } else {
