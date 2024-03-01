@@ -722,6 +722,10 @@
 <a href="#722" id="722">722</a>
 <a href="#723" id="723">723</a>
 <a href="#724" id="724">724</a>
+<a href="#725" id="725">725</a>
+<a href="#726" id="726">726</a>
+<a href="#727" id="727">727</a>
+<a href="#728" id="728">728</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
@@ -731,9 +735,9 @@
 <span class="kw">use </span>mango_v4::{
     accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
     state::{
-        determine_oracle_type, load_whirlpool_state, oracle_state_unchecked, Group,
-        MangoAccountValue, OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType,
-        PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+        determine_oracle_type, load_orca_pool_state, load_raydium_pool_state,
+        oracle_state_unchecked, Group, MangoAccountValue, OracleAccountInfos, OracleConfig,
+        OracleConfigParams, OracleType, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
     },
 };
 
@@ -868,7 +872,7 @@
             <span class="comment">// the base cost is mostly the division
             </span>cu_per_charge_collateral_fees: <span class="number">20_000</span>,
             <span class="comment">// per-chargable-token cost
-            </span>cu_per_charge_collateral_fees_token: <span class="number">12_000</span>,
+            </span>cu_per_charge_collateral_fees_token: <span class="number">15_000</span>,
         }
     }
 }
@@ -1435,8 +1439,12 @@
 </span><span class="kw">fn </span>get_fallback_quote_key(acc_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>KeyedAccountReader) -&gt; Pubkey {
     <span class="kw">let </span>maybe_key = <span class="kw">match </span>determine_oracle_type(acc_info).ok() {
         <span class="prelude-val">Some</span>(oracle_type) =&gt; <span class="kw">match </span>oracle_type {
-            OracleType::OrcaCLMM =&gt; <span class="kw">match </span>load_whirlpool_state(acc_info).ok() {
+            OracleType::OrcaCLMM =&gt; <span class="kw">match </span>load_orca_pool_state(acc_info).ok() {
                 <span class="prelude-val">Some</span>(whirlpool) =&gt; whirlpool.get_quote_oracle().ok(),
+                <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
+            },
+            OracleType::RaydiumCLMM =&gt; <span class="kw">match </span>load_raydium_pool_state(acc_info).ok() {
+                <span class="prelude-val">Some</span>(pool) =&gt; pool.get_quote_oracle().ok(),
                 <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
             },
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
