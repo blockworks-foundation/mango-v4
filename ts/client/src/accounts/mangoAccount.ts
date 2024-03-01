@@ -533,42 +533,61 @@ export class MangoAccount {
     mintPk: PublicKey,
   ): I80F48 {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
+    const tp = this.getToken(tokenBank.tokenIndex);
     const initHealth = this.getHealth(group, HealthType.init);
 
-    // Case 1:
     // Cannot withdraw if init health is below 0
     if (initHealth.lte(ZERO_I80F48())) {
       return ZERO_I80F48();
     }
 
-    // Deposits need special treatment since they would neither count towards liabilities
-    // nor would be charged loanOriginationFeeRate when withdrawn
+    // Step 1: withdrawing deposits
 
-    const tp = this.getToken(tokenBank.tokenIndex);
+    // NOTE: this ignores scaled init asset weight changing due to withdraws
+    const assetHealthFactor = tokenBank
+      .getAssetPrice()
+      .mul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
+
+    // To ensure utilization <= 100%, deposits can only be withdrawn until deposits=borrows
+    const depositWithdrawUtilizationLimit = tokenBank
+      .nativeDeposits()
+      .sub(tokenBank.nativeBorrows())
+      .max(ZERO_I80F48());
+
+    const depositWithdrawHealthLimit = initHealth.div(assetHealthFactor);
+
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
-    let existingPositionHealthContrib = ZERO_I80F48();
-    if (existingTokenDeposits.gt(ZERO_I80F48())) {
-      existingPositionHealthContrib = existingTokenDeposits
-        .mul(tokenBank.getAssetPrice())
-        .imul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
-    }
+    const allowedDepositWithdraws = existingTokenDeposits
+      .min(depositWithdrawUtilizationLimit)
+      .min(depositWithdrawHealthLimit)
+      .max(ZERO_I80F48());
 
-    // Case 2: token deposits have higher contribution than initHealth,
-    // can withdraw without borrowing until initHealth reaches 0
-    if (existingPositionHealthContrib.gt(initHealth)) {
-      const withdrawAbleExistingPositionHealthContrib = initHealth;
-      return withdrawAbleExistingPositionHealthContrib
-        .div(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()))
-        .div(tokenBank.getAssetPrice());
-    }
-
-    // Case 3: withdraw = withdraw existing deposits + borrows until initHealth reaches 0
-    const initHealthWithoutExistingPosition = initHealth.sub(
-      existingPositionHealthContrib,
+    const initHealthWithoutDeposits = initHealth.sub(
+      existingTokenDeposits.mul(assetHealthFactor),
     );
-    let maxBorrowNative = initHealthWithoutExistingPosition
-      .div(tokenBank.scaledInitLiabWeight(tokenBank.price))
-      .div(tokenBank.price);
+
+    // If we can't withdraw all deposits, we're done: there can't be any borrows
+    if (!initHealthWithoutDeposits.isPos()) {
+      return allowedDepositWithdraws;
+    }
+
+    // Step 2: all deposits are gone, how much can be borrowed?
+
+    // NOTE: this ignores scaled init liab weight changing due to borrows
+    const borrowHealthFactor = tokenBank
+      .getLiabPrice()
+      .mul(tokenBank.scaledInitLiabWeight(tokenBank.getLiabPrice()));
+
+    // (bankBorrows+borrows) / (bankDeposits-withdraws) <= maxBorrowUtilization
+    // so borrows <= maxBorrowUtilization * (bankDeposits-withdraws) - bankBorrows
+    const maxBorrowUtilization = I80F48.fromNumber(
+      1 - tokenBank.minVaultToDepositsRatio,
+    );
+    const borrowUtilizationLimit = maxBorrowUtilization
+      .mul(tokenBank.nativeDeposits().sub(existingTokenDeposits))
+      .sub(tokenBank.nativeBorrows());
+
+    const borrowHealthLimit = initHealthWithoutDeposits.div(borrowHealthFactor);
 
     // Cap maxBorrow to maintain minVaultToDepositsRatio on the bank
     const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
@@ -577,23 +596,20 @@ export class MangoAccount {
         `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
       );
     }
-    const vaultAmountAfterWithdrawingDeposits = I80F48.fromU64(vaultAmount).sub(
+    const borrowVaultLimit = I80F48.fromU64(vaultAmount).sub(
       existingTokenDeposits,
     );
-    const expectedVaultMinAmount = tokenBank
-      .nativeDeposits()
-      .mul(I80F48.fromNumber(tokenBank.minVaultToDepositsRatio));
-    if (vaultAmountAfterWithdrawingDeposits.gt(expectedVaultMinAmount)) {
-      maxBorrowNative = maxBorrowNative.min(
-        vaultAmountAfterWithdrawingDeposits.sub(expectedVaultMinAmount),
-      );
-    }
 
-    const maxBorrowNativeWithoutFees = maxBorrowNative.div(
+    const allowedBorrowsWithoutFees = borrowHealthLimit
+      .min(borrowUtilizationLimit)
+      .min(borrowVaultLimit)
+      .max(ZERO_I80F48());
+
+    const allowedBorrows = allowedBorrowsWithoutFees.div(
       ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
     );
 
-    return maxBorrowNativeWithoutFees.add(existingTokenDeposits);
+    return allowedBorrows.add(existingTokenDeposits);
   }
 
   public getMaxWithdrawWithBorrowForTokenUi(
