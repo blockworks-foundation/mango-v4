@@ -156,12 +156,8 @@ impl HealthProcessor {
         account: &Pubkey,
     ) -> anyhow::Result<HealthComponentValue> {
         let mango_account = account_fetcher.fetch_mango_account(account)?;
-        let health_cache = health_cache::new(
-            &mango_group_context,
-            &*account_fetcher,
-            &mango_account,
-        )
-        .await?;
+        let health_cache =
+            health_cache::new(&mango_group_context, &*account_fetcher, &mango_account).await?;
 
         let res = HealthComponentValue {
             maintenance_ratio: health_cache.health_ratio(HealthType::Maint).to_num(),
