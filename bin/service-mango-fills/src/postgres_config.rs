@@ -1,8 +1,10 @@
 use serde_derive::Deserialize;
+use services_mango_lib::env_helper::string_or_env;
 use services_mango_lib::postgres_configuration::PostgresTlsConfig;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct PostgresConfig {
+    #[serde(deserialize_with = "string_or_env")]
     pub connection_string: String,
     /// Number of parallel postgres connections used for insertions
     pub connection_count: u64,

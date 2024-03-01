@@ -1,12 +1,16 @@
 use serde_derive::Deserialize;
+use services_mango_lib::env_helper::string_or_env;
 use services_mango_lib::postgres_configuration::PostgresConfiguration;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Configuration {
     pub postgres: Option<PostgresConfiguration>,
+    #[serde(deserialize_with = "string_or_env")]
     pub rpc_http_url: String,
+    #[serde(deserialize_with = "string_or_env")]
     pub rpc_ws_url: String,
+    #[serde(deserialize_with = "string_or_env")]
     pub mango_group: String,
     pub computing_configuration: ComputingConfiguration,
     pub logging_configuration: LoggingConfiguration,
