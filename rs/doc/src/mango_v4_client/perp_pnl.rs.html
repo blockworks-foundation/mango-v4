@@ -115,8 +115,6 @@
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::Discriminator;
 <span class="kw">use </span>fixed::types::I80F48;
@@ -136,7 +134,6 @@
 /// Note: keep in sync with perp.ts:getSettlePnlCandidates
 </span><span class="kw">pub async fn </span>fetch_top(
     context: <span class="kw-2">&amp;</span><span class="kw">crate</span>::context::MangoGroupContext,
-    fallback_config: <span class="kw-2">&amp;</span>FallbackOracleConfig,
     account_fetcher: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountFetcher,
     perp_market_index: PerpMarketIndex,
     direction: Direction,
@@ -211,10 +208,9 @@
             </span>} <span class="kw">else </span>{
                 I80F48::ZERO
             };
-            <span class="kw">let </span>perp_max_settle =
-                <span class="kw">crate</span>::health_cache::new(context, fallback_config, account_fetcher, <span class="kw-2">&amp;</span>acc)
-                    .<span class="kw">await</span><span class="question-mark">?
-                    </span>.perp_max_settle(perp_market.settle_token_index)<span class="question-mark">?</span>;
+            <span class="kw">let </span>perp_max_settle = <span class="kw">crate</span>::health_cache::new(context, account_fetcher, <span class="kw-2">&amp;</span>acc)
+                .<span class="kw">await</span><span class="question-mark">?
+                </span>.perp_max_settle(perp_market.settle_token_index)<span class="question-mark">?</span>;
             <span class="kw">let </span>settleable_pnl = <span class="kw">if </span>perp_max_settle &gt; <span class="number">0 </span>{
                 (<span class="kw-2">*</span>pnl).max(-perp_max_settle)
             } <span class="kw">else </span>{

@@ -213,7 +213,7 @@
 
 <span class="attr">#[derive(Builder)]
 </span><span class="kw">pub struct </span>ErrorTracking&lt;Key, ErrorType&gt; {
-    <span class="attr">#[builder(default, setter(custom))]
+    <span class="attr">#[builder(setter(custom))]
     </span>errors_by_type: HashMap&lt;ErrorType, ErrorTypeState&lt;Key&gt;&gt;,
 
     <span class="doccomment">/// number of errors of a type after which had_too_many_errors returns true

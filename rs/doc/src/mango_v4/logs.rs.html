@@ -795,26 +795,6 @@
 <a href="#795" id="795">795</a>
 <a href="#796" id="796">796</a>
 <a href="#797" id="797">797</a>
-<a href="#798" id="798">798</a>
-<a href="#799" id="799">799</a>
-<a href="#800" id="800">800</a>
-<a href="#801" id="801">801</a>
-<a href="#802" id="802">802</a>
-<a href="#803" id="803">803</a>
-<a href="#804" id="804">804</a>
-<a href="#805" id="805">805</a>
-<a href="#806" id="806">806</a>
-<a href="#807" id="807">807</a>
-<a href="#808" id="808">808</a>
-<a href="#809" id="809">809</a>
-<a href="#810" id="810">810</a>
-<a href="#811" id="811">811</a>
-<a href="#812" id="812">812</a>
-<a href="#813" id="813">813</a>
-<a href="#814" id="814">814</a>
-<a href="#815" id="815">815</a>
-<a href="#816" id="816">816</a>
-<a href="#817" id="817">817</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{
     accounts_ix::FlashLoanType,
     state::{OracleType, PerpMarket, PerpPosition},
@@ -1611,26 +1591,6 @@
     <span class="kw">pub </span>token_conditional_swap_id: u64,
     <span class="kw">pub </span>incentive_token_index: u16,
     <span class="kw">pub </span>incentive_amount: u64,
-}
-
-<span class="attr">#[event]
-</span><span class="kw">pub struct </span>TokenCollateralFeeLog {
-    <span class="kw">pub </span>mango_group: Pubkey,
-    <span class="kw">pub </span>mango_account: Pubkey,
-    <span class="kw">pub </span>token_index: u16,
-    <span class="kw">pub </span>asset_usage_fraction: i128,
-    <span class="kw">pub </span>fee: i128,
-    <span class="kw">pub </span>price: i128,
-}
-
-<span class="attr">#[event]
-</span><span class="kw">pub struct </span>ForceWithdrawLog {
-    <span class="kw">pub </span>mango_group: Pubkey,
-    <span class="kw">pub </span>mango_account: Pubkey,
-    <span class="kw">pub </span>token_index: u16,
-    <span class="kw">pub </span>quantity: u64,
-    <span class="kw">pub </span>price: i128, <span class="comment">// I80F48
-    </span><span class="kw">pub </span>to_token_account: Pubkey,
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>

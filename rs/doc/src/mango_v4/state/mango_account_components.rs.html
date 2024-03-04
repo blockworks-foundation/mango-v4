@@ -1441,7 +1441,7 @@
 <span class="kw">pub const </span>FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>TokenPosition {
     <span class="comment">// TODO: Why did we have deposits and borrows as two different values
@@ -1539,7 +1539,7 @@
 }
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>Serum3Orders {
     <span class="kw">pub </span>open_orders: Pubkey,
@@ -1632,7 +1632,7 @@
 }
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>PerpPosition {
     <span class="kw">pub </span>market_index: PerpMarketIndex,
@@ -2229,7 +2229,7 @@
 }
 
 <span class="attr">#[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
 #[derivative(Debug)]
 </span><span class="kw">pub struct </span>PerpOpenOrder {
     <span class="kw">pub </span>side_and_tree: u8, <span class="comment">// SideAndOrderTree -- enums aren&#39;t POD
