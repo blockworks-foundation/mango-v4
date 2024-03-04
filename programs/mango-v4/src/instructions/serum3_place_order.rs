@@ -89,7 +89,7 @@ pub fn serum3_place_order(
         &retriever,
         now_ts,
     )
-    .context("pre-withdraw init health")?;
+    .context("pre init health")?;
 
     // The payer and receiver token banks/oracles must be passed and be valid
     health_cache.token_info_index(payer_token_index)?;

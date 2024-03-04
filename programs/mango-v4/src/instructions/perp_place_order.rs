@@ -77,7 +77,7 @@ pub fn perp_place_order(
             &retriever,
             now_ts,
         )
-        .context("pre-withdraw init health")?;
+        .context("pre init health")?;
 
         // The settle token banks/oracles must be passed and be valid
         health_cache.token_info_index(settle_token_index)?;
