@@ -730,3 +730,112 @@ async fn test_margin_trade_deposit_limit() -> Result<(), BanksClientError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_margin_trade_skip_bank() -> Result<(), BanksClientError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(100_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+    let payer_mint0_account = context.users[1].token_accounts[0];
+
+    //
+    // SETUP: Create a group, account, register a token (mint0)
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let bank = tokens[0].bank;
+
+    //
+    // create the test user account
+    //
+
+    let deposit_amount_initial = 100;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints,
+        deposit_amount_initial,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Margin trade
+    //
+    let margin_account = payer_mint0_account;
+    let target_token_account = context.users[0].token_accounts[0];
+    let make_flash_loan_tx = |solana, deposit_amount, skip_banks| async move {
+        let mut tx = ClientTransaction::new(solana);
+        let loans = vec![FlashLoanPart {
+            bank,
+            token_account: target_token_account,
+            withdraw_amount: 0,
+        }];
+        tx.add_instruction(FlashLoanBeginInstruction {
+            account,
+            owner,
+            loans: loans.clone(),
+        })
+        .await;
+        tx.add_instruction_direct(
+            spl_token::instruction::transfer(
+                &spl_token::ID,
+                &margin_account,
+                &target_token_account,
+                &payer.pubkey(),
+                &[&payer.pubkey()],
+                deposit_amount,
+            )
+            .unwrap(),
+        );
+        tx.add_signer(payer);
+        tx.add_instruction(HealthAccountSkipping {
+            inner: FlashLoanEndInstruction {
+                account,
+                owner,
+                loans,
+                // the test only accesses a single token: not a swap
+                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Unknown,
+            },
+            skip_banks,
+        })
+        .await;
+        tx
+    };
+
+    make_flash_loan_tx(solana, 1, vec![])
+        .await
+        .send()
+        .await
+        .unwrap();
+
+    make_flash_loan_tx(solana, 1, vec![tokens[1].bank])
+        .await
+        .send()
+        .await
+        .unwrap();
+
+    make_flash_loan_tx(solana, 1, vec![tokens[0].bank])
+        .await
+        .send_expect_error(MangoError::InvalidBank)
+        .await
+        .unwrap();
+
+    Ok(())
+}

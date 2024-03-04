@@ -9,6 +9,7 @@ use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
 use crate::serum3_cpi::{
     load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
 };
+use crate::util::clock_now;
 use anchor_lang::prelude::*;
 
 use fixed::types::I80F48;
@@ -40,6 +41,7 @@ pub fn serum3_place_order(
     // Validation
     //
     let receiver_token_index;
+    let payer_token_index;
     {
         let account = ctx.accounts.account.load_full()?;
         // account constraint #1
@@ -60,7 +62,7 @@ pub fn serum3_place_order(
         // Validate bank and vault #3
         let payer_bank = ctx.accounts.payer_bank.load()?;
         require_keys_eq!(payer_bank.vault, ctx.accounts.payer_vault.key());
-        let payer_token_index = match side {
+        payer_token_index = match side {
             Serum3Side::Bid => serum_market.quote_token_index,
             Serum3Side::Ask => serum_market.base_token_index,
         };
@@ -76,10 +78,23 @@ pub fn serum3_place_order(
     // Pre-health computation
     //
     let mut account = ctx.accounts.account.load_full_mut()?;
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let mut health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
-        .context("pre-withdraw init health")?;
+    let (now_ts, now_slot) = clock_now();
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        ctx.remaining_accounts,
+        &account.borrow(),
+        now_slot,
+    )?;
+    let mut health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )
+    .context("pre init health")?;
+
+    // The payer and receiver token banks/oracles must be passed and be valid
+    health_cache.token_info_index(payer_token_index)?;
+    health_cache.token_info_index(receiver_token_index)?;
+
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some(pre_init_health)
@@ -412,6 +427,20 @@ pub fn serum3_place_order(
     // Note that all orders on the book executing can still cause a net deposit. That's because
     // the total serum3 potential amount assumes all reserved amounts convert at the current
     // oracle price.
+    //
+    // This also requires that all serum3 oos that touch the receiver_token are avaliable in the
+    // health cache. We make this a general requirement to avoid surprises.
+    for serum3 in account.active_serum3_orders() {
+        if serum3.base_token_index == receiver_token_index
+            || serum3.quote_token_index == receiver_token_index
+        {
+            require_msg!(
+                health_cache.serum3_infos.iter().any(|s3| s3.market_index == serum3.market_index),
+                "health cache is missing serum3 info {} involving receiver token {}; passed banks and oracles?",
+                serum3.market_index, receiver_token_index
+            );
+        }
+    }
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =

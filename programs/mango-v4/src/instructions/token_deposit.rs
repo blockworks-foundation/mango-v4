@@ -11,6 +11,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::*;
+use crate::util::clock_now;
 
 struct DepositCommon<'a, 'info> {
     pub group: &'a AccountLoader<'info, Group>,
@@ -119,13 +120,21 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         //
         // Health computation
         //
-        let retriever = new_fixed_order_account_retriever(remaining_accounts, &account.borrow())?;
-        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+        let (now_ts, now_slot) = clock_now();
+        let retriever = new_fixed_order_account_retriever_with_optional_banks(
+            remaining_accounts,
+            &account.borrow(),
+            now_slot,
+        )?;
 
         // We only compute health to check if the account leaves the being_liquidated state.
-        // So it's ok to possibly skip token positions for bad oracles and compute a health
+        // So it's ok to possibly skip nonnegative token positions and compute a health
         // value that is too low.
-        let cache = new_health_cache_skipping_bad_oracles(&account.borrow(), &retriever, now_ts)?;
+        let cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+            &account.borrow(),
+            &retriever,
+            now_ts,
+        )?;
 
         // Since depositing can only increase health, we can skip the usual pre-health computation.
         // Also, TokenDeposit is one of the rare instructions that is allowed even during being_liquidated.
@@ -143,6 +152,13 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Group level deposit limit on account
         let group = self.group.load()?;
         if group.deposit_limit_quote > 0 {
+            // Requires that all banks were provided an all oracles are healthy, otherwise we
+            // can't know how much this account has deposited
+            require_eq!(
+                cache.token_infos.len(),
+                account.active_token_positions().count()
+            );
+
             let assets = cache
                 .health_assets_and_liabs_stable_assets(HealthType::Init)
                 .0

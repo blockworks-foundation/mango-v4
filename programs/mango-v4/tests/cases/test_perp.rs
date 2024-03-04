@@ -1581,6 +1581,138 @@ async fn test_perp_cancel_with_in_flight_events() -> Result<(), TransportError> 
     Ok(())
 }
 
+#[tokio::test]
+async fn test_perp_skip_bank() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 1000;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // SETUP: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: 0.0000,
+            taker_fee: 0.0000,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1));
+
+    //
+    // TESTS
+    //
+
+    // good without skips
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can skip unrelated
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![tokens[1].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can't skip settle token index
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+        MangoError::TokenPositionDoesNotExist,
+    );
+
+    Ok(())
+}
+
 async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 
