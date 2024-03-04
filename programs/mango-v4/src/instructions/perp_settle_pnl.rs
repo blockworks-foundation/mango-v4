@@ -62,12 +62,14 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     );
 
     // Get oracle prices
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         None, // staleness checked in health
     )?;
+    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
     let settle_token_oracle_price = settle_bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(settle_oracle_ref),
         None, // staleness checked in health
     )?;
 
@@ -141,8 +143,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         b_max_settle,
     );
 
-    a_perp_position.record_settle(settlement);
-    b_perp_position.record_settle(-settlement);
+    a_perp_position.record_settle(settlement, &perp_market);
+    b_perp_position.record_settle(-settlement, &perp_market);
     emit_perp_balances(
         ctx.accounts.group.key(),
         ctx.accounts.account_a.key(),

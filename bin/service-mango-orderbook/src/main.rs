@@ -544,7 +544,7 @@ async fn main() -> anyhow::Result<()> {
         let exit = exit.clone();
         let peers = peers.clone();
         tokio::spawn(async move {
-            let mut write_interval = time::interval(time::Duration::from_secs(30));
+            let mut write_interval = mango_v4_client::delay_interval(time::Duration::from_secs(30));
 
             loop {
                 if exit.load(Ordering::Relaxed) {

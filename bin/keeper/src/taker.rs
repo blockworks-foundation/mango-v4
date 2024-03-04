@@ -12,8 +12,6 @@ use mango_v4::{
 };
 use tracing::*;
 
-use tokio::time;
-
 use crate::MangoClient;
 
 pub async fn runner(
@@ -117,7 +115,7 @@ pub async fn loop_blocking_price_update(
     token_index: TokenIndex,
     price: Arc<RwLock<I80F48>>,
 ) {
-    let mut interval = time::interval(Duration::from_secs(1));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(1));
     let token_name = &mango_client.context.token(token_index).name;
     loop {
         interval.tick().await;
@@ -135,7 +133,7 @@ pub async fn loop_blocking_orders(
     market_name: String,
     price: Arc<RwLock<I80F48>>,
 ) {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(5));
 
     // Cancel existing orders
     let orders: Vec<u128> = mango_client

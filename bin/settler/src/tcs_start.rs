@@ -12,7 +12,19 @@ use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
     pub persistent_error_report_interval: Duration,
-    pub persistent_error_min_duration: Duration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ErrorType {
+    StartTcs,
+}
+
+impl std::fmt::Display for ErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StartTcs => write!(f, "start-tcs"),
+        }
+    }
 }
 
 pub struct State {
@@ -20,8 +32,7 @@ pub struct State {
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub config: Config,
 
-    pub errors: ErrorTracking,
-    pub last_persistent_error_report: Instant,
+    pub errors: ErrorTracking<Pubkey, ErrorType>,
 }
 
 impl State {
@@ -33,21 +44,8 @@ impl State {
         }
 
         self.run_pass_inner(&accounts).await?;
-        self.log_persistent_errors();
+        self.errors.update();
         Ok(())
-    }
-
-    fn log_persistent_errors(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_persistent_error_report)
-            < self.config.persistent_error_report_interval
-        {
-            return;
-        }
-        self.last_persistent_error_report = now;
-
-        let min_duration = self.config.persistent_error_min_duration;
-        self.errors.log_persistent_errors("start_tcs", min_duration);
     }
 
     async fn run_pass_inner(&mut self, accounts: &[Pubkey]) -> anyhow::Result<()> {
@@ -69,7 +67,11 @@ impl State {
             if account.fixed.group != mango_client.group() {
                 continue;
             }
-            if self.errors.had_too_many_errors(account_key, now).is_some() {
+            if self
+                .errors
+                .had_too_many_errors(ErrorType::StartTcs, account_key, now)
+                .is_some()
+            {
                 continue;
             }
 
@@ -79,9 +81,9 @@ impl State {
                     Ok(true) => {}
                     Ok(false) => continue,
                     Err(e) => {
-                        self.errors.record_error(
+                        self.errors.record(
+                            ErrorType::StartTcs,
                             account_key,
-                            now,
                             format!("error in is_tcs_startable: tcsid={}, {e:?}", tcs.id),
                         );
                     }
@@ -91,7 +93,7 @@ impl State {
             }
 
             if !had_tcs {
-                self.errors.clear_errors(account_key);
+                self.errors.clear(ErrorType::StartTcs, account_key);
             }
         }
 
@@ -108,9 +110,9 @@ impl State {
                 let ixs = match self.make_start_ix(pubkey, *tcs_id).await {
                     Ok(v) => v,
                     Err(e) => {
-                        self.errors.record_error(
+                        self.errors.record(
+                            ErrorType::StartTcs,
                             pubkey,
-                            now,
                             format!("error in make_start_ix: tcsid={tcs_id}, {e:?}"),
                         );
                         continue;
@@ -148,9 +150,9 @@ impl State {
                             .iter()
                             .filter_map(|(pk, tcs_id)| (pk == pubkey).then_some(tcs_id))
                             .collect_vec();
-                        self.errors.record_error(
+                        self.errors.record(
+                            ErrorType::StartTcs,
                             pubkey,
-                            now,
                             format!("error sending transaction: tcsids={tcs_ids:?}, {e:?}"),
                         );
                     }
@@ -162,7 +164,7 @@ impl State {
 
             // clear errors on pubkeys with successes
             for pubkey in ix_targets.iter().map(|(pk, _)| pk).unique() {
-                self.errors.clear_errors(pubkey);
+                self.errors.clear(ErrorType::StartTcs, pubkey);
             }
         }
 

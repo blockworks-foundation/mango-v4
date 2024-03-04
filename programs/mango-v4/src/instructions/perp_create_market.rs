@@ -39,6 +39,7 @@ pub fn perp_create_market(
     settle_pnl_limit_factor: f32,
     settle_pnl_limit_window_size_ts: u64,
     positive_pnl_liquidation_fee: f32,
+    platform_liquidation_fee: f32,
 ) -> Result<()> {
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
 
@@ -92,11 +93,14 @@ pub fn perp_create_market(
         init_overall_asset_weight: I80F48::from_num(init_overall_asset_weight),
         positive_pnl_liquidation_fee: I80F48::from_num(positive_pnl_liquidation_fee),
         fees_withdrawn: 0,
-        reserved: [0; 1880],
+        platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
+        accrued_liquidation_fees: I80F48::ZERO,
+        reserved: [0; 1848],
     };
 
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) =
-        perp_market.oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)
+        perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)
     {
         perp_market
             .stable_price_model

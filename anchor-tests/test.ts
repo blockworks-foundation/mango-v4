@@ -704,7 +704,7 @@ describe('mango-v4', () => {
       true,
     );
 
-    // Set price so health is below maintanence
+    // Set price so health is below maintenance
     await envClient.stubOracleSet(group, btcOracle.publicKey, 1);
 
     await mangoAccountB!.reload(clientB);

@@ -131,6 +131,18 @@ pub enum MangoError {
     Serum3PriceBandExceeded,
     #[msg("deposit crosses the token's deposit limit")]
     BankDepositLimit,
+    #[msg("delegates can only withdraw to the owner's associated token account")]
+    DelegateWithdrawOnlyToOwnerAta,
+    #[msg("delegates can only withdraw if they close the token position")]
+    DelegateWithdrawMustClosePosition,
+    #[msg("delegates can only withdraw small amounts")]
+    DelegateWithdrawSmall,
+    #[msg("The provided CLMM oracle is not valid")]
+    InvalidCLMMOracle,
+    #[msg("invalid usdc/usd feed provided for the CLMM oracle")]
+    InvalidFeedForCLMMOracle,
+    #[msg("Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)")]
+    MissingFeedForCLMMOracle,
 }
 
 impl MangoError {

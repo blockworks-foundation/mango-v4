@@ -29,12 +29,14 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     );
 
     // Get oracle prices
+    let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     let oracle_price = perp_market.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(oracle_ref),
         None, // staleness checked in health
     )?;
+    let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
     let settle_token_oracle_price = settle_bank.oracle_price(
-        &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?,
+        &OracleAccountInfos::from_reader(settle_oracle_ref),
         None, // staleness checked in health
     )?;
 
@@ -66,7 +68,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
         .min(I80F48::from(max_settle_amount));
     require!(settlement >= 0, MangoError::SettlementAmountMustBePositive);
 
-    perp_position.record_settle(-settlement); // settle the negative pnl on the user perp position
+    perp_position.record_settle(-settlement, &perp_market); // settle the negative pnl on the user perp position
     perp_market.fees_accrued -= settlement;
 
     emit_perp_balances(

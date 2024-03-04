@@ -33,23 +33,24 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         let perp_market = ctx.accounts.perp_market.load()?;
         perp_market_index = perp_market.perp_market_index;
         settle_token_index = perp_market.settle_token_index;
-        perp_oracle_price = perp_market.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.oracle)?,
-            Some(now_slot),
-        )?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        perp_oracle_price = perp_market
+            .oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
 
         let settle_bank = ctx.accounts.settle_bank.load()?;
+        let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
         settle_token_oracle_price = settle_bank.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.settle_oracle)?,
+            &OracleAccountInfos::from_reader(settle_oracle_ref),
             Some(now_slot),
         )?;
         drop(settle_bank); // could be the same as insurance_bank
 
         let insurance_bank = ctx.accounts.insurance_bank.load()?;
+        let insurance_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.insurance_oracle.as_ref())?;
         // We're not getting the insurance token price from the HealthCache because
         // the liqee isn't guaranteed to have an insurance fund token position.
         insurance_token_oracle_price = insurance_bank.oracle_price(
-            &AccountInfoRef::borrow(&ctx.accounts.insurance_oracle)?,
+            &OracleAccountInfos::from_reader(insurance_oracle_ref),
             Some(now_slot),
         )?;
     }
@@ -266,7 +267,7 @@ pub(crate) fn liquidation_action(
             .max(I80F48::ZERO);
         if settlement > 0 {
             liqor_perp_position.record_liquidation_quote_change(-settlement);
-            liqee_perp_position.record_settle(-settlement);
+            liqee_perp_position.record_settle(-settlement, &perp_market);
 
             // Update the accounts' perp_spot_transfer statistics.
             let settlement_i64 = settlement.round_to_zero().to_num::<i64>();
@@ -379,7 +380,7 @@ pub(crate) fn liquidation_action(
 
             // transfer perp quote loss from the liqee to the liqor
             let liqor_perp_position = liqor.perp_position_mut(perp_market_index)?;
-            liqee_perp_position.record_settle(-insurance_liab_transfer);
+            liqee_perp_position.record_settle(-insurance_liab_transfer, &perp_market);
             liqor_perp_position.record_liquidation_quote_change(-insurance_liab_transfer);
 
             msg!(
@@ -398,7 +399,7 @@ pub(crate) fn liquidation_action(
             (perp_market.long_funding, perp_market.short_funding);
         if insurance_fund_exhausted && remaining_liab > 0 {
             perp_market.socialize_loss(-remaining_liab)?;
-            liqee_perp_position.record_settle(-remaining_liab);
+            liqee_perp_position.record_settle(-remaining_liab, &perp_market);
             socialized_loss = remaining_liab;
             msg!("socialized loss: {}", socialized_loss);
         }
@@ -519,25 +520,33 @@ mod tests {
                 liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
             }
 
-            let insurance_oracle_ai = setup.insurance_oracle.as_account_info();
-            let settle_oracle_ai = setup.settle_oracle.as_account_info();
-            let perp_oracle_ai = setup.perp_oracle.as_account_info();
-
-            let insurance_price = setup
-                .insurance_bank
-                .data()
-                .oracle_price(&AccountInfoRef::borrow(&insurance_oracle_ai).unwrap(), None)
-                .unwrap();
-            let settle_price = setup
-                .settle_bank
-                .data()
-                .oracle_price(&AccountInfoRef::borrow(&settle_oracle_ai).unwrap(), None)
-                .unwrap();
-            let perp_price = setup
-                .perp_market
-                .data()
-                .oracle_price(&AccountInfoRef::borrow(&perp_oracle_ai).unwrap(), None)
-                .unwrap();
+            let insurance_price = {
+                let insurance_oracle_ai = setup.insurance_oracle.as_account_info();
+                let insurance_oracle_ref = &AccountInfoRef::borrow(&insurance_oracle_ai)?;
+                setup
+                    .insurance_bank
+                    .data()
+                    .oracle_price(&OracleAccountInfos::from_reader(insurance_oracle_ref), None)
+                    .unwrap()
+            };
+            let settle_price = {
+                let settle_oracle_ai = setup.settle_oracle.as_account_info();
+                let settle_oracle_ref = &AccountInfoRef::borrow(&settle_oracle_ai)?;
+                setup
+                    .settle_bank
+                    .data()
+                    .oracle_price(&OracleAccountInfos::from_reader(settle_oracle_ref), None)
+                    .unwrap()
+            };
+            let perp_price = {
+                let perp_oracle_ai = setup.perp_oracle.as_account_info();
+                let perp_oracle_ref = &AccountInfoRef::borrow(&perp_oracle_ai)?;
+                setup
+                    .perp_market
+                    .data()
+                    .oracle_price(&OracleAccountInfos::from_reader(perp_oracle_ref), None)
+                    .unwrap()
+            };
 
             // There's no way to construct a TokenAccount directly...
             let mut buffer = [0u8; 165];
@@ -751,7 +760,7 @@ mod tests {
             {
                 let p = perp_p(&mut setup.liqee);
                 p.quote_position_native = I80F48::from_num(init_perp);
-                p.settle_pnl_limit_realized_trade = -settle_limit;
+                p.recurring_settle_pnl_allowance = (settle_limit as i64).abs();
 
                 let settle_bank = setup.settle_bank.data();
                 settle_bank

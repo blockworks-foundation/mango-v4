@@ -4,16 +4,20 @@ use anchor_lang::prelude::*;
 use derivative::Derivative;
 use fixed::types::I80F48;
 
+use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::error::MangoError;
+use crate::error::{Contextable, MangoError};
 use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
 use crate::util;
 
-use super::{orderbook, OracleConfig, OracleState, Orderbook, StablePriceModel, DAY_I80F48};
+use super::{
+    orderbook, OracleAccountInfos, OracleConfig, OracleState, Orderbook, StablePriceModel,
+    DAY_I80F48,
+};
 
 pub type PerpMarketIndex = u16;
 
@@ -185,8 +189,17 @@ pub struct PerpMarket {
     // This ensures that fees_settled is strictly increasing for stats gathering purposes
     pub fees_withdrawn: u64,
 
+    /// Additional to liquidation_fee, but goes to the group owner instead of the liqor
+    pub platform_liquidation_fee: I80F48,
+
+    /// Platform fees that were accrued during liquidation (in native tokens)
+    ///
+    /// These fees are also added to fees_accrued, this is just for bookkeeping the total
+    /// liquidation fees that happened. So never decreases (different to fees_accrued).
+    pub accrued_liquidation_fees: I80F48,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1880],
+    pub reserved: [u8; 1848],
 }
 
 const_assert_eq!(
@@ -223,7 +236,8 @@ const_assert_eq!(
         + 7
         + 3 * 16
         + 8
-        + 1880
+        + 2 * 16
+        + 1848
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -260,26 +274,26 @@ impl PerpMarket {
         orderbook::new_node_key(side, price_data, self.seq_num)
     }
 
-    pub fn oracle_price(
+    pub fn oracle_price<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<I80F48> {
-        Ok(self.oracle_state(oracle_acc, staleness_slot)?.price)
+        Ok(self.oracle_state(oracle_acc_infos, staleness_slot)?.price)
     }
 
-    pub fn oracle_state(
+    pub fn oracle_state<T: KeyedAccountReader>(
         &self,
-        oracle_acc: &impl KeyedAccountReader,
+        oracle_acc_infos: &OracleAccountInfos<T>,
         staleness_slot: Option<u64>,
     ) -> Result<OracleState> {
-        require_keys_eq!(self.oracle, *oracle_acc.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc, self.base_decimals)?;
-        state.check_confidence_and_maybe_staleness(
-            &self.oracle,
-            &self.oracle_config,
-            staleness_slot,
-        )?;
+        require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
+        let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
+        state
+            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
+            .with_context(|| {
+                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
+            })?;
         Ok(state)
     }
 
@@ -521,7 +535,9 @@ impl PerpMarket {
             init_overall_asset_weight: I80F48::ONE,
             positive_pnl_liquidation_fee: I80F48::ZERO,
             fees_withdrawn: 0,
-            reserved: [0; 1880],
+            platform_liquidation_fee: I80F48::ZERO,
+            accrued_liquidation_fees: I80F48::ZERO,
+            reserved: [0; 1848],
         }
     }
 }

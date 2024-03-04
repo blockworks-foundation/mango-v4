@@ -116,7 +116,7 @@ async fn main() -> Result<(), anyhow::Error> {
     );
 
     let debugging_handle = async {
-        let mut interval = time::interval(time::Duration::from_secs(5));
+        let mut interval = mango_v4_client::delay_interval(time::Duration::from_secs(5));
         loop {
             interval.tick().await;
             let client = mango_client.clone();

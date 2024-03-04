@@ -70,6 +70,23 @@ impl From<JupiterVersionArg> for jupiter::Version {
     }
 }
 
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum TcsMode {
+    BorrowBuy,
+    SwapSellIntoBuy,
+    SwapCollateralIntoBuy,
+}
+
+impl From<TcsMode> for trigger_tcs::Mode {
+    fn from(a: TcsMode) -> Self {
+        match a {
+            TcsMode::BorrowBuy => trigger_tcs::Mode::BorrowBuyToken,
+            TcsMode::SwapSellIntoBuy => trigger_tcs::Mode::SwapSellIntoBuy,
+            TcsMode::SwapCollateralIntoBuy => trigger_tcs::Mode::SwapCollateralIntoBuy,
+        }
+    }
+}
+
 #[derive(Parser)]
 #[clap()]
 struct Cli {
@@ -123,6 +140,10 @@ struct Cli {
     /// profit margin at which to take tcs orders
     #[clap(long, env, default_value = "0.0005")]
     tcs_profit_fraction: f64,
+
+    /// control how tcs triggering provides buy tokens
+    #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
+    tcs_mode: TcsMode,
 
     /// prioritize each transaction with this many microlamports/cu
     #[clap(long, env, default_value = "0")]
@@ -327,8 +348,7 @@ async fn main() -> anyhow::Result<()> {
         jupiter_version: cli.jupiter_version.into(),
         jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
-        // TODO: configurable
-        mode: trigger_tcs::Mode::SwapSellIntoBuy,
+        mode: cli.tcs_mode.into(),
         min_buy_fraction: 0.7,
     };
 
@@ -363,29 +383,11 @@ async fn main() -> anyhow::Result<()> {
         liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
         token_swap_info: token_swap_info_updater.clone(),
-        liq_errors: ErrorTracking {
-            skip_threshold: 5,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_hard_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_collection_partial_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        tcs_execution_errors: ErrorTracking {
-            skip_threshold: 2,
-            skip_duration: Duration::from_secs(120),
-            ..ErrorTracking::default()
-        },
-        persistent_error_report_interval: Duration::from_secs(300),
-        persistent_error_min_duration: Duration::from_secs(300),
-        last_persistent_error_report: Instant::now(),
+        errors: ErrorTracking::builder()
+            .skip_threshold(2)
+            .skip_threshold_for_type(LiqErrorType::Liq, 5)
+            .skip_duration(Duration::from_secs(120))
+            .build()?,
     });
 
     info!("main loop");
@@ -483,7 +485,8 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let liquidation_job = tokio::spawn({
-        let mut interval = tokio::time::interval(Duration::from_millis(cli.check_interval_ms));
+        let mut interval =
+            mango_v4_client::delay_interval(Duration::from_millis(cli.check_interval_ms));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -497,7 +500,7 @@ async fn main() -> anyhow::Result<()> {
                     state.mango_accounts.iter().cloned().collect_vec()
                 };
 
-                liquidation.log_persistent_errors();
+                liquidation.errors.update();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -526,8 +529,8 @@ async fn main() -> anyhow::Result<()> {
 
     let token_swap_info_job = tokio::spawn({
         // TODO: configurable interval
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
-        let mut startup_wait = tokio::time::interval(Duration::from_secs(1));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(60));
+        let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -544,17 +547,10 @@ async fn main() -> anyhow::Result<()> {
                     .keys()
                     .copied()
                     .collect_vec();
-                let mut min_delay = tokio::time::interval(Duration::from_secs(1));
+                let mut min_delay = mango_v4_client::delay_interval(Duration::from_secs(1));
                 for token_index in token_indexes {
                     min_delay.tick().await;
-                    match token_swap_info_updater.update_one(token_index).await {
-                        Ok(()) => {}
-                        Err(err) => {
-                            warn!(
-                                "failed to update token swap info for token {token_index}: {err:?}",
-                            );
-                        }
-                    }
+                    token_swap_info_updater.update_one(token_index).await;
                 }
                 token_swap_info_updater.log_all();
             }
@@ -600,6 +596,27 @@ struct SharedState {
     one_snapshot_done: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LiqErrorType {
+    Liq,
+    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
+    TcsCollectionHard,
+    /// Recording errors when some tcs have errors during collection but others don't
+    TcsCollectionPartial,
+    TcsExecution,
+}
+
+impl std::fmt::Display for LiqErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Liq => write!(f, "liq"),
+            Self::TcsCollectionHard => write!(f, "tcs-collection-hard"),
+            Self::TcsCollectionPartial => write!(f, "tcs-collection-partial"),
+            Self::TcsExecution => write!(f, "tcs-execution"),
+        }
+    }
+}
+
 struct LiquidationState {
     mango_client: Arc<MangoClient>,
     account_fetcher: Arc<chain_data::AccountFetcher>,
@@ -607,15 +624,7 @@ struct LiquidationState {
     liquidation_config: liquidate::Config,
     trigger_tcs_config: trigger_tcs::Config,
 
-    liq_errors: ErrorTracking,
-    /// Errors that suggest we maybe should skip trying to collect tcs for that pubkey
-    tcs_collection_hard_errors: ErrorTracking,
-    /// Recording errors when some tcs have errors during collection but others don't
-    tcs_collection_partial_errors: ErrorTracking,
-    tcs_execution_errors: ErrorTracking,
-    persistent_error_report_interval: Duration,
-    last_persistent_error_report: Instant,
-    persistent_error_min_duration: Duration,
+    errors: ErrorTracking<Pubkey, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -646,10 +655,12 @@ impl LiquidationState {
 
     async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
         let now = Instant::now();
-        let error_tracking = &mut self.liq_errors;
+        let error_tracking = &mut self.errors;
 
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, now) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::Liq, pubkey, now)
+        {
             trace!(
                 %pubkey,
                 error_entry.count,
@@ -668,7 +679,7 @@ impl LiquidationState {
 
         if let Err(err) = result.as_ref() {
             // Keep track of pubkeys that had errors
-            error_tracking.record_error(pubkey, now, err.to_string());
+            error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 
             // Not all errors need to be raised to the user's attention.
             let mut is_error = true;
@@ -691,7 +702,7 @@ impl LiquidationState {
                 trace!("liquidating account {}: {:?}", pubkey, err);
             }
         } else {
-            error_tracking.clear_errors(pubkey);
+            error_tracking.clear(LiqErrorType::Liq, pubkey);
         }
 
         result
@@ -720,9 +731,9 @@ impl LiquidationState {
         // Find interesting (pubkey, tcsid, volume)
         let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
-            if let Some(error_entry) = self
-                .tcs_collection_hard_errors
-                .had_too_many_errors(pubkey, now)
+            if let Some(error_entry) =
+                self.errors
+                    .had_too_many_errors(LiqErrorType::TcsCollectionHard, pubkey, now)
             {
                 trace!(
                     %pubkey,
@@ -734,19 +745,20 @@ impl LiquidationState {
 
             match tcs_context.find_interesting_tcs_for_account(pubkey) {
                 Ok(v) => {
-                    self.tcs_collection_hard_errors.clear_errors(pubkey);
+                    self.errors.clear(LiqErrorType::TcsCollectionHard, pubkey);
                     if v.is_empty() {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
-                        self.tcs_execution_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
+                        self.errors.clear(LiqErrorType::TcsExecution, pubkey);
                     } else if v.iter().all(|it| it.is_ok()) {
-                        self.tcs_collection_partial_errors.clear_errors(pubkey);
+                        self.errors
+                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
                     } else {
                         for it in v.iter() {
                             if let Err(e) = it {
-                                info!("error on tcs find_interesting: {:?}", e);
-                                self.tcs_collection_partial_errors.record_error(
+                                self.errors.record(
+                                    LiqErrorType::TcsCollectionPartial,
                                     pubkey,
-                                    now,
                                     e.to_string(),
                                 );
                             }
@@ -755,8 +767,8 @@ impl LiquidationState {
                     interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
                 }
                 Err(e) => {
-                    self.tcs_collection_hard_errors
-                        .record_error(pubkey, now, e.to_string());
+                    self.errors
+                        .record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
                 }
             }
         }
@@ -765,9 +777,11 @@ impl LiquidationState {
         }
 
         let (txsigs, mut changed_pubkeys) = tcs_context
-            .execute_tcs(&mut interesting_tcs, &mut self.tcs_execution_errors)
-            .await
-            .context("execute_tcs")?;
+            .execute_tcs(&mut interesting_tcs, &mut self.errors)
+            .await?;
+        for pubkey in changed_pubkeys.iter() {
+            self.errors.clear(LiqErrorType::TcsExecution, pubkey);
+        }
         if txsigs.is_empty() {
             return Ok(false);
         }
@@ -793,30 +807,10 @@ impl LiquidationState {
 
         Ok(true)
     }
-
-    fn log_persistent_errors(&mut self) {
-        let now = Instant::now();
-        if now.duration_since(self.last_persistent_error_report)
-            < self.persistent_error_report_interval
-        {
-            return;
-        }
-        self.last_persistent_error_report = now;
-
-        let min_duration = self.persistent_error_min_duration;
-        self.liq_errors
-            .log_persistent_errors("liquidation", min_duration);
-        self.tcs_execution_errors
-            .log_persistent_errors("tcs execution", min_duration);
-        self.tcs_collection_hard_errors
-            .log_persistent_errors("tcs collection hard", min_duration);
-        self.tcs_collection_partial_errors
-            .log_persistent_errors("tcs collection partial", min_duration);
-    }
 }
 
 fn start_chain_data_metrics(chain: Arc<RwLock<chain_data::ChainData>>, metrics: &metrics::Metrics) {
-    let mut interval = tokio::time::interval(Duration::from_secs(600));
+    let mut interval = mango_v4_client::delay_interval(Duration::from_secs(600));
 
     let mut metric_slots_count = metrics.register_u64("chain_data_slots_count".into());
     let mut metric_accounts_count = metrics.register_u64("chain_data_accounts_count".into());

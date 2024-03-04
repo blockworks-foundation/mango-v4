@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccount;
+use mango_v4::state::OracleAccountInfos;
 use mango_v4_client::{Client, MangoGroupContext};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
@@ -30,7 +31,7 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
             .map(|(_, p)| (p.oracle, *p))
             .collect();
 
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+    let mut interval = mango_v4_client::delay_interval(std::time::Duration::from_secs(5));
     loop {
         interval.tick().await;
 
@@ -59,7 +60,9 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
             let perp_opt = perp_markets.get(pubkey);
             let mut price = None;
             if let Some(bank) = bank_opt {
-                match bank.oracle_price(&keyed_account, Some(slot)) {
+                match bank
+                    .oracle_price(&OracleAccountInfos::from_reader(&keyed_account), Some(slot))
+                {
                     Ok(p) => price = Some(p),
                     Err(e) => {
                         error!("could not read bank oracle {}: {e:?}", keyed_account.key);
@@ -67,7 +70,9 @@ pub async fn run(client: &Client, group: Pubkey) -> anyhow::Result<()> {
                 }
             }
             if let Some(perp) = perp_opt {
-                match perp.oracle_price(&keyed_account, Some(slot)) {
+                match perp
+                    .oracle_price(&OracleAccountInfos::from_reader(&keyed_account), Some(slot))
+                {
                     Ok(p) => price = Some(p),
                     Err(e) => {
                         error!("could not read perp oracle {}: {e:?}", keyed_account.key);

@@ -18,7 +18,7 @@ use solana_sdk::{signature::Signature, signer::Signer};
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
-use crate::{token_swap_info, util, ErrorTracking};
+use crate::{token_swap_info, util, ErrorTracking, LiqErrorType};
 
 /// When computing the max possible swap for a liqee, assume the price is this fraction worse for them.
 ///
@@ -65,7 +65,7 @@ pub struct Config {
     pub profit_fraction: f64,
 
     /// Minimum fraction of max_buy to buy for success when triggering,
-    /// useful in conjuction with jupiter swaps in same tx to avoid over-buying.
+    /// useful in conjunction with jupiter swaps in same tx to avoid over-buying.
     ///
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
@@ -962,10 +962,9 @@ impl Context {
     pub async fn execute_tcs(
         &self,
         tcs: &mut [(Pubkey, u64, u64)],
-        error_tracking: &mut ErrorTracking,
+        error_tracking: &mut ErrorTracking<Pubkey, LiqErrorType>,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
-        let now = Instant::now();
 
         let max_volume = self.config.max_trigger_quote_amount;
         let mut pending_volume = 0;
@@ -1012,7 +1011,11 @@ impl Context {
                     }
                     Err(e) => {
                         trace!(%result.pubkey, "preparation error {:?}", e);
-                        error_tracking.record_error(&result.pubkey, now, e.to_string());
+                        error_tracking.record(
+                            LiqErrorType::TcsExecution,
+                            &result.pubkey,
+                            e.to_string(),
+                        );
                     }
                 }
                 no_new_job = false;
@@ -1089,7 +1092,7 @@ impl Context {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
                     trace!(%pubkey, "execution error {:?}", err);
-                    error_tracking.record_error(&pubkey, Instant::now(), err.to_string());
+                    error_tracking.record(LiqErrorType::TcsExecution, &pubkey, err.to_string());
                     None
                 }
             });
@@ -1104,10 +1107,12 @@ impl Context {
         pubkey: &Pubkey,
         tcs_id: u64,
         volume: u64,
-        error_tracking: &ErrorTracking,
+        error_tracking: &ErrorTracking<Pubkey, LiqErrorType>,
     ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) = error_tracking.had_too_many_errors(pubkey, Instant::now()) {
+        if let Some(error_entry) =
+            error_tracking.had_too_many_errors(LiqErrorType::TcsExecution, pubkey, Instant::now())
+        {
             trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count

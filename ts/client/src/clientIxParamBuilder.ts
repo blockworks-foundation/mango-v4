@@ -28,6 +28,8 @@ export interface TokenRegisterParams {
   interestCurveScaling: number;
   interestTargetUtilization: number;
   depositLimit: BN;
+  zeroUtilRate: number;
+  platformLiquidationFee: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -66,6 +68,8 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   interestCurveScaling: 4.0,
   interestTargetUtilization: 0.5,
   depositLimit: new BN(0),
+  zeroUtilRate: 0.0,
+  platformLiquidationFee: 0.0,
 };
 
 export interface TokenEditParams {
@@ -103,7 +107,10 @@ export interface TokenEditParams {
   maintWeightShiftAssetTarget: number | null;
   maintWeightShiftLiabTarget: number | null;
   maintWeightShiftAbort: boolean | null;
+  setFallbackOracle: boolean | null;
   depositLimit: BN | null;
+  zeroUtilRate: number | null;
+  platformLiquidationFee: number | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -141,7 +148,10 @@ export const NullTokenEditParams: TokenEditParams = {
   maintWeightShiftAssetTarget: null,
   maintWeightShiftLiabTarget: null,
   maintWeightShiftAbort: null,
+  setFallbackOracle: null,
   depositLimit: null,
+  zeroUtilRate: null,
+  platformLiquidationFee: null,
 };
 
 export interface PerpEditParams {
@@ -175,6 +185,7 @@ export interface PerpEditParams {
   positivePnlLiquidationFee: number | null;
   name: string | null;
   forceClose: boolean | null;
+  platformLiquidationFee: number | null;
 }
 
 export const NullPerpEditParams: PerpEditParams = {
@@ -208,6 +219,7 @@ export const NullPerpEditParams: PerpEditParams = {
   positivePnlLiquidationFee: null,
   name: null,
   forceClose: null,
+  platformLiquidationFee: null,
 };
 
 // Use with TrueIxGateParams and buildIxGate

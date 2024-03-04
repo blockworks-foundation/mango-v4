@@ -15,6 +15,7 @@ use accounts_ix::*;
 pub mod accounts_ix;
 pub mod accounts_zerocopy;
 pub mod address_lookup_table_program;
+mod allocator;
 pub mod error;
 pub mod events;
 pub mod health;
@@ -154,6 +155,8 @@ pub mod mango_v4 {
         interest_target_utilization: f32,
         group_insurance_fund: bool,
         deposit_limit: u64,
+        zero_util_rate: f32,
+        platform_liquidation_fee: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -185,6 +188,8 @@ pub mod mango_v4 {
             interest_target_utilization,
             group_insurance_fund,
             deposit_limit,
+            zero_util_rate,
+            platform_liquidation_fee,
         )?;
         Ok(())
     }
@@ -236,8 +241,10 @@ pub mod mango_v4 {
         maint_weight_shift_asset_target_opt: Option<f32>,
         maint_weight_shift_liab_target_opt: Option<f32>,
         maint_weight_shift_abort: bool,
-        set_fallback_oracle: bool, // unused, introduced in v0.22
+        set_fallback_oracle: bool,
         deposit_limit_opt: Option<u64>,
+        zero_util_rate_opt: Option<f32>,
+        platform_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -278,6 +285,8 @@ pub mod mango_v4 {
             maint_weight_shift_abort,
             set_fallback_oracle,
             deposit_limit_opt,
+            zero_util_rate_opt,
+            platform_liquidation_fee_opt,
         )?;
         Ok(())
     }
@@ -681,6 +690,15 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn serum3_cancel_order_by_client_order_id(
+        ctx: Context<Serum3CancelOrder>,
+        client_order_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::serum3_cancel_order_by_client_order_id(ctx, client_order_id)?;
+        Ok(())
+    }
+
     pub fn serum3_cancel_all_orders(ctx: Context<Serum3CancelAllOrders>, limit: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::serum3_cancel_all_orders(ctx, limit)?;
@@ -823,6 +841,7 @@ pub mod mango_v4 {
         settle_pnl_limit_factor: f32,
         settle_pnl_limit_window_size_ts: u64,
         positive_pnl_liquidation_fee: f32,
+        platform_liquidation_fee: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_create_market(
@@ -854,6 +873,7 @@ pub mod mango_v4 {
             settle_pnl_limit_factor,
             settle_pnl_limit_window_size_ts,
             positive_pnl_liquidation_fee,
+            platform_liquidation_fee,
         )?;
         Ok(())
     }
@@ -891,6 +911,7 @@ pub mod mango_v4 {
         positive_pnl_liquidation_fee_opt: Option<f32>,
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
+        platform_liquidation_fee_opt: Option<f32>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -925,6 +946,7 @@ pub mod mango_v4 {
             positive_pnl_liquidation_fee_opt,
             name_opt,
             force_close_opt,
+            platform_liquidation_fee_opt,
         )?;
         Ok(())
     }

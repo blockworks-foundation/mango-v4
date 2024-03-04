@@ -34,6 +34,9 @@ pub async fn new(
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: None,
+        begin_fallback_oracles: metas.len(), // TODO: add support for fallback oracle accounts
+        usd_oracle_index: None,
+        sol_oracle_index: None,
     };
     let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     mango_v4::health::new_health_cache(&account.borrow(), &retriever, now_ts)
@@ -67,6 +70,9 @@ pub fn new_sync(
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: None,
+        begin_fallback_oracles: metas.len(), // TODO: add support for fallback oracle accounts
+        usd_oracle_index: None,
+        sol_oracle_index: None,
     };
     let now_ts = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     mango_v4::health::new_health_cache(&account.borrow(), &retriever, now_ts)

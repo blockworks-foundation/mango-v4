@@ -227,7 +227,7 @@ impl MangoGroupContext {
                         decimals: u8::MAX,
                         banks: mi.banks,
                         vaults: mi.vaults,
-                        fallback_oracle: Pubkey::default(), // coming in v0.22
+                        fallback_oracle: mi.fallback_oracle,
                         oracle: mi.oracle,
                         group: mi.group,
                         mint: mi.mint,

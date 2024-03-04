@@ -4,7 +4,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthType;
-use mango_v4::state::{PerpMarket, PerpMarketIndex};
+use mango_v4::state::{OracleAccountInfos, PerpMarket, PerpMarketIndex};
 use mango_v4_client::{
     chain_data, health_cache, prettify_solana_client_error, MangoClient, PreparedInstructions,
     TransactionBuilder,
@@ -34,11 +34,10 @@ fn perp_markets_and_prices(
         .map(|(market_index, perp)| {
             let perp_market = account_fetcher.fetch::<PerpMarket>(&perp.address)?;
 
-            let oracle_acc = account_fetcher.fetch_raw(&perp_market.oracle)?;
-            let oracle_price = perp_market.oracle_price(
-                &KeyedAccountSharedData::new(perp_market.oracle, oracle_acc),
-                None,
-            )?;
+            let oracle = account_fetcher.fetch_raw(&perp_market.oracle)?;
+            let oracle_acc = &KeyedAccountSharedData::new(perp_market.oracle, oracle);
+            let oracle_price =
+                perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
 
             let settle_token = mango_client.context.token(perp_market.settle_token_index);
             let settle_token_price =

@@ -39,6 +39,7 @@ pub fn perp_edit_market(
     positive_pnl_liquidation_fee_opt: Option<f32>,
     name_opt: Option<String>,
     force_close_opt: Option<bool>,
+    platform_liquidation_fee_opt: Option<f32>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -65,8 +66,9 @@ pub fn perp_edit_market(
     if reset_stable_price {
         msg!("Stable price reset");
         require_keys_eq!(perp_market.oracle, ctx.accounts.oracle.key());
-        let oracle_price = perp_market
-            .oracle_price(&AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?, None)?;
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        let oracle_price =
+            perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)?;
         perp_market.stable_price_model.reset_to_price(
             oracle_price.to_num(),
             Clock::get()?.unix_timestamp.try_into().unwrap(),
@@ -341,6 +343,16 @@ pub fn perp_edit_market(
             u8::from(force_close)
         );
         perp_market.force_close = u8::from(force_close);
+        require_group_admin = true;
+    };
+
+    if let Some(platform_liquidation_fee) = platform_liquidation_fee_opt {
+        msg!(
+            "Platform liquidation fee: old - {:?}, new - {:?}",
+            perp_market.platform_liquidation_fee,
+            platform_liquidation_fee
+        );
+        perp_market.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
         require_group_admin = true;
     };
 

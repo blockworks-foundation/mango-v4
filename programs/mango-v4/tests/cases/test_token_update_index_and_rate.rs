@@ -97,3 +97,62 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_token_rates_migrate() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let start_time = solana.clock_timestamp().await;
+
+    // Change the bank to have the old on-chain state without curveScaling
+    let mut bank_before = solana.get_account::<Bank>(tokens[0].bank).await;
+    bank_before.interest_curve_scaling = 0.0;
+    bank_before.interest_target_utilization = 0.0;
+    bank_before.adjustment_factor = I80F48::ZERO; // so we don't need to compute expected rate changes
+    solana.set_account(tokens[0].bank, &bank_before).await;
+
+    // Update index and rate is allowed every hour
+    solana.set_clock_timestamp(start_time + 3601).await;
+
+    send_tx(
+        solana,
+        TokenUpdateIndexAndRateInstruction {
+            mint_info: tokens[0].mint_info,
+        },
+    )
+    .await
+    .unwrap();
+
+    let bank_after = solana.get_account::<Bank>(tokens[0].bank).await;
+
+    assert!(assert_equal_fixed_f64(bank_after.rate0, 0.07 / 3.0, 0.0001));
+    assert!(assert_equal_fixed_f64(bank_after.rate1, 0.9 / 3.0, 0.0001));
+    assert!(assert_equal_fixed_f64(bank_after.max_rate, 0.5, 0.0001));
+    assert!(assert_equal_f64_f64(
+        bank_after.interest_curve_scaling,
+        3.0,
+        0.0001
+    ));
+    assert!(assert_equal_f64_f64(
+        bank_after.interest_target_utilization as f64,
+        0.4,
+        0.0001
+    ));
+
+    Ok(())
+}

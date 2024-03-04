@@ -316,23 +316,19 @@ pub fn serum3_place_order(
         )?
     };
 
-    // Deposit limit check: Placing an order can increase deposit limit use on both
-    // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
-    // use up 1000 quote and 500 base because either could be deposit on cancel/fill.
-    // This is why this must happen after update_bank_potential_tokens() and any withdraws.
+    // Deposit limit check, receiver side:
+    // Placing an order can always increase the receiver bank deposits on fill.
     {
         let receiver_bank = receiver_bank_ai.load::<Bank>()?;
         receiver_bank
             .check_deposit_and_oo_limit()
             .with_context(|| std::format!("on {}", receiver_bank.name()))?;
-        payer_bank
-            .check_deposit_and_oo_limit()
-            .with_context(|| std::format!("on {}", payer_bank.name()))?;
     }
 
     // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
+    let payer_oracle_ref = &AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?;
     let payer_bank_oracle =
-        payer_bank.oracle_price(&AccountInfoRef::borrow(&ctx.accounts.payer_oracle)?, None)?;
+        payer_bank.oracle_price(&OracleAccountInfos::from_reader(payer_oracle_ref), None)?;
     let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
     if withdrawn_from_vault > before_position_native {
         require_msg_typed!(
@@ -342,6 +338,18 @@ pub fn serum3_place_order(
         );
         payer_bank.enforce_max_utilization_on_borrow()?;
         payer_bank.check_net_borrows(payer_bank_oracle)?;
+
+        // Deposit limit check, payer side:
+        // The payer bank deposits could increase when cancelling the order later:
+        // Imagine the account borrowing payer tokens to place the order, repaying the borrows
+        // and then cancelling the order to create a deposit.
+        //
+        // However, if the account only decreases its deposits to place an order it can't
+        // worsen the situation and should always go through, even if payer deposit limits are
+        // already exceeded.
+        payer_bank
+            .check_deposit_and_oo_limit()
+            .with_context(|| std::format!("on {}", payer_bank.name()))?;
     } else {
         payer_bank.enforce_borrows_lte_deposits()?;
     }
@@ -570,8 +578,11 @@ pub fn apply_settle_changes(
             let clock = Clock::get()?;
             let now_ts = clock.unix_timestamp.try_into().unwrap();
 
-            let quote_oracle_price = quote_bank
-                .oracle_price(&AccountInfoRef::borrow(quote_oracle_ai)?, Some(clock.slot))?;
+            let quote_oracle_ref = &AccountInfoRef::borrow(quote_oracle_ai)?;
+            let quote_oracle_price = quote_bank.oracle_price(
+                &OracleAccountInfos::from_reader(quote_oracle_ref),
+                Some(clock.slot),
+            )?;
             let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());
             account
                 .fixed
