@@ -1267,26 +1267,29 @@ fn new_health_cache_impl(
     // token contribution from token accounts
     let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
-    let available_banks = if skip_missing_banks {
+    // As a CU optimization, don't call available_banks() unless necessary
+    let available_banks_opt = if skip_missing_banks {
         Some(retriever.available_banks()?)
     } else {
         None
     };
 
     for (i, position) in account.active_token_positions().enumerate() {
-        // Allow skipping of missing banks if the account has a nonnegative balance
-        let bank_is_available = available_banks
-            .as_ref()
-            .map(|ab| ab.contains(&position.token_index))
-            .unwrap_or(true);
-        if skip_missing_banks && !bank_is_available {
-            require_msg_typed!(
-                position.indexed_position >= 0,
-                MangoError::InvalidBank,
-                "the bank for token index {} is a required health account when the account has a negative balance in it",
-                position.token_index
-            );
-            continue;
+        // Allow skipping of missing banks only if the account has a nonnegative balance
+        if skip_missing_banks {
+            let bank_is_available = available_banks_opt
+                .as_ref()
+                .unwrap()
+                .contains(&position.token_index);
+            if !bank_is_available {
+                require_msg_typed!(
+                    position.indexed_position >= 0,
+                    MangoError::InvalidBank,
+                    "the bank for token index {} is a required health account when the account has a negative balance in it",
+                    position.token_index
+                );
+                continue;
+            }
         }
 
         let bank_oracle_result =
