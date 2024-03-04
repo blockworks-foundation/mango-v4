@@ -738,13 +738,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank],
         },
     )
@@ -753,13 +755,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[1].bank],
         },
     )
@@ -769,13 +773,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
     // ok even when total health = 0
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank, tokens[1].bank],
         },
     )
@@ -784,13 +790,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1001,
-            allow_borrow: true,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1001,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank],
         },
         MangoError::BorrowsRequireHealthAccountBank
@@ -798,13 +806,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1001,
-            allow_borrow: true,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1001,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[1].bank],
         },
         MangoError::HealthMustBePositiveOrIncrease
@@ -816,13 +826,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: true,
-            account,
-            owner,
-            token_account: payer_token_accounts[2],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank, tokens[1].bank],
         },
         MangoError::HealthMustBePositiveOrIncrease
@@ -830,13 +842,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: true,
-            account,
-            owner,
-            token_account: payer_token_accounts[2],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[2].bank],
         },
         MangoError::BorrowsRequireHealthAccountBank
@@ -844,13 +858,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: true,
-            account,
-            owner,
-            token_account: payer_token_accounts[2],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank],
         },
     )
@@ -863,13 +879,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank],
         },
     )
@@ -878,13 +896,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[1].bank],
         },
     )
@@ -893,13 +913,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[2].bank],
         },
         MangoError::InvalidBank
@@ -907,13 +929,15 @@ async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
 
     send_tx_expect_error!(
         solana,
-        TokenWithdrawSkipBanks {
-            amount: 1,
-            allow_borrow: false,
-            account,
-            owner,
-            token_account: payer_token_accounts[0],
-            bank_index: 0,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
             skip_banks: vec![tokens[0].bank, tokens[1].bank],
         },
         MangoError::HealthMustBePositiveOrIncrease
