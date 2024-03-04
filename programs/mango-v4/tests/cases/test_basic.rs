@@ -687,7 +687,7 @@ async fn test_bank_deposit_limit() -> Result<(), TransportError> {
 }
 
 #[tokio::test]
-async fn test_withdraw_without_all_banks() -> Result<(), TransportError> {
+async fn test_withdraw_skip_bank() -> Result<(), TransportError> {
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

@@ -369,8 +369,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // all vaults must have had matching banks
     for (i, has_bank) in vaults_with_banks.iter().enumerate() {
-        require_msg!(
+        require_msg_typed!(
             has_bank,
+            MangoError::InvalidBank,
             "missing bank for vault index {}, address {}",
             i,
             vaults[i].key
