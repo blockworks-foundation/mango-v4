@@ -49,7 +49,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
-  loanOriginationFeeRate: 0.005,
+  loanOriginationFeeRate: 0.0075,
   maintAssetWeight: 0,
   initAssetWeight: 0,
   maintLiabWeight: 1.4,
