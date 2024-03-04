@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["JupiterV4","QueryFee","QueryMarketInfo","QueryResult","QueryRoute","QueryRouteFees","SwapRequest","SwapResponse"]};

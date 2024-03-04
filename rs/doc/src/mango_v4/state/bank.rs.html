@@ -1769,6 +1769,48 @@
 <a href="#1769" id="1769">1769</a>
 <a href="#1770" id="1770">1770</a>
 <a href="#1771" id="1771">1771</a>
+<a href="#1772" id="1772">1772</a>
+<a href="#1773" id="1773">1773</a>
+<a href="#1774" id="1774">1774</a>
+<a href="#1775" id="1775">1775</a>
+<a href="#1776" id="1776">1776</a>
+<a href="#1777" id="1777">1777</a>
+<a href="#1778" id="1778">1778</a>
+<a href="#1779" id="1779">1779</a>
+<a href="#1780" id="1780">1780</a>
+<a href="#1781" id="1781">1781</a>
+<a href="#1782" id="1782">1782</a>
+<a href="#1783" id="1783">1783</a>
+<a href="#1784" id="1784">1784</a>
+<a href="#1785" id="1785">1785</a>
+<a href="#1786" id="1786">1786</a>
+<a href="#1787" id="1787">1787</a>
+<a href="#1788" id="1788">1788</a>
+<a href="#1789" id="1789">1789</a>
+<a href="#1790" id="1790">1790</a>
+<a href="#1791" id="1791">1791</a>
+<a href="#1792" id="1792">1792</a>
+<a href="#1793" id="1793">1793</a>
+<a href="#1794" id="1794">1794</a>
+<a href="#1795" id="1795">1795</a>
+<a href="#1796" id="1796">1796</a>
+<a href="#1797" id="1797">1797</a>
+<a href="#1798" id="1798">1798</a>
+<a href="#1799" id="1799">1799</a>
+<a href="#1800" id="1800">1800</a>
+<a href="#1801" id="1801">1801</a>
+<a href="#1802" id="1802">1802</a>
+<a href="#1803" id="1803">1803</a>
+<a href="#1804" id="1804">1804</a>
+<a href="#1805" id="1805">1805</a>
+<a href="#1806" id="1806">1806</a>
+<a href="#1807" id="1807">1807</a>
+<a href="#1808" id="1808">1808</a>
+<a href="#1809" id="1809">1809</a>
+<a href="#1810" id="1810">1810</a>
+<a href="#1811" id="1811">1811</a>
+<a href="#1812" id="1812">1812</a>
+<a href="#1813" id="1813">1813</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
@@ -1929,8 +1971,14 @@
     </span><span class="kw">pub </span>reduce_only: u8,
     <span class="kw">pub </span>force_close: u8,
 
+    <span class="doccomment">/// If set to 1, deposits cannot be liquidated when an account is liquidatable.
+    /// That means bankrupt accounts may still have assets of this type deposited.
+    </span><span class="kw">pub </span>disable_asset_liquidation: u8,
+
+    <span class="kw">pub </span>force_withdraw: u8,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>padding: [u8; <span class="number">6</span>],
+    </span><span class="kw">pub </span>padding: [u8; <span class="number">4</span>],
 
     <span class="comment">// Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -1988,8 +2036,16 @@
     /// See also collected_fees_native and fees_withdrawn.
     </span><span class="kw">pub </span>collected_liquidation_fees: I80F48,
 
+    <span class="doccomment">/// Collateral fees that have been collected (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    </span><span class="kw">pub </span>collected_collateral_fees: I80F48,
+
+    <span class="doccomment">/// The daily collateral fees rate for fully utilized collateral.
+    </span><span class="kw">pub </span>collateral_fee_per_day: f32,
+
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1920</span>],
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1900</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -2026,8 +2082,9 @@
         </span>+ <span class="number">16 </span>* <span class="number">3
         </span>+ <span class="number">32
         </span>+ <span class="number">8
-        </span>+ <span class="number">16 </span>* <span class="number">3
-        </span>+ <span class="number">1920
+        </span>+ <span class="number">16 </span>* <span class="number">4
+        </span>+ <span class="number">4
+        </span>+ <span class="number">1900
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -2071,6 +2128,7 @@
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
             collected_liquidation_fees: I80F48::ZERO,
+            collected_collateral_fees: I80F48::ZERO,
             fees_withdrawn: <span class="number">0</span>,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: <span class="number">0</span>,
@@ -2117,7 +2175,9 @@
             deposit_weight_scale_start_quote: existing_bank.deposit_weight_scale_start_quote,
             reduce_only: existing_bank.reduce_only,
             force_close: existing_bank.force_close,
-            padding: [<span class="number">0</span>; <span class="number">6</span>],
+            disable_asset_liquidation: existing_bank.disable_asset_liquidation,
+            force_withdraw: existing_bank.force_withdraw,
+            padding: [<span class="number">0</span>; <span class="number">4</span>],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -2134,7 +2194,8 @@
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
-            reserved: [<span class="number">0</span>; <span class="number">1920</span>],
+            collateral_fee_per_day: existing_bank.collateral_fee_per_day,
+            reserved: [<span class="number">0</span>; <span class="number">1900</span>],
         }
     }
 
@@ -2146,14 +2207,18 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.rate0, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.rate1, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.max_rate, I80F48::ZERO);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.adjustment_factor, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.loan_origination_fee_rate, <span class="number">0.0</span>);
-        <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_asset_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.stable_price_model.delay_growth_limit, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.stable_price_model.stable_growth_limit, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.init_asset_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_asset_weight, <span class="self">self</span>.init_asset_weight);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_liab_weight, <span class="number">0.0</span>);
-        <span class="macro">require_gte!</span>(<span class="self">self</span>.init_liab_weight, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.init_liab_weight, <span class="self">self</span>.maint_liab_weight);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.liquidation_fee, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.min_vault_to_deposits_ratio, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="number">1.0</span>, <span class="self">self</span>.min_vault_to_deposits_ratio);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.net_borrow_limit_per_window_quote, -<span class="number">1</span>);
         <span class="macro">require_gt!</span>(<span class="self">self</span>.borrow_weight_scale_start_quote, <span class="number">0.0</span>);
         <span class="macro">require_gt!</span>(<span class="self">self</span>.deposit_weight_scale_start_quote, <span class="number">0.0</span>);
@@ -2163,11 +2228,22 @@
         <span class="macro">require_gte!</span>(<span class="self">self</span>.flash_loan_swap_fee_rate, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.interest_curve_scaling, <span class="number">1.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.interest_target_utilization, <span class="number">0.0</span>);
+        <span class="macro">require_gte!</span>(<span class="number">1.0</span>, <span class="self">self</span>.interest_target_utilization);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_duration_inv, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_asset_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.maint_weight_shift_liab_target, <span class="number">0.0</span>);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.zero_util_rate, I80F48::ZERO);
         <span class="macro">require_gte!</span>(<span class="self">self</span>.platform_liquidation_fee, <span class="number">0.0</span>);
+        <span class="kw">if </span>!<span class="self">self</span>.allows_asset_liquidation() {
+            <span class="macro">require!</span>(<span class="self">self</span>.are_borrows_reduce_only(), MangoError::SomeError);
+            <span class="macro">require_eq!</span>(<span class="self">self</span>.maint_asset_weight, I80F48::ZERO);
+        }
+        <span class="macro">require_gte!</span>(<span class="self">self</span>.collateral_fee_per_day, <span class="number">0.0</span>);
+        <span class="kw">if </span><span class="self">self</span>.is_force_withdraw() {
+            <span class="macro">require!</span>(<span class="self">self</span>.are_deposits_reduce_only(), MangoError::SomeError);
+            <span class="macro">require!</span>(!<span class="self">self</span>.allows_asset_liquidation(), MangoError::SomeError);
+            <span class="macro">require_eq!</span>(<span class="self">self</span>.maint_asset_weight, I80F48::ZERO);
+        }
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -2187,6 +2263,14 @@
 
     <span class="kw">pub fn </span>is_force_close(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.force_close == <span class="number">1
+    </span>}
+
+    <span class="kw">pub fn </span>is_force_withdraw(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.force_withdraw == <span class="number">1
+    </span>}
+
+    <span class="kw">pub fn </span>allows_asset_liquidation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.disable_asset_liquidation == <span class="number">0
     </span>}
 
     <span class="attr">#[inline(always)]
@@ -2503,7 +2587,7 @@
         })
     }
 
-    <span class="comment">// withdraw the loan origination fee for a borrow that happenend earlier
+    <span class="comment">// withdraw the loan origination fee for a borrow that happened earlier
     </span><span class="kw">pub fn </span>withdraw_loan_origination_fee(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         position: <span class="kw-2">&amp;mut </span>TokenPosition,
@@ -2823,7 +2907,7 @@
         )
     }
 
-    <span class="doccomment">/// calcualtor function that can be used to compute an interest
+    <span class="doccomment">/// calculator function that can be used to compute an interest
     /// rate based on the given parameters
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>interest_rate_curve_calculator(

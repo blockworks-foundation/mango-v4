@@ -712,7 +712,7 @@
     <span class="kw">pub </span>begin_serum3: usize,
     <span class="kw">pub </span>staleness_slot: <span class="prelude-ty">Option</span>&lt;u64&gt;,
     <span class="kw">pub </span>begin_fallback_oracles: usize,
-    <span class="kw">pub </span>usd_oracle_index: <span class="prelude-ty">Option</span>&lt;usize&gt;,
+    <span class="kw">pub </span>usdc_oracle_index: <span class="prelude-ty">Option</span>&lt;usize&gt;,
     <span class="kw">pub </span>sol_oracle_index: <span class="prelude-ty">Option</span>&lt;usize&gt;,
 }
 
@@ -731,7 +731,7 @@
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
     );
-    <span class="kw">let </span>usd_oracle_index = ais[..]
+    <span class="kw">let </span>usdc_oracle_index = ais[..]
         .iter()
         .position(|o| o.key == <span class="kw-2">&amp;</span>pyth_mainnet_usdc_oracle::ID);
     <span class="kw">let </span>sol_oracle_index = ais[..]
@@ -746,7 +746,7 @@
         begin_serum3: active_token_len * <span class="number">2 </span>+ active_perp_len * <span class="number">2</span>,
         staleness_slot: <span class="prelude-val">Some</span>(Clock::get()<span class="question-mark">?</span>.slot),
         begin_fallback_oracles: expected_ais,
-        usd_oracle_index,
+        usdc_oracle_index,
         sol_oracle_index,
     })
 }
@@ -792,7 +792,7 @@
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: <span class="self">self</span>.usd_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.ais[i]),
+            usdc_opt: <span class="self">self</span>.usdc_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.ais[i]),
             sol_opt: <span class="self">self</span>.sol_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.ais[i]),
         }
     }
@@ -977,7 +977,7 @@
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: <span class="self">self</span>.usd_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles[i]),
+            usdc_opt: <span class="self">self</span>.usd_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles[i]),
             sol_opt: <span class="self">self</span>.sol_oracle_index.map(|i| <span class="kw-2">&amp;</span><span class="self">self</span>.fallback_oracles[i]),
         }
     }

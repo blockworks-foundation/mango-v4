@@ -413,6 +413,13 @@
 <a href="#413" id="413">413</a>
 <a href="#414" id="414">414</a>
 <a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
+<a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 
 <span class="kw">use </span>anchor_lang::prelude::Pubkey;
@@ -609,15 +616,15 @@
                 ),
             ),
         ];
-        <span class="kw">let </span>client = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.client;
-        <span class="kw">if </span>!client.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, client.jupiter_token.clone()));
+        <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
+        <span class="kw">if </span>!config.jupiter_token.is_empty() {
+            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
         }
 
         <span class="kw">let </span>response = <span class="self">self
             </span>.mango_client
             .http_client
-            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, client.jupiter_v6_url))
+            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, config.jupiter_v6_url))
             .query(<span class="kw-2">&amp;</span>query_args)
             .send()
             .<span class="kw">await
@@ -652,6 +659,7 @@
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
         <span class="kw">let </span>owner = <span class="self">self</span>.mango_client.owner();
+        <span class="kw">let </span>account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let </span>token_ams = [source_token.mint, target_token.mint]
             .into_iter()
@@ -674,6 +682,7 @@
         </span><span class="kw">let </span>(health_ams, _health_cu) = <span class="self">self
             </span>.mango_client
             .derive_health_check_remaining_account_metas(
+                account,
                 <span class="macro">vec!</span>[source_token.token_index, target_token.token_index],
                 <span class="macro">vec!</span>[source_token.token_index, target_token.token_index],
                 <span class="macro">vec!</span>[],
@@ -682,15 +691,15 @@
             </span>.context(<span class="string">&quot;building health accounts&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>query_args = <span class="macro">vec!</span>[];
-        <span class="kw">let </span>client = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.client;
-        <span class="kw">if </span>!client.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, client.jupiter_token.clone()));
+        <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
+        <span class="kw">if </span>!config.jupiter_token.is_empty() {
+            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
         }
 
         <span class="kw">let </span>swap_response = <span class="self">self
             </span>.mango_client
             .http_client
-            .post(<span class="macro">format!</span>(<span class="string">&quot;{}/swap-instructions&quot;</span>, client.jupiter_v6_url))
+            .post(<span class="macro">format!</span>(<span class="string">&quot;{}/swap-instructions&quot;</span>, config.jupiter_v6_url))
             .query(<span class="kw-2">&amp;</span>query_args)
             .json(<span class="kw-2">&amp;</span>SwapRequest {
                 user_public_key: owner.to_string(),
@@ -801,7 +810,12 @@
             address_lookup_tables,
             payer,
             signers: <span class="macro">vec!</span>[<span class="self">self</span>.mango_client.owner.clone()],
-            config: <span class="self">self</span>.mango_client.client.transaction_builder_config,
+            config: <span class="self">self
+                </span>.mango_client
+                .client
+                .config()
+                .transaction_builder_config
+                .clone(),
         })
     }
 

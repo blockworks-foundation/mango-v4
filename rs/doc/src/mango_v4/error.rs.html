@@ -282,6 +282,8 @@
 <a href="#282" id="282">282</a>
 <a href="#283" id="283">283</a>
 <a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>core::fmt::Display;
 
@@ -427,6 +429,8 @@
     </span>InvalidFeedForCLMMOracle,
     <span class="attr">#[msg(<span class="string">&quot;Pyth USDC/USD or SOL/USD feed not found (required by CLMM oracle)&quot;</span>)]
     </span>MissingFeedForCLMMOracle,
+    <span class="attr">#[msg(<span class="string">&quot;the asset does not allow liquidation&quot;</span>)]
+    </span>TokenAssetLiquidationDisabled,
 }
 
 <span class="kw">impl </span>MangoError {
