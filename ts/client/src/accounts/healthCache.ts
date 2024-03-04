@@ -811,7 +811,7 @@ export class HealthCache {
     }
   }
 
-  private static binaryApproximationSearch(
+  static binaryApproximationSearch(
     left: I80F48,
     leftValue: I80F48,
     right: I80F48,

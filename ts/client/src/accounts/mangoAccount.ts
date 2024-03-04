@@ -4,7 +4,13 @@ import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import {
+  I80F48,
+  I80F48Dto,
+  MAX_I80F48,
+  ONE_I80F48,
+  ZERO_I80F48,
+} from '../numbers/I80F48';
 import {
   U64_MAX_BN,
   roundTo5,
@@ -12,6 +18,7 @@ import {
   toUiDecimals,
   toUiDecimalsForQuote,
   toUiSellPerBuyTokenPrice,
+  deepClone,
 } from '../utils';
 import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
@@ -533,83 +540,100 @@ export class MangoAccount {
     mintPk: PublicKey,
   ): I80F48 {
     const tokenBank: Bank = group.getFirstBankByMint(mintPk);
+    const loanOriginationFactor = ONE_I80F48().add(
+      tokenBank.loanOriginationFeeRate,
+    );
+    const maxBorrowUtilization = I80F48.fromNumber(
+      1 - tokenBank.minVaultToDepositsRatio,
+    );
     const tp = this.getToken(tokenBank.tokenIndex);
-    const initHealth = this.getHealth(group, HealthType.init);
+    let healthCache = HealthCache.fromMangoAccount(group, this);
+    const tokenInfoIndex = healthCache.getOrCreateTokenInfoIndex(tokenBank);
+    const initHealth = healthCache.health(HealthType.init);
 
     // Cannot withdraw if init health is below 0
     if (initHealth.lte(ZERO_I80F48())) {
       return ZERO_I80F48();
     }
 
-    // Step 1: withdrawing deposits
-
-    // NOTE: this ignores scaled init asset weight changing due to withdraws
-    const assetHealthFactor = tokenBank
-      .getAssetPrice()
-      .mul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
-
-    // To ensure utilization <= 100%, deposits can only be withdrawn until deposits=borrows
-    const depositWithdrawUtilizationLimit = tokenBank
-      .nativeDeposits()
-      .sub(tokenBank.nativeBorrows())
-      .max(ZERO_I80F48());
-
-    const depositWithdrawHealthLimit = initHealth.div(assetHealthFactor);
+    // Step 1: Since withdraws can change the asset weight scaling and borrows will
+    // change the liab weight scaling, we use a binary search to find something
+    // close to the true maximum value.
+    // To do that, we first get an upper bound that the search can start with.
 
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
-    const allowedDepositWithdraws = existingTokenDeposits
-      .min(depositWithdrawUtilizationLimit)
-      .min(depositWithdrawHealthLimit)
-      .max(ZERO_I80F48());
-
-    const initHealthWithoutDeposits = initHealth.sub(
-      existingTokenDeposits.mul(assetHealthFactor),
-    );
-
-    // If we can't withdraw all deposits, we're done: there can't be any borrows
-    if (!initHealthWithoutDeposits.isPos()) {
-      return allowedDepositWithdraws;
-    }
-
-    // Step 2: all deposits are gone, how much can be borrowed?
-
-    // NOTE: this ignores scaled init liab weight changing due to borrows
-    const borrowHealthFactor = tokenBank
+    const lowerBoundBorrowHealthFactor = tokenBank
       .getLiabPrice()
       .mul(tokenBank.scaledInitLiabWeight(tokenBank.getLiabPrice()));
-
-    // (bankBorrows+borrows) / (bankDeposits-withdraws) <= maxBorrowUtilization
-    // so borrows <= maxBorrowUtilization * (bankDeposits-withdraws) - bankBorrows
-    const maxBorrowUtilization = I80F48.fromNumber(
-      1 - tokenBank.minVaultToDepositsRatio,
+    const upperBound = existingTokenDeposits.add(
+      initHealth.div(lowerBoundBorrowHealthFactor),
     );
-    const borrowUtilizationLimit = maxBorrowUtilization
-      .mul(tokenBank.nativeDeposits().sub(existingTokenDeposits))
-      .sub(tokenBank.nativeBorrows());
 
-    const borrowHealthLimit = initHealthWithoutDeposits.div(borrowHealthFactor);
+    // Step 2: Find the maximum withdraw amount
 
-    // Cap maxBorrow to maintain minVaultToDepositsRatio on the bank
+    let mutTokenBank = deepClone<Bank>(tokenBank);
+    let mutHealthCache = deepClone<HealthCache>(healthCache);
+    function healthAfterWithdraw(amount: I80F48): I80F48 {
+      const withdrawOfDepositsAmount = amount.min(existingTokenDeposits);
+      const borrowAmount = amount.sub(withdrawOfDepositsAmount);
+      // Take care of loan origination fee
+      const borrowCost = borrowAmount.mul(loanOriginationFactor);
+
+      // Update the account's token position
+      let mutTi = mutHealthCache.tokenInfos[tokenInfoIndex];
+      const startTi = healthCache.tokenInfos[tokenInfoIndex];
+      mutTi.balanceSpot = startTi.balanceSpot
+        .sub(withdrawOfDepositsAmount)
+        .sub(borrowCost);
+
+      // Update the bank and the scaled weights
+      mutTokenBank.indexedDeposits = tokenBank.indexedDeposits.sub(
+        withdrawOfDepositsAmount.div(tokenBank.depositIndex),
+      );
+      mutTokenBank.indexedBorrows = tokenBank.indexedBorrows.add(
+        borrowCost.div(tokenBank.borrowIndex),
+      );
+      if (mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeDeposits())) {
+        return MAX_I80F48().neg();
+      }
+      if (borrowAmount.isPos()) {
+        if (
+          mutTokenBank
+            .nativeBorrows()
+            .gt(mutTokenBank.nativeDeposits().mul(maxBorrowUtilization))
+        ) {
+          return MAX_I80F48().neg();
+        }
+      }
+      mutTi.initScaledAssetWeight = mutTokenBank.scaledInitAssetWeight(
+        tokenBank.getAssetPrice(),
+      );
+      mutTi.initScaledLiabWeight = mutTokenBank.scaledInitLiabWeight(
+        tokenBank.getLiabPrice(),
+      );
+
+      return mutHealthCache.health(HealthType.init);
+    }
+
+    const amount = HealthCache.binaryApproximationSearch(
+      ZERO_I80F48(),
+      initHealth,
+      upperBound,
+      ONE_I80F48().min(initHealth),
+      I80F48.fromNumber(0.1),
+      healthAfterWithdraw,
+    );
+
+    // Step 3: also limit by vault funds
     const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
     if (!vaultAmount) {
       throw new Error(
         `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
       );
     }
-    const borrowVaultLimit = I80F48.fromU64(vaultAmount).sub(
-      existingTokenDeposits,
-    );
+    const vaultLimit = I80F48.fromU64(vaultAmount);
 
-    const allowedBorrowsWithoutFees = borrowHealthLimit
-      .min(borrowUtilizationLimit)
-      .min(borrowVaultLimit)
-      .max(ZERO_I80F48());
-
-    const allowedBorrows = allowedBorrowsWithoutFees.div(
-      ONE_I80F48().add(tokenBank.loanOriginationFeeRate),
-    );
-
-    return allowedBorrows.add(existingTokenDeposits);
+    return amount.min(vaultLimit);
   }
 
   public getMaxWithdrawWithBorrowForTokenUi(
