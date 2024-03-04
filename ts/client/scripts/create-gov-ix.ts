@@ -265,6 +265,7 @@ async function perpCreate(): Promise<void> {
       1,
       new BN(60 * 60),
       percentageToDecimal(10),
+      0,
     )
     .accounts({
       group: group.publicKey,
@@ -358,6 +359,7 @@ async function perpEdit(): Promise<void> {
       params.positivePnlLiquidationFee,
       params.name,
       params.forceClose,
+      params.platformLiquidationFee,
     )
     .accounts({
       group: group.publicKey,

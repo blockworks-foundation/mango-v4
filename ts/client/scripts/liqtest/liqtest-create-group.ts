@@ -237,6 +237,7 @@ async function main(): Promise<void> {
       -1.0,
       2 * 60 * 60,
       0.025,
+      0,
     );
   } catch (error) {
     console.log(error);
