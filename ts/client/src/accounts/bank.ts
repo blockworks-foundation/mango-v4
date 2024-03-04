@@ -1,7 +1,6 @@
 import { BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { PublicKey } from '@solana/web3.js';
-import { format } from 'path';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, toUiDecimals } from '../utils';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
@@ -142,6 +141,7 @@ export class Bank implements BankForHealth {
       maintWeightShiftDurationInv: I80F48Dto;
       maintWeightShiftAssetTarget: I80F48Dto;
       maintWeightShiftLiabTarget: I80F48Dto;
+      fallbackOracle: PublicKey;
       depositLimit: BN;
       zeroUtilRate: I80F48Dto;
       platformLiquidationFee: I80F48Dto;
@@ -205,6 +205,7 @@ export class Bank implements BankForHealth {
       obj.maintWeightShiftDurationInv,
       obj.maintWeightShiftAssetTarget,
       obj.maintWeightShiftLiabTarget,
+      obj.fallbackOracle,
       obj.depositLimit,
       obj.zeroUtilRate,
       obj.platformLiquidationFee,
@@ -269,6 +270,7 @@ export class Bank implements BankForHealth {
     maintWeightShiftDurationInv: I80F48Dto,
     maintWeightShiftAssetTarget: I80F48Dto,
     maintWeightShiftLiabTarget: I80F48Dto,
+    public fallbackOracle: PublicKey,
     public depositLimit: BN,
     zeroUtilRate: I80F48Dto,
     platformLiquidationFee: I80F48Dto,
@@ -669,6 +671,7 @@ export class MintInfo {
       vaults: PublicKey[];
       oracle: PublicKey;
       registrationTime: BN;
+      fallbackOracle: PublicKey;
       groupInsuranceFund: number;
     },
   ): MintInfo {
@@ -681,6 +684,7 @@ export class MintInfo {
       obj.vaults,
       obj.oracle,
       obj.registrationTime,
+      obj.fallbackOracle,
       obj.groupInsuranceFund == 1,
     );
   }
@@ -694,6 +698,7 @@ export class MintInfo {
     public vaults: PublicKey[],
     public oracle: PublicKey,
     public registrationTime: BN,
+    public fallbackOracle: PublicKey,
     public groupInsuranceFund: boolean,
   ) {}
 
