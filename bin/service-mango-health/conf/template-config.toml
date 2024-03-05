@@ -1,6 +1,7 @@
 rpc_http_url = "$RPC_HTTP_URL"
 rpc_ws_url = "$RPC_WS_URL"
 mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
+snapshot_interval_secs = 900
 
 [postgres]
 connection_string = "$PG_CONNECTION_STRING"
