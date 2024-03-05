@@ -3700,6 +3700,21 @@ export class MangoClient {
       ])
       .instruction();
 
+    const uniqueAccountsCount = [
+      ...new Set(
+        [
+          ...preInstructions,
+          flashLoanBeginIx,
+          ...userDefinedInstructions,
+          flashLoanEndIx,
+        ].flatMap((x) => x.keys.map((x) => x.pubkey.toBase58())),
+      ),
+    ].length;
+
+    if (uniqueAccountsCount > 62) {
+      throw new Error(`Max accounts limit exceeded`);
+    }
+
     return await this.sendAndConfirmTransactionForGroup(
       group,
       [
