@@ -830,10 +830,8 @@ export class HealthCache {
     // );
 
     if (
-      (leftValue.sub(targetValue).isPos() &&
-        rightValue.sub(targetValue).isPos()) ||
-      (leftValue.sub(targetValue).isNeg() &&
-        rightValue.sub(targetValue).isNeg())
+      (leftValue.gt(targetValue) && rightValue.gt(targetValue)) ||
+      (leftValue.lt(targetValue) && rightValue.lt(targetValue))
     ) {
       throw new Error(
         `Internal error: left ${leftValue.toNumber()}  and right ${rightValue.toNumber()} don't contain the target value ${targetValue.toNumber()}!`,

@@ -573,6 +573,7 @@ export class MangoAccount {
 
     let mutTokenBank = deepClone<Bank>(tokenBank);
     let mutHealthCache = deepClone<HealthCache>(healthCache);
+    const invalidHealthValue = MAX_I80F48().div(I80F48.fromNumber(2)).neg();
     function healthAfterWithdraw(amount: I80F48): I80F48 {
       const withdrawOfDepositsAmount = amount.min(existingTokenDeposits);
       const borrowAmount = amount.sub(withdrawOfDepositsAmount);
@@ -594,7 +595,7 @@ export class MangoAccount {
         borrowCost.div(tokenBank.borrowIndex),
       );
       if (mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeDeposits())) {
-        return MAX_I80F48().neg();
+        return invalidHealthValue;
       }
       if (borrowAmount.isPos()) {
         if (
@@ -602,7 +603,7 @@ export class MangoAccount {
             .nativeBorrows()
             .gt(mutTokenBank.nativeDeposits().mul(maxBorrowUtilization))
         ) {
-          return MAX_I80F48().neg();
+          return invalidHealthValue;
         }
       }
       mutTi.initScaledAssetWeight = mutTokenBank.scaledInitAssetWeight(
@@ -615,16 +616,36 @@ export class MangoAccount {
       return mutHealthCache.health(HealthType.init);
     }
 
-    const amount = HealthCache.binaryApproximationSearch(
+    // Withdrawing one token will change health by at least this much.
+    // We use this to define a good stopping criterion for the search.
+    const minHealthChangePerNative = tokenBank
+      .getAssetPrice()
+      .mul(tokenBank.scaledInitAssetWeight(tokenBank.getAssetPrice()));
+
+    let amount = HealthCache.binaryApproximationSearch(
       ZERO_I80F48(),
       initHealth,
       upperBound,
-      ONE_I80F48().min(initHealth),
-      I80F48.fromNumber(0.1),
+      I80F48.fromNumber(0.5).mul(minHealthChangePerNative).min(initHealth),
+      I80F48.fromNumber(0.2).mul(minHealthChangePerNative),
       healthAfterWithdraw,
+      {
+        targetError: I80F48.fromNumber(0.2)
+          .mul(minHealthChangePerNative)
+          .toNumber(),
+      },
     );
 
-    // Step 3: also limit by vault funds
+    // Step 3: Only full tokens can be withdrawn, do the rounding and
+    // check if withdrawing one-native more would also be fine
+
+    amount = amount.floor();
+    const amountPlusOne = amount.add(ONE_I80F48());
+    if (!healthAfterWithdraw(amountPlusOne).isNeg()) {
+      amount = amountPlusOne;
+    }
+
+    // Step 4: also limit by vault funds
     const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
     if (!vaultAmount) {
       throw new Error(
