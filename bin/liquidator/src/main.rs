@@ -403,6 +403,9 @@ async fn main() -> anyhow::Result<()> {
         let mut metric_liquidation_start_end =
             metrics.register_latency("liquidation_start_end".into());
 
+        let mut liquidation_start_time = None;
+        let mut tcs_start_time = None;
+
         let shared_state = shared_state.clone();
         async move {
             loop {
@@ -416,14 +419,10 @@ async fn main() -> anyhow::Result<()> {
                         continue;
                     }
                     if state.oldest_chain_event_reception_time.is_none()
-                        && state.liquidation_start_time.is_none()
+                        && liquidation_start_time.is_none()
                     {
                         // no new update, skip computing
                         continue;
-                    }
-
-                    if state.liquidation_start_time.is_none() {
-                        state.liquidation_start_time = Some(Instant::now());
                     }
 
                     state.mango_accounts.iter().cloned().collect_vec()
@@ -431,6 +430,10 @@ async fn main() -> anyhow::Result<()> {
 
                 liquidation.errors.update();
                 liquidation.oracle_errors.update();
+
+                if liquidation_start_time.is_none() {
+                    liquidation_start_time = Some(Instant::now());
+                }
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -443,23 +446,19 @@ async fn main() -> anyhow::Result<()> {
 
                     let mut state = shared_state.write().unwrap();
                     let reception_time = state.oldest_chain_event_reception_time.unwrap();
-                    let liquidation_start_time = state.liquidation_start_time.unwrap();
                     let current_time = Instant::now();
 
-                    state.liquidation_start_time = None;
                     state.oldest_chain_event_reception_time = None;
 
                     metric_liquidation_check.push(current_time - reception_time);
-                    metric_liquidation_start_end.push(current_time - liquidation_start_time);
+                    metric_liquidation_start_end
+                        .push(current_time - liquidation_start_time.unwrap());
+                    liquidation_start_time = None;
                 }
 
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    let tcs_start_time = {
-                        let mut state = shared_state.write().unwrap();
-                        state.tcs_start_time = Some(state.tcs_start_time.unwrap_or(Instant::now()));
-                        state.tcs_start_time
-                    };
+                    tcs_start_time = Some(tcs_start_time.unwrap_or(Instant::now()));
 
                     took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
@@ -473,9 +472,8 @@ async fn main() -> anyhow::Result<()> {
                         let current_time = Instant::now();
                         let mut metric_tcs_start_end =
                             metrics.register_latency("tcs_start_end".into());
-                        let mut state = shared_state.write().unwrap();
-                        state.tcs_start_time = None;
                         metric_tcs_start_end.push(current_time - tcs_start_time.unwrap());
+                        tcs_start_time = None;
                     }
                 }
 
@@ -559,14 +557,6 @@ struct SharedState {
 
     /// Oldest chain event not processed yet
     oldest_chain_event_reception_time: Option<Instant>,
-
-    /// When did current liquidation loop start
-    /// Will not change until we do a full loop over all accounts
-    /// (might need several tries as we exit computation as soon as we find a liquidation candidate)
-    liquidation_start_time: Option<Instant>,
-
-    /// When did current tcs loop start
-    tcs_start_time: Option<Instant>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
