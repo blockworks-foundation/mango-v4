@@ -627,9 +627,10 @@ export class MangoAccount {
       initHealth,
       upperBound,
       I80F48.fromNumber(0.5).mul(minHealthChangePerNative).min(initHealth),
-      I80F48.fromNumber(0.2).mul(minHealthChangePerNative),
+      I80F48.fromNumber(0.5),
       healthAfterWithdraw,
       {
+        maxIterations: 100,
         targetError: I80F48.fromNumber(0.2)
           .mul(minHealthChangePerNative)
           .toNumber(),
