@@ -179,8 +179,8 @@ describe('maxWithdraw', () => {
 
   function setup(vaultAmount): [Group, Bank, Bank, MangoAccount] {
     const account = deepClone<MangoAccount>(protoAccount);
-    let bank0 = deepClone(protoBank);
-    let bank1 = deepClone(protoBank);
+    const bank0 = deepClone(protoBank);
+    const bank1 = deepClone(protoBank);
     bank1.tokenIndex = 1 as TokenIndex;
     bank1.mint = PublicKey.unique();
     bank1.initAssetWeight = ONE_I80F48();
@@ -191,13 +191,13 @@ describe('maxWithdraw', () => {
 
   function deposit(bank, account, amount) {
     const amountV = I80F48.fromNumber(amount);
-    let indexedAmount = amountV.div(bank.depositIndex);
+    const indexedAmount = amountV.div(bank.depositIndex);
     if (indexedAmount.mul(bank.depositIndex).lt(amountV)) {
       const delta = new I80F48(new BN(1));
       indexedAmount.iadd(delta);
     }
     bank.indexedDeposits.iadd(indexedAmount);
-    let tp = account.tokens[bank.tokenIndex];
+    const tp = account.tokens[bank.tokenIndex];
     assert(!tp.indexedPosition.isNeg());
     tp.indexedPosition.iadd(indexedAmount);
   }
@@ -205,7 +205,7 @@ describe('maxWithdraw', () => {
   function borrow(bank, account, amount) {
     const indexedAmount = I80F48.fromNumber(amount).div(bank.borrowIndex);
     bank.indexedBorrows.iadd(indexedAmount);
-    let tp = account.tokens[bank.tokenIndex];
+    const tp = account.tokens[bank.tokenIndex];
     assert(!tp.indexedPosition.isPos());
     tp.indexedPosition.isub(indexedAmount);
   }
@@ -217,22 +217,22 @@ describe('maxWithdraw', () => {
   }
 
   it('full withdraw', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, bank1, account] = setup(1000000);
     deposit(bank0, account, 100);
     expect(maxWithdraw(group, account)).equal(100);
     done();
   });
 
   it('full withdraw limited vault', (done) => {
-    let [group, bank0, bank1, account] = setup(90);
+    const [group, bank0, bank1, account] = setup(90);
     deposit(bank0, account, 100);
     expect(maxWithdraw(group, account)).equal(90);
     done();
   });
 
   it('full withdraw limited utilization', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
-    let other = deepClone(account);
+    const [group, bank0, bank1, account] = setup(1000000);
+    const other = deepClone(account);
     deposit(bank0, account, 100);
     borrow(bank0, other, 50);
     expect(maxWithdraw(group, account)).equal(50);
@@ -240,7 +240,7 @@ describe('maxWithdraw', () => {
   });
 
   it('withdraw limited health', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, bank1, account] = setup(1000000);
     deposit(bank0, account, 100);
     borrow(bank1, account, 50);
     expect(maxWithdraw(group, account)).equal(Math.floor(100 - 50 / 0.8));
@@ -248,8 +248,8 @@ describe('maxWithdraw', () => {
   });
 
   it('pure borrow', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
-    let other = deepClone(account);
+    const [group, bank0, bank1, account] = setup(1000000);
+    const other = deepClone(account);
     deposit(bank0, other, 1000); // so there's something to borrow
     deposit(bank1, account, 100);
     expect(maxWithdraw(group, account)).equal(Math.floor(100 / 1.2));
@@ -257,8 +257,8 @@ describe('maxWithdraw', () => {
   });
 
   it('pure borrow limited utilization', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
-    let other = deepClone(account);
+    const [group, bank0, bank1, account] = setup(1000000);
+    const other = deepClone(account);
     deposit(bank0, other, 50);
     deposit(bank1, account, 100);
     expect(maxWithdraw(group, account)).equal(44); // due to origination fees!
@@ -270,8 +270,8 @@ describe('maxWithdraw', () => {
   });
 
   it('withdraw and borrow', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
-    let other = deepClone(account);
+    const [group, bank0, bank1, account] = setup(1000000);
+    const other = deepClone(account);
     deposit(bank0, account, 100);
     deposit(bank1, account, 100);
     deposit(bank0, other, 10000);
@@ -280,7 +280,7 @@ describe('maxWithdraw', () => {
   });
 
   it('withdraw limited health and scaling', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, bank1, account] = setup(1000000);
     bank0.scaledInitAssetWeight = function (price) {
       const startScale = I80F48.fromNumber(50);
       if (this.nativeDeposits().gt(startScale)) {
@@ -288,7 +288,7 @@ describe('maxWithdraw', () => {
       }
       return this.initAssetWeight;
     };
-    let other = deepClone(account);
+    const other = deepClone(account);
     deposit(bank0, other, 100);
     deposit(bank0, account, 200);
     borrow(bank1, account, 20);
@@ -300,7 +300,7 @@ describe('maxWithdraw', () => {
   });
 
   it('borrow limited health and scaling', (done) => {
-    let [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, bank1, account] = setup(1000000);
     bank0.scaledInitLiabWeight = function (price) {
       const startScale = I80F48.fromNumber(50);
       if (this.nativeBorrows().gt(startScale)) {
@@ -308,7 +308,7 @@ describe('maxWithdraw', () => {
       }
       return this.initLiabWeight;
     };
-    let other = deepClone(account);
+    const other = deepClone(account);
     deposit(bank0, other, 100);
     deposit(bank1, account, 100);
     // -64*1.2*64/50+100 = 1.69
