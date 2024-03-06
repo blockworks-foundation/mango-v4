@@ -154,6 +154,9 @@ describe('maxWithdraw', () => {
     nativeBorrows() {
       return this.borrowIndex.mul(this.indexedBorrows);
     },
+    areBorrowsReduceOnly() {
+      return false;
+    },
   } as any as Bank;
 
   function makeGroup(bank0, bank1, vaultAmount) {

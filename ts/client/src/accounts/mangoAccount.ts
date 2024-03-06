@@ -639,14 +639,18 @@ export class MangoAccount {
 
     // Step 3: Only full tokens can be withdrawn, do the rounding and
     // check if withdrawing one-native more would also be fine
-
     amount = amount.floor();
     const amountPlusOne = amount.add(ONE_I80F48());
     if (!healthAfterWithdraw(amountPlusOne).isNeg()) {
       amount = amountPlusOne;
     }
 
-    // Step 4: also limit by vault funds
+    // Step 4: No borrows on no-borrow tokens
+    if (tokenBank.areBorrowsReduceOnly()) {
+      amount = amount.min(existingTokenDeposits);
+    }
+
+    // Step 5: also limit by vault funds
     const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
     if (!vaultAmount) {
       throw new Error(
@@ -655,7 +659,7 @@ export class MangoAccount {
     }
     const vaultLimit = I80F48.fromU64(vaultAmount);
 
-    return amount.min(vaultLimit);
+    return amount.min(vaultLimit).max(ZERO_I80F48());
   }
 
   public getMaxWithdrawWithBorrowForTokenUi(
