@@ -576,9 +576,6 @@ impl Bank {
             self.unlendable_deposits += deposit_amount.to_num::<u64>();
             self.dust += native_amount - deposit_amount;
             position.indexed_position += deposit_amount;
-            // TODO: do these positions auto-delete themselves, like normal ones?
-            // sounds like users might accidentally switch over to lendable positions that way,
-            // better make it explicit!
             Ok(true)
         }
     }
@@ -734,11 +731,10 @@ impl Bank {
         } else {
             // TODO: might there be trouble by rounding up here?
             let withdraw_amount = native_amount.ceil();
+            self.dust += withdraw_amount - native_amount;
             self.unlendable_deposits -= withdraw_amount.to_num::<u64>();
             position.indexed_position -= withdraw_amount;
-            // TODO: do these positions auto-delete themselves, like normal ones?
-            // sounds like users might accidentally switch over to lendable positions that way,
-            // better make it explicit!
+            require_gte!(position.indexed_position, I80F48::ZERO); // TODO: error
             Ok(WithdrawResult {
                 position_is_active: true,
                 loan_amount: I80F48::ZERO,
