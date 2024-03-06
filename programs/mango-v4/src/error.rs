@@ -147,6 +147,8 @@ pub enum MangoError {
     TokenAssetLiquidationDisabled,
     #[msg("for borrows the bank must be in the health account list")]
     BorrowsRequireHealthAccountBank,
+    #[msg("perp settle token position does not support borrows")]
+    PerpSettleTokenPositionMustSupportBorrows,
 }
 
 impl MangoError {

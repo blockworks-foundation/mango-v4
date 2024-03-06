@@ -91,11 +91,12 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let bank = ctx.accounts.bank.load()?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
-    if ctx.accounts.vault.amount < amount {
+    // Note that unlendable_deposits has already been reduced above.
+    if ctx.accounts.vault.amount < bank.unlendable_deposits + amount {
         return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
             format!(
-                "bank vault does not have enough tokens, need {} but have {}",
-                amount, ctx.accounts.vault.amount
+                "bank vault does not have enough tokens, need {} but have {} ({} unlendable)",
+                amount, ctx.accounts.vault.amount, bank.unlendable_deposits
             )
         });
     }

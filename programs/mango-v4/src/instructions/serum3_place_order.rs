@@ -331,6 +331,14 @@ pub fn serum3_place_order(
         )?
     };
 
+    // Verify that the no-lending amount on the vault remains. If the acting account
+    // itself had a no-lending position, the unlendable_deposits has already been reduced.
+    require_gte!(
+        after_vault,
+        payer_bank.unlendable_deposits,
+        MangoError::InsufficentBankVaultFunds
+    );
+
     // Deposit limit check, receiver side:
     // Placing an order can always increase the receiver bank deposits on fill.
     {

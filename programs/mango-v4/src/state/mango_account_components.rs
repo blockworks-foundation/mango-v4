@@ -29,8 +29,20 @@ pub struct TokenPosition {
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u16,
 
+    /// set to 1 when these deposits may not be lent out
+    ///
+    /// This has wide ranging consequences:
+    /// - only deposits possible, no borrows (TODO: that means no perps because settlement may cause borrows?)
+    /// - not accounted for in Bank.indexedDeposits
+    /// - instead tracked in Bank.unlendableDeposits (to ensure the vault always has them)
+    /// - indexed_position becomes stores straight token-native amount, fractional will always be 0
+    ///
+    /// TODO: completely borks logging of indexed_position in many instructions
+    /// TODO: this means all fractional deposits/withdraws are dusted?!
+    pub disable_lending: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 4],
+    pub padding: [u8; 3],
 
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
@@ -59,6 +71,7 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
@@ -78,26 +91,30 @@ impl TokenPosition {
     }
 
     pub fn native(&self, bank: &Bank) -> I80F48 {
-        if self.indexed_position.is_positive() {
-            self.indexed_position * bank.deposit_index
+        if self.allow_lending() {
+            if self.indexed_position.is_positive() {
+                self.indexed_position * bank.deposit_index
+            } else {
+                self.indexed_position * bank.borrow_index
+            }
         } else {
-            self.indexed_position * bank.borrow_index
+            self.indexed_position
         }
     }
 
     #[cfg(feature = "client")]
     pub fn ui(&self, bank: &Bank) -> I80F48 {
-        if self.indexed_position.is_positive() {
-            (self.indexed_position * bank.deposit_index)
-                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
-        } else {
-            (self.indexed_position * bank.borrow_index)
-                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
-        }
+        let native = self.native(bank);
+        native / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
     }
 
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
+    }
+
+    // Positions that disable lending never auto-close
+    pub fn can_auto_close(&self) -> bool {
+        !self.is_in_use() && self.allow_lending()
     }
 
     pub fn increment_in_use(&mut self) {
@@ -106,6 +123,10 @@ impl TokenPosition {
 
     pub fn decrement_in_use(&mut self) {
         self.in_use_count = self.in_use_count.saturating_sub(1);
+    }
+
+    pub fn allow_lending(&self) -> bool {
+        self.disable_lending == 0
     }
 }
 

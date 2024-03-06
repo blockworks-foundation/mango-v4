@@ -1012,6 +1012,7 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
+                    disable_lending: 0,
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
@@ -1161,6 +1162,13 @@ impl<
                 perp_position.market_index = perp_market_index;
 
                 let settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                // no-lending positions can't have negative balances can't work with perps:
+                // settlement must be able to move the position arbitrarily
+                require_msg_typed!(
+                    settle_token_position.allow_lending(),
+                    MangoError::PerpSettleTokenPositionMustSupportBorrows,
+                    "the account's settle token position (index {settle_token_index}) is a no-lending position, unsuitable for perps"
+                );
                 settle_token_position.increment_in_use();
             }
         }

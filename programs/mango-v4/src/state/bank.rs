@@ -232,7 +232,12 @@ pub struct Bank {
     pub collateral_fee_per_day: f32,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1900],
+    pub padding2: [u8; 4],
+
+    pub unlendable_deposits: u64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 1888],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -271,7 +276,9 @@ const_assert_eq!(
         + 8
         + 16 * 4
         + 4
-        + 1900
+        + 4
+        + 8
+        + 1888
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -322,6 +329,7 @@ impl Bank {
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
             potential_serum_tokens: 0,
+            unlendable_deposits: 0,
             bump,
             bank_num,
 
@@ -382,7 +390,8 @@ impl Bank {
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
             collateral_fee_per_day: existing_bank.collateral_fee_per_day,
-            reserved: [0; 1900],
+            padding2: [0; 4],
+            reserved: [0; 1888],
         }
     }
 
@@ -534,7 +543,7 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<bool> {
-        self.deposit_internal_wrapper(position, native_amount, !position.is_in_use(), now_ts)
+        self.deposit_internal_wrapper(position, native_amount, position.can_auto_close(), now_ts)
     }
 
     /// Like `deposit()`, but allows dusting of in-use accounts.
@@ -547,7 +556,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         self.deposit_internal_wrapper(position, native_amount, true, now_ts)
-            .map(|not_dusted| not_dusted || position.is_in_use())
+            .map(|not_dusted| not_dusted || !position.can_auto_close())
     }
 
     pub fn deposit_internal_wrapper(
@@ -557,10 +566,21 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        let opening_indexed_position = position.indexed_position;
-        let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
-        self.update_cumulative_interest(position, opening_indexed_position);
-        Ok(result)
+        if position.allow_lending() {
+            let opening_indexed_position = position.indexed_position;
+            let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
+            self.update_cumulative_interest(position, opening_indexed_position);
+            Ok(result)
+        } else {
+            let deposit_amount = native_amount.floor();
+            self.unlendable_deposits += deposit_amount.to_num::<u64>();
+            self.dust += native_amount - deposit_amount;
+            position.indexed_position += deposit_amount;
+            // TODO: do these positions auto-delete themselves, like normal ones?
+            // sounds like users might accidentally switch over to lendable positions that way,
+            // better make it explicit!
+            Ok(true)
+        }
     }
 
     /// Internal function to deposit funds
@@ -572,6 +592,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
+        assert!(position.allow_lending());
 
         let native_position = position.native(self);
 
@@ -646,7 +667,7 @@ impl Bank {
                 position,
                 native_amount,
                 false,
-                !position.is_in_use(),
+                position.can_auto_close(),
                 now_ts,
             )?
             .position_is_active;
@@ -664,7 +685,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         self.withdraw_internal_wrapper(position, native_amount, false, true, now_ts)
-            .map(|withdraw_result| withdraw_result.position_is_active || position.is_in_use())
+            .map(|withdraw_result| withdraw_result.position_is_active || !position.can_auto_close())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -681,7 +702,13 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<WithdrawResult> {
-        self.withdraw_internal_wrapper(position, native_amount, true, !position.is_in_use(), now_ts)
+        self.withdraw_internal_wrapper(
+            position,
+            native_amount,
+            true,
+            position.can_auto_close(),
+            now_ts,
+        )
     }
 
     /// Internal function to withdraw funds
@@ -693,16 +720,31 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<WithdrawResult> {
-        let opening_indexed_position = position.indexed_position;
-        let res = self.withdraw_internal(
-            position,
-            native_amount,
-            with_loan_origination_fee,
-            allow_dusting,
-            now_ts,
-        );
-        self.update_cumulative_interest(position, opening_indexed_position);
-        res
+        if position.allow_lending() {
+            let opening_indexed_position = position.indexed_position;
+            let res = self.withdraw_internal(
+                position,
+                native_amount,
+                with_loan_origination_fee,
+                allow_dusting,
+                now_ts,
+            );
+            self.update_cumulative_interest(position, opening_indexed_position);
+            res
+        } else {
+            // TODO: might there be trouble by rounding up here?
+            let withdraw_amount = native_amount.ceil();
+            self.unlendable_deposits -= withdraw_amount.to_num::<u64>();
+            position.indexed_position -= withdraw_amount;
+            // TODO: do these positions auto-delete themselves, like normal ones?
+            // sounds like users might accidentally switch over to lendable positions that way,
+            // better make it explicit!
+            Ok(WithdrawResult {
+                position_is_active: true,
+                loan_amount: I80F48::ZERO,
+                loan_origination_fee: I80F48::ZERO,
+            })
+        }
     }
 
     /// Internal function to withdraw funds
@@ -789,7 +831,7 @@ impl Bank {
                 position,
                 loan_origination_fee,
                 false,
-                !position.is_in_use(),
+                position.can_auto_close(),
                 now_ts,
             )?
             .position_is_active;
@@ -804,7 +846,7 @@ impl Bank {
 
     /// Returns true if the position remains active
     pub fn dust_if_possible(&mut self, position: &mut TokenPosition, now_ts: u64) -> Result<bool> {
-        if position.is_in_use() {
+        if !position.can_auto_close() {
             return Ok(true);
         }
         let native = position.native(self);
@@ -998,6 +1040,10 @@ impl Bank {
         position: &mut TokenPosition,
         opening_indexed_position: I80F48,
     ) {
+        if !position.allow_lending() {
+            return;
+        }
+
         if opening_indexed_position.is_positive() {
             let interest = ((self.deposit_index - position.previous_index)
                 * opening_indexed_position)
@@ -1340,6 +1386,7 @@ mod tests {
             indexed_position: I80F48::ZERO,
             token_index: 0,
             in_use_count: u16::from(is_in_use),
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
@@ -1467,6 +1514,7 @@ mod tests {
             indexed_position: I80F48::ZERO,
             token_index: 0,
             in_use_count: 1,
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
