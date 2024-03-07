@@ -950,8 +950,6 @@ async fn test_withdraw_skip_bank() -> Result<(), TransportError> {
 
 #[tokio::test]
 async fn test_sequence_check() -> Result<(), TransportError> {
-    // TODO FAS
-
     let context = TestContext::new().await;
     let solana = &context.solana.clone();
 

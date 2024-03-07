@@ -7,8 +7,9 @@ use crate::state::*;
 pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u64) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
 
-    require!(
-        expected_sequence_number == account.fixed.sequence_number,
+    require_eq!(
+        expected_sequence_number,
+        account.fixed.sequence_number,
         MangoError::InvalidSequenceNumber
     );
 
