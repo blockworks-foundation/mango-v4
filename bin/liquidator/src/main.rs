@@ -4,33 +4,41 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
-use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
-    snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
+    snapshot_source, websocket_source, Client, MangoClient, MangoGroupContext,
     TransactionBuilderConfig,
 };
 
+use crate::cli_args::Cli;
+use crate::rebalance::Rebalancer;
+use crate::token_swap_info::TokenSwapInfoUpdater;
 use itertools::Itertools;
+use liquidation_state::LiquidationState;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
+use tcs_state::TcsState;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Sender;
+use tokio::task::JoinHandle;
 use tracing::*;
 
 pub mod cli_args;
 pub mod liquidate;
+mod liquidation_state;
 pub mod metrics;
 pub mod rebalance;
+mod tcs_state;
 pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
 mod unwrappable_oracle_error;
 pub mod util;
 
-use crate::unwrappable_oracle_error::UnwrappableOracleError;
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
@@ -40,6 +48,19 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
+}
+
+pub enum TxTrigger {
+    Liquidation(TxTriggerLiquidation),
+    TokenConditionalSwap(TxTriggerTokenConditionalSwap),
+}
+
+pub struct TxTriggerLiquidation {
+    pub key: Pubkey,
+}
+
+pub struct TxTriggerTokenConditionalSwap {
+    pub interesting_tcs: Vec<(Pubkey, u64, u64)>,
 }
 
 #[tokio::main]
@@ -69,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
     // Client setup
     //
     let liqor_owner = Arc::new(keypair_from_cli(&cli.liqor_owner));
-    let rpc_url = cli.rpc_url;
+    let rpc_url = cli.rpc_url.clone();
     let ws_url = rpc_url.replace("https", "wss");
     let rpc_timeout = Duration::from_secs(10);
     let cluster = Cluster::Custom(rpc_url.clone(), ws_url.clone());
@@ -79,8 +100,8 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
-        .jupiter_v6_url(cli.jupiter_v6_url)
-        .jupiter_token(cli.jupiter_token)
+        .jupiter_v6_url(cli.jupiter_v6_url.clone())
+        .jupiter_token(cli.jupiter_token.clone())
         .transaction_builder_config(
             TransactionBuilderConfig::builder()
                 .priority_fee_provider(prio_provider)
@@ -89,7 +110,7 @@ async fn main() -> anyhow::Result<()> {
                 .build()
                 .unwrap(),
         )
-        .override_send_transaction_urls(cli.override_send_transaction_url)
+        .override_send_transaction_urls(cli.override_send_transaction_url.clone())
         .build()
         .unwrap();
 
@@ -207,17 +228,18 @@ async fn main() -> anyhow::Result<()> {
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         max_cu_per_transaction: 1_000_000,
         refresh_timeout: Duration::from_secs(cli.liquidation_refresh_timeout_secs as u64),
-        only_allowed_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.only_allow_tokens),
-        forbidden_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.forbidden_tokens),
+        only_allowed_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.only_allow_tokens.clone()),
+        forbidden_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.forbidden_tokens.clone()),
         only_allowed_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
-            cli.liquidation_only_allow_perp_markets,
+            cli.liquidation_only_allow_perp_markets.clone(),
         ),
         forbidden_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
-            cli.liquidation_forbidden_perp_markets,
+            cli.liquidation_forbidden_perp_markets.clone(),
         ),
     };
 
     let tcs_config = trigger_tcs::Config {
+        refresh_timeout: Duration::from_secs(cli.tcs_refresh_timeout_secs),
         min_health_ratio: cli.min_health_ratio,
         max_trigger_quote_amount: (cli.tcs_max_trigger_amount * 1e6) as u64,
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
@@ -234,18 +256,19 @@ async fn main() -> anyhow::Result<()> {
         forbidden_tokens: liq_config.forbidden_tokens.clone(),
     };
 
-    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
-    let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
+    let (rebalance_trigger_sender, rebalance_trigger_receiver) = tokio::sync::mpsc::channel(1);
+    let (tx_trigger_sender, tx_trigger_receiver) = tokio::sync::mpsc::channel::<TxTrigger>(100);
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
         borrow_settle_excess: (1f64 + cli.rebalance_borrow_settle_excess).max(1f64),
         refresh_timeout: Duration::from_secs(cli.rebalance_refresh_timeout_secs),
         jupiter_version: cli.jupiter_version.into(),
-        skip_tokens: cli.rebalance_skip_tokens.unwrap_or_default(),
+        skip_tokens: cli.rebalance_skip_tokens.clone().unwrap_or(Vec::new()),
         alternate_jupiter_route_tokens: cli
-            .rebalance_alternate_jupiter_route_tokens
-            .unwrap_or_default(),
+                    .rebalance_alternate_jupiter_route_tokens
+                    .clone()
+                    .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
     };
     rebalance_config.validate(&mango_client.context);
@@ -257,23 +280,39 @@ async fn main() -> anyhow::Result<()> {
         config: rebalance_config,
     });
 
-    let mut liquidation = Box::new(LiquidationState {
+    let liquidation = Box::new(LiquidationState {
+        mango_client: mango_client.clone(),
+        account_fetcher: account_fetcher.clone(),
+        liquidation_config: liq_config,
+        errors: Arc::new(RwLock::new(
+            ErrorTracking::builder()
+                .skip_threshold(2)
+                .skip_threshold_for_type(LiqErrorType::Liq, 5)
+                .skip_duration(Duration::from_secs(120))
+                .build()?,
+        )),
+        oracle_errors: Arc::new(RwLock::new(
+            ErrorTracking::builder()
+                .skip_threshold(1)
+                .skip_duration(Duration::from_secs(
+                    cli.skip_oracle_error_in_logs_duration_secs,
+                ))
+                .build()?,
+        )),
+    });
+
+    let tcs = Box::new(TcsState {
         mango_client: mango_client.clone(),
         account_fetcher,
-        liquidation_config: liq_config,
         trigger_tcs_config: tcs_config,
         token_swap_info: token_swap_info_updater.clone(),
-        errors: ErrorTracking::builder()
-            .skip_threshold(2)
-            .skip_threshold_for_type(LiqErrorType::Liq, 5)
-            .skip_duration(Duration::from_secs(120))
-            .build()?,
-        oracle_errors: ErrorTracking::builder()
-            .skip_threshold(1)
-            .skip_duration(Duration::from_secs(
-                cli.skip_oracle_error_in_logs_duration_secs,
-            ))
-            .build()?,
+        errors: Arc::new(RwLock::new(
+            ErrorTracking::builder()
+                .skip_threshold(2)
+                .skip_threshold_for_type(LiqErrorType::Liq, 5)
+                .skip_duration(Duration::from_secs(120))
+                .build()?,
+        )),
     });
 
     info!("main loop");
@@ -374,126 +413,83 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
+    let mut optional_jobs = vec![];
+
     // Could be refactored to only start the below jobs when the first snapshot is done.
     // But need to take care to abort if the above job aborts beforehand.
+    if cli.rebalance == BoolArg::True {
+        let rebalance_job =
+            spawn_rebalance_job(&shared_state, rebalance_trigger_receiver, rebalancer);
+        optional_jobs.push(rebalance_job);
+    }
 
-    let rebalance_job = tokio::spawn({
-        let shared_state = shared_state.clone();
-        async move {
-            loop {
-                tokio::select! {
-                    _ = rebalance_interval.tick() => {}
-                    _ = rebalance_trigger_receiver.recv() => {}
-                }
-                if !shared_state.read().unwrap().one_snapshot_done {
-                    continue;
-                }
-                if let Err(err) = rebalancer.zero_all_non_quote().await {
-                    error!("failed to rebalance liqor: {:?}", err);
+    if cli.liquidation_enabled == BoolArg::True {
+        let liquidation_job = liquidation_state::spawn_liquidation_job(
+            &cli,
+            &shared_state,
+            tx_trigger_sender.clone(),
+            liquidation.clone(),
+            &metrics,
+        );
+        optional_jobs.push(liquidation_job);
+    }
 
-                    // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
-                    // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
-                    // off. For now, hard sleep on error to avoid the most frequent error cases.
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                }
-            }
-        }
-    });
+    if cli.take_tcs == BoolArg::True {
+        let tcs_job = tcs_state::spawn_tcs_job(
+            &cli,
+            &shared_state,
+            tx_trigger_sender,
+            tcs.clone(),
+            &metrics,
+        );
+        optional_jobs.push(tcs_job);
+    }
 
-    let liquidation_job = tokio::spawn({
-        let mut interval =
-            mango_v4_client::delay_interval(Duration::from_millis(cli.check_interval_ms));
-        let mut metric_liquidation_check = metrics.register_latency("liquidation_check".into());
-        let mut metric_liquidation_start_end =
-            metrics.register_latency("liquidation_start_end".into());
+    if cli.liquidation_enabled == BoolArg::True || cli.take_tcs == BoolArg::True {
+        let tx_sender_job = spawn_tx_sender_job(
+            tx_trigger_receiver,
+            rebalance_trigger_sender,
+            liquidation,
+            tcs,
+        );
+        optional_jobs.push(tx_sender_job);
+    }
 
-        let mut liquidation_start_time = None;
-        let mut tcs_start_time = None;
+    if cli.telemetry == BoolArg::True {
+        optional_jobs.push(spawn_telemetry_job(&cli, mango_client.clone()));
+    }
 
-        let shared_state = shared_state.clone();
-        async move {
-            loop {
-                interval.tick().await;
+    let token_swap_info_job =
+        spawn_token_swap_refresh_job(&cli, shared_state, token_swap_info_updater);
+    let check_changes_for_abort_job = spawn_context_change_watchdog_job(mango_client.clone());
 
-                let account_addresses = {
-                    let mut state = shared_state.write().unwrap();
-                    if !state.one_snapshot_done {
-                        // discard first latency info as it will skew data too much
-                        state.oldest_chain_event_reception_time = None;
-                        continue;
-                    }
-                    if state.oldest_chain_event_reception_time.is_none()
-                        && liquidation_start_time.is_none()
-                    {
-                        // no new update, skip computing
-                        continue;
-                    }
+    use cli_args::{BoolArg, Cli, CliDotenv};
+    use futures::StreamExt;
+    use liquidation_state::LiquidationState;
+    use tcs_state::TcsState;
+    let mut jobs: futures::stream::FuturesUnordered<_> =
+        vec![data_job, token_swap_info_job, check_changes_for_abort_job]
+            .into_iter()
+            .chain(optional_jobs)
+            .chain(prio_jobs.into_iter())
+            .collect();
+    jobs.next().await;
 
-                    state.mango_accounts.iter().cloned().collect_vec()
-                };
+    error!("a critical job aborted, exiting");
+    Ok(())
+}
 
-                liquidation.errors.update();
-                liquidation.oracle_errors.update();
-
-                if liquidation_start_time.is_none() {
-                    liquidation_start_time = Some(Instant::now());
-                }
-
-                let liquidated = liquidation
-                    .maybe_liquidate_one(account_addresses.iter())
-                    .await;
-
-                if !liquidated {
-                    // This will be incorrect if we liquidate the last checked account
-                    // (We will wait for next full run, skewing latency metrics)
-                    // Probability is very low, might not need to be fixed
-
-                    let mut state = shared_state.write().unwrap();
-                    let reception_time = state.oldest_chain_event_reception_time.unwrap();
-                    let current_time = Instant::now();
-
-                    state.oldest_chain_event_reception_time = None;
-
-                    metric_liquidation_check.push(current_time - reception_time);
-                    metric_liquidation_start_end
-                        .push(current_time - liquidation_start_time.unwrap());
-                    liquidation_start_time = None;
-                }
-
-                let mut took_tcs = false;
-                if !liquidated && cli.take_tcs == BoolArg::True {
-                    tcs_start_time = Some(tcs_start_time.unwrap_or(Instant::now()));
-
-                    took_tcs = liquidation
-                        .maybe_take_token_conditional_swap(account_addresses.iter())
-                        .await
-                        .unwrap_or_else(|err| {
-                            error!("error during maybe_take_token_conditional_swap: {err}");
-                            false
-                        });
-
-                    if !took_tcs {
-                        let current_time = Instant::now();
-                        let mut metric_tcs_start_end =
-                            metrics.register_latency("tcs_start_end".into());
-                        metric_tcs_start_end.push(current_time - tcs_start_time.unwrap());
-                        tcs_start_time = None;
-                    }
-                }
-
-                if liquidated || took_tcs {
-                    rebalance_trigger_sender.send_unless_full(()).unwrap();
-                }
-            }
-        }
-    });
-
-    let token_swap_info_job = tokio::spawn({
+fn spawn_token_swap_refresh_job(
+    cli: &Cli,
+    shared_state: Arc<RwLock<SharedState>>,
+    token_swap_info_updater: Arc<TokenSwapInfoUpdater>,
+) -> JoinHandle<()> {
+    tokio::spawn({
         let mut interval = mango_v4_client::delay_interval(Duration::from_secs(
             cli.token_swap_refresh_interval_secs,
         ));
         let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
-        let shared_state = shared_state.clone();
+        let shared_state = shared_state;
         async move {
             loop {
                 if !shared_state.read().unwrap().one_snapshot_done {
@@ -517,41 +513,87 @@ async fn main() -> anyhow::Result<()> {
                 token_swap_info_updater.log_all();
             }
         }
-    });
+    })
+}
 
-    let check_changes_for_abort_job =
-        tokio::spawn(MangoClient::loop_check_for_context_changes_and_abort(
-            mango_client.clone(),
-            Duration::from_secs(300),
-        ));
+fn spawn_context_change_watchdog_job(mango_client: Arc<MangoClient>) -> JoinHandle<()> {
+    tokio::spawn(MangoClient::loop_check_for_context_changes_and_abort(
+        mango_client,
+        Duration::from_secs(300),
+    ))
+}
 
-    if cli.telemetry == BoolArg::True {
-        tokio::spawn(telemetry::report_regularly(
-            mango_client,
-            cli.min_health_ratio,
-        ));
-    }
+fn spawn_telemetry_job(cli: &Cli, mango_client: Arc<MangoClient>) -> JoinHandle<()> {
+    tokio::spawn(telemetry::report_regularly(
+        mango_client,
+        cli.min_health_ratio,
+    ))
+}
 
-    use cli_args::{BoolArg, Cli, CliDotenv};
-    use futures::StreamExt;
-    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
-        data_job,
-        rebalance_job,
-        liquidation_job,
-        token_swap_info_job,
-        check_changes_for_abort_job,
-    ]
-    .into_iter()
-    .chain(prio_jobs.into_iter())
-    .collect();
-    jobs.next().await;
+fn spawn_rebalance_job(
+    shared_state: &Arc<RwLock<SharedState>>,
+    mut rebalance_trigger_receiver: Receiver<()>,
+    rebalancer: Arc<Rebalancer>,
+) -> JoinHandle<()> {
+    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
 
-    error!("a critical job aborted, exiting");
-    Ok(())
+    tokio::spawn({
+        let shared_state = shared_state.clone();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = rebalance_interval.tick() => {}
+                    _ = rebalance_trigger_receiver.recv() => {}
+                }
+                if !shared_state.read().unwrap().one_snapshot_done {
+                    continue;
+                }
+                if let Err(err) = rebalancer.zero_all_non_quote().await {
+                    error!("failed to rebalance liqor: {:?}", err);
+
+                    // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
+                    // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
+                    // off. For now, hard sleep on error to avoid the most frequent error cases.
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+                }
+            }
+        }
+    })
+}
+
+fn spawn_tx_sender_job(
+    mut tx_trigger_receiver: Receiver<TxTrigger>,
+    rebalance_trigger_sender: Sender<()>,
+    mut liquidation: Box<LiquidationState>,
+    mut tcs: Box<TcsState>,
+) -> JoinHandle<()> {
+    tokio::spawn({
+        async move {
+            loop {
+                let trigger = tx_trigger_receiver.recv().await;
+                if let Some(trigger) = trigger {
+                    let done = match trigger {
+                        TxTrigger::Liquidation(l) => liquidation
+                            .maybe_liquidate_and_log_error(&l.key)
+                            .await
+                            .unwrap_or(false),
+                        TxTrigger::TokenConditionalSwap(t) => tcs
+                            .maybe_take_token_conditional_swap(t.interesting_tcs)
+                            .await
+                            .unwrap_or(false),
+                    };
+
+                    if done {
+                        rebalance_trigger_sender.send_unless_full(()).unwrap();
+                    }
+                }
+            }
+        }
+    })
 }
 
 #[derive(Default)]
-struct SharedState {
+pub struct SharedState {
     /// Addresses of the MangoAccounts belonging to the mango program.
     /// Needed to check health of them all when the cache updates.
     mango_accounts: HashSet<Pubkey>,
@@ -581,218 +623,6 @@ impl std::fmt::Display for LiqErrorType {
             Self::TcsCollectionPartial => write!(f, "tcs-collection-partial"),
             Self::TcsExecution => write!(f, "tcs-execution"),
         }
-    }
-}
-
-struct LiquidationState {
-    mango_client: Arc<MangoClient>,
-    account_fetcher: Arc<chain_data::AccountFetcher>,
-    token_swap_info: Arc<token_swap_info::TokenSwapInfoUpdater>,
-    liquidation_config: liquidate::Config,
-    trigger_tcs_config: trigger_tcs::Config,
-
-    errors: ErrorTracking<Pubkey, LiqErrorType>,
-    oracle_errors: ErrorTracking<TokenIndex, LiqErrorType>,
-}
-
-impl LiquidationState {
-    async fn maybe_liquidate_one<'b>(
-        &mut self,
-        accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> bool {
-        use rand::seq::SliceRandom;
-
-        let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
-        {
-            let mut rng = rand::thread_rng();
-            accounts.shuffle(&mut rng);
-        }
-
-        for pubkey in accounts {
-            if self
-                .maybe_liquidate_and_log_error(pubkey)
-                .await
-                .unwrap_or(false)
-            {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    async fn maybe_liquidate_and_log_error(&mut self, pubkey: &Pubkey) -> anyhow::Result<bool> {
-        let now = Instant::now();
-        let error_tracking = &mut self.errors;
-
-        // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) =
-            error_tracking.had_too_many_errors(LiqErrorType::Liq, pubkey, now)
-        {
-            trace!(
-                %pubkey,
-                error_entry.count,
-                "skip checking account for liquidation, had errors recently",
-            );
-            return Ok(false);
-        }
-
-        let result = liquidate::maybe_liquidate_account(
-            &self.mango_client,
-            &self.account_fetcher,
-            pubkey,
-            &self.liquidation_config,
-        )
-        .await;
-
-        if let Err(err) = result.as_ref() {
-            if let Some((ti, ti_name)) = err.try_unwrap_oracle_error() {
-                if self
-                    .oracle_errors
-                    .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
-                    .is_none()
-                {
-                    warn!(
-                        "{:?} recording oracle error for token {} {}",
-                        chrono::offset::Utc::now(),
-                        ti_name,
-                        ti
-                    );
-                }
-
-                self.oracle_errors
-                    .record(LiqErrorType::Liq, &ti, err.to_string());
-                return result;
-            }
-
-            // Keep track of pubkeys that had errors
-            error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
-
-            // Not all errors need to be raised to the user's attention.
-            let mut is_error = true;
-
-            // Simulation errors due to liqee precondition failures on the liquidation instructions
-            // will commonly happen if our liquidator is late or if there are chain forks.
-            match err.downcast_ref::<MangoClientError>() {
-                Some(MangoClientError::SendTransactionPreflightFailure { logs, .. }) => {
-                    if logs.iter().any(|line| {
-                        line.contains("HealthMustBeNegative") || line.contains("IsNotBankrupt")
-                    }) {
-                        is_error = false;
-                    }
-                }
-                _ => {}
-            };
-            if is_error {
-                error!("liquidating account {}: {:?}", pubkey, err);
-            } else {
-                trace!("liquidating account {}: {:?}", pubkey, err);
-            }
-        } else {
-            error_tracking.clear(LiqErrorType::Liq, pubkey);
-        }
-
-        result
-    }
-
-    async fn maybe_take_token_conditional_swap(
-        &mut self,
-        accounts_iter: impl Iterator<Item = &Pubkey>,
-    ) -> anyhow::Result<bool> {
-        let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
-
-        let now = Instant::now();
-        let now_ts: u64 = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs();
-
-        let tcs_context = trigger_tcs::Context {
-            mango_client: self.mango_client.clone(),
-            account_fetcher: self.account_fetcher.clone(),
-            token_swap_info: self.token_swap_info.clone(),
-            config: self.trigger_tcs_config.clone(),
-            jupiter_quote_cache: Arc::new(trigger_tcs::JupiterQuoteCache::default()),
-            now_ts,
-        };
-
-        // Find interesting (pubkey, tcsid, volume)
-        let mut interesting_tcs = Vec::with_capacity(accounts.len());
-        for pubkey in accounts.iter() {
-            if let Some(error_entry) =
-                self.errors
-                    .had_too_many_errors(LiqErrorType::TcsCollectionHard, pubkey, now)
-            {
-                trace!(
-                    %pubkey,
-                    error_entry.count,
-                    "skip checking account for tcs, had errors recently",
-                );
-                continue;
-            }
-
-            match tcs_context.find_interesting_tcs_for_account(pubkey) {
-                Ok(v) => {
-                    self.errors.clear(LiqErrorType::TcsCollectionHard, pubkey);
-                    if v.is_empty() {
-                        self.errors
-                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
-                        self.errors.clear(LiqErrorType::TcsExecution, pubkey);
-                    } else if v.iter().all(|it| it.is_ok()) {
-                        self.errors
-                            .clear(LiqErrorType::TcsCollectionPartial, pubkey);
-                    } else {
-                        for it in v.iter() {
-                            if let Err(e) = it {
-                                self.errors.record(
-                                    LiqErrorType::TcsCollectionPartial,
-                                    pubkey,
-                                    e.to_string(),
-                                );
-                            }
-                        }
-                    }
-                    interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
-                }
-                Err(e) => {
-                    self.errors
-                        .record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
-                }
-            }
-        }
-        if interesting_tcs.is_empty() {
-            return Ok(false);
-        }
-
-        let (txsigs, mut changed_pubkeys) = tcs_context
-            .execute_tcs(&mut interesting_tcs, &mut self.errors)
-            .await?;
-        for pubkey in changed_pubkeys.iter() {
-            self.errors.clear(LiqErrorType::TcsExecution, pubkey);
-        }
-        if txsigs.is_empty() {
-            return Ok(false);
-        }
-        changed_pubkeys.push(self.mango_client.mango_account_address);
-
-        // Force a refresh of affected accounts
-        let slot = self
-            .account_fetcher
-            .transaction_max_slot(&txsigs)
-            .await
-            .context("transaction_max_slot")?;
-        if let Err(e) = self
-            .account_fetcher
-            .refresh_accounts_via_rpc_until_slot(
-                &changed_pubkeys,
-                slot,
-                self.liquidation_config.refresh_timeout,
-            )
-            .await
-        {
-            info!(slot, "could not refresh after tcs execution: {}", e);
-        }
-
-        Ok(true)
     }
 }
 

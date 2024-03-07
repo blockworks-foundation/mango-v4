@@ -136,6 +136,12 @@ pub struct Cli {
     #[clap(long, env, value_enum, default_value = "true")]
     pub(crate) take_tcs: BoolArg,
 
+    #[clap(long, env, default_value = "30")]
+    pub(crate) tcs_refresh_timeout_secs: u64,
+
+    #[clap(long, env, default_value = "1000")]
+    pub(crate) tcs_check_interval_ms: u64,
+
     /// profit margin at which to take tcs orders
     #[clap(long, env, default_value = "0.0005")]
     pub(crate) tcs_profit_fraction: f64,
@@ -190,6 +196,12 @@ pub struct Cli {
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
     pub(crate) telemetry: BoolArg,
+
+    /// if liquidation is enabled
+    ///
+    /// might be used to run an instance of liquidator dedicated to TCS and another one for liquidation
+    #[clap(long, env, value_enum, default_value = "true")]
+    pub(crate) liquidation_enabled: BoolArg,
 
     /// liquidation refresh timeout in secs
     #[clap(long, env, default_value = "30")]

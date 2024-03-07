@@ -651,14 +651,11 @@ impl<'a> LiquidateHelper<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn maybe_liquidate_account(
+pub async fn can_liquidate_account(
     mango_client: &MangoClient,
     account_fetcher: &chain_data::AccountFetcher,
     pubkey: &Pubkey,
-    config: &Config,
 ) -> anyhow::Result<bool> {
-    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
-
     let account = account_fetcher.fetch_mango_account(pubkey)?;
     let health_cache = mango_client
         .health_cache(&account)
@@ -674,6 +671,18 @@ pub async fn maybe_liquidate_account(
         %maint_health,
         "possible candidate",
     );
+
+    Ok(true)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn maybe_liquidate_account(
+    mango_client: &MangoClient,
+    account_fetcher: &chain_data::AccountFetcher,
+    pubkey: &Pubkey,
+    config: &Config,
+) -> anyhow::Result<bool> {
+    let liqor_min_health_ratio = I80F48::from_num(config.min_health_ratio);
 
     // Fetch a fresh account and re-compute
     // This is -- unfortunately -- needed because the websocket streams seem to not
