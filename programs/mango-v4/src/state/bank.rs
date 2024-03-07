@@ -474,6 +474,7 @@ impl Bank {
         self.borrow_index * self.indexed_borrows
     }
 
+    // TODO: this now only tracks lendable deposits - need to audit all uses
     #[inline(always)]
     pub fn native_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_deposits
