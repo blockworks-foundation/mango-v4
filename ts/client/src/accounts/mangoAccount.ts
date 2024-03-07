@@ -44,6 +44,7 @@ export class MangoAccount {
       buybackFeesAccruedCurrent: BN;
       buybackFeesAccruedPrevious: BN;
       buybackFeesExpiryTimestamp: BN;
+      sequenceNumber: BN;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -68,6 +69,7 @@ export class MangoAccount {
       obj.buybackFeesAccruedCurrent,
       obj.buybackFeesAccruedPrevious,
       obj.buybackFeesExpiryTimestamp,
+      obj.sequenceNumber,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -94,6 +96,7 @@ export class MangoAccount {
     public buybackFeesAccruedCurrent: BN,
     public buybackFeesAccruedPrevious: BN,
     public buybackFeesExpiryTimestamp: BN,
+    public sequenceNumber: BN,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],

@@ -1761,6 +1761,36 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -7943,11 +7973,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "sequenceNumber",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                152
+                144
               ]
             }
           },
@@ -9722,11 +9756,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "sequenceNumber",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                152
+                144
               ]
             }
           }
@@ -11008,6 +11046,9 @@ export type MangoV4 = {
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
           }
         ]
       }
@@ -14350,6 +14391,16 @@ export type MangoV4 = {
       "code": 6069,
       "name": "TokenAssetLiquidationDisabled",
       "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
     }
   ]
 };
@@ -16117,6 +16168,36 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -22299,11 +22380,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "sequenceNumber",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                152
+                144
               ]
             }
           },
@@ -24078,11 +24163,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "sequenceNumber",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                152
+                144
               ]
             }
           }
@@ -25364,6 +25453,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
           }
         ]
       }
@@ -28706,6 +28798,16 @@ export const IDL: MangoV4 = {
       "code": 6069,
       "name": "TokenAssetLiquidationDisabled",
       "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
     }
   ]
 };
