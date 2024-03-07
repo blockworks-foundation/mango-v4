@@ -3,7 +3,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::*;
-use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
+use crate::logs::emit_token_balance_log;
+use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3};
 use crate::state::*;
 use crate::util::clock_now;
 
@@ -514,14 +515,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount: approved_amount_u64,
         });
 
-        emit_stack(TokenBalanceLog {
-            mango_group: group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index: bank.token_index as u16,
-            indexed_position: position.indexed_position.to_bits(),
-            deposit_index: bank.deposit_index.to_bits(),
-            borrow_index: bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(ctx.accounts.account.key(), &bank, position);
     }
 
     emit_stack(FlashLoanLogV3 {

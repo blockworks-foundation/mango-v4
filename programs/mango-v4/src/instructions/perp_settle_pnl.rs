@@ -6,7 +6,8 @@ use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{new_health_cache, HealthType, ScanningAccountRetriever};
-use crate::logs::{emit_perp_balances, emit_stack, PerpSettlePnlLog, TokenBalanceLog};
+use crate::logs::emit_token_balance_log;
+use crate::logs::{emit_perp_balances, emit_stack, PerpSettlePnlLog};
 use crate::state::*;
 
 pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
@@ -191,23 +192,8 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
     // settled back and forth repeatedly.
     settle_bank.withdraw_without_fee(b_token_position, settlement, now_ts)?;
 
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account_a.key(),
-        token_index: settle_token_index,
-        indexed_position: a_token_position.indexed_position.to_bits(),
-        deposit_index: settle_bank.deposit_index.to_bits(),
-        borrow_index: settle_bank.borrow_index.to_bits(),
-    });
-
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account_b.key(),
-        token_index: settle_token_index,
-        indexed_position: b_token_position.indexed_position.to_bits(),
-        deposit_index: settle_bank.deposit_index.to_bits(),
-        borrow_index: settle_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(ctx.accounts.account_a.key(), &settle_bank, a_token_position);
+    emit_token_balance_log(ctx.accounts.account_b.key(), &settle_bank, b_token_position);
 
     // settler might be the same as account a or b
     drop(account_a);
@@ -226,14 +212,11 @@ pub fn perp_settle_pnl(ctx: Context<PerpSettlePnl>) -> Result<()> {
         settler.ensure_token_position(settle_token_index)?;
     let settler_token_position_active = settle_bank.deposit(settler_token_position, fee, now_ts)?;
 
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.settler.key(),
-        token_index: settler_token_position.token_index,
-        indexed_position: settler_token_position.indexed_position.to_bits(),
-        deposit_index: settle_bank.deposit_index.to_bits(),
-        borrow_index: settle_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(
+        ctx.accounts.settler.key(),
+        &settle_bank,
+        settler_token_position,
+    );
 
     if !settler_token_position_active {
         settler

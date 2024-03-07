@@ -83,6 +83,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
                 Clock::get()?.unix_timestamp.try_into().unwrap(),
             )?
         };
+        emit_token_balance_log(self.account.key(), &bank, position);
 
         // Transfer the actual tokens
         token::transfer(self.transfer_ctx(), amount_i80f48.to_num::<u64>())?;
@@ -107,14 +108,6 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let amount_usd = (amount_i80f48 * unsafe_oracle_price).to_num::<i64>();
         account.fixed.net_deposits += amount_usd;
 
-        emit_stack(TokenBalanceLog {
-            mango_group: self.group.key(),
-            mango_account: self.account.key(),
-            token_index,
-            indexed_position: indexed_position.to_bits(),
-            deposit_index: bank.deposit_index.to_bits(),
-            borrow_index: bank.borrow_index.to_bits(),
-        });
         drop(bank);
 
         //

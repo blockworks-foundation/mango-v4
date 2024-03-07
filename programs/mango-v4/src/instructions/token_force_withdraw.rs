@@ -1,12 +1,13 @@
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, ForceWithdrawLog, TokenBalanceLog};
+use crate::logs::{emit_stack, ForceWithdrawLog};
 
 pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -61,14 +62,7 @@ pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
         amount,
     )?;
 
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index,
-        indexed_position: position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(ctx.accounts.account.key(), &bank, position);
 
     // Get the oracle price, even if stale or unconfident: We want to allow force withdraws
     // even if the oracle is bad.

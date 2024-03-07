@@ -5,10 +5,11 @@ use fixed::types::I80F48;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::{compute_health, new_fixed_order_account_retriever, HealthType};
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, emit_stack, PerpSettleFeesLog, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpSettleFeesLog};
 use crate::util::clock_now;
 
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
@@ -103,14 +104,7 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     // Update the settled balance on the market itself
     perp_market.fees_settled += settlement;
 
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index: perp_market.settle_token_index,
-        indexed_position: token_position.indexed_position.to_bits(),
-        deposit_index: settle_bank.deposit_index.to_bits(),
-        borrow_index: settle_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(ctx.accounts.account.key(), &settle_bank, token_position);
 
     emit_stack(PerpSettleFeesLog {
         mango_group: ctx.accounts.group.key(),

@@ -5,8 +5,9 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
+use crate::logs::emit_token_balance_log;
 use crate::logs::{
-    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenConditionalSwapCancelLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenConditionalSwapCancelLog,
     TokenConditionalSwapTriggerLogV3, WithdrawLoanLog,
 };
 use crate::state::*;
@@ -306,8 +307,8 @@ fn action(
 
     let post_liqee_buy_token = liqee_buy_token.native(&buy_bank);
     let post_liqor_buy_token = liqor_buy_token.native(&buy_bank);
-    let liqee_buy_indexed_position = liqee_buy_token.indexed_position;
-    let liqor_buy_indexed_position = liqor_buy_token.indexed_position;
+    emit_token_balance_log(liqee_key, buy_bank, liqee_buy_token);
+    emit_token_balance_log(liqor_key, buy_bank, liqor_buy_token);
 
     let (liqee_sell_token, liqee_sell_raw_index) =
         liqee.token_position_mut(tcs.sell_token_index)?;
@@ -327,8 +328,8 @@ fn action(
 
     let post_liqee_sell_token = liqee_sell_token.native(&sell_bank);
     let post_liqor_sell_token = liqor_sell_token.native(&sell_bank);
-    let liqee_sell_indexed_position = liqee_sell_token.indexed_position;
-    let liqor_sell_indexed_position = liqor_sell_token.indexed_position;
+    emit_token_balance_log(liqee_key, sell_bank, liqee_sell_token);
+    emit_token_balance_log(liqor_key, sell_bank, liqor_sell_token);
 
     // With a scanning account retriever, it's safe to deactivate inactive token positions immediately.
     // Liqee positions can only be deactivated if the tcs is closed (see below).
@@ -340,43 +341,6 @@ fn action(
     }
 
     // Log info
-
-    // liqee buy token
-    emit_stack(TokenBalanceLog {
-        mango_group: liqee.fixed.group,
-        mango_account: liqee_key,
-        token_index: tcs.buy_token_index,
-        indexed_position: liqee_buy_indexed_position.to_bits(),
-        deposit_index: buy_bank.deposit_index.to_bits(),
-        borrow_index: buy_bank.borrow_index.to_bits(),
-    });
-    // liqee sell token
-    emit_stack(TokenBalanceLog {
-        mango_group: liqee.fixed.group,
-        mango_account: liqee_key,
-        token_index: tcs.sell_token_index,
-        indexed_position: liqee_sell_indexed_position.to_bits(),
-        deposit_index: sell_bank.deposit_index.to_bits(),
-        borrow_index: sell_bank.borrow_index.to_bits(),
-    });
-    // liqor buy token
-    emit_stack(TokenBalanceLog {
-        mango_group: liqee.fixed.group,
-        mango_account: liqor_key,
-        token_index: tcs.buy_token_index,
-        indexed_position: liqor_buy_indexed_position.to_bits(),
-        deposit_index: buy_bank.deposit_index.to_bits(),
-        borrow_index: buy_bank.borrow_index.to_bits(),
-    });
-    // liqor sell token
-    emit_stack(TokenBalanceLog {
-        mango_group: liqee.fixed.group,
-        mango_account: liqor_key,
-        token_index: tcs.sell_token_index,
-        indexed_position: liqor_sell_indexed_position.to_bits(),
-        deposit_index: sell_bank.deposit_index.to_bits(),
-        borrow_index: sell_bank.borrow_index.to_bits(),
-    });
 
     if buy_transfer.has_loan() {
         emit_stack(WithdrawLoanLog {

@@ -5,10 +5,11 @@ use fixed::types::I80F48;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLogV3, TokenBalanceLog};
+use crate::logs::{emit_perp_balances, emit_stack, PerpLiqBaseOrPositivePnlLogV3};
 
 /// This instruction deals with increasing health by:
 /// - reducing the liqee's base position
@@ -137,25 +138,10 @@ pub fn perp_liq_base_or_positive_pnl(
 
     if pnl_transfer != 0 {
         let liqee_token_position = liqee.token_position(settle_token_index)?;
+        emit_token_balance_log(ctx.accounts.liqee.key(), &settle_bank, liqee_token_position);
+
         let liqor_token_position = liqor.token_position(settle_token_index)?;
-
-        emit_stack(TokenBalanceLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.liqee.key(),
-            token_index: settle_token_index,
-            indexed_position: liqee_token_position.indexed_position.to_bits(),
-            deposit_index: settle_bank.deposit_index.to_bits(),
-            borrow_index: settle_bank.borrow_index.to_bits(),
-        });
-
-        emit_stack(TokenBalanceLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.liqor.key(),
-            token_index: settle_token_index,
-            indexed_position: liqor_token_position.indexed_position.to_bits(),
-            deposit_index: settle_bank.deposit_index.to_bits(),
-            borrow_index: settle_bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(ctx.accounts.liqor.key(), &settle_bank, liqor_token_position);
     }
 
     if base_transfer != 0 || pnl_transfer != 0 {
