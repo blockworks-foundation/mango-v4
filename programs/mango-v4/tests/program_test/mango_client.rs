@@ -5169,3 +5169,42 @@ impl<T: ClientInstruction> ClientInstruction for HealthAccountSkipping<T> {
         self.inner.signers()
     }
 }
+
+#[derive(Default)]
+pub struct SequenceCheckInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub expected_sequence_number: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for SequenceCheckInstruction {
+    type Accounts = mango_v4::accounts::SequenceCheck;
+    type Instruction = mango_v4::instruction::SequenceCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            expected_sequence_number: self.expected_sequence_number,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}

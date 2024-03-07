@@ -147,6 +147,8 @@ pub enum MangoError {
     TokenAssetLiquidationDisabled,
     #[msg("for borrows the bank must be in the health account list")]
     BorrowsRequireHealthAccountBank,
+    #[msg("invalid sequence number")]
+    InvalidSequenceNumber,
 }
 
 impl MangoError {

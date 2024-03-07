@@ -947,3 +947,107 @@ async fn test_withdraw_skip_bank() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_sequence_check() -> Result<(), TransportError> {
+    // TODO FAS
+
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 6,
+            serum3_count: 3,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 0);
+
+    //
+    // TEST: Sequence check with right sequence number
+    //
+
+    send_tx(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 1);
+
+    send_tx(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 2);
+
+    //
+    // TEST: Sequence check with wrong sequence number
+    //
+
+    send_tx_expect_error!(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 1
+        },
+        MangoError::InvalidSequenceNumber
+    );
+
+    send_tx_expect_error!(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 4
+        },
+        MangoError::InvalidSequenceNumber
+    );
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 2);
+
+    Ok(())
+}
