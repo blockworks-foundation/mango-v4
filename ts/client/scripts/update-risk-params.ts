@@ -27,7 +27,6 @@ import { MangoAccount } from '../src/accounts/mangoAccount';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { I80F48 } from '../src/numbers/I80F48';
 import {
   LiqorPriceImpact,
   buildGroupGrid,
@@ -190,35 +189,56 @@ async function updateTokenParams(): Promise<void> {
       const builder = Builder(NullTokenEditParams);
       let change = false;
 
+      const tier = Object.values(LISTING_PRESETS).find((x) =>
+        x.initLiabWeight.toFixed(1) === '1.8'
+          ? x.initLiabWeight.toFixed(1) ===
+              bank?.initLiabWeight.toNumber().toFixed(1) &&
+            x.reduceOnly === bank.reduceOnly
+          : x.initLiabWeight.toFixed(1) ===
+            bank?.initLiabWeight.toNumber().toFixed(1),
+      );
+
       // eslint-disable-next-line no-constant-condition
       if (true) {
-        const tier = Object.values(LISTING_PRESETS).find((x) =>
-          x.initLiabWeight.toFixed(1) === '1.8'
-            ? x.initLiabWeight.toFixed(1) ===
-                bank?.initLiabWeight.toNumber().toFixed(1) &&
-              x.reduceOnly === bank.reduceOnly
-            : x.initLiabWeight.toFixed(1) ===
-              bank?.initLiabWeight.toNumber().toFixed(1),
-        );
         if (!tier) {
           console.log(`${bank.name}, no tier found`);
-        } else {
-          console.log(
-            `${bank.name.padStart(10)}, ${bank.loanFeeRate
-              .mul(I80F48.fromNumber(100))
-              .toFixed(2)}, ${bank.loanOriginationFeeRate
-              .mul(I80F48.fromNumber(100))
-              .toFixed(2)}, ${tier?.preset_name.padStart(5)}, ${(
-              tier.loanFeeRate * 100
-            ).toFixed(2)}, ${(tier!.loanOriginationFeeRate * 100).toFixed(2)}`,
-          );
-
-          builder.loanFeeRate(tier!.loanFeeRate);
-          builder.loanOriginationFeeRate(tier!.loanOriginationFeeRate);
-          builder.flashLoanSwapFeeRate(tier!.loanOriginationFeeRate);
+        } else if (tier.preset_name != 'C') {
+          if (tier.preset_name.includes('A')) {
+            builder.liquidationFee(bank.liquidationFee.toNumber() * 0.2);
+            builder.platformLiquidationFee(
+              bank.liquidationFee.toNumber() * 0.8,
+            );
+          } else if (tier.preset_name.includes('B')) {
+            builder.liquidationFee(bank.liquidationFee.toNumber() * 0.4);
+            builder.platformLiquidationFee(
+              bank.liquidationFee.toNumber() * 0.6,
+            );
+          }
           change = true;
         }
       }
+
+      // eslint-disable-next-line no-constant-condition
+      // if (true) {
+      //   if (!tier) {
+      //     console.log(`${bank.name}, no tier found`);
+      //   } else {
+      //     console.log(
+      //       `${bank.name.padStart(10)}, ${bank.loanFeeRate
+      //         .mul(I80F48.fromNumber(100))
+      //         .toFixed(2)}, ${bank.loanOriginationFeeRate
+      //         .mul(I80F48.fromNumber(100))
+      //         .toFixed(2)}, ${tier?.preset_name.padStart(5)}, ${(
+      //         tier.loanFeeRate * 100
+      //       ).toFixed(2)}, ${(tier!.loanOriginationFeeRate * 100).toFixed(2)}`,
+      //     );
+
+      //     builder.loanFeeRate(tier!.loanFeeRate);
+      //     builder.loanOriginationFeeRate(tier!.loanOriginationFeeRate);
+      //     builder.flashLoanSwapFeeRate(tier!.loanOriginationFeeRate);
+      //     change = true;
+      //   }
+      // }
 
       try {
         // formulas are sourced from here
@@ -324,10 +344,15 @@ async function updateTokenParams(): Promise<void> {
           }
 
           const params = builder.build();
-          console.log(bank.name);
-          console.log(params.loanFeeRate);
-          console.log(params.loanOriginationFeeRate);
-          console.log(params.flashLoanSwapFeeRate);
+          if (tier) {
+            console.log(
+              `${bank.name}, ${tier.preset_name}, ${(
+                params.liquidationFee! * 100
+              ).toFixed(2)} ${(params.platformLiquidationFee! * 100).toFixed(
+                2,
+              )}`,
+            );
+          }
 
           const ix = await client.program.methods
             .tokenEdit(
@@ -380,6 +405,7 @@ async function updateTokenParams(): Promise<void> {
               admin: group.admin,
               mintInfo: group.mintInfosMapByTokenIndex.get(bank.tokenIndex)
                 ?.publicKey,
+              fallbackOracle: PublicKey.default,
             })
             .remainingAccounts([
               {
@@ -435,7 +461,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Update loan fee, loan origination fee, and flash loan fees in mango-v4',
+        : 'Update liquidation and platform liquidation fee in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
