@@ -98,9 +98,19 @@
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
 </pre><pre class="rust"><code><span class="kw">use </span>solana_client::rpc_response::{Response, RpcKeyedAccount};
 <span class="kw">use </span>solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
+<span class="kw">use </span>std::time::Instant;
 <span class="kw">use </span>std::{str::FromStr, sync::Arc};
 <span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
@@ -111,6 +121,7 @@
     <span class="kw">pub </span>pubkey: Pubkey,
     <span class="kw">pub </span>slot: u64,
     <span class="kw">pub </span>account: AccountSharedData,
+    <span class="kw">pub </span>reception_time: Instant,
 }
 
 <span class="kw">impl </span>AccountUpdate {
@@ -125,15 +136,22 @@
             pubkey,
             slot: rpc.context.slot,
             account,
+            reception_time: Instant::now(),
         })
     }
+}
+
+<span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>ChainSlotUpdate {
+    <span class="kw">pub </span>slot_update: Arc&lt;solana_client::rpc_response::SlotUpdate&gt;,
+    <span class="kw">pub </span>reception_time: Instant,
 }
 
 <span class="attr">#[derive(Clone)]
 </span><span class="kw">pub enum </span>Message {
     Account(AccountUpdate),
     Snapshot(Vec&lt;AccountUpdate&gt;),
-    Slot(Arc&lt;solana_client::rpc_response::SlotUpdate&gt;),
+    Slot(ChainSlotUpdate),
 }
 
 <span class="kw">impl </span>Message {
@@ -165,7 +183,7 @@
             }
             Message::Slot(slot_update) =&gt; {
                 <span class="macro">trace!</span>(<span class="string">&quot;websocket slot message&quot;</span>);
-                <span class="kw">let </span>slot_update = <span class="kw">match </span><span class="kw-2">**</span>slot_update {
+                <span class="kw">let </span>slot_update = <span class="kw">match </span><span class="kw-2">*</span>(slot_update.slot_update) {
                     solana_client::rpc_response::SlotUpdate::CreatedBank {
                         slot, parent, ..
                     } =&gt; <span class="prelude-val">Some</span>(SlotData {
