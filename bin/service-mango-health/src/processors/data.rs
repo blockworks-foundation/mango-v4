@@ -198,7 +198,7 @@ impl DataProcessor {
                 mango_group,
                 get_multiple_accounts_count: 100,
                 parallel_rpc_requests: 10,
-                snapshot_interval: Duration::from_secs(5 * 60),
+                snapshot_interval: Duration::from_secs(configuration.snapshot_interval_secs),
                 min_slot: first_websocket_slot + 10,
             },
             mango_oracles,
