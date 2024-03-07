@@ -1034,6 +1034,20 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async sequenceCheckIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .sequenceCheck(mangoAccount.sequenceNumber)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+  }
+
   public async getMangoAccount(
     mangoAccountPk: PublicKey,
     loadSerum3Oo = false,
