@@ -228,4 +228,8 @@ pub struct Cli {
     /// how long should it wait before logging an oracle error again (for the same token)
     #[clap(long, env, default_value = "30")]
     pub(crate) skip_oracle_error_in_logs_duration_secs: u64,
+
+    /// max number of liquidation/tcs to do concurrently
+    #[clap(long, env, default_value = "5")]
+    pub(crate) max_parallel_operations: u64,
 }

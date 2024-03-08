@@ -1,7 +1,7 @@
 use crate::cli_args::Cli;
 use crate::metrics::Metrics;
 use crate::token_swap_info::TokenSwapInfoUpdater;
-use crate::{trigger_tcs, LiqErrorType, SharedState, TxTrigger, TxTriggerTokenConditionalSwap};
+use crate::{trigger_tcs, LiqErrorType, SharedState, TxTrigger};
 use anchor_lang::prelude::Pubkey;
 use anyhow::Context;
 use itertools::Itertools;
@@ -52,10 +52,17 @@ pub fn spawn_tcs_job(
                     });
 
                 if !interesting_tcs.is_empty() {
+                    let mut state_writer = shared_state.write().unwrap();
+                    let mut n = 0;
+
+                    for i in interesting_tcs {
+                        if state_writer.interesting_tcs.insert(i) {
+                            n += 1;
+                        }
+                    }
+
                     tx_trigger_sender
-                        .send_unless_full(TxTrigger::TokenConditionalSwap(
-                            TxTriggerTokenConditionalSwap { interesting_tcs },
-                        ))
+                        .send_unless_full(TxTrigger::TokenConditionalSwap(n))
                         .unwrap();
                 }
 

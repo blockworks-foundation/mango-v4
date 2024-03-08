@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoGroupContext,
@@ -17,13 +16,10 @@ use crate::cli_args::Cli;
 use crate::rebalance::Rebalancer;
 use crate::token_swap_info::TokenSwapInfoUpdater;
 use itertools::Itertools;
-use liquidation_state::LiquidationState;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
-use tcs_state::TcsState;
 use tokio::sync::mpsc::Receiver;
-use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -36,6 +32,7 @@ mod tcs_state;
 pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
+mod tx_sender;
 mod unwrappable_oracle_error;
 pub mod util;
 
@@ -51,16 +48,8 @@ pub fn encode_address(addr: &Pubkey) -> String {
 }
 
 pub enum TxTrigger {
-    Liquidation(TxTriggerLiquidation),
-    TokenConditionalSwap(TxTriggerTokenConditionalSwap),
-}
-
-pub struct TxTriggerLiquidation {
-    pub key: Pubkey,
-}
-
-pub struct TxTriggerTokenConditionalSwap {
-    pub interesting_tcs: Vec<(Pubkey, u64, u64)>,
+    Liquidation(),
+    TokenConditionalSwap(usize),
 }
 
 #[tokio::main]
@@ -446,13 +435,15 @@ async fn main() -> anyhow::Result<()> {
     }
 
     if cli.liquidation_enabled == BoolArg::True || cli.take_tcs == BoolArg::True {
-        let tx_sender_job = spawn_tx_sender_job(
+        let mut tx_sender_jobs = tx_sender::spawn_tx_senders_job(
+            cli.max_parallel_operations,
             tx_trigger_receiver,
             rebalance_trigger_sender,
+            shared_state.clone(),
             liquidation,
             tcs,
         );
-        optional_jobs.push(tx_sender_job);
+        optional_jobs.append(&mut tx_sender_jobs);
     }
 
     if cli.telemetry == BoolArg::True {
@@ -561,37 +552,6 @@ fn spawn_rebalance_job(
     })
 }
 
-fn spawn_tx_sender_job(
-    mut tx_trigger_receiver: Receiver<TxTrigger>,
-    rebalance_trigger_sender: Sender<()>,
-    mut liquidation: Box<LiquidationState>,
-    mut tcs: Box<TcsState>,
-) -> JoinHandle<()> {
-    tokio::spawn({
-        async move {
-            loop {
-                let trigger = tx_trigger_receiver.recv().await;
-                if let Some(trigger) = trigger {
-                    let done = match trigger {
-                        TxTrigger::Liquidation(l) => liquidation
-                            .maybe_liquidate_and_log_error(&l.key)
-                            .await
-                            .unwrap_or(false),
-                        TxTrigger::TokenConditionalSwap(t) => tcs
-                            .maybe_take_token_conditional_swap(t.interesting_tcs)
-                            .await
-                            .unwrap_or(false),
-                    };
-
-                    if done {
-                        rebalance_trigger_sender.send_unless_full(()).unwrap();
-                    }
-                }
-            }
-        }
-    })
-}
-
 #[derive(Default)]
 pub struct SharedState {
     /// Addresses of the MangoAccounts belonging to the mango program.
@@ -603,6 +563,18 @@ pub struct SharedState {
 
     /// Oldest chain event not processed yet
     oldest_chain_event_reception_time: Option<Instant>,
+
+    /// Liquidation candidates (locally identified as liquidatable)
+    liquidation_candidates_accounts: indexmap::set::IndexSet<Pubkey>,
+
+    /// Interesting TCS that should be triggered
+    interesting_tcs: indexmap::set::IndexSet<(Pubkey, u64, u64)>,
+
+    /// Liquidation currently being processed by a worker
+    processing_liquidation: HashSet<Pubkey>,
+
+    // TCS currently being processed by a worker
+    processing_tcs: HashSet<(Pubkey, u64, u64)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

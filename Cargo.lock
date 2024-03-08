@@ -3540,6 +3540,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hdrhistogram",
+ "indexmap 2.0.0",
  "itertools",
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",

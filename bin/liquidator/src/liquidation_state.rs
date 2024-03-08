@@ -1,7 +1,7 @@
 use crate::cli_args::Cli;
 use crate::metrics::Metrics;
 use crate::unwrappable_oracle_error::UnwrappableOracleError;
-use crate::{liquidate, LiqErrorType, SharedState, TxTrigger, TxTriggerLiquidation};
+use crate::{liquidate, LiqErrorType, SharedState, TxTrigger};
 use anchor_lang::prelude::Pubkey;
 use itertools::Itertools;
 use mango_v4::state::TokenIndex;
@@ -24,10 +24,12 @@ pub struct LiquidationState {
 }
 
 impl LiquidationState {
-    async fn find_candidate<'b>(
+    async fn find_candidates<'b>(
         &mut self,
         accounts_iter: impl Iterator<Item = &'b Pubkey>,
-    ) -> Option<Pubkey> {
+        action: impl Fn(Pubkey) -> anyhow::Result<()>,
+    ) -> anyhow::Result<u64> {
+        let mut found_counter = 0u64;
         use rand::seq::SliceRandom;
 
         let mut accounts = accounts_iter.collect::<Vec<&Pubkey>>();
@@ -48,11 +50,12 @@ impl LiquidationState {
             self.log_or_ignore_error(&result, pubkey);
 
             if result.unwrap_or(false) {
-                return Some(*pubkey);
+                action(*pubkey)?;
+                found_counter = found_counter + 1;
             }
         }
 
-        None
+        Ok(found_counter)
     }
 
     fn should_skip_execution(&mut self, pubkey: &Pubkey) -> bool {
@@ -201,26 +204,35 @@ pub fn spawn_liquidation_job(
                     liquidation_start_time = Some(Instant::now());
                 }
 
-                let candidate = liquidation.find_candidate(account_addresses.iter()).await;
+                let found_candidates = liquidation
+                    .find_candidates(account_addresses.iter(), |p| {
+                        if shared_state
+                            .write()
+                            .unwrap()
+                            .liquidation_candidates_accounts
+                            .insert(p)
+                        {
+                            return tx_trigger_sender.send_unless_full(TxTrigger::Liquidation());
+                        }
 
-                if let Some(candidate) = candidate {
-                    tx_trigger_sender
-                        .send_unless_full(TxTrigger::Liquidation(TxTriggerLiquidation {
-                            key: candidate,
-                        }))
-                        .unwrap();
-                } else {
-                    let mut state = shared_state.write().unwrap();
-                    let reception_time = state.oldest_chain_event_reception_time.unwrap();
-                    let current_time = Instant::now();
+                        Ok(())
+                    })
+                    .await
+                    .unwrap();
 
-                    state.oldest_chain_event_reception_time = None;
-
-                    metric_liquidation_check.push(current_time - reception_time);
-                    metric_liquidation_start_end
-                        .push(current_time - liquidation_start_time.unwrap());
-                    liquidation_start_time = None;
+                if found_candidates > 0 {
+                    tracing::debug!("found {} candidates for liquidation", found_candidates);
                 }
+
+                let mut state = shared_state.write().unwrap();
+                let reception_time = state.oldest_chain_event_reception_time.unwrap();
+                let current_time = Instant::now();
+
+                state.oldest_chain_event_reception_time = None;
+
+                metric_liquidation_check.push(current_time - reception_time);
+                metric_liquidation_start_end.push(current_time - liquidation_start_time.unwrap());
+                liquidation_start_time = None;
             }
         }
     })
