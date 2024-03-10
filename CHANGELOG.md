@@ -4,6 +4,7 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+<<<<<<< HEAD
 ### v0.22.0, 2024-2-
 
 - Perp: Allow reusing your own perp order slots immediately (#817)
@@ -32,6 +33,61 @@ Update this for each program release and mainnet deployment.
 
 ## mainnet
 
+=======
+### v0.23.0, 2024-3-
+
+- Allow disabling asset liquidations for tokens (#867)
+
+  This allows listing tokens that have no reliable oracle. Those tokens could be
+  traded through mango but can't be borrowed, can't have asset weight and can't
+  even be liquidated.
+
+- Add configurable collateral fees for tokens (#868, #880, #894)
+
+  Collateral fees allow the DAO to regularly charge users for using particular
+  types of collateral to back their liabilities.
+
+- Add force_withdraw token state (#884)
+
+  There already is a force_close_borrows state, but for a full delisting user
+  deposits need to be removed too. In force_withdraw, user deposits can be
+  permissionlessly withdrawn to their owners' token accounts.
+
+- Flash loan: Add a "swap without flash loan fees" option (#882)
+- Cleanup, tests and minor (#878, #875, #854, #838, #895)
+
+## mainnet
+
+### v0.22.0, 2024-3-3
+
+Deployment: Mar 3, 2024 at 23:52:08 Central European Standard Time, https://explorer.solana.com/tx/3MpEMU12Pv7RpSnwfShoM9sbyr41KAEeJFCVx9ypkq8nuK8Q5vm7CRLkdhH3u91yQ4k44a32armZHaoYguX6NqsY
+
+- Perp: Allow reusing your own perp order slots immediately (#817)
+
+  Previously users who placed a lot of perp orders and used time-in-force needed
+  to wait for out-event cranking if their perp order before reusing an order
+  slot. Now perp order slots can be reused even when the out-event is still on
+  the event queue.
+
+- Introduce fallback oracles (#790, #813)
+
+  Fallback oracles can be used when the primary oracle is stale or not confident.
+  These oracles need to configured by the DAO to be usable by clients.
+
+  Fallback oracles may be based on Orca in addition to the other supported types.
+
+- Add serum3_cancel_by_client_order_id instruction (#798)
+
+  Can now cancel by client order id and not just the order id.
+
+- Add configurable platform liquidation fees for tokens and perps (#849, #858)
+- Delegates can now withdraw small token amounts to the owner's ata (#820)
+- Custom allocator to allow larger heap use if needed (#801)
+- Optimize compute use in token_deposit instruction (#786)
+- Disable support for v1 and v2 mango accounts (#783)
+- Cleanups, logging and tests (#819, #799, #818, #823, #834, #828, #833)
+
+>>>>>>> main
 ### v0.21.3, 2024-2-9
 
 Deployment: Feb 9, 2024 at 11:21:58 Central European Standard Time, https://explorer.solana.com/tx/44f2wcLyLiic1aycdaPTdfwXJBMeGeuA984kvCByg4L5iGprH6xW3D35gd3bvZ6kU3SipEtoY3kDuexJghbxL89T

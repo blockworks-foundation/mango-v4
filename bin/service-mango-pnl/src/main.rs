@@ -21,7 +21,8 @@ use fixed::types::I80F48;
 use mango_feeds_connector::metrics::*;
 use mango_v4::state::{MangoAccount, MangoAccountValue, PerpMarketIndex};
 use mango_v4_client::{
-    chain_data, health_cache, AccountFetcher, Client, MangoGroupContext, TransactionBuilderConfig,
+    chain_data, health_cache, AccountFetcher, Client, FallbackOracleConfig, MangoGroupContext,
+    TransactionBuilderConfig,
 };
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::{account::ReadableAccount, signature::Keypair};
@@ -52,7 +53,13 @@ async fn compute_pnl(
     account_fetcher: Arc<impl AccountFetcher>,
     account: &MangoAccountValue,
 ) -> anyhow::Result<Vec<(PerpMarketIndex, I80F48)>> {
-    let health_cache = health_cache::new(&context, account_fetcher.as_ref(), account).await?;
+    let health_cache = health_cache::new(
+        &context,
+        &FallbackOracleConfig::Dynamic,
+        account_fetcher.as_ref(),
+        account,
+    )
+    .await?;
 
     let pnls = account
         .active_perp_positions()
@@ -265,7 +272,7 @@ async fn main() -> anyhow::Result<()> {
     );
     let group_context = Arc::new(
         MangoGroupContext::new_from_rpc(
-            &client.rpc_async(),
+            client.rpc_async(),
             Pubkey::from_str(&config.pnl.mango_group).unwrap(),
         )
         .await?,
@@ -273,7 +280,7 @@ async fn main() -> anyhow::Result<()> {
     let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
     let account_fetcher = Arc::new(chain_data::AccountFetcher {
         chain_data: chain_data.clone(),
-        rpc: client.rpc_async(),
+        rpc: client.new_rpc_async(),
     });
 
     let metrics_tx = metrics::start(config.metrics, "pnl".into());

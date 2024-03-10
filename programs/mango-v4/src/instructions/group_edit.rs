@@ -19,6 +19,7 @@ pub fn group_edit(
     mngo_token_index_opt: Option<TokenIndex>,
     buyback_fees_expiry_interval_opt: Option<u64>,
     allowed_fast_listings_per_interval_opt: Option<u16>,
+    collateral_fee_interval_opt: Option<u64>,
 ) -> Result<()> {
     let mut group = ctx.accounts.group.load_mut()?;
 
@@ -114,6 +115,15 @@ pub fn group_edit(
             allowed_fast_listings_per_interval
         );
         group.allowed_fast_listings_per_interval = allowed_fast_listings_per_interval;
+    }
+
+    if let Some(collateral_fee_interval) = collateral_fee_interval_opt {
+        msg!(
+            "Collateral fee interval old {:?}, new {:?}",
+            group.collateral_fee_interval,
+            collateral_fee_interval
+        );
+        group.collateral_fee_interval = collateral_fee_interval;
     }
 
     Ok(())

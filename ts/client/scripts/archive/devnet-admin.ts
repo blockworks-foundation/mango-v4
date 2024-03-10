@@ -94,6 +94,7 @@ async function main() {
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
+      PublicKey.default,
       0, // tokenIndex
       'USDC',
       {
@@ -124,6 +125,7 @@ async function main() {
       group,
       solDevnetMint,
       solDevnetOracle,
+      PublicKey.default,
       1, // tokenIndex
       'SOL',
       {

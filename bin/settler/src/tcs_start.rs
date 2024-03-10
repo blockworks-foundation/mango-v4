@@ -123,14 +123,17 @@ impl State {
             }
 
             // Clear newly created token positions, so the liqor account is mostly empty
-            for token_index in startable_chunk.iter().map(|(_, _, ti)| *ti).unique() {
+            let new_token_pos_indices = startable_chunk
+                .iter()
+                .map(|(_, _, ti)| *ti)
+                .unique()
+                .collect_vec();
+            for token_index in new_token_pos_indices {
                 let mint = mango_client.context.token(token_index).mint;
-                let ix = match mango_client.token_withdraw_instructions(
-                    &liqor_account,
-                    mint,
-                    u64::MAX,
-                    false,
-                ) {
+                let ix = match mango_client
+                    .token_withdraw_instructions(&liqor_account, mint, u64::MAX, false)
+                    .await
+                {
                     Ok(ix) => ix,
                     Err(_) => continue,
                 };

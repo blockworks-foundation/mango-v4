@@ -7,8 +7,10 @@ import {
 } from '@coral-xyz/anchor';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
+  createAccount,
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
+  unpackAccount,
 } from '@solana/spl-token';
 import {
   AccountInfo,
@@ -24,6 +26,7 @@ import {
   RecentPrioritizationFees,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  Signer,
   SystemProgram,
   TransactionInstruction,
 } from '@solana/web3.js';
@@ -322,6 +325,7 @@ export class MangoClient {
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
     allowedFastListingsPerInterval?: number,
+    collateralFeeInterval?: BN,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -337,6 +341,7 @@ export class MangoClient {
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
         allowedFastListingsPerInterval ?? null,
+        collateralFeeInterval ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -443,6 +448,7 @@ export class MangoClient {
     group: Group,
     mintPk: PublicKey,
     oraclePk: PublicKey,
+    fallbackOraclePk: PublicKey,
     tokenIndex: number,
     name: string,
     params: TokenRegisterParams,
@@ -478,12 +484,15 @@ export class MangoClient {
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
+        params.collateralFeePerDay,
       )
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mint: mintPk,
         oracle: oraclePk,
+        fallbackOracle: fallbackOraclePk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
         rent: SYSVAR_RENT_PUBKEY,
       })
@@ -560,14 +569,18 @@ export class MangoClient {
         params.maintWeightShiftAssetTarget,
         params.maintWeightShiftLiabTarget,
         params.maintWeightShiftAbort ?? false,
-        params.setFallbackOracle ?? false,
+        params.fallbackOracle !== null, // setFallbackOracle
         params.depositLimit,
         params.zeroUtilRate,
         params.platformLiquidationFee,
+        params.disableAssetLiquidation,
+        params.collateralFeePerDay,
+        params.forceWithdraw,
       )
       .accounts({
         group: group.publicKey,
         oracle: params.oracle ?? bank.oracle,
+        fallbackOracle: params.fallbackOracle ?? bank.fallbackOracle,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
         mintInfo: mintInfo.publicKey,
       })
@@ -627,6 +640,94 @@ export class MangoClient {
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenForceWithdraw(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenIndex: TokenIndex,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByTokenIndex(tokenIndex);
+    if (!bank.forceWithdraw) {
+      throw new Error('Bank is not in force-withdraw mode');
+    }
+
+    const ownerAtaTokenAccount = await getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+      true,
+    );
+    let alternateOwnerTokenAccount = PublicKey.default;
+    const preInstructions: TransactionInstruction[] = [];
+    const postInstructions: TransactionInstruction[] = [];
+
+    const ai = await this.connection.getAccountInfo(ownerAtaTokenAccount);
+
+    // ensure withdraws don't fail with missing ATAs
+    if (ai == null) {
+      preInstructions.push(
+        await createAssociatedTokenAccountIdempotentInstruction(
+          (this.program.provider as AnchorProvider).wallet.publicKey,
+          mangoAccount.owner,
+          bank.mint,
+        ),
+      );
+
+      // wsol case
+      if (bank.mint.equals(NATIVE_MINT)) {
+        postInstructions.push(
+          createCloseAccountInstruction(
+            ownerAtaTokenAccount,
+            mangoAccount.owner,
+            mangoAccount.owner,
+          ),
+        );
+      }
+    } else {
+      const account = await unpackAccount(ownerAtaTokenAccount, ai);
+      // if owner is not same as mango account's owner on the ATA (for whatever reason)
+      // then create another token account
+      if (!account.owner.equals(mangoAccount.owner)) {
+        const kp = Keypair.generate();
+        alternateOwnerTokenAccount = kp.publicKey;
+        await createAccount(
+          this.connection,
+          (this.program.provider as AnchorProvider).wallet as any as Signer,
+          bank.mint,
+          mangoAccount.owner,
+          kp,
+        );
+
+        // wsol case
+        if (bank.mint.equals(NATIVE_MINT)) {
+          postInstructions.push(
+            createCloseAccountInstruction(
+              alternateOwnerTokenAccount,
+              mangoAccount.owner,
+              mangoAccount.owner,
+            ),
+          );
+        }
+      }
+    }
+
+    const ix = await this.program.methods
+      .tokenForceWithdraw()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        oracle: bank.oracle,
+        ownerAtaTokenAccount,
+        alternateOwnerTokenAccount,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenDeregister(
@@ -737,16 +838,20 @@ export class MangoClient {
     mintPk: PublicKey,
     price: number,
   ): Promise<MangoSignatureStatus> {
+    const stubOracle = Keypair.generate();
     const ix = await this.program.methods
       .stubOracleCreate({ val: I80F48.fromNumber(price).getData() })
       .accounts({
         group: group.publicKey,
         admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        oracle: stubOracle.publicKey,
         mint: mintPk,
         payer: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+    return await this.sendAndConfirmTransactionForGroup(group, [ix], {
+      additionalSigners: [stubOracle],
+    });
   }
 
   public async stubOracleClose(

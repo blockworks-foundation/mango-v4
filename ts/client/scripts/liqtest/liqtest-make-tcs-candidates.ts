@@ -1,6 +1,6 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
-import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as splToken from '@solana/spl-token';
+import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import {
@@ -280,6 +280,7 @@ async function main() {
       group,
       newMint,
       newOracle.publicKey,
+      PublicKey.default,
       newTokenIndex,
       'TMP',
       {

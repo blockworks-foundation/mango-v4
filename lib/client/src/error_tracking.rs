@@ -32,7 +32,7 @@ impl<Key> Default for ErrorTypeState<Key> {
 
 #[derive(Builder)]
 pub struct ErrorTracking<Key, ErrorType> {
-    #[builder(setter(custom))]
+    #[builder(default, setter(custom))]
     errors_by_type: HashMap<ErrorType, ErrorTypeState<Key>>,
 
     /// number of errors of a type after which had_too_many_errors returns true

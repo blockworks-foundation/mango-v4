@@ -82,7 +82,7 @@ pub mod sol_mint_mainnet {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq, Eq)]
 #[derivative(Debug)]
 pub struct OracleConfig {
     pub conf_filter: I80F48,
@@ -94,7 +94,7 @@ const_assert_eq!(size_of::<OracleConfig>(), 16 + 8 + 72);
 const_assert_eq!(size_of::<OracleConfig>(), 96);
 const_assert_eq!(size_of::<OracleConfig>() % 8, 0);
 
-#[derive(AnchorDeserialize, AnchorSerialize, Debug)]
+#[derive(AnchorDeserialize, AnchorSerialize, Debug, Default)]
 pub struct OracleConfigParams {
     pub conf_filter: f32,
     pub max_staleness_slots: Option<u32>,
@@ -278,7 +278,7 @@ fn get_pyth_state(
 pub struct OracleAccountInfos<'a, T: KeyedAccountReader> {
     pub oracle: &'a T,
     pub fallback_opt: Option<&'a T>,
-    pub usd_opt: Option<&'a T>,
+    pub usdc_opt: Option<&'a T>,
     pub sol_opt: Option<&'a T>,
 }
 
@@ -287,7 +287,7 @@ impl<'a, T: KeyedAccountReader> OracleAccountInfos<'a, T> {
         OracleAccountInfos {
             oracle: acc_reader,
             fallback_opt: None,
-            usd_opt: None,
+            usdc_opt: None,
             sol_opt: None,
         }
     }
@@ -406,9 +406,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
         OracleType::OrcaCLMM => {
             let whirlpool = load_whirlpool_state(oracle_info)?;
 
-            let inverted = whirlpool.token_mint_a == usdc_mint_mainnet::ID
-                || (whirlpool.token_mint_a == sol_mint_mainnet::ID
-                    && whirlpool.token_mint_b != usdc_mint_mainnet::ID);
+            let inverted = whirlpool.is_inverted();
             let quote_state = if inverted {
                 quote_state_unchecked(acc_infos, &whirlpool.token_mint_a)?
             } else {
@@ -441,7 +439,7 @@ fn quote_state_unchecked<T: KeyedAccountReader>(
 ) -> Result<OracleState> {
     if quote_mint == &usdc_mint_mainnet::ID {
         let usd_feed = acc_infos
-            .usd_opt
+            .usdc_opt
             .ok_or_else(|| error!(MangoError::MissingFeedForCLMMOracle))?;
         let usd_state = get_pyth_state(usd_feed, QUOTE_DECIMALS as u8)?;
         return Ok(usd_state);
@@ -590,13 +588,13 @@ mod tests {
         let usdc_ais = OracleAccountInfos {
             oracle: usdc_ai,
             fallback_opt: None,
-            usd_opt: None,
+            usdc_opt: None,
             sol_opt: None,
         };
         let orca_ais = OracleAccountInfos {
             oracle: ai,
             fallback_opt: None,
-            usd_opt: Some(usdc_ai),
+            usdc_opt: Some(usdc_ai),
             sol_opt: None,
         };
         let usdc = oracle_state_unchecked(&usdc_ais, usdc_decimals).unwrap();
@@ -635,7 +633,7 @@ mod tests {
             let oracle_infos = OracleAccountInfos {
                 oracle: ai,
                 fallback_opt: None,
-                usd_opt: None,
+                usdc_opt: None,
                 sol_opt: None,
             };
             assert!(oracle_state_unchecked(&oracle_infos, base_decimals)

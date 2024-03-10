@@ -55,6 +55,7 @@ export class Group {
       fastListingIntervalStart: BN;
       fastListingsInInterval: number;
       allowedFastListingsPerInterval: number;
+      collateralFeeInterval: BN;
     },
   ): Group {
     return new Group(
@@ -79,6 +80,7 @@ export class Group {
       obj.fastListingIntervalStart,
       obj.fastListingsInInterval,
       obj.allowedFastListingsPerInterval,
+      obj.collateralFeeInterval,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -118,6 +120,7 @@ export class Group {
     public fastListingIntervalStart: BN,
     public fastListingsInInterval: number,
     public allowedFastListingsPerInterval: number,
+    public collateralFeeInterval: BN,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,

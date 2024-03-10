@@ -398,6 +398,9 @@ async function updateTokenParams(): Promise<void> {
               params.depositLimit,
               params.zeroUtilRate,
               params.platformLiquidationFee,
+              params.disableAssetLiquidation,
+              params.collateralFeePerDay,
+              params.forceWithdraw,
             )
             .accounts({
               group: group.publicKey,

@@ -112,6 +112,10 @@ pub(crate) fn liquidation_action(
         liqee.token_position_and_raw_index(asset_token_index)?;
     let liqee_asset_native = liqee_asset_position.native(asset_bank);
     require_gt!(liqee_asset_native, 0);
+    require!(
+        asset_bank.allows_asset_liquidation(),
+        MangoError::TokenAssetLiquidationDisabled
+    );
 
     let (liqee_liab_position, liqee_liab_raw_index) =
         liqee.token_position_and_raw_index(liab_token_index)?;

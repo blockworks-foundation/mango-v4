@@ -59,7 +59,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub begin_serum3: usize,
     pub staleness_slot: Option<u64>,
     pub begin_fallback_oracles: usize,
-    pub usd_oracle_index: Option<usize>,
+    pub usdc_oracle_index: Option<usize>,
     pub sol_oracle_index: Option<usize>,
 }
 
@@ -78,7 +78,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         ais.len(), expected_ais,
         active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len
     );
-    let usd_oracle_index = ais[..]
+    let usdc_oracle_index = ais[..]
         .iter()
         .position(|o| o.key == &pyth_mainnet_usdc_oracle::ID);
     let sol_oracle_index = ais[..]
@@ -93,7 +93,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
         staleness_slot: Some(Clock::get()?.slot),
         begin_fallback_oracles: expected_ais,
-        usd_oracle_index,
+        usdc_oracle_index,
         sol_oracle_index,
     })
 }
@@ -139,7 +139,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: self.usd_oracle_index.map(|i| &self.ais[i]),
+            usdc_opt: self.usdc_oracle_index.map(|i| &self.ais[i]),
             sol_opt: self.sol_oracle_index.map(|i| &self.ais[i]),
         }
     }
@@ -324,7 +324,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
         OracleAccountInfos {
             oracle,
             fallback_opt,
-            usd_opt: self.usd_oracle_index.map(|i| &self.fallback_oracles[i]),
+            usdc_opt: self.usd_oracle_index.map(|i| &self.fallback_oracles[i]),
             sol_opt: self.sol_oracle_index.map(|i| &self.fallback_oracles[i]),
         }
     }

@@ -8,7 +8,10 @@ use anchor_lang::Discriminator;
 
 use fixed::types::I80F48;
 use mango_v4::accounts_zerocopy::{KeyedAccountSharedData, LoadZeroCopy};
-use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, OracleAccountInfos};
+use mango_v4::state::{
+    pyth_mainnet_sol_oracle, pyth_mainnet_usdc_oracle, Bank, MangoAccount, MangoAccountValue,
+    OracleAccountInfos,
+};
 
 use anyhow::Context;
 
@@ -64,10 +67,32 @@ impl AccountFetcher {
 
     pub fn fetch_bank_and_price(&self, bank: &Pubkey) -> anyhow::Result<(Bank, I80F48)> {
         let bank: Bank = self.fetch(bank)?;
-        let oracle = self.fetch_raw(&bank.oracle)?;
-        let oracle_acc = &KeyedAccountSharedData::new(bank.oracle, oracle.into());
-        let price = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_acc), None)?;
+        let oracle_data = self.fetch_raw(&bank.oracle)?;
+        let oracle = &KeyedAccountSharedData::new(bank.oracle, oracle_data.into());
+
+        let fallback_opt = self.fetch_keyed_account_data(bank.fallback_oracle)?;
+        let sol_opt = self.fetch_keyed_account_data(pyth_mainnet_sol_oracle::ID)?;
+        let usdc_opt = self.fetch_keyed_account_data(pyth_mainnet_usdc_oracle::ID)?;
+
+        let oracle_acc_infos = OracleAccountInfos {
+            oracle,
+            fallback_opt: fallback_opt.as_ref(),
+            usdc_opt: usdc_opt.as_ref(),
+            sol_opt: sol_opt.as_ref(),
+        };
+        let price = bank.oracle_price(&oracle_acc_infos, None)?;
         Ok((bank, price))
+    }
+
+    #[inline(always)]
+    fn fetch_keyed_account_data(
+        &self,
+        key: Pubkey,
+    ) -> anyhow::Result<Option<KeyedAccountSharedData>> {
+        Ok(self
+            .fetch_raw(&key)
+            .ok()
+            .map(|data| KeyedAccountSharedData::new(key, data)))
     }
 
     pub fn fetch_bank_price(&self, bank: &Pubkey) -> anyhow::Result<I80F48> {
@@ -216,5 +241,21 @@ impl crate::AccountFetcher for AccountFetcher {
                 Some((*pk, data.account.clone()))
             })
             .collect::<Vec<_>>())
+    }
+
+    async fn fetch_multiple_accounts(
+        &self,
+        keys: &[Pubkey],
+    ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(keys
+            .iter()
+            .map(|pk| (*pk, chain_data.account(pk).unwrap().account.clone()))
+            .collect::<Vec<_>>())
+    }
+
+    async fn get_slot(&self) -> anyhow::Result<u64> {
+        let chain_data = self.chain_data.read().unwrap();
+        Ok(chain_data.newest_processed_slot())
     }
 }

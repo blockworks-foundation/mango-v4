@@ -20,6 +20,9 @@ import { generateSerum3MarketExternalVaultSignerAddress } from '../../src/accoun
 // Script which creates three mints and two serum3 markets relating them
 //
 
+const MINT_COUNT = 5;
+const SERUM_MARKET_COUNT = 4;
+
 function getVaultOwnerAndNonce(
   market: PublicKey,
   programId: PublicKey,
@@ -56,7 +59,7 @@ async function main(): Promise<void> {
 
   // Make mints
   const mints = await Promise.all(
-    Array(4)
+    Array(MINT_COUNT)
       .fill(null)
       .map(() =>
         splToken.createMint(connection, admin, admin.publicKey, null, 6),
@@ -78,11 +81,11 @@ async function main(): Promise<void> {
   // Make serum markets
   const serumMarkets: PublicKey[] = [];
   const quoteMint = mints[0];
-  for (const baseMint of mints.slice(1, 3)) {
+  for (const baseMint of mints.slice(1, 1 + SERUM_MARKET_COUNT)) {
     const feeRateBps = 0.25; // don't think this does anything
     const quoteDustThreshold = 100;
     const baseLotSize = 1000;
-    const quoteLotSize = 1000;
+    const quoteLotSize = 1; // makes prices be in 1000ths
 
     const openbookProgramId = OPENBOOK_PROGRAM_ID.devnet;
     const market = Keypair.generate();
