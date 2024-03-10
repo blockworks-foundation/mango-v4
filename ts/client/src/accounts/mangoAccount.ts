@@ -13,12 +13,12 @@ import {
 } from '../numbers/I80F48';
 import {
   U64_MAX_BN,
+  deepClone,
   roundTo5,
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
   toUiSellPerBuyTokenPrice,
-  deepClone,
 } from '../utils';
 import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
@@ -547,7 +547,7 @@ export class MangoAccount {
       1 - tokenBank.minVaultToDepositsRatio,
     );
     const tp = this.getToken(tokenBank.tokenIndex);
-    let healthCache = HealthCache.fromMangoAccount(group, this);
+    const healthCache = HealthCache.fromMangoAccount(group, this);
     const tokenInfoIndex = healthCache.getOrCreateTokenInfoIndex(tokenBank);
     const initHealth = healthCache.health(HealthType.init);
 
@@ -571,8 +571,8 @@ export class MangoAccount {
 
     // Step 2: Find the maximum withdraw amount
 
-    let mutTokenBank = deepClone<Bank>(tokenBank);
-    let mutHealthCache = deepClone<HealthCache>(healthCache);
+    const mutTokenBank = deepClone<Bank>(tokenBank);
+    const mutHealthCache = deepClone<HealthCache>(healthCache);
     const invalidHealthValue = MAX_I80F48().div(I80F48.fromNumber(2)).neg();
     function healthAfterWithdraw(amount: I80F48): I80F48 {
       const withdrawOfDepositsAmount = amount.min(existingTokenDeposits);
@@ -581,7 +581,7 @@ export class MangoAccount {
       const borrowCost = borrowAmount.mul(loanOriginationFactor);
 
       // Update the account's token position
-      let mutTi = mutHealthCache.tokenInfos[tokenInfoIndex];
+      const mutTi = mutHealthCache.tokenInfos[tokenInfoIndex];
       const startTi = healthCache.tokenInfos[tokenInfoIndex];
       mutTi.balanceSpot = startTi.balanceSpot
         .sub(withdrawOfDepositsAmount)
