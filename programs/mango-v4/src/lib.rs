@@ -458,10 +458,7 @@ pub mod mango_v4 {
         Ok(())
     }
 
-    pub fn sequence_check(
-        ctx: Context<SequenceCheck>,
-        expected_sequence_number: u64,
-    ) -> Result<()> {
+    pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u8) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::sequence_check(ctx, expected_sequence_number)?;
         Ok(())

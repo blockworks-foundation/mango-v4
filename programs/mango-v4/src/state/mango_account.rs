@@ -157,10 +157,10 @@ pub struct MangoAccount {
     /// Time at which the last collateral fee was charged
     pub last_collateral_fee_charge: u64,
 
-    pub sequence_number: u64,
+    pub sequence_number: u8,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 144],
+    pub reserved: [u8; 151],
 
     // dynamic
     pub header_version: u8,
@@ -215,7 +215,7 @@ impl MangoAccount {
             temporary_delegate_expiry: 0,
             last_collateral_fee_charge: 0,
             sequence_number: 0,
-            reserved: [0; 144],
+            reserved: [0; 151],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -340,12 +340,12 @@ pub struct MangoAccountFixed {
     pub temporary_delegate: Pubkey,
     pub temporary_delegate_expiry: u64,
     pub last_collateral_fee_charge: u64,
-    pub sequence_number: u64,
-    pub reserved: [u8; 144],
+    pub sequence_number: u8,
+    pub reserved: [u8; 151],
 }
 const_assert_eq!(
     size_of::<MangoAccountFixed>(),
-    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 8 + 144
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 1 + 151
 );
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
@@ -2914,7 +2914,7 @@ mod tests {
                 temporary_delegate_expiry: fixed.temporary_delegate_expiry,
                 last_collateral_fee_charge: fixed.last_collateral_fee_charge,
                 sequence_number: 0,
-                reserved: [0u8; 144],
+                reserved: [0u8; 151],
 
                 header_version: *zerocopy_reader.header_version(),
                 padding3: Default::default(),

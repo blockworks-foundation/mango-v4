@@ -1786,7 +1786,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "expectedSequenceNumber",
-          "type": "u64"
+          "type": "u8"
         }
       ]
     },
@@ -7974,14 +7974,14 @@ export type MangoV4 = {
           },
           {
             "name": "sequenceNumber",
-            "type": "u64"
+            "type": "u8"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                151
               ]
             }
           },
@@ -9757,14 +9757,14 @@ export type MangoV4 = {
           },
           {
             "name": "sequenceNumber",
-            "type": "u64"
+            "type": "u8"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                151
               ]
             }
           }
@@ -16193,7 +16193,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "expectedSequenceNumber",
-          "type": "u64"
+          "type": "u8"
         }
       ]
     },
@@ -22381,14 +22381,14 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "sequenceNumber",
-            "type": "u64"
+            "type": "u8"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                151
               ]
             }
           },
@@ -24164,14 +24164,14 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "sequenceNumber",
-            "type": "u64"
+            "type": "u8"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                151
               ]
             }
           }
