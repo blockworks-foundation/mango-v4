@@ -2948,6 +2948,13 @@
 <a href="#2948" id="2948">2948</a>
 <a href="#2949" id="2949">2949</a>
 <a href="#2950" id="2950">2950</a>
+<a href="#2951" id="2951">2951</a>
+<a href="#2952" id="2952">2952</a>
+<a href="#2953" id="2953">2953</a>
+<a href="#2954" id="2954">2954</a>
+<a href="#2955" id="2955">2955</a>
+<a href="#2956" id="2956">2956</a>
+<a href="#2957" id="2957">2957</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -4404,6 +4411,13 @@
             post_init_health &gt;= <span class="number">0 </span>|| health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// A stricter version of check_health_post_checks() that requires &gt;=0 health, it not getting
+    /// worse is not sufficient
+    </span><span class="kw">pub fn </span>check_health_post_checks_strict(<span class="kw-2">&amp;mut </span><span class="self">self</span>, post_init_health: I80F48) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="macro">require!</span>(post_init_health &gt;= <span class="number">0</span>, MangoError::HealthMustBePositive);
         <span class="prelude-val">Ok</span>(())
     }
 
