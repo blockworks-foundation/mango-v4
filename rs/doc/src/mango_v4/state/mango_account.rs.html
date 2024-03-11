@@ -2948,7 +2948,6 @@
 <a href="#2948" id="2948">2948</a>
 <a href="#2949" id="2949">2949</a>
 <a href="#2950" id="2950">2950</a>
-<a href="#2951" id="2951">2951</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
@@ -3074,8 +3073,7 @@
 
     <span class="kw">pub </span>bump: u8,
 
-    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>padding: [u8; <span class="number">1</span>],
+    <span class="kw">pub </span>sequence_number: u8,
 
     <span class="comment">// (Display only)
     // Cumulative (deposits - withdraws)
@@ -3151,7 +3149,7 @@
             in_health_region: <span class="number">0</span>,
             account_num: <span class="number">0</span>,
             bump: <span class="number">0</span>,
-            padding: Default::default(),
+            sequence_number: <span class="number">0</span>,
             net_deposits: <span class="number">0</span>,
             perp_spot_transfers: <span class="number">0</span>,
             health_region_begin_init_health: <span class="number">0</span>,
@@ -3276,7 +3274,7 @@
     being_liquidated: u8,
     in_health_region: u8,
     <span class="kw">pub </span>bump: u8,
-    <span class="kw">pub </span>padding: [u8; <span class="number">1</span>],
+    <span class="kw">pub </span>sequence_number: u8,
     <span class="kw">pub </span>net_deposits: i64,
     <span class="kw">pub </span>perp_spot_transfers: i64,
     <span class="kw">pub </span>health_region_begin_init_health: i64,
@@ -5848,7 +5846,7 @@
                 being_liquidated: fixed.being_liquidated,
                 in_health_region: fixed.in_health_region,
                 bump: fixed.bump,
-                padding: Default::default(),
+                sequence_number: <span class="number">0</span>,
                 net_deposits: fixed.net_deposits,
                 perp_spot_transfers: fixed.perp_spot_transfers,
                 health_region_begin_init_health: fixed.health_region_begin_init_health,

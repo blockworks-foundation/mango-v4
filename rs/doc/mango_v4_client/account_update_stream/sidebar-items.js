@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Message"],"struct":["AccountUpdate"]};
+window.SIDEBAR_ITEMS = {"enum":["Message"],"struct":["AccountUpdate","ChainSlotUpdate"]};

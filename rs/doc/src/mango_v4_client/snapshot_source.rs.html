@@ -259,6 +259,8 @@
 <a href="#259" id="259">259</a>
 <a href="#260" id="260">260</a>
 <a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
 </pre><pre class="rust"><code><span class="kw">use </span>jsonrpc_core_client::transports::http;
 
 <span class="kw">use </span>mango_v4::accounts_zerocopy::<span class="kw-2">*</span>;
@@ -276,7 +278,7 @@
 <span class="kw">use </span>solana_rpc::rpc::rpc_accounts::AccountsDataClient;
 <span class="kw">use </span>solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 <span class="kw">use </span>std::str::FromStr;
-<span class="kw">use </span>std::time::Duration;
+<span class="kw">use </span>std::time::{Duration, Instant};
 <span class="kw">use </span>tokio::time;
 <span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
@@ -316,6 +318,7 @@
                     .account
                     .decode()
                     .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;could not decode account&quot;</span>))<span class="question-mark">?</span>,
+                reception_time: Instant::now(),
             });
         }
         <span class="prelude-val">Ok</span>(())
@@ -335,6 +338,7 @@
                     account: ui_account
                         .decode()
                         .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;could not decode account&quot;</span>))<span class="question-mark">?</span>,
+                    reception_time: Instant::now(),
                 });
             }
         }
