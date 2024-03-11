@@ -1457,6 +1457,13 @@ impl<
         Ok(())
     }
 
+    /// A stricter version of check_health_post_checks() that requires >=0 health, it not getting
+    /// worse is not sufficient
+    pub fn check_health_post_checks_strict(&mut self, post_init_health: I80F48) -> Result<()> {
+        require!(post_init_health >= 0, MangoError::HealthMustBePositive);
+        Ok(())
+    }
+
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {
         // Once maint_health falls below 0, we want to start liquidating,
         // we want to allow liquidation to continue until init_health is positive,

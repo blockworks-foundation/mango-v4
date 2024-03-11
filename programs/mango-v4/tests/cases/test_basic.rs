@@ -942,7 +942,7 @@ async fn test_withdraw_skip_bank() -> Result<(), TransportError> {
             },
             skip_banks: vec![tokens[0].bank, tokens[1].bank],
         },
-        MangoError::HealthMustBePositiveOrIncrease
+        MangoError::HealthMustBePositive
     );
 
     Ok(())
