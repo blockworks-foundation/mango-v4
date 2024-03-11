@@ -36,6 +36,7 @@ mod test_perp_settle;
 mod test_perp_settle_fees;
 mod test_position_lifetime;
 mod test_reduce_only;
+mod test_replay;
 mod test_serum;
 mod test_stale_oracles;
 mod test_token_conditional_swap;
