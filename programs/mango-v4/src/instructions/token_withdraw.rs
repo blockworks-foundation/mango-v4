@@ -175,9 +175,9 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
             // However, if health without it is negative then full health could be negative
             // and could be made worse by withdrawals.
             //
-            // We don't know the true pre_init_health, and substitute MAX. That way the check
-            // won't pass because post == pre.
-            account.check_health_post_checks(I80F48::MAX, post_init_health_lower_bound)?;
+            // We don't know the true pre_init_health: So require that our lower bound on
+            // post health is strictly good enough.
+            account.check_health_post_checks_strict(post_init_health_lower_bound)?;
         }
     }
 
