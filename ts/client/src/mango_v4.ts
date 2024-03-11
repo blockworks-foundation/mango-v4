@@ -1791,6 +1791,36 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthMaintenanceRatio",
+          "type": "f64"
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -11049,6 +11079,9 @@ export type MangoV4 = {
           },
           {
             "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           }
         ]
       }
@@ -14401,6 +14434,11 @@ export type MangoV4 = {
       "code": 6071,
       "name": "InvalidSequenceNumber",
       "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
     }
   ]
 };
@@ -16198,6 +16236,36 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthMaintenanceRatio",
+          "type": "f64"
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -25456,6 +25524,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           }
         ]
       }
@@ -28808,6 +28879,11 @@ export const IDL: MangoV4 = {
       "code": 6071,
       "name": "InvalidSequenceNumber",
       "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
     }
   ]
 };

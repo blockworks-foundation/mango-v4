@@ -1048,6 +1048,30 @@ export class MangoClient {
       .instruction();
   }
 
+  public async healthCheckIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    minHealthMaintenanceRatio: number,
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      this.buildHealthRemainingAccounts(group, [mangoAccount], [], [], []);
+
+    return await this.program.methods
+      .healthCheck(minHealthMaintenanceRatio)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
+  }
+
   public async getMangoAccount(
     mangoAccountPk: PublicKey,
     loadSerum3Oo = false,

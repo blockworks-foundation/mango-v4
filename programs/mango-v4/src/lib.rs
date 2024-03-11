@@ -467,6 +467,15 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn health_check(
+        ctx: Context<HealthCheck>,
+        min_health_maintenance_ratio: f64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::health_check(ctx, min_health_maintenance_ratio)?;
+        Ok(())
+    }
+
     // todo:
     // ckamm: generally, using an I80F48 arg will make it harder to call
     // because generic anchor clients won't know how to deal with it

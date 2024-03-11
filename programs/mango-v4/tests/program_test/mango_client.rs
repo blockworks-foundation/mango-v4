@@ -5208,3 +5208,52 @@ impl ClientInstruction for SequenceCheckInstruction {
         vec![self.owner]
     }
 }
+
+#[derive(Default)]
+pub struct HealthCheckInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub min_health_ratio: f64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for HealthCheckInstruction {
+    type Accounts = mango_v4::accounts::HealthCheck;
+    type Instruction = mango_v4::instruction::HealthCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            min_health_maintenance_ratio: self.min_health_ratio,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+        };
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}

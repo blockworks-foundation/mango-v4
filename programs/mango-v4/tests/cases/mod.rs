@@ -22,6 +22,7 @@ mod test_collateral_fees;
 mod test_delegate;
 mod test_fees_buyback_with_mngo;
 mod test_force_close;
+mod test_health_check;
 mod test_health_compute;
 mod test_health_region;
 mod test_ix_gate_set;

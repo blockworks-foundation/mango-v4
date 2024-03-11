@@ -247,6 +247,7 @@ pub enum IxGate {
     Serum3PlaceOrderV2 = 71,
     TokenForceWithdraw = 72,
     SequenceCheck = 73,
+    HealthCheck = 74,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
