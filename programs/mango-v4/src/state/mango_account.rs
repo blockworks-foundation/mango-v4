@@ -123,8 +123,7 @@ pub struct MangoAccount {
 
     pub bump: u8,
 
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
 
     // (Display only)
     // Cumulative (deposits - withdraws)
@@ -157,10 +156,8 @@ pub struct MangoAccount {
     /// Time at which the last collateral fee was charged
     pub last_collateral_fee_charge: u64,
 
-    pub sequence_number: u64,
-
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 144],
+    pub reserved: [u8; 152],
 
     // dynamic
     pub header_version: u8,
@@ -202,7 +199,7 @@ impl MangoAccount {
             in_health_region: 0,
             account_num: 0,
             bump: 0,
-            padding: Default::default(),
+            sequence_number: 0,
             net_deposits: 0,
             perp_spot_transfers: 0,
             health_region_begin_init_health: 0,
@@ -214,8 +211,7 @@ impl MangoAccount {
             temporary_delegate: Pubkey::default(),
             temporary_delegate_expiry: 0,
             last_collateral_fee_charge: 0,
-            sequence_number: 0,
-            reserved: [0; 144],
+            reserved: [0; 152],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -328,7 +324,7 @@ pub struct MangoAccountFixed {
     being_liquidated: u8,
     in_health_region: u8,
     pub bump: u8,
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
     pub net_deposits: i64,
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
@@ -340,12 +336,11 @@ pub struct MangoAccountFixed {
     pub temporary_delegate: Pubkey,
     pub temporary_delegate_expiry: u64,
     pub last_collateral_fee_charge: u64,
-    pub sequence_number: u64,
-    pub reserved: [u8; 144],
+    pub reserved: [u8; 152],
 }
 const_assert_eq!(
     size_of::<MangoAccountFixed>(),
-    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 8 + 144
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 152
 );
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
@@ -2901,7 +2896,7 @@ mod tests {
                 being_liquidated: fixed.being_liquidated,
                 in_health_region: fixed.in_health_region,
                 bump: fixed.bump,
-                padding: Default::default(),
+                sequence_number: 0,
                 net_deposits: fixed.net_deposits,
                 perp_spot_transfers: fixed.perp_spot_transfers,
                 health_region_begin_init_health: fixed.health_region_begin_init_health,
@@ -2913,8 +2908,7 @@ mod tests {
                 temporary_delegate: fixed.temporary_delegate,
                 temporary_delegate_expiry: fixed.temporary_delegate_expiry,
                 last_collateral_fee_charge: fixed.last_collateral_fee_charge,
-                sequence_number: 0,
-                reserved: [0u8; 144],
+                reserved: [0u8; 152],
 
                 header_version: *zerocopy_reader.header_version(),
                 padding3: Default::default(),
