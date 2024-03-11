@@ -4,7 +4,7 @@ use crate::accounts_ix::*;
 use crate::error::MangoError;
 use crate::state::*;
 
-pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u64) -> Result<()> {
+pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u8) -> Result<()> {
     let mut account = ctx.accounts.account.load_full_mut()?;
 
     require_eq!(

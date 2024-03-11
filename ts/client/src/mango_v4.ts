@@ -1786,7 +1786,7 @@ export type MangoV4 = {
       "args": [
         {
           "name": "expectedSequenceNumber",
-          "type": "u64"
+          "type": "u8"
         }
       ]
     },
@@ -7901,13 +7901,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -7973,15 +7968,11 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "sequenceNumber",
-            "type": "u64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                152
               ]
             }
           },
@@ -9703,13 +9694,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -9756,15 +9742,11 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "sequenceNumber",
-            "type": "u64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                152
               ]
             }
           }
@@ -16190,7 +16172,7 @@ export const IDL: MangoV4 = {
       "args": [
         {
           "name": "expectedSequenceNumber",
-          "type": "u64"
+          "type": "u8"
         }
       ]
     },
@@ -22305,13 +22287,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -22377,15 +22354,11 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "sequenceNumber",
-            "type": "u64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                152
               ]
             }
           },
@@ -24107,13 +24080,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -24160,15 +24128,11 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
-            "name": "sequenceNumber",
-            "type": "u64"
-          },
-          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                152
               ]
             }
           }

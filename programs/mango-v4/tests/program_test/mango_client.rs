@@ -5144,7 +5144,7 @@ impl ClientInstruction for TokenChargeCollateralFeesInstruction {
 pub struct SequenceCheckInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
-    pub expected_sequence_number: u64,
+    pub expected_sequence_number: u8,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for SequenceCheckInstruction {
