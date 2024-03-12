@@ -55,23 +55,14 @@ pub struct PerpBalanceLog {
 
 pub fn emit_token_balance_log(mango_account: Pubkey, bank: &Bank, token_position: &TokenPosition) {
     assert_eq!(bank.token_index, token_position.token_index);
-    let allow_lending = token_position.allow_lending();
     emit_stack(TokenBalanceLogV2 {
         mango_group: bank.group,
         mango_account,
         token_index: bank.token_index,
-        indexed_position: if allow_lending {
-            token_position.indexed_position.to_bits()
-        } else {
-            0
-        },
+        indexed_position: token_position.indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
-        native_position: if !allow_lending {
-            token_position.indexed_position.to_num::<u64>()
-        } else {
-            0
-        },
+        native_position: token_position.unlendable_deposit,
         allow_lending: token_position.allow_lending(),
     });
 }

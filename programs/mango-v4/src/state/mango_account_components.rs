@@ -54,13 +54,15 @@ pub struct TokenPosition {
     // Cumulative borrow interest in token native units
     pub cumulative_borrow_interest: f64,
 
+    pub unlendable_deposit: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 128],
+    pub reserved: [u8; 120],
 }
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
-    16 + 2 + 2 + 4 + 16 + 8 + 8 + 128
+    16 + 2 + 2 + 4 + 16 + 8 + 8 + 8 + 120
 );
 const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
@@ -75,8 +77,9 @@ impl Default for TokenPosition {
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposit: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         }
     }
 }
@@ -98,7 +101,7 @@ impl TokenPosition {
                 self.indexed_position * bank.borrow_index
             }
         } else {
-            self.indexed_position
+            I80F48::from(self.unlendable_deposit)
         }
     }
 

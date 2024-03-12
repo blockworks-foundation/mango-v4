@@ -568,15 +568,20 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         if position.allow_lending() {
+            assert!(position.unlendable_deposit == 0);
             let opening_indexed_position = position.indexed_position;
             let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
             self.update_cumulative_interest(position, opening_indexed_position);
             Ok(result)
         } else {
+            assert!(position.indexed_position.is_zero());
             let deposit_amount = native_amount.floor();
-            self.unlendable_deposits += deposit_amount.to_num::<u64>();
             self.dust += native_amount - deposit_amount;
-            position.indexed_position += deposit_amount;
+
+            let deposit_amount_u64 = deposit_amount.to_num::<u64>();
+            position.unlendable_deposit += deposit_amount_u64;
+            self.unlendable_deposits += deposit_amount_u64;
+
             Ok(true)
         }
     }
@@ -719,6 +724,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<WithdrawResult> {
         if position.allow_lending() {
+            assert!(position.unlendable_deposit == 0);
             let opening_indexed_position = position.indexed_position;
             let res = self.withdraw_internal(
                 position,
@@ -730,12 +736,15 @@ impl Bank {
             self.update_cumulative_interest(position, opening_indexed_position);
             res
         } else {
+            assert!(position.indexed_position.is_zero());
+
             // TODO: might there be trouble by rounding up here?
             let withdraw_amount = native_amount.ceil();
             self.dust += withdraw_amount - native_amount;
-            self.unlendable_deposits -= withdraw_amount.to_num::<u64>();
-            position.indexed_position -= withdraw_amount;
-            require_gte!(position.indexed_position, I80F48::ZERO); // TODO: error
+
+            let withdraw_amount_u64 = withdraw_amount.to_num::<u64>();
+            self.unlendable_deposits -= withdraw_amount_u64;
+            position.unlendable_deposit -= withdraw_amount_u64;
             Ok(WithdrawResult {
                 position_is_active: true,
                 loan_amount: I80F48::ZERO,
@@ -1387,8 +1396,9 @@ mod tests {
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposit: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         };
 
         account.indexed_position = indexed(I80F48::from_num(start), &bank);
@@ -1515,8 +1525,9 @@ mod tests {
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposit: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         };
 
         //
