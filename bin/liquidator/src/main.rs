@@ -7,6 +7,7 @@ use anchor_client::Cluster;
 use clap::Parser;
 use futures_util::StreamExt;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::account_update_stream::SnapshotType;
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoGroupContext,
@@ -51,6 +52,7 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // env_logger::init();
     mango_v4_client::tracing_subscriber_init();
 
     let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
@@ -154,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
     websocket_source::start(
         websocket_source::Config {
             rpc_ws_url: ws_url.clone(),
+            rpc_http_url: rpc_url.clone(),
             serum_programs,
             open_orders_authority: mango_group,
         },
@@ -330,6 +333,7 @@ async fn main() -> anyhow::Result<()> {
                 let current_time = Instant::now();
                 metric_account_update_queue_len.set(account_update_receiver.len() as u64);
 
+
                 message.update_chain_data(&mut chain_data.write().unwrap());
 
                 match message {
@@ -356,7 +360,8 @@ async fn main() -> anyhow::Result<()> {
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
                         }
                     }
-                    Message::Snapshot(snapshot) => {
+                    Message::Snapshot(snapshot, snapshot_type) => {
+                        debug!("Got a new snapshot ({:?})", snapshot_type); 
                         let mut state = shared_state.write().unwrap();
                         let mut reception_time = None;
 
@@ -393,7 +398,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
-                        state.one_snapshot_done = true;
+                        if snapshot_type == SnapshotType::Full {
+                            state.one_snapshot_done = true;
+                        }
                     }
                     _ => {}
                 }

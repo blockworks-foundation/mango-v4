@@ -162,6 +162,7 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: websocket feed should take which accounts to listen to as an input
     websocket_source::start(
         websocket_source::Config {
+            rpc_http_url: rpc_url.clone(),
             rpc_ws_url: ws_url.clone(),
             serum_programs,
             open_orders_authority: mango_group,
