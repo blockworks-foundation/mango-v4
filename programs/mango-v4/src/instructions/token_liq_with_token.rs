@@ -226,8 +226,14 @@ pub(crate) fn liquidation_action(
 
     // The amount of asset native tokens we will give up for them
     let asset_transfer_base = liab_transfer * liab_oracle_price / asset_oracle_price;
-    let asset_transfer_to_liqor = asset_transfer_base * fee_factor_liqor;
-    let asset_transfer_from_liqee = asset_transfer_base * fee_factor_total;
+    let mut asset_transfer_to_liqor = asset_transfer_base * fee_factor_liqor;
+    let mut asset_transfer_from_liqee = asset_transfer_base * fee_factor_total;
+
+    // Converting max asset to liab and back to asset can have introduced rounding errors, ensure
+    // the transfered amounts are guaranteed < max
+    assert!(asset_transfer_from_liqee < max_asset_transfer + I80F48::ONE);
+    asset_transfer_to_liqor = asset_transfer_to_liqor.min(max_asset_transfer);
+    asset_transfer_from_liqee = asset_transfer_from_liqee.min(max_asset_transfer);
 
     let asset_liquidation_fee = asset_transfer_from_liqee - asset_transfer_to_liqor;
     asset_bank.collected_fees_native += asset_liquidation_fee;
@@ -308,6 +314,7 @@ pub(crate) fn liquidation_action(
 
     // Check liqee health again
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
+    msg!("liqee liq end health: {}", liqee_liq_end_health);
     liqee
         .fixed
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
