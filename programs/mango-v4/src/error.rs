@@ -149,6 +149,8 @@ pub enum MangoError {
     BorrowsRequireHealthAccountBank,
     #[msg("invalid sequence number")]
     InvalidSequenceNumber,
+    #[msg("invalid health")]
+    InvalidHealth,
 }
 
 impl MangoError {

@@ -7,7 +7,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::accounts_ix::{
-    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+    HealthCheckKind, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
@@ -5206,5 +5206,54 @@ impl ClientInstruction for SequenceCheckInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
+    }
+}
+
+pub struct HealthCheckInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub min_health_value: f64,
+    pub check_kind: HealthCheckKind,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for HealthCheckInstruction {
+    type Accounts = mango_v4::accounts::HealthCheck;
+    type Instruction = mango_v4::instruction::HealthCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            min_health_value: self.min_health_value,
+            check_kind: self.check_kind,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+        };
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
     }
 }

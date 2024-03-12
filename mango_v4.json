@@ -1791,6 +1791,36 @@
       ]
     },
     {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthValue",
+          "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -10675,6 +10705,32 @@
       }
     },
     {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -11031,6 +11087,9 @@
           },
           {
             "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           }
         ]
       }
@@ -14383,6 +14442,11 @@
       "code": 6071,
       "name": "InvalidSequenceNumber",
       "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
     }
   ]
 }
