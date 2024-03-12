@@ -15,15 +15,11 @@ pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct TokenPosition {
-    // TODO: Why did we have deposits and borrows as two different values
-    //       if only one of them was allowed to be != 0 at a time?
-    // todo: maybe we want to split collateral and lending?
-    // todo: see https://github.com/blockworks-foundation/mango-v4/issues/1
-    // todo: how does ftx do this?
-    /// The deposit_index (if positive) or borrow_index (if negative) scaled position
+    /// The token position, scaled with the deposit_index (if positive) or borrow_index (if negative)
+    /// to get the lendable/borrowed native token amount
     pub indexed_position: I80F48,
 
-    /// index into Group.tokens
+    /// index the token is registered with, same as in Bank and MintInfo
     pub token_index: TokenIndex,
 
     /// incremented when a market requires this position to stay alive
@@ -31,14 +27,11 @@ pub struct TokenPosition {
 
     /// set to 1 when these deposits may not be lent out
     ///
-    /// This has wide ranging consequences:
-    /// - only deposits possible, no borrows (TODO: that means no perps because settlement may cause borrows?)
-    /// - not accounted for in Bank.indexedDeposits
-    /// - instead tracked in Bank.unlendableDeposits (to ensure the vault always has them)
-    /// - indexed_position becomes stores straight token-native amount, fractional will always be 0
-    ///
-    /// TODO: completely borks logging of indexed_position in many instructions
-    /// TODO: this means all fractional deposits/withdraws are dusted?!
+    /// This has consequences:
+    /// - only deposits possible, no borrows (also implying no perps with that settle token)
+    /// - not accounted for in Bank.indexed_deposits,
+    /// - instead tracked in Bank.unlendable_deposits (to ensure the vault always has them)
+    /// - indexed_position stays 0, instead use unlendable_deposits a straight native token amount
     pub disable_lending: u8,
 
     #[derivative(Debug = "ignore")]
@@ -54,6 +47,9 @@ pub struct TokenPosition {
     // Cumulative borrow interest in token native units
     pub cumulative_borrow_interest: f64,
 
+    /// deposited unlendable native token amount
+    ///
+    /// When this is set, indexed_position is always zero
     pub unlendable_deposits: u64,
 
     #[derivative(Debug = "ignore")]
