@@ -1803,20 +1803,20 @@ export type MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
         {
-          "name": "minHealthMaintenanceRatio",
+          "name": "minHealthValue",
           "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
         }
       ]
     },
@@ -10718,6 +10718,32 @@ export type MangoV4 = {
           },
           {
             "name": "SwapWithoutFee"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
           }
         ]
       }
@@ -16248,20 +16274,20 @@ export const IDL: MangoV4 = {
           "isMut": true,
           "isSigner": false,
           "relations": [
-            "group",
-            "owner"
+            "group"
           ]
-        },
-        {
-          "name": "owner",
-          "isMut": false,
-          "isSigner": true
         }
       ],
       "args": [
         {
-          "name": "minHealthMaintenanceRatio",
+          "name": "minHealthValue",
           "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
         }
       ]
     },
@@ -25163,6 +25189,32 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwapWithoutFee"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
           }
         ]
       }

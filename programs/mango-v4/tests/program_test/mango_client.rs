@@ -7,7 +7,7 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::accounts_ix::{
-    InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+    HealthCheckKind, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
@@ -5209,11 +5209,11 @@ impl ClientInstruction for SequenceCheckInstruction {
     }
 }
 
-#[derive(Default)]
 pub struct HealthCheckInstruction {
     pub account: Pubkey,
     pub owner: TestKeypair,
-    pub min_health_ratio: f64,
+    pub min_health_value: f64,
+    pub check_kind: HealthCheckKind,
 }
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for HealthCheckInstruction {
@@ -5225,7 +5225,8 @@ impl ClientInstruction for HealthCheckInstruction {
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
-            min_health_maintenance_ratio: self.min_health_ratio,
+            min_health_value: self.min_health_value,
+            check_kind: self.check_kind,
         };
 
         let account = account_loader
@@ -5236,7 +5237,6 @@ impl ClientInstruction for HealthCheckInstruction {
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
-            owner: self.owner.pubkey(),
         };
 
         let health_check_metas = derive_health_check_remaining_account_metas(
@@ -5254,6 +5254,6 @@ impl ClientInstruction for HealthCheckInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.owner]
+        vec![]
     }
 }

@@ -3,7 +3,7 @@ use crate::cases::{
     HealthCheckInstruction, TestContext, TestKeypair, TokenWithdrawInstruction,
 };
 use crate::send_tx_expect_error;
-use mango_v4::accounts_ix::HealthCheck;
+use mango_v4::accounts_ix::{HealthCheck, HealthCheckKind};
 use mango_v4::error::MangoError;
 use solana_sdk::transport::TransportError;
 
@@ -78,7 +78,20 @@ async fn test_health_check() -> Result<(), TransportError> {
         HealthCheckInstruction {
             account,
             owner,
-            min_health_ratio: 20.0,
+            min_health_value: 20.0,
+            check_kind: HealthCheckKind::MaintRatio,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        HealthCheckInstruction {
+            account,
+            owner,
+            min_health_value: 500.0,
+            check_kind: HealthCheckKind::Init,
         },
     )
     .await
@@ -89,7 +102,31 @@ async fn test_health_check() -> Result<(), TransportError> {
         HealthCheckInstruction {
             owner,
             account,
-            min_health_ratio: 100.0
+            min_health_value: 600.0,
+            check_kind: HealthCheckKind::Init,
+        },
+        MangoError::InvalidHealth
+    );
+
+    send_tx(
+        solana,
+        HealthCheckInstruction {
+            account,
+            owner,
+            min_health_value: 800.0,
+            check_kind: HealthCheckKind::Maint,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        HealthCheckInstruction {
+            owner,
+            account,
+            min_health_value: 100.0,
+            check_kind: HealthCheckKind::MaintRatio,
         },
         MangoError::InvalidHealth
     );
@@ -100,7 +137,8 @@ async fn test_health_check() -> Result<(), TransportError> {
             inner: HealthCheckInstruction {
                 owner,
                 account,
-                min_health_ratio: 5.0,
+                min_health_value: 5.0,
+                check_kind: HealthCheckKind::MaintRatio,
             },
             skip_banks: vec![tokens[1].bank],
         },
@@ -114,7 +152,8 @@ async fn test_health_check() -> Result<(), TransportError> {
             inner: HealthCheckInstruction {
                 owner,
                 account,
-                min_health_ratio: 10.0
+                min_health_value: 10.0,
+                check_kind: HealthCheckKind::MaintRatio,
             },
             skip_banks: vec![tokens[1].bank],
         },
@@ -127,7 +166,8 @@ async fn test_health_check() -> Result<(), TransportError> {
             inner: HealthCheckInstruction {
                 owner,
                 account,
-                min_health_ratio: 10.0
+                min_health_value: 10.0,
+                check_kind: HealthCheckKind::MaintRatio,
             },
             skip_banks: vec![tokens[2].bank],
         },

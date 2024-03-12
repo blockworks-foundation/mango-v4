@@ -10,7 +10,11 @@ use crate::health::{
 use crate::state::*;
 use crate::util::clock_now;
 
-pub fn health_check(ctx: Context<HealthCheck>, min_health_maintenance_ratio: f64) -> Result<()> {
+pub fn health_check(
+    ctx: Context<HealthCheck>,
+    min_value: f64,
+    health_check_kind: HealthCheckKind,
+) -> Result<()> {
     let account = ctx.accounts.account.load_full_mut()?;
     let (now_ts, now_slot) = clock_now();
 
@@ -26,14 +30,20 @@ pub fn health_check(ctx: Context<HealthCheck>, min_health_maintenance_ratio: f64
     )
     .context("health_check health cache")?;
 
-    let min_health_maintenance_ratio = I80F48::from_num(min_health_maintenance_ratio);
-    let maintenance_ratio = health_cache.health_ratio(HealthType::Maint);
+    let min_value = I80F48::from_num(min_value);
+    let actual_value = match health_check_kind {
+        HealthCheckKind::Maint => health_cache.health(HealthType::Maint),
+        HealthCheckKind::Init => health_cache.health(HealthType::Init),
+        HealthCheckKind::LiquidationEnd => health_cache.health(HealthType::LiquidationEnd),
+        HealthCheckKind::MaintRatio => health_cache.health_ratio(HealthType::Maint),
+        HealthCheckKind::InitRatio => health_cache.health_ratio(HealthType::Init),
+        HealthCheckKind::LiquidationEndRatio => {
+            health_cache.health_ratio(HealthType::LiquidationEnd)
+        }
+    };
 
-    require_gte!(
-        maintenance_ratio,
-        min_health_maintenance_ratio,
-        MangoError::InvalidHealth
-    );
+    // msg!("{}", actual_value);
+    require_gte!(actual_value, min_value, MangoError::InvalidHealth);
 
     Ok(())
 }

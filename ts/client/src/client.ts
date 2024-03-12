@@ -83,7 +83,7 @@ import {
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, OracleConfigParams } from './types';
+import { FlashLoanType, HealthCheckKind, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
   U64_MAX_BN,
@@ -1051,17 +1051,17 @@ export class MangoClient {
   public async healthCheckIx(
     group: Group,
     mangoAccount: MangoAccount,
-    minHealthMaintenanceRatio: number,
+    minHealthValue: number,
+    checkKind: HealthCheckKind,
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(group, [mangoAccount], [], [], []);
 
     return await this.program.methods
-      .healthCheck(minHealthMaintenanceRatio)
+      .healthCheck(minHealthValue, checkKind)
       .accounts({
         group: group.publicKey,
         account: mangoAccount.publicKey,
-        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
       })
       .remainingAccounts(
         healthRemainingAccounts.map(

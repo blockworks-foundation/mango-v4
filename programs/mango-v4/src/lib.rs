@@ -469,10 +469,11 @@ pub mod mango_v4 {
 
     pub fn health_check(
         ctx: Context<HealthCheck>,
-        min_health_maintenance_ratio: f64,
+        min_health_value: f64,
+        check_kind: HealthCheckKind,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::health_check(ctx, min_health_maintenance_ratio)?;
+        instructions::health_check(ctx, min_health_value, check_kind)?;
         Ok(())
     }
 
