@@ -155,6 +155,8 @@ pub enum MangoError {
     TokenPositionBalanceNotZero,
     #[msg("cannot have a lending and no-lending token position at the same time")]
     TokenPositionWithDifferentSettingAlreadyExists,
+    #[msg("cannot borrow from unlendable token position")]
+    UnlendableTokenPositionCannotBeNegative,
 }
 
 impl MangoError {

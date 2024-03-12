@@ -752,8 +752,13 @@ impl Bank {
             self.dust += withdraw_amount - native_amount;
 
             let withdraw_amount_u64 = withdraw_amount.to_num::<u64>();
-            self.unlendable_deposits -= withdraw_amount_u64;
+            require_gte!(
+                position.unlendable_deposits,
+                withdraw_amount_u64,
+                MangoError::UnlendableTokenPositionCannotBeNegative
+            );
             position.unlendable_deposits -= withdraw_amount_u64;
+            self.unlendable_deposits -= withdraw_amount_u64;
             Ok(WithdrawResult {
                 position_is_active: true,
                 loan_amount: I80F48::ZERO,

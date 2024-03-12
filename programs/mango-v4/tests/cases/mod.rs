@@ -40,3 +40,4 @@ mod test_serum;
 mod test_stale_oracles;
 mod test_token_conditional_swap;
 mod test_token_update_index_and_rate;
+mod test_unlendable;

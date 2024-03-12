@@ -492,6 +492,21 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn token_create_position(
+        ctx: Context<TokenCreateOrClosePosition>,
+        allow_lending: bool,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_create_position(ctx, allow_lending)?;
+        Ok(())
+    }
+
+    pub fn token_close_position(ctx: Context<TokenCreateOrClosePosition>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_close_position(ctx)?;
+        Ok(())
+    }
+
     pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_deposit(ctx, amount, reduce_only)?;
