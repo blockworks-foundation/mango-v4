@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "version": "0.22.0",
-=======
   "version": "0.23.0",
->>>>>>> main
   "name": "mango_v4",
   "instructions": [
     {
@@ -641,8 +637,6 @@
         {
           "name": "platformLiquidationFee",
           "type": "f32"
-<<<<<<< HEAD
-=======
         },
         {
           "name": "disableAssetLiquidation",
@@ -651,7 +645,6 @@
         {
           "name": "collateralFeePerDay",
           "type": "f32"
->>>>>>> main
         }
       ]
     },
@@ -1062,8 +1055,6 @@
           "type": {
             "option": "f32"
           }
-<<<<<<< HEAD
-=======
         },
         {
           "name": "disableAssetLiquidationOpt",
@@ -1082,7 +1073,6 @@
           "type": {
             "option": "bool"
           }
->>>>>>> main
         }
       ]
     },
@@ -7644,8 +7634,6 @@
             }
           },
           {
-<<<<<<< HEAD
-=======
             "name": "collectedCollateralFees",
             "docs": [
               "Collateral fees that have been collected (in native tokens)",
@@ -7664,16 +7652,11 @@
             "type": "f32"
           },
           {
->>>>>>> main
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-<<<<<<< HEAD
-                1920
-=======
                 1900
->>>>>>> main
               ]
             }
           }

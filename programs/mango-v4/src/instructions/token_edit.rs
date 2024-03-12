@@ -485,8 +485,6 @@ pub fn token_edit(
                 platform_liquidation_fee
             );
             bank.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
-<<<<<<< HEAD
-=======
             if platform_liquidation_fee != 0.0 {
                 require_group_admin = true;
             }
@@ -521,7 +519,6 @@ pub fn token_edit(
                 force_withdraw
             );
             bank.force_withdraw = u8::from(force_withdraw);
->>>>>>> main
             require_group_admin = true;
         }
     }
