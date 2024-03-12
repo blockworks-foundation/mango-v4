@@ -42,7 +42,7 @@ async function x(): Promise<void> {
   );
 
   const group = await client.getGroup(
-    new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
+    new PublicKey('AKeMSYiJekyKfwCc3CUfVNDVAiqk9FfbQVMY3G7RUZUf'),
   );
 
   const { bestRoute } = await fetchRoutes(

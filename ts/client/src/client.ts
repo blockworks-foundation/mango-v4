@@ -1,4 +1,10 @@
-import { AnchorProvider, BN, Program, Wallet } from '@coral-xyz/anchor';
+import {
+  AnchorProvider,
+  BN,
+  Program,
+  Provider,
+  Wallet,
+} from '@coral-xyz/anchor';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createAccount,
@@ -63,6 +69,7 @@ import {
 } from './accounts/serum3';
 import {
   IxGateParams,
+  PerpEditParams,
   TokenEditParams,
   TokenRegisterParams,
   buildIxGate,
@@ -1025,6 +1032,20 @@ export class MangoClient {
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async sequenceCheckIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .sequenceCheck(mangoAccount.sequenceNumber)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
   }
 
   public async getMangoAccount(
@@ -2375,13 +2396,18 @@ export class MangoClient {
     externalMarketPk: PublicKey,
     limit?: number,
   ): Promise<MangoSignatureStatus> {
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      await this.serum3CancelAllOrdersIx(
+    const [cancelAllIx, settle] = await Promise.all([
+      this.serum3CancelAllOrdersIx(
         group,
         mangoAccount,
         externalMarketPk,
         limit,
       ),
+      this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      cancelAllIx,
+      settle,
     ]);
   }
 
@@ -3942,8 +3968,9 @@ export class MangoClient {
     );
     const lowerLimit = 0;
     const upperLimit = thresholdPriceNativeNative;
+    console.log(thresholdPriceNativeNative);
 
-    return await this.tokenConditionalSwapCreateIx(
+    return await this.tokenConditionalSwapCreatePremiumAuctionIx(
       group,
       account,
       sellBank,
@@ -3958,6 +3985,9 @@ export class MangoClient {
       false,
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
+      120,
+      2,
+      10,
     );
   }
 
@@ -4016,7 +4046,7 @@ export class MangoClient {
     const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
-    return await this.tokenConditionalSwapCreateIx(
+    return await this.tokenConditionalSwapCreatePremiumAuctionIx(
       group,
       account,
       sellBank,
@@ -4031,6 +4061,9 @@ export class MangoClient {
       false,
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
+      120,
+      2,
+      10,
     );
   }
 
@@ -4092,7 +4125,7 @@ export class MangoClient {
     const lowerLimit = 0;
     const upperLimit = thresholdPriceNativeNative;
 
-    return await this.tokenConditionalSwapCreateIx(
+    return await this.tokenConditionalSwapCreatePremiumAuctionIx(
       group,
       account,
       sellBank,
@@ -4107,6 +4140,9 @@ export class MangoClient {
       allowMargin ?? false,
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
+      120,
+      2,
+      10,
     );
   }
 
@@ -4168,7 +4204,7 @@ export class MangoClient {
     const lowerLimit = thresholdPriceNativeNative;
     const upperLimit = Number.MAX_SAFE_INTEGER;
 
-    return await this.tokenConditionalSwapCreateIx(
+    return await this.tokenConditionalSwapCreatePremiumAuctionIx(
       group,
       account,
       sellBank,
@@ -4183,6 +4219,9 @@ export class MangoClient {
       allowMargin ?? false,
       expiryTimestamp,
       thresholdPriceInSellPerBuyToken,
+      120,
+      2,
+      10,
     );
   }
 
@@ -4224,7 +4263,7 @@ export class MangoClient {
       maxBuy,
       maxSell,
     );
-    const pricePremiumRate = pricePremium > 0 ? pricePremium / 100 : 0.03;
+    const pricePremiumRate = pricePremium / 100;
 
     let intention: TokenConditionalSwapIntention;
     switch (tcsIntention) {
@@ -4458,8 +4497,8 @@ export class MangoClient {
     account: MangoAccount,
     sellBank: Bank,
     buyBank: Bank,
-    lowerLimit: number,
-    upperLimit: number,
+    lowerLimitNative: number,
+    upperLimitNative: number,
     maxBuy: number,
     maxSell: number,
     tcsIntention:
@@ -4473,19 +4512,10 @@ export class MangoClient {
     allowCreatingBorrows: boolean,
     expiryTimestamp: number | null,
     displayPriceInSellTokenPerBuyToken: boolean,
-    durationSeconds: number,
+    durationSeconds,
+    premiumMultiplier = 1,
+    extraPricePremiumBps = 0,
   ): Promise<TransactionInstruction[]> {
-    const lowerLimitNative = toNativeSellPerBuyTokenPrice(
-      lowerLimit,
-      sellBank,
-      buyBank,
-    );
-    const upperLimitNative = toNativeSellPerBuyTokenPrice(
-      upperLimit,
-      sellBank,
-      buyBank,
-    );
-
     let maxBuyNative, maxSellNative, buyAmountInUsd, sellAmountInUsd;
     if (maxBuy == Number.MAX_SAFE_INTEGER) {
       maxBuyNative = U64_MAX_BN;
@@ -4520,13 +4550,21 @@ export class MangoClient {
         sellBank.tokenIndex,
         liqorTcsChunkSizeInUsd,
       );
+
+      if (buyTokenPriceImpact <= 0 || sellTokenPriceImpact <= 0) {
+        throw new Error(
+          `Error compitong slippage/premium for token conditional swap!`,
+        );
+      }
+
       maxPricePremiumPercent =
         ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) -
           1) *
         100;
     }
-    const maxPricePremiumRate =
-      maxPricePremiumPercent > 0 ? maxPricePremiumPercent / 100 : 0.03;
+    let maxPricePremiumRate = maxPricePremiumPercent / 100;
+    maxPricePremiumRate =
+      maxPricePremiumRate * premiumMultiplier + extraPricePremiumBps / 10000;
 
     let intention: TokenConditionalSwapIntention;
     switch (tcsIntention) {

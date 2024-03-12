@@ -49,7 +49,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
-  loanOriginationFeeRate: 0.005,
+  loanOriginationFeeRate: 0.0075,
   maintAssetWeight: 0,
   initAssetWeight: 0,
   maintLiabWeight: 1.4,
@@ -310,6 +310,7 @@ export interface IxGateParams {
   TokenConditionalSwapCreateLinearAuction: boolean;
   Serum3PlaceOrderV2: boolean;
   TokenForceWithdraw: boolean;
+  SequenceCheck: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -390,6 +391,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapCreateLinearAuction: true,
   Serum3PlaceOrderV2: true,
   TokenForceWithdraw: true,
+  SequenceCheck: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -480,6 +482,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
   toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
   toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
+  toggleIx(ixGate, p, 'SequenceCheck', 73);
 
   return ixGate;
 }

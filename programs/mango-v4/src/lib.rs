@@ -39,7 +39,7 @@ use state::{
     TokenIndex, TCS_START_INCENTIVE,
 };
 
-declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
+declare_id!("zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25");
 
 #[program]
 pub mod mango_v4 {
@@ -455,6 +455,12 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::account_buyback_fees_with_mngo(ctx, max_buyback_usd)?;
+        Ok(())
+    }
+
+    pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u8) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::sequence_check(ctx, expected_sequence_number)?;
         Ok(())
     }
 

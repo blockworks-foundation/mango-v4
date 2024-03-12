@@ -3,17 +3,11 @@ import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
 import { AccountInfo, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
-import {
-  OPENBOOK_PROGRAM_ID,
-  RUST_I64_MAX,
-  RUST_I64_MIN,
-  USDC_MINT,
-} from '../constants';
+import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import {
   U64_MAX_BN,
   roundTo5,
-  toNative,
   toNativeI80F48,
   toUiDecimals,
   toUiDecimalsForQuote,
@@ -50,6 +44,7 @@ export class MangoAccount {
       buybackFeesAccruedCurrent: BN;
       buybackFeesAccruedPrevious: BN;
       buybackFeesExpiryTimestamp: BN;
+      sequenceNumber: number;
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
@@ -74,6 +69,7 @@ export class MangoAccount {
       obj.buybackFeesAccruedCurrent,
       obj.buybackFeesAccruedPrevious,
       obj.buybackFeesExpiryTimestamp,
+      obj.sequenceNumber,
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
@@ -100,6 +96,7 @@ export class MangoAccount {
     public buybackFeesAccruedCurrent: BN,
     public buybackFeesAccruedPrevious: BN,
     public buybackFeesExpiryTimestamp: BN,
+    public sequenceNumber: number,
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
@@ -668,6 +665,15 @@ export class MangoAccount {
 
       maxSource = maxSource.min(equivalentSourceAmount);
     }
+
+    // Apply max swap fee
+    const maxSwapFeeRate = I80F48.fromNumber(
+      Math.max(
+        sourceBank.flashLoanSwapFeeRate,
+        targetBank.flashLoanSwapFeeRate,
+      ),
+    );
+    maxSource = maxSource.div(ONE_I80F48().add(maxSwapFeeRate));
 
     return toUiDecimals(maxSource, group.getMintDecimals(sourceMintPk));
   }
@@ -2145,6 +2151,13 @@ export class TokenConditionalSwap {
       sellBank.tokenIndex,
       liqorTcsChunkSizeInUsd,
     );
+
+    if (buyTokenPriceImpact <= 0 || sellTokenPriceImpact <= 0) {
+      throw new Error(
+        `Error compitong slippage/premium for token conditional swap!`,
+      );
+    }
+
     return (
       ((1 + buyTokenPriceImpact / 100) * (1 + sellTokenPriceImpact / 100) - 1) *
       100

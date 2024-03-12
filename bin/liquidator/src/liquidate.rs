@@ -92,7 +92,7 @@ impl<'a> LiquidateHelper<'a> {
             let exceeds_cu_limit = new_ixs.cu > self.config.max_cu_per_transaction;
             let exceeds_size_limit = {
                 tx_builder.instructions = new_ixs.clone().to_instructions();
-                !tx_builder.transaction_size()?.is_ok()
+                !tx_builder.transaction_size()?.is_within_limit()
             };
             if exceeds_cu_limit || exceeds_size_limit {
                 break;

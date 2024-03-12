@@ -24,6 +24,7 @@ describe('Mango Account', () => {
     new BN(0),
     new BN(0),
     0,
+    0,
     [],
     [],
     [],

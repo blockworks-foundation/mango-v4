@@ -552,7 +552,12 @@ async fn send_batched_log_errors_no_confirm(
         current_batch.append(ixs.clone());
 
         tx_builder.instructions = current_batch.clone().to_instructions();
-        if !tx_builder.transaction_size().is_ok() || current_batch.cu > max_cu {
+        if tx_builder
+            .transaction_size()
+            .map(|ts| !ts.is_within_limit())
+            .unwrap_or(true)
+            || current_batch.cu > max_cu
+        {
             tx_builder.instructions = previous_batch.to_instructions();
             match tx_builder.send(client).await {
                 Err(err) => error!("could not send transaction: {err:?}"),

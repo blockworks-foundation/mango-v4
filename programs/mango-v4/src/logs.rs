@@ -803,6 +803,7 @@ pub struct TokenCollateralFeeLog {
     pub token_index: u16,
     pub asset_usage_fraction: i128,
     pub fee: i128,
+    pub price: i128,
 }
 
 #[event]
