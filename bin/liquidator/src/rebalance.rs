@@ -114,16 +114,7 @@ impl Rebalancer {
         in_amount_quote: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
-        let sol_token = self.mango_client.context.token(
-            *self
-                .mango_client
-                .context
-                .token_indexes_by_name
-                .get("SOL") // TODO: better use mint
-                .unwrap(),
-        );
         let quote_mint = quote_token.mint;
-        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job = self.jupiter_quote(
@@ -142,16 +133,8 @@ impl Rebalancer {
         );
 
         // For the SOL -> output route we need to adjust the in amount by the SOL price
-        let sol_price = self
-            .account_fetcher
-            .fetch_bank_price(&sol_token.first_bank())?;
-        let in_amount_sol = (I80F48::from(in_amount_quote) / sol_price)
-            .ceil()
-            .to_num::<u64>();
-        let direct_sol_route_job =
-            self.jupiter_quote(sol_mint, output_mint, in_amount_sol, true, jupiter_version);
 
-        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+        let jobs = vec![full_route_job, direct_quote_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -181,26 +164,15 @@ impl Rebalancer {
         in_amount: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
-        let sol_token = self.mango_client.context.token(
-            *self
-                .mango_client
-                .context
-                .token_indexes_by_name
-                .get("SOL") // TODO: better use mint
-                .unwrap(),
-        );
         let quote_mint = quote_token.mint;
-        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
             self.jupiter_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
         let direct_quote_route_job =
             self.jupiter_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
-        let direct_sol_route_job =
-            self.jupiter_quote(input_mint, sol_mint, in_amount, true, jupiter_version);
 
-        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+        let jobs = vec![full_route_job, direct_quote_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
