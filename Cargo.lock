@@ -3326,9 +3326,8 @@ dependencies = [
 
 [[package]]
 name = "mango-feeds-connector"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fcd440ee3dd5090a6f36bf8d9392ce7f9cc705828fdacf88b6022ddb7aeb895"
+version = "0.2.2"
+source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=serge/custom_filtering#0e1cef027c68a261b0fdbd78cffef602eed09cdd"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -3337,7 +3336,6 @@ dependencies = [
  "itertools",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
- "log 0.4.20",
  "rustls 0.20.9",
  "serde",
  "serde_derive",
@@ -3347,6 +3345,7 @@ dependencies = [
  "solana-rpc",
  "solana-sdk",
  "tokio",
+ "tracing",
  "warp",
  "yellowstone-grpc-client",
  "yellowstone-grpc-proto",
@@ -8914,11 +8913,10 @@ checksum = "b6bc1c9ce2b5135ac7f93c72918fc37feb872bdc6a5533a8b85eb4b86bfdae52"
 
 [[package]]
 name = "tracing"
-version = "0.1.37"
+version = "0.1.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
+checksum = "c3523ab5a71916ccf420eebdf5521fcef02141234bbc0b8a49f2fdc4544364ef"
 dependencies = [
- "cfg-if 1.0.0",
  "log 0.4.20",
  "pin-project-lite",
  "tracing-attributes",
@@ -8927,9 +8925,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.26"
+version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f4f31f56159e98206da9efd823404b79b6ef3143b4a7ab76e67b1751b25a4ab"
+checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2 1.0.67",
  "quote 1.0.33",
@@ -8938,9 +8936,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.31"
+version = "0.1.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0955b8137a1df6f1a2e9a37d8a6656291ff0297c1a97c24e0d8425fe2312f79a"
+checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
  "valuable",
@@ -9801,9 +9799,8 @@ dependencies = [
 
 [[package]]
 name = "yellowstone-grpc-client"
-version = "1.9.0+solana.1.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "638fc820f10c6d836732d43f7c8f93a85301a7d90705a0db38b3bc11fc6657f6"
+version = "1.10.0+solana.1.16.14"
+source = "git+https://github.com/rpcpool/yellowstone-grpc.git?tag=v1.8.0+solana.1.16.14#a6cb542167f5eb9ec59e4a074c1671fa132e2f00"
 dependencies = [
  "bytes 1.5.0",
  "futures 0.3.28",
@@ -9816,9 +9813,8 @@ dependencies = [
 
 [[package]]
 name = "yellowstone-grpc-proto"
-version = "1.9.0+solana.1.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22b29533f1a9486a84b2ffc1fc53d19607af3b71e0554dbde38a841b72026be6"
+version = "1.9.0+solana.1.16.14"
+source = "git+https://github.com/rpcpool/yellowstone-grpc.git?tag=v1.8.0+solana.1.16.14#a6cb542167f5eb9ec59e4a074c1671fa132e2f00"
 dependencies = [
  "anyhow",
  "prost 0.11.9",

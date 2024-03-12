@@ -178,6 +178,7 @@ impl DataProcessor {
 
         websocket_source::start(
             websocket_source::Config {
+                rpc_http_url: configuration.rpc_http_url.clone(),
                 rpc_ws_url: configuration.rpc_ws_url.clone(),
                 serum_programs,
                 open_orders_authority: mango_group,
