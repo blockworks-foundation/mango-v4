@@ -1016,7 +1016,7 @@ impl<
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
-                    unlendable_deposit: 0,
+                    unlendable_deposits: 0,
                     padding: Default::default(),
                     reserved: [0; 120],
                 };

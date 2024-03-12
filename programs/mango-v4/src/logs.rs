@@ -62,7 +62,7 @@ pub fn emit_token_balance_log(mango_account: Pubkey, bank: &Bank, token_position
         indexed_position: token_position.indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
-        native_position: token_position.unlendable_deposit,
+        native_position: token_position.unlendable_deposits,
         allow_lending: token_position.allow_lending(),
     });
 }

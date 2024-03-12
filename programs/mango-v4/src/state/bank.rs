@@ -470,14 +470,23 @@ impl Bank {
     }
 
     #[inline(always)]
-    pub fn native_borrows(&self) -> I80F48 {
+    pub fn borrows(&self) -> I80F48 {
         self.borrow_index * self.indexed_borrows
     }
 
-    // TODO: this now only tracks lendable deposits - need to audit all uses
     #[inline(always)]
-    pub fn native_deposits(&self) -> I80F48 {
+    pub fn lendable_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_deposits
+    }
+
+    #[inline(always)]
+    pub fn unlendable_deposits(&self) -> u64 {
+        self.unlendable_deposits
+    }
+
+    #[inline(always)]
+    pub fn deposits(&self) -> I80F48 {
+        self.lendable_deposits() + I80F48::from(self.unlendable_deposits())
     }
 
     pub fn maint_weights(&self, now_ts: u64) -> (I80F48, I80F48) {
@@ -515,14 +524,14 @@ impl Bank {
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
     fn enforce_max_utilization(&self, max_utilization: I80F48) -> Result<()> {
-        let bank_native_deposits = self.native_deposits();
-        let bank_native_borrows = self.native_borrows();
+        let bank_lendable_deposits = self.lendable_deposits();
+        let bank_borrows = self.borrows();
 
-        if bank_native_borrows > max_utilization * bank_native_deposits {
+        if bank_borrows > max_utilization * bank_lendable_deposits {
             return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
                     "deposits {}, borrows {}, max utilization {}",
-                    bank_native_deposits, bank_native_borrows, max_utilization,
+                    bank_lendable_deposits, bank_borrows, max_utilization,
                 )
             });
         };
@@ -568,7 +577,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         if position.allow_lending() {
-            assert!(position.unlendable_deposit == 0);
+            assert!(position.unlendable_deposits == 0);
             let opening_indexed_position = position.indexed_position;
             let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
             self.update_cumulative_interest(position, opening_indexed_position);
@@ -579,7 +588,7 @@ impl Bank {
             self.dust += native_amount - deposit_amount;
 
             let deposit_amount_u64 = deposit_amount.to_num::<u64>();
-            position.unlendable_deposit += deposit_amount_u64;
+            position.unlendable_deposits += deposit_amount_u64;
             self.unlendable_deposits += deposit_amount_u64;
 
             Ok(true)
@@ -724,7 +733,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<WithdrawResult> {
         if position.allow_lending() {
-            assert!(position.unlendable_deposit == 0);
+            assert!(position.unlendable_deposits == 0);
             let opening_indexed_position = position.indexed_position;
             let res = self.withdraw_internal(
                 position,
@@ -744,7 +753,7 @@ impl Bank {
 
             let withdraw_amount_u64 = withdraw_amount.to_num::<u64>();
             self.unlendable_deposits -= withdraw_amount_u64;
-            position.unlendable_deposit -= withdraw_amount_u64;
+            position.unlendable_deposits -= withdraw_amount_u64;
             Ok(WithdrawResult {
                 position_is_active: true,
                 loan_amount: I80F48::ZERO,
@@ -1022,7 +1031,7 @@ impl Bank {
         // Intentionally does not use remaining_deposits_until_limit(): That function
         // returns slightly less than the true limit to make sure depositing that amount
         // will not cause a limit overrun.
-        let deposits = self.native_deposits();
+        let deposits = self.deposits();
         let serum = I80F48::from(self.potential_serum_tokens);
         let total = deposits + serum;
         let remaining = I80F48::from(self.deposit_limit) - total;
@@ -1294,8 +1303,7 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits =
-            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
+        let all_deposits = self.deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1311,7 +1319,7 @@ impl Bank {
         if self.borrow_weight_scale_start_quote == f64::MAX {
             return self.init_liab_weight;
         }
-        let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
+        let borrows_quote = self.borrows().to_num::<f64>() * price.to_num::<f64>();
         if borrows_quote <= self.borrow_weight_scale_start_quote {
             self.init_liab_weight
         } else if self.borrow_weight_scale_start_quote == 0.0 {
@@ -1396,7 +1404,7 @@ mod tests {
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
-            unlendable_deposit: 0,
+            unlendable_deposits: 0,
             padding: Default::default(),
             reserved: [0; 120],
         };
@@ -1525,7 +1533,7 @@ mod tests {
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
-            unlendable_deposit: 0,
+            unlendable_deposits: 0,
             padding: Default::default(),
             reserved: [0; 120],
         };

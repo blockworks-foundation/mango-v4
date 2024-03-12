@@ -220,7 +220,7 @@ pub fn token_liq_bankruptcy(
             bank.deposit_index = new_deposit_index;
 
             // credit liqee on each bank where we can offset borrows
-            let amount_for_bank = amount_to_credit.min(bank.native_borrows());
+            let amount_for_bank = amount_to_credit.min(bank.borrows());
             if amount_for_bank.is_positive() {
                 // enable dusting, because each deposit() is allowed to round up. thus multiple deposit
                 // could bring the total position slightly above zero otherwise
