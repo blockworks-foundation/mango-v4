@@ -9,6 +9,7 @@ use mango_v4_client::{chain_data, MangoClient, PreparedInstructions};
 use solana_sdk::signature::Signature;
 
 use futures::{stream, StreamExt, TryStreamExt};
+use mango_v4::accounts_ix::HealthCheckKind::MaintRatio;
 use rand::seq::SliceRandom;
 use tracing::*;
 use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -260,7 +261,16 @@ impl<'a> LiquidateHelper<'a> {
             )
             .await
             .context("creating perp_liq_base_or_positive_pnl_instruction")?;
+
         liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
+
+        let liqor = &self.client.mango_account().await?;
+        liq_ixs.append(
+            self.client
+                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .await?,
+        );
+
         let txsig = self
             .client
             .send_and_confirm_owner_tx(liq_ixs.to_instructions())
@@ -501,6 +511,14 @@ impl<'a> LiquidateHelper<'a> {
             .await
             .context("creating liq_token_with_token ix")?;
         liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
+
+        let liqor = &self.client.mango_account().await?;
+        liq_ixs.append(
+            self.client
+                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .await?,
+        );
+
         let txsig = self
             .client
             .send_and_confirm_owner_tx(liq_ixs.to_instructions())

@@ -42,10 +42,19 @@ pub fn spawn_tx_senders_job(
                         let (l, t) = {
                             let mut writer = shared_state.write().unwrap();
 
+                            // print out list of all task for debugging
+                            for x in &writer.liquidation_candidates_accounts {
+                                if !writer.processing_liquidation.contains(x) {
+                                    tracing::trace!(" - LIQ {:?}", x);
+                                }
+                            }
                             for x in &writer.interesting_tcs {
-                                tracing::info!(" Worker #{} - {:?}", id, x);
+                                if !writer.processing_tcs.contains(x) {
+                                    tracing::trace!("  - TCS {:?}", x);
+                                }
                             }
 
+                            // next task to execute
                             let liq_candidate = writer
                                 .liquidation_candidates_accounts
                                 .iter()
@@ -133,7 +142,7 @@ pub fn spawn_tx_senders_job(
                         TxTrigger::TokenConditionalSwap(n) => n,
                     };
 
-                    debug!("Queuing {} new task for workers..", n);
+                    debug!("Queuing {} new task(s) for workers..", n);
                     semaphore.add_permits(n);
                 }
             }

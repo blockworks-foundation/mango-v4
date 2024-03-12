@@ -16,6 +16,7 @@ use mango_v4::{
 use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
+use mango_v4::accounts_ix::HealthCheckKind::MaintRatio;
 use solana_sdk::signature::Signature;
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -1232,6 +1233,15 @@ impl Context {
         tx_builder
             .instructions
             .append(&mut trigger_ixs.instructions);
+
+        let liqor = &self.mango_client.mango_account().await?;
+        tx_builder.instructions.append(
+            &mut self
+                .mango_client
+                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .await?
+                .instructions,
+        );
 
         let txsig = tx_builder
             .send_and_confirm(&self.mango_client.client)

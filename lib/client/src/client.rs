@@ -17,7 +17,9 @@ use futures::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use tracing::*;
 
-use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{
+    HealthCheckKind, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthCache;
 use mango_v4::state::{
@@ -558,6 +560,41 @@ impl MangoClient {
             self.instruction_cu(health_cu),
         );
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+    }
+
+    /// Asserrt that health of account is > N
+    pub async fn health_check_instruction(
+        &self,
+        account: &MangoAccountValue,
+        min_health_value: f64,
+        check_kind: HealthCheckKind,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])
+            .await?;
+
+        let ixs = PreparedInstructions::from_vec(
+            vec![Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::HealthCheck {
+                            group: self.group(),
+                            account: self.mango_account_address,
+                        },
+                        None,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::HealthCheck {
+                    min_health_value,
+                    check_kind,
+                }),
+            }],
+            self.instruction_cu(health_cu),
+        );
+        Ok(ixs)
     }
 
     /// Creates token withdraw instructions for the MangoClient's account/owner.
