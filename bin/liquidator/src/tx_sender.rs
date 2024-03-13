@@ -1,15 +1,14 @@
 use crate::liquidation_state::LiquidationState;
 use crate::tcs_state::TcsState;
-use crate::{SharedState, TxTrigger};
+use crate::{SharedState};
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use std::sync::{Arc, RwLock};
-use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
 pub fn spawn_tx_senders_job(
     max_parallel_operations: u64,
-    tx_trigger_receiver: async_channel::Receiver<TxTrigger>,
+    tx_trigger_receiver: async_channel::Receiver<()>,
     rebalance_trigger_sender: async_channel::Sender<()>,
     shared_state: Arc<RwLock<SharedState>>,
     liquidation: Box<LiquidationState>,
@@ -20,12 +19,11 @@ pub fn spawn_tx_senders_job(
         std::process::exit(1)
     }
 
-    let semaphore = Arc::new(Semaphore::new(0));
-    let mut workers: Vec<JoinHandle<()>> = (0..max_parallel_operations)
+    let workers: Vec<JoinHandle<()>> = (0..max_parallel_operations)
         .map(|i| {
             tokio::spawn({
-                let semaphore = semaphore.clone();
                 let shared_state = shared_state.clone();
+                let receiver = tx_trigger_receiver.clone();
                 let rebalance_trigger_sender = rebalance_trigger_sender.clone();
                 let mut liquidation = liquidation.clone();
                 let mut tcs = tcs.clone();
@@ -33,7 +31,7 @@ pub fn spawn_tx_senders_job(
                 async move {
                     loop {
                         debug!("Worker #{} waiting for task", id);
-                        let permit = semaphore.acquire().await.unwrap();
+                        let _ = receiver.recv().await.unwrap();
 
                         // a task is supposed to be available to process
                         // find it in global shared state, and mark it as processing
@@ -122,37 +120,11 @@ pub fn spawn_tx_senders_job(
                                 writer.processing_tcs.remove(&t);
                             }
                         }
-
-                        // worker is available for next task
-                        permit.forget();
                     }
                 }
             })
         })
         .collect();
-
-    workers.push(tokio::spawn({
-        async move {
-            loop {
-                let trigger_res = tx_trigger_receiver.recv().await;
-                match trigger_res {
-                    Ok(trigger) => {
-                        let n = match trigger {
-                            TxTrigger::Liquidation() => 1,
-                            TxTrigger::TokenConditionalSwap(n) => n,
-                        };
-
-                        debug!("Queuing {} new task(s) for workers..", n);
-                        semaphore.add_permits(n);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Error in tx_sender job, failed to receive data: {}", e);
-                        break;
-                    }
-                }
-            }
-        }
-    }));
 
     workers
 }

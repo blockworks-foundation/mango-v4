@@ -1,7 +1,7 @@
 use crate::cli_args::Cli;
 use crate::metrics::Metrics;
 use crate::unwrappable_oracle_error::UnwrappableOracleError;
-use crate::{liquidate, LiqErrorType, SharedState, TxTrigger};
+use crate::{liquidate, LiqErrorType, SharedState};
 use anchor_lang::prelude::Pubkey;
 use itertools::Itertools;
 use mango_v4::state::TokenIndex;
@@ -161,7 +161,7 @@ impl LiquidationState {
 pub fn spawn_liquidation_job(
     cli: &Cli,
     shared_state: &Arc<RwLock<SharedState>>,
-    tx_trigger_sender: async_channel::Sender<TxTrigger>,
+    tx_trigger_sender: async_channel::Sender<()>,
     mut liquidation: Box<LiquidationState>,
     metrics: &Metrics,
 ) -> JoinHandle<()> {
@@ -211,7 +211,7 @@ pub fn spawn_liquidation_job(
                             .liquidation_candidates_accounts
                             .insert(p)
                         {
-                            return tx_trigger_sender.send_unless_full(TxTrigger::Liquidation());
+                            return tx_trigger_sender.send_unless_full(());
                         }
 
                         Ok(())

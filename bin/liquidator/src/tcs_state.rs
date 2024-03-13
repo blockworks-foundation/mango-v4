@@ -1,7 +1,7 @@
 use crate::cli_args::Cli;
 use crate::metrics::Metrics;
 use crate::token_swap_info::TokenSwapInfoUpdater;
-use crate::{trigger_tcs, LiqErrorType, SharedState, TxTrigger};
+use crate::{trigger_tcs, LiqErrorType, SharedState};
 use anchor_lang::prelude::Pubkey;
 use anyhow::Context;
 use itertools::Itertools;
@@ -15,7 +15,7 @@ use tracing::{error, info, trace};
 pub fn spawn_tcs_job(
     cli: &Cli,
     shared_state: &Arc<RwLock<SharedState>>,
-    tx_trigger_sender: async_channel::Sender<TxTrigger>,
+    tx_trigger_sender: async_channel::Sender<()>,
     mut tcs: Box<TcsState>,
     metrics: &Metrics,
 ) -> JoinHandle<()> {
@@ -42,27 +42,27 @@ pub fn spawn_tcs_job(
 
                 tcs_start_time = Some(tcs_start_time.unwrap_or(Instant::now()));
 
-                let interesting_tcs = tcs
-                    .find_candidate(account_addresses.iter())
+                let found_candidates = tcs
+                    .find_candidates(account_addresses.iter(), |candidate| {
+                        if shared_state
+                            .write()
+                            .unwrap()
+                            .interesting_tcs
+                            .insert(candidate)
+                        {
+                            return tx_trigger_sender.send_unless_full(());
+                        }
+
+                        Ok(())
+                    })
                     .await
                     .unwrap_or_else(|err| {
                         error!("error during find_candidate: {err}");
-                        Vec::new()
+                        0
                     });
 
-                if !interesting_tcs.is_empty() {
-                    let mut state_writer = shared_state.write().unwrap();
-                    let mut n = 0;
-
-                    for i in interesting_tcs {
-                        if state_writer.interesting_tcs.insert(i) {
-                            n += 1;
-                        }
-                    }
-
-                    tx_trigger_sender
-                        .send_unless_full(TxTrigger::TokenConditionalSwap(n))
-                        .unwrap();
+                if found_candidates > 0 {
+                    tracing::debug!("found {} candidates for liquidation", found_candidates);
                 }
 
                 let current_time = Instant::now();
@@ -84,10 +84,11 @@ pub struct TcsState {
 }
 
 impl TcsState {
-    async fn find_candidate(
+    async fn find_candidates(
         &mut self,
         accounts_iter: impl Iterator<Item = &Pubkey>,
-    ) -> anyhow::Result<Vec<(Pubkey, u64, u64)>> {
+        action: impl Fn((Pubkey, u64, u64)) -> anyhow::Result<()>,
+    ) -> anyhow::Result<usize> {
         let accounts = accounts_iter.collect::<Vec<&Pubkey>>();
 
         let now = Instant::now();
@@ -104,8 +105,9 @@ impl TcsState {
             now_ts,
         };
 
+        let mut found_counter = 0;
+
         // Find interesting (pubkey, tcsid, volume)
-        let mut interesting_tcs = Vec::with_capacity(accounts.len());
         for pubkey in accounts.iter() {
             if let Some(error_entry) = self.errors.read().unwrap().had_too_many_errors(
                 LiqErrorType::TcsCollectionHard,
@@ -142,7 +144,12 @@ impl TcsState {
                             }
                         }
                     }
-                    interesting_tcs.extend(v.iter().filter_map(|it| it.as_ref().ok()));
+                    for interesting_candidate_res in v.iter() {
+                        if let Ok(interesting_candidate) = interesting_candidate_res {
+                            action(*interesting_candidate).expect("failed to send TCS candidate");
+                            found_counter += 1;
+                        }
+                    }
                 }
                 Err(e) => {
                     error_guard.record(LiqErrorType::TcsCollectionHard, pubkey, e.to_string());
@@ -150,7 +157,7 @@ impl TcsState {
             }
         }
 
-        return Ok(interesting_tcs);
+        return Ok(found_counter);
     }
 
     pub async fn maybe_take_token_conditional_swap(

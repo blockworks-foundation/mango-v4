@@ -49,11 +49,6 @@ pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
 }
 
-pub enum TxTrigger {
-    Liquidation(),
-    TokenConditionalSwap(usize),
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
@@ -248,7 +243,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
-    let (tx_trigger_sender, tx_trigger_receiver) = async_channel::unbounded::<TxTrigger>();
+    let (tx_trigger_sender, tx_trigger_receiver) = async_channel::unbounded::<()>();
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
