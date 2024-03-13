@@ -3,7 +3,7 @@ use crate::processors::data::DataEvent;
 use chrono::Utc;
 use mango_v4::health::HealthType;
 use mango_v4_client::chain_data::AccountFetcher;
-use mango_v4_client::{chain_data, health_cache, MangoGroupContext};
+use mango_v4_client::{chain_data, health_cache, FallbackOracleConfig, MangoGroupContext};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::pubkey::Pubkey;
 use std::collections::HashSet;
@@ -156,8 +156,13 @@ impl HealthProcessor {
         account: &Pubkey,
     ) -> anyhow::Result<HealthComponentValue> {
         let mango_account = account_fetcher.fetch_mango_account(account)?;
-        let health_cache =
-            health_cache::new(&mango_group_context, &*account_fetcher, &mango_account).await?;
+        let health_cache = health_cache::new(
+            &mango_group_context,
+            &FallbackOracleConfig::Never,
+            &*account_fetcher,
+            &mango_account,
+        )
+        .await?;
 
         let res = HealthComponentValue {
             maintenance_ratio: health_cache.health_ratio(HealthType::Maint).to_num(),
