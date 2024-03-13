@@ -1,6 +1,6 @@
 use crate::liquidation_state::LiquidationState;
 use crate::tcs_state::TcsState;
-use crate::{SharedState};
+use crate::SharedState;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use std::sync::{Arc, RwLock};
 use tokio::task::JoinHandle;
