@@ -3,15 +3,14 @@ use crate::tcs_state::TcsState;
 use crate::{SharedState, TxTrigger};
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
 use tracing::debug;
 
 pub fn spawn_tx_senders_job(
     max_parallel_operations: u64,
-    mut tx_trigger_receiver: Receiver<TxTrigger>,
-    rebalance_trigger_sender: Sender<()>,
+    tx_trigger_receiver: async_channel::Receiver<TxTrigger>,
+    rebalance_trigger_sender: async_channel::Sender<()>,
     shared_state: Arc<RwLock<SharedState>>,
     liquidation: Box<LiquidationState>,
     tcs: Box<TcsState>,
@@ -135,15 +134,21 @@ pub fn spawn_tx_senders_job(
     workers.push(tokio::spawn({
         async move {
             loop {
-                let trigger_opt = tx_trigger_receiver.recv().await;
-                if let Some(trigger) = trigger_opt {
-                    let n = match trigger {
-                        TxTrigger::Liquidation() => 1,
-                        TxTrigger::TokenConditionalSwap(n) => n,
-                    };
+                let trigger_res = tx_trigger_receiver.recv().await;
+                match trigger_res {
+                    Ok(trigger) => {
+                        let n = match trigger {
+                            TxTrigger::Liquidation() => 1,
+                            TxTrigger::TokenConditionalSwap(n) => n,
+                        };
 
-                    debug!("Queuing {} new task(s) for workers..", n);
-                    semaphore.add_permits(n);
+                        debug!("Queuing {} new task(s) for workers..", n);
+                        semaphore.add_permits(n);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Error in tx_sender job, failed to receive data: {}", e);
+                        break;
+                    }
                 }
             }
         }

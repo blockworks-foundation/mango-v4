@@ -9,7 +9,6 @@ use mango_v4_client::error_tracking::ErrorTracking;
 use mango_v4_client::{chain_data, AsyncChannelSendUnlessFull, MangoClient, MangoClientError};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::{error, trace, warn};
 
@@ -162,7 +161,7 @@ impl LiquidationState {
 pub fn spawn_liquidation_job(
     cli: &Cli,
     shared_state: &Arc<RwLock<SharedState>>,
-    tx_trigger_sender: Sender<TxTrigger>,
+    tx_trigger_sender: async_channel::Sender<TxTrigger>,
     mut liquidation: Box<LiquidationState>,
     metrics: &Metrics,
 ) -> JoinHandle<()> {

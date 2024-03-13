@@ -9,14 +9,13 @@ use mango_v4_client::error_tracking::ErrorTracking;
 use mango_v4_client::{chain_data, AsyncChannelSendUnlessFull, MangoClient};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc::Sender;
 use tokio::task::JoinHandle;
 use tracing::{error, info, trace};
 
 pub fn spawn_tcs_job(
     cli: &Cli,
     shared_state: &Arc<RwLock<SharedState>>,
-    tx_trigger_sender: Sender<TxTrigger>,
+    tx_trigger_sender: async_channel::Sender<TxTrigger>,
     mut tcs: Box<TcsState>,
     metrics: &Metrics,
 ) -> JoinHandle<()> {

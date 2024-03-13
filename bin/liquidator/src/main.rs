@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use clap::Parser;
+use futures_util::StreamExt;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
 use mango_v4_client::{
     account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
@@ -12,14 +13,15 @@ use mango_v4_client::{
     TransactionBuilderConfig,
 };
 
-use crate::cli_args::Cli;
+use crate::cli_args::{BoolArg, Cli, CliDotenv};
+use crate::liquidation_state::LiquidationState;
 use crate::rebalance::Rebalancer;
+use crate::tcs_state::TcsState;
 use crate::token_swap_info::TokenSwapInfoUpdater;
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
-use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use tracing::*;
 
@@ -245,8 +247,8 @@ async fn main() -> anyhow::Result<()> {
         forbidden_tokens: liq_config.forbidden_tokens.clone(),
     };
 
-    let (rebalance_trigger_sender, rebalance_trigger_receiver) = tokio::sync::mpsc::channel(1);
-    let (tx_trigger_sender, tx_trigger_receiver) = tokio::sync::mpsc::channel::<TxTrigger>(100);
+    let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
+    let (tx_trigger_sender, tx_trigger_receiver) = async_channel::unbounded::<TxTrigger>();
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
@@ -454,10 +456,6 @@ async fn main() -> anyhow::Result<()> {
         spawn_token_swap_refresh_job(&cli, shared_state, token_swap_info_updater);
     let check_changes_for_abort_job = spawn_context_change_watchdog_job(mango_client.clone());
 
-    use cli_args::{BoolArg, Cli, CliDotenv};
-    use futures::StreamExt;
-    use liquidation_state::LiquidationState;
-    use tcs_state::TcsState;
     let mut jobs: futures::stream::FuturesUnordered<_> =
         vec![data_job, token_swap_info_job, check_changes_for_abort_job]
             .into_iter()
@@ -480,7 +478,6 @@ fn spawn_token_swap_refresh_job(
             cli.token_swap_refresh_interval_secs,
         ));
         let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
-        let shared_state = shared_state;
         async move {
             loop {
                 if !shared_state.read().unwrap().one_snapshot_done {
@@ -523,7 +520,7 @@ fn spawn_telemetry_job(cli: &Cli, mango_client: Arc<MangoClient>) -> JoinHandle<
 
 fn spawn_rebalance_job(
     shared_state: &Arc<RwLock<SharedState>>,
-    mut rebalance_trigger_receiver: Receiver<()>,
+    rebalance_trigger_receiver: async_channel::Receiver<()>,
     rebalancer: Arc<Rebalancer>,
 ) -> JoinHandle<()> {
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
