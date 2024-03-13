@@ -242,9 +242,13 @@ async fn main() -> anyhow::Result<()> {
         borrow_settle_excess: (1f64 + cli.rebalance_borrow_settle_excess).max(1f64),
         refresh_timeout: Duration::from_secs(cli.rebalance_refresh_timeout_secs),
         jupiter_version: cli.jupiter_version.into(),
-        skip_tokens: cli.rebalance_skip_tokens.unwrap_or(Vec::new()),
+        skip_tokens: cli.rebalance_skip_tokens.unwrap_or_default(),
+        alternate_jupiter_route_tokens: cli
+            .rebalance_alternate_jupiter_route_tokens
+            .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
     };
+    rebalance_config.validate(&mango_client.context);
 
     let rebalancer = Arc::new(rebalance::Rebalancer {
         mango_client: mango_client.clone(),

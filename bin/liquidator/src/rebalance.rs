@@ -5,7 +5,7 @@ use mango_v4::state::{
     PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, MangoClient, PerpMarketContext, TokenContext,
+    chain_data, jupiter, perp_pnl, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
 
@@ -28,7 +28,20 @@ pub struct Config {
     pub refresh_timeout: Duration,
     pub jupiter_version: jupiter::Version,
     pub skip_tokens: Vec<TokenIndex>,
+    pub alternate_jupiter_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
+}
+
+impl Config {
+    // panics on failure
+    pub fn validate(&self, context: &MangoGroupContext) {
+        self.skip_tokens.iter().for_each(|&ti| {
+            context.token(ti);
+        });
+        self.alternate_jupiter_route_tokens.iter().for_each(|&ti| {
+            context.token(ti);
+        });
+    }
 }
 
 fn token_bank(
@@ -106,7 +119,7 @@ impl Rebalancer {
     /// Grab three possible routes:
     /// 1. USDC -> output (complex routes)
     /// 2. USDC -> output (direct route only)
-    /// 3. SOL -> output (direct route only)
+    /// 3. alternate_jupiter_route_tokens -> output (direct route only)
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_buy(
         &self,
@@ -114,16 +127,7 @@ impl Rebalancer {
         in_amount_quote: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
-        let sol_token = self.mango_client.context.token(
-            *self
-                .mango_client
-                .context
-                .token_indexes_by_name
-                .get("SOL") // TODO: better use mint
-                .unwrap(),
-        );
         let quote_mint = quote_token.mint;
-        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job = self.jupiter_quote(
@@ -140,18 +144,21 @@ impl Rebalancer {
             true,
             jupiter_version,
         );
+        let mut jobs = vec![full_route_job, direct_quote_route_job];
 
-        // For the SOL -> output route we need to adjust the in amount by the SOL price
-        let sol_price = self
-            .account_fetcher
-            .fetch_bank_price(&sol_token.first_bank())?;
-        let in_amount_sol = (I80F48::from(in_amount_quote) / sol_price)
-            .ceil()
-            .to_num::<u64>();
-        let direct_sol_route_job =
-            self.jupiter_quote(sol_mint, output_mint, in_amount_sol, true, jupiter_version);
-
-        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+        for in_token_index in &self.config.alternate_jupiter_route_tokens {
+            let in_token = self.mango_client.context.token(*in_token_index);
+            // For the alternate output routes we need to adjust the in amount by the token price
+            let in_price = self
+                .account_fetcher
+                .fetch_bank_price(&in_token.first_bank())?;
+            let in_amount = (I80F48::from(in_amount_quote) / in_price)
+                .ceil()
+                .to_num::<u64>();
+            let direct_route_job =
+                self.jupiter_quote(in_token.mint, output_mint, in_amount, true, jupiter_version);
+            jobs.push(direct_route_job);
+        }
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -173,7 +180,7 @@ impl Rebalancer {
     /// Grab three possible routes:
     /// 1. input -> USDC (complex routes)
     /// 2. input -> USDC (direct route only)
-    /// 3. input -> SOL (direct route only)
+    /// 3. input -> alternate_jupiter_route_tokens (direct route only)
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_sell(
         &self,
@@ -181,26 +188,21 @@ impl Rebalancer {
         in_amount: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
-        let sol_token = self.mango_client.context.token(
-            *self
-                .mango_client
-                .context
-                .token_indexes_by_name
-                .get("SOL") // TODO: better use mint
-                .unwrap(),
-        );
         let quote_mint = quote_token.mint;
-        let sol_mint = sol_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
             self.jupiter_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
         let direct_quote_route_job =
             self.jupiter_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
-        let direct_sol_route_job =
-            self.jupiter_quote(input_mint, sol_mint, in_amount, true, jupiter_version);
+        let mut jobs = vec![full_route_job, direct_quote_route_job];
 
-        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
+        for out_token_index in &self.config.alternate_jupiter_route_tokens {
+            let out_token = self.mango_client.context.token(*out_token_index);
+            let direct_route_job =
+                self.jupiter_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
+            jobs.push(direct_route_job);
+        }
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
