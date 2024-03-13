@@ -147,7 +147,7 @@ fn worker_pull_task(
         return Ok(WorkerTask::Tcs(tcs_candidate));
     }
 
-    Err(anyhow::format_err!("Worker #{} - No task found", id))
+    anyhow::bail!("Worker #{} - No task found", id);
 }
 
 fn worker_finalize_task(

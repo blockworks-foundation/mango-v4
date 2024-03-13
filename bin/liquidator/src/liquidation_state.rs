@@ -211,7 +211,7 @@ pub fn spawn_liquidation_job(
                             .liquidation_candidates_accounts
                             .insert(p)
                         {
-                            return tx_trigger_sender.try_send(()).map_err(|e| e.into());
+                            tx_trigger_sender.try_send(())?;
                         }
 
                         Ok(())

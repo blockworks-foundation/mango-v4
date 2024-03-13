@@ -50,7 +50,7 @@ pub fn spawn_tcs_job(
                             .interesting_tcs
                             .insert(candidate)
                         {
-                            return tx_trigger_sender.try_send(()).map_err(|e| e.into());
+                            tx_trigger_sender.try_send(())?;
                         }
 
                         Ok(())
