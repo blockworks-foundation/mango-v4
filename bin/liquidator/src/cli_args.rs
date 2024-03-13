@@ -113,6 +113,14 @@ pub struct Cli {
     #[clap(long, env, value_parser, value_delimiter = ',')]
     pub(crate) rebalance_skip_tokens: Option<Vec<u16>>,
 
+    /// query jupiter for direct routes to and from these tokens
+    ///
+    /// These alternate routes will only be used when the main USDC-based one does not
+    /// work or does not fit in a transaction. A direct route to/from USDC is always also an alternative.
+    /// The alternate route with the lowest price impact will be used.
+    #[clap(long, env, value_parser, value_delimiter = ',')]
+    pub(crate) rebalance_alternate_jupiter_route_tokens: Option<Vec<u16>>,
+
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
     /// If this is 0.05, then it'll swap borrow_value * (1 + 0.05) quote token into borrow token.
