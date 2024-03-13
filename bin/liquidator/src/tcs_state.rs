@@ -6,7 +6,7 @@ use anchor_lang::prelude::Pubkey;
 use anyhow::Context;
 use itertools::Itertools;
 use mango_v4_client::error_tracking::ErrorTracking;
-use mango_v4_client::{chain_data, AsyncChannelSendUnlessFull, MangoClient};
+use mango_v4_client::{chain_data, MangoClient};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
@@ -50,7 +50,7 @@ pub fn spawn_tcs_job(
                             .interesting_tcs
                             .insert(candidate)
                         {
-                            return tx_trigger_sender.send_unless_full(());
+                            return tx_trigger_sender.try_send(()).map_err(|e| e.into());
                         }
 
                         Ok(())

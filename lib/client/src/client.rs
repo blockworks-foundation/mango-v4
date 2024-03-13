@@ -562,7 +562,7 @@ impl MangoClient {
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
-    /// Asserrt that health of account is > N
+    /// Assert that health of account is > N
     pub async fn health_check_instruction(
         &self,
         account: &MangoAccountValue,

@@ -6,7 +6,7 @@ use anchor_lang::prelude::Pubkey;
 use itertools::Itertools;
 use mango_v4::state::TokenIndex;
 use mango_v4_client::error_tracking::ErrorTracking;
-use mango_v4_client::{chain_data, AsyncChannelSendUnlessFull, MangoClient, MangoClientError};
+use mango_v4_client::{chain_data, MangoClient, MangoClientError};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
@@ -23,9 +23,9 @@ pub struct LiquidationState {
 }
 
 impl LiquidationState {
-    async fn find_candidates<'b>(
+    async fn find_candidates(
         &mut self,
-        accounts_iter: impl Iterator<Item = &'b Pubkey>,
+        accounts_iter: impl Iterator<Item = &Pubkey>,
         action: impl Fn(Pubkey) -> anyhow::Result<()>,
     ) -> anyhow::Result<u64> {
         let mut found_counter = 0u64;
@@ -211,7 +211,7 @@ pub fn spawn_liquidation_job(
                             .liquidation_candidates_accounts
                             .insert(p)
                         {
-                            return tx_trigger_sender.send_unless_full(());
+                            return tx_trigger_sender.try_send(()).map_err(|e| e.into());
                         }
 
                         Ok(())

@@ -20,11 +20,11 @@ impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
 /// Push to an async_channel::Sender and ignore if the channel is full
 pub trait AsyncChannelSendUnlessFull<T> {
     /// Send a message if the channel isn't full
-    fn send_unless_full(&self, msg: T) -> Result<(), anyhow::Error>;
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()>;
 }
 
 impl<T> AsyncChannelSendUnlessFull<T> for async_channel::Sender<T> {
-    fn send_unless_full(&self, msg: T) -> Result<(), anyhow::Error> {
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()> {
         use async_channel::*;
         match self.try_send(msg) {
             Ok(()) => Ok(()),
@@ -34,7 +34,7 @@ impl<T> AsyncChannelSendUnlessFull<T> for async_channel::Sender<T> {
     }
 }
 impl<T> AsyncChannelSendUnlessFull<T> for tokio::sync::mpsc::Sender<T> {
-    fn send_unless_full(&self, msg: T) -> Result<(), anyhow::Error> {
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()> {
         use tokio::sync::mpsc::*;
         match self.try_send(msg) {
             Ok(()) => Ok(()),
