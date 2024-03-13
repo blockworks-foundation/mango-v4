@@ -208,6 +208,10 @@ async function updateTokenParams(): Promise<void> {
             bank.maintAssetWeight.toNumber() == 0
           ) {
             builder.disableAssetLiquidation(true);
+            builder.oracleConfig({
+              confFilter: 1000,
+              maxStalenessSlots: -1,
+            });
             change = true;
           }
         }
@@ -363,7 +367,9 @@ async function updateTokenParams(): Promise<void> {
         }
 
         const params = builder.build();
-        console.log(`${bank.name}, ${params.disableAssetLiquidation}`);
+        console.log(
+          `${bank.name}, ${params.disableAssetLiquidation} ${params.oracleConfig?.maxStalenessSlots} ${params.oracleConfig?.confFilter}`,
+        );
 
         const ix = await client.program.methods
           .tokenEdit(
@@ -474,7 +480,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Disable asset liquidation for C tier tokens in mango-v4',
+        : 'Disable asset liquidation for C tier tokens in mango-v4, part 2',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
