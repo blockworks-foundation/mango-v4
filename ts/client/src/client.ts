@@ -1514,7 +1514,12 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], []);
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [bank],
+        [],
+      );
 
     const sharedAccounts = {
       group: group.publicKey,
@@ -1670,7 +1675,13 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      await this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], [], []);
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [bank],
+        [],
+        [],
+      );
 
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -5216,63 +5227,73 @@ export class MangoClient {
 
     for (const oracle of mintInfos.map((mintInfo) => mintInfo.oracle)) {
       if (fallbackMap.has(oracle)) {
-        fallbacks.push(...fallbackMap.get(oracle)!)
+        fallbacks.push(...fallbackMap.get(oracle)!);
       }
     }
 
     for (const fallback of uniq(fallbacks)) {
-      if (!healthRemainingAccounts.find(h => h.equals(fallback)) && !fallback.equals(PublicKey.default)) {
-        healthRemainingAccounts.push(fallback)
+      if (
+        !healthRemainingAccounts.find((h) => h.equals(fallback)) &&
+        !fallback.equals(PublicKey.default)
+      ) {
+        healthRemainingAccounts.push(fallback);
       }
     }
     return healthRemainingAccounts;
   }
 
   /**This function assumes that the provided group has loaded banks*/
-  public async deriveFallbackOracleContexts(group: Group): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
+  public async deriveFallbackOracleContexts(
+    group: Group,
+  ): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
     // fixed
-    if (typeof this.fallbackOracleConfig !== "string") {
+    if (typeof this.fallbackOracleConfig !== 'string') {
       if (this.fixedFallbacks.size == 0) {
         const oracles: PublicKey[] = this.fallbackOracleConfig;
-        const fallbacks: PublicKey[] = []
-        Array.from(group.banksMapByTokenIndex.values()).forEach(b => {
-          if (oracles.find(o => o.toBase58() === b[0].oracle.toBase58())) {
-            fallbacks.push(b[0].fallbackOracle)
+        const fallbacks: PublicKey[] = [];
+        Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
+          if (oracles.find((o) => o.toBase58() === b[0].oracle.toBase58())) {
+            fallbacks.push(b[0].fallbackOracle);
           }
         });
-        this.fixedFallbacks = await createFallbackOracleMap(this.connection, oracles, fallbacks)
+        this.fixedFallbacks = await createFallbackOracleMap(
+          this.connection,
+          oracles,
+          fallbacks,
+        );
       }
-      return this.fixedFallbacks
+      return this.fixedFallbacks;
     }
 
     switch (this.fallbackOracleConfig) {
       case 'never':
-        return new Map()
+        return new Map();
       case 'dynamic': {
         const nowSlot = await this.connection.getSlot();
-        const oracles: PublicKey[] = []
-        const fallbacks: PublicKey[] = []
-        await group.reloadBankOraclePrices(this)
-        Array.from(group.banksMapByTokenIndex.values()).filter(b => b[0].isOracleStaleOrUnconfident(nowSlot)).forEach(b => {
-          oracles.push(b[0].oracle)
-          fallbacks.push(b[0].fallbackOracle)
-        });
-        return createFallbackOracleMap(this.connection, oracles, fallbacks)
-      }
-      case 'all':
-        {
-          const oracles: PublicKey[] = []
-          const fallbacks: PublicKey[] = []
-          Array.from(group.banksMapByTokenIndex.values()).forEach(b => {
-            oracles.push(b[0].oracle)
-            fallbacks.push(b[0].fallbackOracle)
+        const oracles: PublicKey[] = [];
+        const fallbacks: PublicKey[] = [];
+        await group.reloadBankOraclePrices(this);
+        Array.from(group.banksMapByTokenIndex.values())
+          .filter((b) => b[0].isOracleStaleOrUnconfident(nowSlot))
+          .forEach((b) => {
+            oracles.push(b[0].oracle);
+            fallbacks.push(b[0].fallbackOracle);
           });
-          return createFallbackOracleMap(this.connection, oracles, fallbacks)
-        }
-      default: {
-          return new Map()
-        }
+        return createFallbackOracleMap(this.connection, oracles, fallbacks);
       }
+      case 'all': {
+        const oracles: PublicKey[] = [];
+        const fallbacks: PublicKey[] = [];
+        Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
+          oracles.push(b[0].oracle);
+          fallbacks.push(b[0].fallbackOracle);
+        });
+        return createFallbackOracleMap(this.connection, oracles, fallbacks);
+      }
+      default: {
+        return new Map();
+      }
+    }
   }
 
   public async modifyPerpOrder(

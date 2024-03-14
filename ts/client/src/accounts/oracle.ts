@@ -12,16 +12,24 @@ const SBV1_MAINNET_PID = new PublicKey(
   'DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM',
 );
 
-const ORCA_MAINNET_PID = new PublicKey('whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc')
+const ORCA_MAINNET_PID = new PublicKey(
+  'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc',
+);
 const ORCA_WHIRLPOOL_LEN = 653;
 const ORCA_WHIRLPOOL_DISCRIMINATOR = [63, 149, 209, 12, 225, 128, 99, 9];
 
-const RAYDIUM_MAINNET_PID = new PublicKey('CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK')
+const RAYDIUM_MAINNET_PID = new PublicKey(
+  'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK',
+);
 const RAYDIUM_POOL_LEN = 1544;
 const RAYDIUM_POOL_DISCRIMINATOR = [247, 237, 227, 245, 215, 195, 222, 70];
 
-export const USDC_MINT_MAINNET = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
-export const SOL_MINT_MAINNET = new PublicKey('So11111111111111111111111111111111111111112')
+export const USDC_MINT_MAINNET = new PublicKey(
+  'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+);
+export const SOL_MINT_MAINNET = new PublicKey(
+  'So11111111111111111111111111111111111111112',
+);
 
 let sbv2DevnetProgram;
 let sbv2MainnetProgram;
@@ -177,29 +185,33 @@ export function isPythOracle(accountInfo: AccountInfo<Buffer>): boolean {
 }
 
 export function isOrcaOracle(accountInfo: AccountInfo<Buffer>): boolean {
-  for (let i = 0; i < 8; i ++) {
+  for (let i = 0; i < 8; i++) {
     if (accountInfo.data.at(i) !== ORCA_WHIRLPOOL_DISCRIMINATOR[i]) {
-      return false
+      return false;
     }
   }
 
-  return accountInfo.owner.equals(ORCA_MAINNET_PID) 
-      && accountInfo.data.length == ORCA_WHIRLPOOL_LEN 
+  return (
+    accountInfo.owner.equals(ORCA_MAINNET_PID) &&
+    accountInfo.data.length == ORCA_WHIRLPOOL_LEN
+  );
 }
 
 export function isRaydiumOracle(accountInfo: AccountInfo<Buffer>): boolean {
-  for (let i = 0; i < 8; i ++) {
+  for (let i = 0; i < 8; i++) {
     if (accountInfo.data.at(i) !== RAYDIUM_POOL_DISCRIMINATOR[i]) {
-      return false
+      return false;
     }
   }
 
-  return accountInfo.owner.equals(RAYDIUM_MAINNET_PID) 
-      && accountInfo.data.length == RAYDIUM_POOL_LEN 
+  return (
+    accountInfo.owner.equals(RAYDIUM_MAINNET_PID) &&
+    accountInfo.data.length == RAYDIUM_POOL_LEN
+  );
 }
 
 export function isClmmOracle(accountInfo: AccountInfo<Buffer>): boolean {
-  return isOrcaOracle(accountInfo) || isRaydiumOracle(accountInfo)
+  return isOrcaOracle(accountInfo) || isRaydiumOracle(accountInfo);
 }
 
 export function isOracleStaleOrUnconfident(
@@ -225,41 +237,49 @@ export function isOracleStaleOrUnconfident(
   return false;
 }
 
-export function deriveFallbackOracleQuoteKey(accountInfo: AccountInfo<Buffer>): PublicKey {
+export function deriveFallbackOracleQuoteKey(
+  accountInfo: AccountInfo<Buffer>,
+): PublicKey {
   if (isOrcaOracle(accountInfo)) {
-    const tokenA = new PublicKey(accountInfo.data.subarray(101, 133))
-    const tokenB = new PublicKey(accountInfo.data.subarray(181, 213))
-    return clmmQuoteKey(tokenA, tokenB)
+    const tokenA = new PublicKey(accountInfo.data.subarray(101, 133));
+    const tokenB = new PublicKey(accountInfo.data.subarray(181, 213));
+    return clmmQuoteKey(tokenA, tokenB);
   } else if (isRaydiumOracle(accountInfo)) {
-    const tokenA = new PublicKey(accountInfo.data.subarray(73, 105))
-    const tokenB = new PublicKey(accountInfo.data.subarray(105, 137))
-    return clmmQuoteKey(tokenA, tokenB)
+    const tokenA = new PublicKey(accountInfo.data.subarray(73, 105));
+    const tokenB = new PublicKey(accountInfo.data.subarray(105, 137));
+    return clmmQuoteKey(tokenA, tokenB);
   } else {
-    return PublicKey.default
+    return PublicKey.default;
   }
 }
 
 function clmmQuoteKey(tokenA: PublicKey, tokenB: PublicKey): PublicKey {
-  if (tokenA.equals(USDC_MINT_MAINNET)  ||
-            (tokenA.equals(SOL_MINT_MAINNET) && !tokenB.equals(USDC_MINT_MAINNET))) {
-              return tokenA // inverted
-            }  else {
-              return tokenB
-            }         
+  if (
+    tokenA.equals(USDC_MINT_MAINNET) ||
+    (tokenA.equals(SOL_MINT_MAINNET) && !tokenB.equals(USDC_MINT_MAINNET))
+  ) {
+    return tokenA; // inverted
+  } else {
+    return tokenB;
+  }
 }
 // Assumes oracles.length === fallbacks.length
-export async function createFallbackOracleMap(conn: Connection, oracles: PublicKey[], fallbacks: PublicKey[]): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
+export async function createFallbackOracleMap(
+  conn: Connection,
+  oracles: PublicKey[],
+  fallbacks: PublicKey[],
+): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
   const map: Map<PublicKey, [PublicKey, PublicKey]> = new Map();
-  const accounts = await conn.getMultipleAccountsInfo(fallbacks)
-  for (let i = 0; i < oracles.length; i++ ) {
+  const accounts = await conn.getMultipleAccountsInfo(fallbacks);
+  for (let i = 0; i < oracles.length; i++) {
     if (accounts[i] === null) {
-      map.set(oracles[i], [fallbacks[i], PublicKey.default])
+      map.set(oracles[i], [fallbacks[i], PublicKey.default]);
     } else if (!isClmmOracle(accounts[i]!)) {
-      map.set(oracles[i], [fallbacks[i], PublicKey.default])
+      map.set(oracles[i], [fallbacks[i], PublicKey.default]);
     } else {
-      const quoteKey = deriveFallbackOracleQuoteKey(accounts[i]!)
-      map.set(oracles[i], [fallbacks[i], quoteKey])
+      const quoteKey = deriveFallbackOracleQuoteKey(accounts[i]!);
+      map.set(oracles[i], [fallbacks[i], quoteKey]);
     }
   }
-  return map
+  return map;
 }
