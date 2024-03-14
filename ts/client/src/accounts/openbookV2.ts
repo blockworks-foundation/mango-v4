@@ -356,7 +356,7 @@ export function priceNumberToLots(price: number, market: MarketAccount): BN {
       (price *
         Math.pow(10, market.quoteDecimals) *
         market.baseLotSize.toNumber()) /
-        (Math.pow(10, market.quoteDecimals) * market.quoteLotSize.toNumber()),
+        (Math.pow(10, market.baseDecimals) * market.quoteLotSize.toNumber()),
     ),
   );
 }
