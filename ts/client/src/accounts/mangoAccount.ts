@@ -565,12 +565,14 @@ export class MangoAccount {
     // To do that, we first get an upper bound that the search can start with.
 
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
+    const allowLending = tp ? tp.allowLending() : true;
     const lowerBoundBorrowHealthFactor = tokenBank
       .getLiabPrice()
       .mul(tokenBank.scaledInitLiabWeight(tokenBank.getLiabPrice()));
-    const upperBound = existingTokenDeposits.add(
-      initHealth.div(lowerBoundBorrowHealthFactor),
-    );
+    let upperBound = existingTokenDeposits;
+    if (allowLending) {
+      upperBound.iadd(initHealth.div(lowerBoundBorrowHealthFactor));
+    }
 
     // Step 2: Find the maximum withdraw amount
 
@@ -591,21 +593,34 @@ export class MangoAccount {
         .sub(borrowCost);
 
       // Update the bank and the scaled weights
-      mutTokenBank.indexedDeposits = tokenBank.indexedDeposits.sub(
-        withdrawOfDepositsAmount.div(tokenBank.depositIndex),
-      );
-      mutTokenBank.indexedBorrows = tokenBank.indexedBorrows.add(
-        borrowCost.div(tokenBank.borrowIndex),
-      );
-      if (mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeDeposits())) {
-        return invalidHealthValue;
-      }
-      if (borrowAmount.isPos()) {
+      if (allowLending) {
+        mutTokenBank.indexedDeposits = tokenBank.indexedDeposits.sub(
+          withdrawOfDepositsAmount.div(tokenBank.depositIndex),
+        );
+        mutTokenBank.indexedBorrows = tokenBank.indexedBorrows.add(
+          borrowCost.div(tokenBank.borrowIndex),
+        );
         if (
-          mutTokenBank
-            .nativeBorrows()
-            .gt(mutTokenBank.nativeDeposits().mul(maxBorrowUtilization))
+          mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeLendableDeposits())
         ) {
+          return invalidHealthValue;
+        }
+        if (borrowAmount.isPos()) {
+          if (
+            mutTokenBank
+              .nativeBorrows()
+              .gt(
+                mutTokenBank.nativeLendableDeposits().mul(maxBorrowUtilization),
+              )
+          ) {
+            return invalidHealthValue;
+          }
+        }
+      } else {
+        mutTokenBank.unlendableDeposts = tokenBank.unlendableDeposts.sub(
+          withdrawOfDepositsAmount.ceil().toBN(),
+        );
+        if (borrowAmount.isPos()) {
           return invalidHealthValue;
         }
       }
@@ -715,9 +730,11 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
+    const sourceAllowsLending = this.getToken(sourceBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = sourceBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(sourceBank.mint),
       sourceBalance,
+      sourceAllowsLending,
     );
 
     maxSource = maxSource.min(maxWithdrawNative);
@@ -873,9 +890,11 @@ export class MangoAccount {
     let quoteAmount = nativeAmount.div(quoteBank.price);
 
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
+    const quoteAllowsLending = this.getToken(quoteBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = quoteBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(quoteBank.mint),
       quoteBalance,
+      quoteAllowsLending,
     );
     quoteAmount = quoteAmount.min(maxWithdrawNative);
 
@@ -928,9 +947,11 @@ export class MangoAccount {
     let baseAmount = nativeAmount.div(baseBank.price);
 
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
+    const baseAllowsLending = this.getToken(baseBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = baseBank.getMaxWithdraw(
       group.getTokenVaultBalanceByMint(baseBank.mint),
       baseBalance,
+      baseAllowsLending,
     );
     baseAmount = baseAmount.min(maxWithdrawNative);
 

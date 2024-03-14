@@ -115,10 +115,28 @@ describe('maxWithdraw', () => {
     new Map(),
   );
   protoAccount.tokens.push(
-    new TokenPosition(ZERO_I80F48(), 0 as TokenIndex, 0, ZERO_I80F48(), 0, 0, false, new BN(0)),
+    new TokenPosition(
+      ZERO_I80F48(),
+      0 as TokenIndex,
+      0,
+      ZERO_I80F48(),
+      0,
+      0,
+      false,
+      new BN(0),
+    ),
   );
   protoAccount.tokens.push(
-    new TokenPosition(ZERO_I80F48(), 1 as TokenIndex, 0, ZERO_I80F48(), 0, 0, false, new BN(0)),
+    new TokenPosition(
+      ZERO_I80F48(),
+      1 as TokenIndex,
+      0,
+      ZERO_I80F48(),
+      0,
+      0,
+      false,
+      new BN(0),
+    ),
   );
 
   const protoBank = {
@@ -150,7 +168,7 @@ describe('maxWithdraw', () => {
     borrowIndex: I80F48.fromNumber(1000000),
     indexedDeposits: I80F48.fromNumber(0),
     indexedBorrows: I80F48.fromNumber(0),
-    nativeDeposits() {
+    nativeLendableDeposits() {
       return this.depositIndex.mul(this.indexedDeposits);
     },
     nativeBorrows() {
