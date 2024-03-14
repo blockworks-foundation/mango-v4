@@ -157,6 +157,8 @@ pub enum MangoError {
     TokenPositionWithDifferentSettingAlreadyExists,
     #[msg("cannot borrow from unlendable token position")]
     UnlendableTokenPositionCannotBeNegative,
+    #[msg("token conditional swaps currently don't support unlendable positions")]
+    TokenConditionalSwapUnsupportedUnlendablePosition,
 }
 
 impl MangoError {

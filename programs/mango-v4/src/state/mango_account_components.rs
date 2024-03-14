@@ -127,6 +127,10 @@ impl TokenPosition {
     pub fn allow_lending(&self) -> bool {
         self.disable_lending == 0
     }
+
+    pub fn has_deposits(&self) -> bool {
+        self.indexed_position > 0 || self.unlendable_deposits > 0
+    }
 }
 
 #[zero_copy]

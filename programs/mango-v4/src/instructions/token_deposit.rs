@@ -88,8 +88,6 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         // Transfer the actual tokens
         token::transfer(self.transfer_ctx(), amount_i80f48.to_num::<u64>())?;
 
-        let indexed_position = position.indexed_position;
-
         // Get the oracle price, even if stale or unconfident: We want to allow users
         // to deposit to close borrows or do other fixes even if the oracle is bad.
         let oracle_ref = &AccountInfoRef::borrow(self.oracle.as_ref())?;
@@ -100,7 +98,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let unsafe_oracle_price = unsafe_oracle_state.price;
 
         // If increasing total deposits, check deposit limits
-        if indexed_position > 0 {
+        if position.has_deposits() {
             bank.check_deposit_and_oo_limit()?;
         }
 

@@ -943,7 +943,7 @@ impl Bank {
         let target_is_active = if !target_amount.is_zero() {
             let active = self.deposit(target, target_amount, now_ts)?;
             require!(
-                target.indexed_position <= 0 || !self.are_deposits_reduce_only(),
+                !target.has_deposits() || !self.are_deposits_reduce_only(),
                 MangoError::TokenInReduceOnlyMode
             );
             active
