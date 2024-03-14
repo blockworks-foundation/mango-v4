@@ -48,7 +48,7 @@ import {
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
-import { StubOracle } from './accounts/oracle';
+import { StubOracle, createFallbackOracleMap } from './accounts/oracle';
 import {
   FillEvent,
   OutEvent,
@@ -111,6 +111,7 @@ export enum AccountRetriever {
 }
 
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
+export type FallbackOracleConfig = 'never' | 'all' | 'dynamic' | PublicKey[]; // 'fixed'
 
 export type MangoClientOptions = {
   idsSource?: IdsSource;
@@ -122,6 +123,7 @@ export type MangoClientOptions = {
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
   multipleConnections?: Connection[];
+  fallbackOracleConfig?: FallbackOracleConfig;
 };
 
 export type TxCallbackOptions = {
@@ -138,6 +140,8 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
+  private fallbackOracleConfig: FallbackOracleConfig = 'never';
+  private fixedFallbacks: Map<PublicKey, [PublicKey, PublicKey]> = new Map();
   multipleConnections: Connection[] = [];
 
   constructor(
@@ -161,6 +165,7 @@ export class MangoClient {
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
     this.multipleConnections = opts?.multipleConnections ?? [];
+    this.fallbackOracleConfig = opts?.fallbackOracleConfig ?? 'never';
   }
 
   /// Convenience accessors
@@ -5196,6 +5201,7 @@ export class MangoClient {
         }
       }
     }
+    const fallback =  // TODO
 
     healthRemainingAccounts.push(
       ...serumPositionMarketIndices
@@ -5207,6 +5213,53 @@ export class MangoClient {
     );
 
     return healthRemainingAccounts;
+  }
+
+  /**This function assumes that the provided group has loaded banks*/
+  public async deriveFallbackOracleContexts(group: Group): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
+    // fixed
+    if (typeof this.fallbackOracleConfig !== "string") {
+      if (this.fixedFallbacks.size == 0) {
+        const oracles: PublicKey[] = this.fallbackOracleConfig;
+        const fallbacks: PublicKey[] = []
+        Array.from(group.banksMapByTokenIndex.values()).forEach(b => {
+          if (oracles.find(o => o.toBase58() === b[0].oracle.toBase58())) {
+            fallbacks.push(b[0].fallbackOracle)
+          }
+        });
+        this.fixedFallbacks = await createFallbackOracleMap(this.connection, oracles, fallbacks)
+      }
+      return this.fixedFallbacks
+    }
+
+    switch (this.fallbackOracleConfig) {
+      case 'never':
+        return new Map()
+      case 'dynamic': {
+        const nowSlot = await this.connection.getSlot();
+        const oracles: PublicKey[] = []
+        const fallbacks: PublicKey[] = []
+        await group.reloadBankOraclePrices(this)
+        Array.from(group.banksMapByTokenIndex.values()).filter(b => b[0].isOracleStaleOrUnconfident(nowSlot)).forEach(b => {
+          oracles.push(b[0].oracle)
+          fallbacks.push(b[0].fallbackOracle)
+        });
+        return createFallbackOracleMap(this.connection, oracles, fallbacks)
+      }
+      case 'all':
+        {
+          const oracles: PublicKey[] = []
+          const fallbacks: PublicKey[] = []
+          Array.from(group.banksMapByTokenIndex.values()).forEach(b => {
+            oracles.push(b[0].oracle)
+            fallbacks.push(b[0].fallbackOracle)
+          });
+          return createFallbackOracleMap(this.connection, oracles, fallbacks)
+        }
+      default: {
+          return new Map()
+        }
+      }
   }
 
   public async modifyPerpOrder(

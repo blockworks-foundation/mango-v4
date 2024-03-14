@@ -247,3 +247,19 @@ function clmmQuoteKey(tokenA: PublicKey, tokenB: PublicKey): PublicKey {
               return tokenB
             }         
 }
+// Assumes oracles.length === fallbacks.length
+export async function createFallbackOracleMap(conn: Connection, oracles: PublicKey[], fallbacks: PublicKey[]): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
+  const map: Map<PublicKey, [PublicKey, PublicKey]> = new Map();
+  const accounts = await conn.getMultipleAccountsInfo(fallbacks)
+  for (let i = 0; i < oracles.length; i++ ) {
+    if (accounts[i] === null) {
+      map.set(oracles[i], [fallbacks[i], PublicKey.default])
+    } else if (!isClmmOracle(accounts[i]!)) {
+      map.set(oracles[i], [fallbacks[i], PublicKey.default])
+    } else {
+      const quoteKey = deriveFallbackOracleQuoteKey(accounts[i]!)
+      map.set(oracles[i], [fallbacks[i], quoteKey])
+    }
+  }
+  return map
+}
