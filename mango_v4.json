@@ -1922,6 +1922,75 @@
       ]
     },
     {
+      "name": "tokenCreatePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "allowLending",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "tokenClosePosition",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "tokenDeposit",
       "accounts": [
         {
@@ -7652,11 +7721,24 @@
             "type": "f32"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "unlendableDeposits",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1900
+                1888
               ]
             }
           }
@@ -9163,7 +9245,8 @@
           {
             "name": "indexedPosition",
             "docs": [
-              "The deposit_index (if positive) or borrow_index (if negative) scaled position"
+              "The token position, scaled with the deposit_index (if positive) or borrow_index (if negative)",
+              "to get the lendable/borrowed native token amount"
             ],
             "type": {
               "defined": "I80F48"
@@ -9172,7 +9255,7 @@
           {
             "name": "tokenIndex",
             "docs": [
-              "index into Group.tokens"
+              "index the token is registered with, same as in Bank and MintInfo"
             ],
             "type": "u16"
           },
@@ -9184,11 +9267,24 @@
             "type": "u16"
           },
           {
+            "name": "disableLending",
+            "docs": [
+              "set to 1 when these deposits may not be lent out",
+              "",
+              "This has consequences:",
+              "- only deposits possible, no borrows (also implying no perps with that settle token)",
+              "- not accounted for in Bank.indexed_deposits,",
+              "- instead tracked in Bank.unlendable_deposits (to ensure the vault always has them)",
+              "- indexed_position stays 0, instead use unlendable_deposits a straight native token amount"
+            ],
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                4
+                3
               ]
             }
           },
@@ -9207,11 +9303,20 @@
             "type": "f64"
           },
           {
+            "name": "unlendableDeposits",
+            "docs": [
+              "deposited unlendable native token amount",
+              "",
+              "When this is set, indexed_position is always zero"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                128
+                120
               ]
             }
           }
@@ -11008,6 +11113,12 @@
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "TokenCreatePosition"
+          },
+          {
+            "name": "TokenClosePosition"
           }
         ]
       }
@@ -11454,6 +11565,51 @@
         {
           "name": "borrowIndex",
           "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenBalanceLogV2",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "indexedPosition",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "depositIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "borrowIndex",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "nativePosition",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "allowLending",
+          "type": "bool",
           "index": false
         }
       ]
@@ -14350,6 +14506,41 @@
       "code": 6069,
       "name": "TokenAssetLiquidationDisabled",
       "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "PerpSettleTokenPositionMustSupportBorrows",
+      "msg": "perp settle token position does not support borrows"
+    },
+    {
+      "code": 6072,
+      "name": "TokenPositionIsInUse",
+      "msg": "the token position is still in use by another position"
+    },
+    {
+      "code": 6073,
+      "name": "TokenPositionBalanceNotZero",
+      "msg": "the token position has a non-zero balance"
+    },
+    {
+      "code": 6074,
+      "name": "TokenPositionWithDifferentSettingAlreadyExists",
+      "msg": "cannot have a lending and no-lending token position at the same time"
+    },
+    {
+      "code": 6075,
+      "name": "UnlendableTokenPositionCannotBeNegative",
+      "msg": "cannot borrow from unlendable token position"
+    },
+    {
+      "code": 6076,
+      "name": "TokenConditionalSwapUnsupportedUnlendablePosition",
+      "msg": "token conditional swaps currently don't support unlendable positions"
     }
   ]
 }
