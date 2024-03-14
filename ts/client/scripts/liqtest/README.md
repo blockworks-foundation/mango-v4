@@ -8,6 +8,11 @@ PAYER_KEYPAIR=~/.config/solana/mb-liqtest.json
 GROUP_NUM=200
 ```
 
+### Get devnet SOL
+
+The scripts need a lot of SOL for mint, market, group and account creation.
+There's ample available, best to ask around.
+
 ### Create tokens and markets
 
 This is one-time setup:
@@ -44,6 +49,13 @@ This creates a bunch of to-be-liquidated accounts as well as a LIQOR account.
 ### Liquidate
 
 Run the liquidator on the group with the liqor account.
+
+Since devnet doesn't have any jupiter, run with
+```
+JUPITER_VERSION=mock
+TCS_MODE=borrow-buy
+REBALANCE=false
+```
 
 ### Settle and close all open mango accounts
 
