@@ -15,6 +15,8 @@ pub struct Configuration {
     pub computing_configuration: ComputingConfiguration,
     pub logging_configuration: LoggingConfiguration,
     pub persistence_configuration: PersistenceConfiguration,
+
+    pub snapshot_interval_secs: u64,
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -51,7 +51,7 @@ async function main() {
         market.serumMarketExternal,
       );
       console.log(
-        `Deregistered serum market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
+        `Deregistered serum market ${market.name}, sig https://explorer.solana.com/tx/${sig.signature}`,
       );
     }
 
@@ -59,7 +59,7 @@ async function main() {
     for (const market of group.perpMarketsMapByMarketIndex.values()) {
       sig = await client.perpCloseMarket(group, market.perpMarketIndex);
       console.log(
-        `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig}`,
+        `Closed perp market ${market.name}, sig https://explorer.solana.com/tx/${sig.signature}`,
       );
     }
 
@@ -67,7 +67,7 @@ async function main() {
     for (const banks of group.banksMapByMint.values()) {
       sig = await client.tokenDeregister(group, banks[0].mint);
       console.log(
-        `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig}`,
+        `Removed token ${banks[0].name}, sig https://explorer.solana.com/tx/${sig.signature}`,
       );
     }
 
@@ -76,13 +76,15 @@ async function main() {
     for (const stubOracle of stubOracles) {
       sig = await client.stubOracleClose(group, stubOracle.publicKey);
       console.log(
-        `Closed stub oracle ${stubOracle.publicKey}, sig https://explorer.solana.com/tx/${sig}`,
+        `Closed stub oracle ${stubOracle.publicKey}, sig https://explorer.solana.com/tx/${sig.signature}`,
       );
     }
 
     // finally, close the group
     sig = await client.groupClose(group);
-    console.log(`Closed group, sig https://explorer.solana.com/tx/${sig}`);
+    console.log(
+      `Closed group, sig https://explorer.solana.com/tx/${sig.signature}`,
+    );
   }
 
   process.exit();

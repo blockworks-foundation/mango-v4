@@ -246,8 +246,10 @@ pub enum IxGate {
     TokenConditionalSwapCreateLinearAuction = 70,
     Serum3PlaceOrderV2 = 71,
     TokenForceWithdraw = 72,
-    TokenCreatePosition = 73,
-    TokenClosePosition = 74,
+    SequenceCheck = 73,
+    HealthCheck = 74,
+    TokenCreatePosition = 75,
+    TokenClosePosition = 76,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

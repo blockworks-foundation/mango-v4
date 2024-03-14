@@ -28,12 +28,13 @@ pub async fn save_snapshot(
 
     let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
-    let oracles_and_vaults = group_context
+    let extra_accounts = group_context
         .tokens
         .values()
         .map(|value| value.oracle)
         .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .chain(group_context.tokens.values().flat_map(|value| value.vaults))
+        .chain(group_context.address_lookup_tables.iter().copied())
         .unique()
         .filter(|pk| *pk != Pubkey::default())
         .collect::<Vec<Pubkey>>();
@@ -55,7 +56,7 @@ pub async fn save_snapshot(
             serum_programs,
             open_orders_authority: mango_group,
         },
-        oracles_and_vaults.clone(),
+        extra_accounts.clone(),
         account_update_sender.clone(),
     );
 
@@ -75,7 +76,7 @@ pub async fn save_snapshot(
             snapshot_interval: Duration::from_secs(6000),
             min_slot: first_websocket_slot + 10,
         },
-        oracles_and_vaults,
+        extra_accounts,
         account_update_sender,
     );
 

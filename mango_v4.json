@@ -1761,6 +1761,66 @@
       ]
     },
     {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthValue",
+          "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
+        }
+      ]
+    },
+    {
       "name": "stubOracleCreate",
       "accounts": [
         {
@@ -7731,6 +7791,9 @@
           },
           {
             "name": "unlendableDeposits",
+            "docs": [
+              "The sum of native tokens in unlendable token positions"
+            ],
             "type": "u64"
           },
           {
@@ -7953,13 +8016,8 @@
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -9774,13 +9832,8 @@
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -10760,6 +10813,32 @@
       }
     },
     {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -11113,6 +11192,12 @@
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           },
           {
             "name": "TokenCreatePosition"
@@ -14514,31 +14599,41 @@
     },
     {
       "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
+    },
+    {
+      "code": 6073,
       "name": "PerpSettleTokenPositionMustSupportBorrows",
       "msg": "perp settle token position does not support borrows"
     },
     {
-      "code": 6072,
+      "code": 6074,
       "name": "TokenPositionIsInUse",
       "msg": "the token position is still in use by another position"
     },
     {
-      "code": 6073,
+      "code": 6075,
       "name": "TokenPositionBalanceNotZero",
       "msg": "the token position has a non-zero balance"
     },
     {
-      "code": 6074,
+      "code": 6076,
       "name": "TokenPositionWithDifferentSettingAlreadyExists",
       "msg": "cannot have a lending and no-lending token position at the same time"
     },
     {
-      "code": 6075,
+      "code": 6077,
       "name": "UnlendableTokenPositionCannotBeNegative",
       "msg": "cannot borrow from unlendable token position"
     },
     {
-      "code": 6076,
+      "code": 6078,
       "name": "TokenConditionalSwapUnsupportedUnlendablePosition",
       "msg": "token conditional swaps currently don't support unlendable positions"
     }
