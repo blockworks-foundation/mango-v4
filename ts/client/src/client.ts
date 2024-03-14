@@ -229,9 +229,26 @@ export class MangoClient {
     ixs: TransactionInstruction[],
     opts: SendTransactionOpts = {},
   ): Promise<MangoSignatureStatus> {
+    const alts =
+      opts?.alts && opts?.alts?.length
+        ? opts.alts
+        : group.addressLookupTablesList;
+
+    const uniqueAccountsCount = [
+      ...new Set([
+        ...ixs.flatMap((x) => x.keys.map((x) => x.pubkey.toBase58())),
+        ...ixs.flatMap((x) => x.programId.toBase58()),
+        ...alts.map((x) => x.key.toBase58()),
+      ]),
+    ].length;
+
+    if (uniqueAccountsCount > 64) {
+      throw new Error(`Max accounts limit exceeded`);
+    }
+
     return await this.sendAndConfirmTransaction(ixs, {
-      alts: group.addressLookupTablesList,
       ...opts,
+      alts: alts,
     });
   }
 

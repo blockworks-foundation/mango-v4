@@ -202,7 +202,7 @@ async function main(): Promise<void> {
 
   const genericBanks = ['MNGO', 'MSOL'];
   let nextTokenIndex = 3;
-  for (let name of genericBanks) {
+  for (const name of genericBanks) {
     console.log(`Registering ${name}...`);
     const mint = new PublicKey(MAINNET_MINTS.get(name)!);
     const oracle = oracles.get(name);
@@ -239,7 +239,7 @@ async function main(): Promise<void> {
   }
 
   let nextSerumMarketIndex = 0;
-  for (let [name, mint] of MAINNET_MINTS) {
+  for (const [name, mint] of MAINNET_MINTS) {
     if (name == 'USDC') {
       continue;
     }

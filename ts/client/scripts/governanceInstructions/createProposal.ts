@@ -18,9 +18,12 @@ import {
   Transaction,
   TransactionInstruction,
 } from '@solana/web3.js';
-import chunk from 'lodash/chunk';
+import { chunk } from 'lodash';
 import { updateVoterWeightRecord } from './updateVoteWeightRecord';
 import { VsrClient } from './voteStakeRegistryClient';
+import { createComputeBudgetIx } from '../../src/utils/rpc';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 
 export const MANGO_MINT = 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac';
 export const MANGO_REALM_PK = new PublicKey(
@@ -98,23 +101,27 @@ export const createProposal = async (
 
   const insertInstructions: TransactionInstruction[] = [];
   for (const i in proposalInstructions) {
-    const instruction = getInstructionDataFromBase64(
-      serializeInstructionToBase64(proposalInstructions[i]),
-    );
-    await withInsertTransaction(
-      insertInstructions,
-      MANGO_GOVERNANCE_PROGRAM,
-      programVersion,
-      governance,
-      proposalAddress,
-      tokenOwnerRecord.pubkey,
-      governanceAuthority,
-      Number(i),
-      0,
-      0,
-      [instruction],
-      payer,
-    );
+    try {
+      const instruction = getInstructionDataFromBase64(
+        serializeInstructionToBase64(proposalInstructions[i]),
+      );
+      await withInsertTransaction(
+        insertInstructions,
+        MANGO_GOVERNANCE_PROGRAM,
+        programVersion,
+        governance,
+        proposalAddress,
+        tokenOwnerRecord.pubkey,
+        governanceAuthority,
+        Number(i),
+        0,
+        0,
+        [instruction],
+        payer,
+      );
+    } catch (e) {
+      console.log(e, '@@@@@@@');
+    }
   }
   if (signOff) {
     const signatoryRecordAddress = await getSignatoryRecordAddress(
@@ -137,28 +144,29 @@ export const createProposal = async (
 
   const txChunks = chunk([...instructions, ...insertInstructions], 2);
 
-  const transactions: Transaction[] = [];
-  const latestBlockhash = await connection.getLatestBlockhash('confirmed');
-  for (const chunk of txChunks) {
-    const tx = new Transaction();
-    tx.add(...chunk);
-    tx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
-    tx.recentBlockhash = latestBlockhash.blockhash;
-    tx.feePayer = payer;
-    transactions.push(tx);
-  }
+  await sendSignAndConfirmTransactions({
+    connection,
+    wallet,
+    transactionInstructions: txChunks.map((txChunk) => ({
+      instructionsSet: [
+        {
+          signers: [],
+          transactionInstruction: createComputeBudgetIx(80000),
+        },
+        ...txChunk.map((tx) => ({
+          signers: [],
+          transactionInstruction: tx,
+        })),
+      ],
+      sequenceType: SequenceType.Sequential,
+    })),
+    config: {
+      maxRetries: 5,
+      autoRetry: true,
+      maxTxesInBatch: 20,
+      logFlowInfo: true,
+    },
+  });
 
-  const signedTransactions = await wallet.signAllTransactions(transactions);
-  for (const tx of signedTransactions) {
-    const rawTransaction = tx.serialize();
-    const address = await connection.sendRawTransaction(rawTransaction, {
-      skipPreflight: true,
-    });
-    await connection.confirmTransaction({
-      blockhash: latestBlockhash.blockhash,
-      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      signature: address,
-    });
-  }
   return proposalAddress;
 };
