@@ -1201,6 +1201,8 @@ export class TokenPosition {
       I80F48.from(dto.previousIndex),
       dto.cumulativeDepositInterest,
       dto.cumulativeBorrowInterest,
+      dto.disableLending != 0,
+      dto.unlendableDeposits,
     );
   }
 
@@ -1211,10 +1213,16 @@ export class TokenPosition {
     public previousIndex: I80F48,
     public cumulativeDepositInterest: number,
     public cumulativeBorrowInterest: number,
+    public disableLending: boolean,
+    public unlendableDeposits: BN,
   ) {}
 
   public isActive(): boolean {
     return this.tokenIndex !== TokenPosition.TokenIndexUnset;
+  }
+
+  public allowLending(): boolean {
+    return !this.disableLending;
   }
 
   /**
@@ -1223,10 +1231,14 @@ export class TokenPosition {
    * @returns native balance
    */
   public balance(bank: Bank): I80F48 {
-    if (this.indexedPosition.isPos()) {
-      return bank.depositIndex.mul(this.indexedPosition);
+    if (this.allowLending()) {
+      if (this.indexedPosition.isPos()) {
+        return bank.depositIndex.mul(this.indexedPosition);
+      } else {
+        return bank.borrowIndex.mul(this.indexedPosition);
+      }
     } else {
-      return bank.borrowIndex.mul(this.indexedPosition);
+      return I80F48.fromU64(this.unlendableDeposits);
     }
   }
 
@@ -1248,10 +1260,10 @@ export class TokenPosition {
    * @returns native borrows, 0 if position has deposits
    */
   public borrows(bank: Bank): I80F48 {
-    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48())) {
-      return ZERO_I80F48();
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48())) {
+      return this.balance(bank).abs();
     }
-    return this.balance(bank).abs();
+    return ZERO_I80F48();
   }
 
   /**
@@ -1312,6 +1324,8 @@ export class TokenPositionDto {
     public previousIndex: I80F48Dto,
     public cumulativeDepositInterest: number,
     public cumulativeBorrowInterest: number,
+    public disableLending: number,
+    public unlendableDeposits: BN,
   ) {}
 }
 

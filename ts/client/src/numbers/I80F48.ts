@@ -36,6 +36,10 @@ export class I80F48 {
     return new I80F48(dto.val);
   }
 
+  // Note: this is equivalent to I80F48::from_bits(), meaning that
+  // new I80F48(1) is not ONE_I80F48 but the smallest representable
+  // positive number!
+  // Use fromU64(n) to represent the integer n.
   constructor(data: BN) {
     if (data.lt(I80F48.MIN_BN) || data.gt(I80F48.MAX_BN)) {
       throw new Error('Number out of range');
