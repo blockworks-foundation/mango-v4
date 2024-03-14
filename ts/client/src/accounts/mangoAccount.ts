@@ -193,7 +193,7 @@ export class MangoAccount {
           }
           const oo =
             openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
-              'OpenOrdersAccount',
+              'openOrdersAccount',
               ai.data,
             );
           return [openbookV2Active[i].marketIndex, oo];
