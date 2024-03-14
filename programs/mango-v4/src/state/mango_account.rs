@@ -1402,7 +1402,7 @@ impl<
 
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
-        msg!("pre_init_health: {}", pre_init_health);
+        msg!("pre_init_health: {}", pre_init_health.to_num::<f64>());
         self.check_health_pre_checks(health_cache, pre_init_health)?;
         Ok(pre_init_health)
     }
@@ -1434,7 +1434,7 @@ impl<
         pre_init_health: I80F48,
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
-        msg!("post_init_health: {}", post_init_health);
+        msg!("post_init_health: {}", post_init_health.to_num::<f64>());
         self.check_health_post_checks(pre_init_health, post_init_health)?;
         Ok(post_init_health)
     }

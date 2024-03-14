@@ -231,7 +231,9 @@ pub(crate) fn liquidation_action(
 
     // Converting max asset to liab and back to asset can have introduced rounding errors, ensure
     // the transfered amounts are guaranteed < max
-    assert!(asset_transfer_from_liqee < max_asset_transfer + I80F48::ONE);
+    // The intuition here is:
+    //   asset_to_liab = asset_oracle_price / liab_oracle_price / fee_factor_total
+    //   min(max_asset_transfer * asset_to_liab, max_liab_transfer) / asset_to_liab <= max_asset_transfer
     asset_transfer_to_liqor = asset_transfer_to_liqor.min(max_asset_transfer);
     asset_transfer_from_liqee = asset_transfer_from_liqee.min(max_asset_transfer);
 
@@ -279,8 +281,8 @@ pub(crate) fn liquidation_action(
 
     msg!(
         "liquidated {} liab for {} asset",
-        liab_transfer,
-        asset_transfer_from_liqee,
+        liab_transfer.to_num::<f64>(),
+        asset_transfer_from_liqee.to_num::<f64>(),
     );
 
     if liqor_liab_withdraw_result
@@ -314,7 +316,10 @@ pub(crate) fn liquidation_action(
 
     // Check liqee health again
     let liqee_liq_end_health = liqee_health_cache.health(HealthType::LiquidationEnd);
-    msg!("liqee liq end health: {}", liqee_liq_end_health);
+    msg!(
+        "liqee liq end health: {}",
+        liqee_liq_end_health.to_num::<f64>()
+    );
     liqee
         .fixed
         .maybe_recover_from_being_liquidated(liqee_liq_end_health);
