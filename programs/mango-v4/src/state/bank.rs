@@ -234,6 +234,7 @@ pub struct Bank {
     #[derivative(Debug = "ignore")]
     pub padding2: [u8; 4],
 
+    /// The sum of native tokens in unlendable token positions
     pub unlendable_deposits: u64,
 
     #[derivative(Debug = "ignore")]

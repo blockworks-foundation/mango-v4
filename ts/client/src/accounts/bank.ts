@@ -152,6 +152,7 @@ export class Bank implements BankForHealth {
       collectedLiquidationFees: I80F48Dto;
       collectedCollateralFees: I80F48Dto;
       collateralFeePerDay: number;
+      unlendableDeposits: BN;
     },
   ): Bank {
     return new Bank(
@@ -220,6 +221,7 @@ export class Bank implements BankForHealth {
       obj.collectedCollateralFees,
       obj.collateralFeePerDay,
       obj.forceWithdraw == 1,
+      obj.unlendableDeposits,
     );
   }
 
@@ -289,6 +291,7 @@ export class Bank implements BankForHealth {
     collectedCollateralFees: I80F48Dto,
     public collateralFeePerDay: number,
     public forceWithdraw: boolean,
+    public unlendableDeposts: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -515,8 +518,16 @@ export class Bank implements BankForHealth {
     return this._oracleProvider;
   }
 
-  nativeDeposits(): I80F48 {
+  nativeLendableDeposits(): I80F48 {
     return this.indexedDeposits.mul(this.depositIndex);
+  }
+
+  nativeUnlendableDeposits(): I80F48 {
+    return I80F48.fromU64(this.unlendableDeposts);
+  }
+
+  nativeDeposits(): I80F48 {
+    return this.nativeUnlendableDeposits().add(this.nativeLendableDeposits());
   }
 
   nativeBorrows(): I80F48 {
