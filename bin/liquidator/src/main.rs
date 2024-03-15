@@ -243,7 +243,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
-    let (tx_trigger_sender, tx_trigger_receiver) = async_channel::unbounded::<()>();
+    let (tx_tcs_trigger_sender, tx_tcs_trigger_receiver) = async_channel::unbounded::<()>();
+    let (tx_liq_trigger_sender, tx_liq_trigger_receiver) = async_channel::unbounded::<()>();
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
@@ -413,7 +414,7 @@ async fn main() -> anyhow::Result<()> {
         let liquidation_job = liquidation_state::spawn_liquidation_job(
             &cli,
             &shared_state,
-            tx_trigger_sender.clone(),
+            tx_liq_trigger_sender.clone(),
             liquidation.clone(),
             &metrics,
         );
@@ -424,7 +425,7 @@ async fn main() -> anyhow::Result<()> {
         let tcs_job = tcs_state::spawn_tcs_job(
             &cli,
             &shared_state,
-            tx_trigger_sender,
+            tx_tcs_trigger_sender.clone(),
             tcs.clone(),
             &metrics,
         );
@@ -434,7 +435,10 @@ async fn main() -> anyhow::Result<()> {
     if cli.liquidation_enabled == BoolArg::True || cli.take_tcs == BoolArg::True {
         let mut tx_sender_jobs = tx_sender::spawn_tx_senders_job(
             cli.max_parallel_operations,
-            tx_trigger_receiver,
+            cli.liquidation_enabled == BoolArg::True,
+            tx_liq_trigger_receiver,
+            tx_tcs_trigger_receiver,
+            tx_tcs_trigger_sender,
             rebalance_trigger_sender,
             shared_state.clone(),
             liquidation,

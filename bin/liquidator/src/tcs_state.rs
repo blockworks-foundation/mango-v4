@@ -62,7 +62,7 @@ pub fn spawn_tcs_job(
                     });
 
                 if found_candidates > 0 {
-                    tracing::debug!("found {} candidates for liquidation", found_candidates);
+                    tracing::debug!("found {} candidates for triggering", found_candidates);
                 }
 
                 let current_time = Instant::now();

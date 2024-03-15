@@ -11,11 +11,15 @@ use tracing::{debug, error, trace};
 enum WorkerTask {
     Liquidation(Pubkey),
     Tcs((Pubkey, u64, u64)),
+    GiveUpTcs,
 }
 
 pub fn spawn_tx_senders_job(
     max_parallel_operations: u64,
-    tx_trigger_receiver: Receiver<()>,
+    enable_liquidation: bool,
+    tx_liq_trigger_receiver: Receiver<()>,
+    tx_tcs_trigger_receiver: Receiver<()>,
+    tx_tcs_trigger_sender: Sender<()>,
     rebalance_trigger_sender: Sender<()>,
     shared_state: Arc<RwLock<SharedState>>,
     liquidation: Box<LiquidationState>,
@@ -26,22 +30,29 @@ pub fn spawn_tx_senders_job(
         std::process::exit(1)
     }
 
+    let reserve_one_worker_for_liquidation = max_parallel_operations > 1 && enable_liquidation;
+
     let workers: Vec<JoinHandle<()>> = (0..max_parallel_operations)
         .map(|worker_id| {
             tokio::spawn({
                 let shared_state = shared_state.clone();
-                let receiver = tx_trigger_receiver.clone();
+                let receiver_liq = tx_liq_trigger_receiver.clone();
+                let receiver_tcs = tx_tcs_trigger_receiver.clone();
+                let sender_tcs = tx_tcs_trigger_sender.clone();
                 let rebalance_trigger_sender = rebalance_trigger_sender.clone();
                 let liquidation = liquidation.clone();
                 let tcs = tcs.clone();
                 async move {
                     worker_loop(
                         shared_state,
-                        receiver,
+                        receiver_liq,
+                        receiver_tcs,
+                        sender_tcs,
                         rebalance_trigger_sender,
                         liquidation,
                         tcs,
                         worker_id,
+                        reserve_one_worker_for_liquidation && worker_id == 0,
                     )
                     .await;
                 }
@@ -54,34 +65,51 @@ pub fn spawn_tx_senders_job(
 
 async fn worker_loop(
     shared_state: Arc<RwLock<SharedState>>,
-    receiver: Receiver<()>,
+    liq_receiver: Receiver<()>,
+    tcs_receiver: Receiver<()>,
+    tcs_sender: Sender<()>,
     rebalance_trigger_sender: Sender<()>,
     mut liquidation: Box<LiquidationState>,
     mut tcs: Box<TcsState>,
     id: u64,
+    only_liquidation: bool,
 ) {
     loop {
         debug!("Worker #{} waiting for task", id);
-        let _ = receiver.recv().await.unwrap();
+
+        let _ = if only_liquidation {
+            liq_receiver.recv().await.expect("receive failed")
+        } else {
+            tokio::select!(
+                _ = liq_receiver.recv() => {},
+                _ = tcs_receiver.recv() => {},
+            )
+        };
 
         // a task must be available to process
         // find it in global shared state, and mark it as processing
-        let task =
-            worker_pull_task(&shared_state, id).expect("Worker woke up but has nothing to do");
+        let task = worker_pull_task(&shared_state, id, only_liquidation)
+            .expect("Worker woke up but has nothing to do");
 
         // execute the task
-        let done = match task {
+        let need_rebalancing = match task {
             WorkerTask::Liquidation(l) => worker_execute_liquidation(&mut liquidation, l).await,
             WorkerTask::Tcs(t) => worker_execute_tcs(&mut tcs, t).await,
+            WorkerTask::GiveUpTcs => worker_give_up_tcs(&tcs_sender).await,
         };
 
-        if done {
+        if need_rebalancing {
             rebalance_trigger_sender.send_unless_full(()).unwrap();
         }
 
         // remove from shared state
-        worker_finalize_task(&shared_state, id, task, done);
+        worker_finalize_task(&shared_state, id, task, need_rebalancing);
     }
+}
+
+async fn worker_give_up_tcs(sender: &Sender<()>) -> bool {
+    sender.send(()).await.expect("sending task failed");
+    false
 }
 
 async fn worker_execute_tcs(tcs: &mut Box<TcsState>, candidate: (Pubkey, u64, u64)) -> bool {
@@ -103,6 +131,7 @@ async fn worker_execute_liquidation(
 fn worker_pull_task(
     shared_state: &Arc<RwLock<SharedState>>,
     id: u64,
+    only_liquidation: bool,
 ) -> anyhow::Result<WorkerTask> {
     let mut writer = shared_state.write().unwrap();
 
@@ -113,13 +142,7 @@ fn worker_pull_task(
         }
     }
 
-    for x in &writer.interesting_tcs {
-        if !writer.processing_tcs.contains(x) {
-            trace!("  - TCS {:?}", x);
-        }
-    }
-
-    // next task to execute
+    // next liq task to execute
     if let Some(liq_candidate) = writer
         .liquidation_candidates_accounts
         .iter()
@@ -131,12 +154,23 @@ fn worker_pull_task(
         return Ok(WorkerTask::Liquidation(liq_candidate));
     }
 
+    for x in &writer.interesting_tcs {
+        if !writer.processing_tcs.contains(x) {
+            trace!("  - TCS {:?}", x);
+        }
+    }
+
+    // next tcs task to execute
     if let Some(tcs_candidate) = writer
         .interesting_tcs
         .iter()
         .find(|x| !writer.processing_tcs.contains(x))
         .copied()
     {
+        if only_liquidation {
+            return Ok(WorkerTask::GiveUpTcs);
+        }
+
         debug!(
             "worker #{} got a tcs candidate -> {:?} (out of {})",
             id,
@@ -174,5 +208,6 @@ fn worker_finalize_task(
             writer.interesting_tcs.shift_remove(&tcs);
             writer.processing_tcs.remove(&tcs);
         }
+        WorkerTask::GiveUpTcs => {}
     }
 }
