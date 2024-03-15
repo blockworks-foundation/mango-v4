@@ -86,6 +86,7 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
+        .jupiter_timeout(Duration::from_secs(cli.jupiter_timeout_secs))
         .jupiter_v6_url(cli.jupiter_v6_url.clone())
         .jupiter_token(cli.jupiter_token.clone())
         .transaction_builder_config(

@@ -82,6 +82,12 @@ pub struct ClientConfig {
     #[builder(default = "Duration::from_secs(60)")]
     pub timeout: Duration,
 
+    /// Jupiter Timeout, defaults to 30s
+    ///
+    /// This timeout applies to jupiter requests.
+    #[builder(default = "Duration::from_secs(30)")]
+    pub jupiter_timeout: Duration,
+
     #[builder(default)]
     pub transaction_builder_config: TransactionBuilderConfig,
 
@@ -2131,7 +2137,10 @@ impl MangoClient {
     // jupiter
 
     pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
-        jupiter::v6::JupiterV6 { mango_client: self }
+        jupiter::v6::JupiterV6 {
+            mango_client: self,
+            timeout_duration: self.client.config.jupiter_timeout,
+        }
     }
 
     pub fn jupiter(&self) -> jupiter::Jupiter {

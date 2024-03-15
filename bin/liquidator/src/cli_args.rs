@@ -184,6 +184,10 @@ pub struct Cli {
     #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
     pub(crate) jupiter_v6_url: String,
 
+    /// override the jupiter http request timeout
+    #[clap(long, env, default_value = "30")]
+    pub(crate) jupiter_timeout_secs: u64,
+
     /// provide a jupiter token, currently only for jup v6
     #[clap(long, env, default_value = "")]
     pub(crate) jupiter_token: String,
