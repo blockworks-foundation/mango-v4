@@ -10,7 +10,7 @@ use tracing::{debug, error, trace};
 
 enum WorkerTask {
     Liquidation(Pubkey),
-    Tcs((Pubkey, u64, u64)),
+    Tcs(Vec<(Pubkey, u64, u64)>),
     GiveUpTcs,
 }
 
@@ -31,6 +31,12 @@ pub fn spawn_tx_senders_job(
     }
 
     let reserve_one_worker_for_liquidation = max_parallel_operations > 1 && enable_liquidation;
+    let tcs_capable_worker_count = (max_parallel_operations as usize)
+        - if reserve_one_worker_for_liquidation {
+            1
+        } else {
+            0
+        };
 
     let workers: Vec<JoinHandle<()>> = (0..max_parallel_operations)
         .map(|worker_id| {
@@ -52,6 +58,7 @@ pub fn spawn_tx_senders_job(
                         liquidation,
                         tcs,
                         worker_id,
+                        tcs_capable_worker_count,
                         reserve_one_worker_for_liquidation && worker_id == 0,
                     )
                     .await;
@@ -72,6 +79,7 @@ async fn worker_loop(
     mut liquidation: Box<LiquidationState>,
     mut tcs: Box<TcsState>,
     id: u64,
+    tcs_capable_workers: usize,
     only_liquidation: bool,
 ) {
     loop {
@@ -88,13 +96,13 @@ async fn worker_loop(
 
         // a task must be available to process
         // find it in global shared state, and mark it as processing
-        let task = worker_pull_task(&shared_state, id, only_liquidation)
+        let task = worker_pull_task(&shared_state, id, tcs_capable_workers, only_liquidation)
             .expect("Worker woke up but has nothing to do");
 
         // execute the task
-        let need_rebalancing = match task {
-            WorkerTask::Liquidation(l) => worker_execute_liquidation(&mut liquidation, l).await,
-            WorkerTask::Tcs(t) => worker_execute_tcs(&mut tcs, t).await,
+        let need_rebalancing = match &task {
+            WorkerTask::Liquidation(l) => worker_execute_liquidation(&mut liquidation, *l).await,
+            WorkerTask::Tcs(t) => worker_execute_tcs(&mut tcs, t.clone()).await,
             WorkerTask::GiveUpTcs => worker_give_up_tcs(&tcs_sender).await,
         };
 
@@ -112,8 +120,8 @@ async fn worker_give_up_tcs(sender: &Sender<()>) -> bool {
     false
 }
 
-async fn worker_execute_tcs(tcs: &mut Box<TcsState>, candidate: (Pubkey, u64, u64)) -> bool {
-    tcs.maybe_take_token_conditional_swap(vec![candidate])
+async fn worker_execute_tcs(tcs: &mut Box<TcsState>, candidates: Vec<(Pubkey, u64, u64)>) -> bool {
+    tcs.maybe_take_token_conditional_swap(candidates)
         .await
         .unwrap_or(false)
 }
@@ -131,6 +139,7 @@ async fn worker_execute_liquidation(
 fn worker_pull_task(
     shared_state: &Arc<RwLock<SharedState>>,
     id: u64,
+    tcs_capable_workers: usize,
     only_liquidation: bool,
 ) -> anyhow::Result<WorkerTask> {
     let mut writer = shared_state.write().unwrap();
@@ -154,6 +163,10 @@ fn worker_pull_task(
         return Ok(WorkerTask::Liquidation(liq_candidate));
     }
 
+    if only_liquidation {
+        return Ok(WorkerTask::GiveUpTcs);
+    }
+
     for x in &writer.interesting_tcs {
         if !writer.processing_tcs.contains(x) {
             trace!("  - TCS {:?}", x);
@@ -161,27 +174,27 @@ fn worker_pull_task(
     }
 
     // next tcs task to execute
-    if let Some(tcs_candidate) = writer
+    let tcs_todo = writer.interesting_tcs.len() - writer.processing_tcs.len();
+    let max_tcs_batch_size = tcs_todo / tcs_capable_workers;
+    let tcs_candidates: Vec<(Pubkey, u64, u64)> = writer
         .interesting_tcs
         .iter()
-        .find(|x| !writer.processing_tcs.contains(x))
+        .filter(|x| !writer.processing_tcs.contains(x))
+        .take(max_tcs_batch_size)
         .copied()
-    {
-        if only_liquidation {
-            return Ok(WorkerTask::GiveUpTcs);
-        }
+        .collect();
 
+    for tcs_candidate in &tcs_candidates {
         debug!(
             "worker #{} got a tcs candidate -> {:?} (out of {})",
             id,
             tcs_candidate,
             writer.interesting_tcs.len()
         );
-        writer.processing_tcs.insert(tcs_candidate);
-        return Ok(WorkerTask::Tcs(tcs_candidate));
+        writer.processing_tcs.insert(tcs_candidate.clone());
     }
 
-    anyhow::bail!("Worker #{} - No task found", id);
+    Ok(WorkerTask::Tcs(tcs_candidates))
 }
 
 fn worker_finalize_task(
@@ -200,13 +213,15 @@ fn worker_finalize_task(
             writer.liquidation_candidates_accounts.shift_remove(&liq);
             writer.processing_liquidation.remove(&liq);
         }
-        WorkerTask::Tcs(tcs) => {
-            debug!(
-                "worker #{} - checked tcs {:?} with success ? {}",
-                id, tcs, done
-            );
-            writer.interesting_tcs.shift_remove(&tcs);
-            writer.processing_tcs.remove(&tcs);
+        WorkerTask::Tcs(tcs_list) => {
+            for tcs in tcs_list {
+                debug!(
+                    "worker #{} - checked tcs {:?} with success ? {}",
+                    id, tcs, done
+                );
+                writer.interesting_tcs.shift_remove(&tcs);
+                writer.processing_tcs.remove(&tcs);
+            }
         }
         WorkerTask::GiveUpTcs => {}
     }
