@@ -267,7 +267,14 @@ impl<'a> LiquidateHelper<'a> {
         let liqor = &self.client.mango_account().await?;
         liq_ixs.append(
             self.client
-                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .health_check_instruction(
+                    liqor,
+                    self.config.min_health_ratio,
+                    vec![],
+                    vec![],
+                    vec![*perp_market_index],
+                    MaintRatio,
+                )
                 .await?,
         );
 
@@ -512,10 +519,17 @@ impl<'a> LiquidateHelper<'a> {
             .context("creating liq_token_with_token ix")?;
         liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
 
-        let liqor = &self.client.mango_account().await?;
+        let liqor = self.client.mango_account().await?;
         liq_ixs.append(
             self.client
-                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .health_check_instruction(
+                    &liqor,
+                    self.config.min_health_ratio,
+                    vec![asset_token_index, liab_token_index],
+                    vec![asset_token_index, liab_token_index],
+                    vec![],
+                    MaintRatio,
+                )
                 .await?,
         );
 

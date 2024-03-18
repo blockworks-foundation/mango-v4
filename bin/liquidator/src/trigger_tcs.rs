@@ -1234,11 +1234,24 @@ impl Context {
             .instructions
             .append(&mut trigger_ixs.instructions);
 
+        let (_, tcs) = liqee.token_conditional_swap_by_id(pending.tcs_id)?;
+        let affected_tokens = allowed_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
         let liqor = &self.mango_client.mango_account().await?;
         tx_builder.instructions.append(
             &mut self
                 .mango_client
-                .health_check_instruction(liqor, self.config.min_health_ratio, MaintRatio)
+                .health_check_instruction(
+                    liqor,
+                    self.config.min_health_ratio,
+                    affected_tokens,
+                    vec![tcs.buy_token_index, tcs.sell_token_index],
+                    vec![],
+                    MaintRatio,
+                )
                 .await?
                 .instructions,
         );

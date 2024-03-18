@@ -4,7 +4,10 @@ use crate::SharedState;
 use anchor_lang::prelude::Pubkey;
 use async_channel::{Receiver, Sender};
 use mango_v4_client::AsyncChannelSendUnlessFull;
-use std::{cmp::max, sync::{Arc, RwLock}};
+use std::{
+    cmp::max,
+    sync::{Arc, RwLock},
+};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, trace};
 
@@ -83,7 +86,10 @@ async fn worker_loop(
     only_liquidation: bool,
 ) {
     loop {
-        debug!("Worker #{} waiting for task (only_liq={})", id, only_liquidation);
+        debug!(
+            "Worker #{} waiting for task (only_liq={})",
+            id, only_liquidation
+        );
 
         let _ = if only_liquidation {
             liq_receiver.recv().await.expect("receive failed")
