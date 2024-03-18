@@ -3970,7 +3970,6 @@ export class MangoClient {
     );
     const lowerLimit = 0;
     const upperLimit = thresholdPriceNativeNative;
-    console.log(thresholdPriceNativeNative);
 
     return await this.tokenConditionalSwapCreatePremiumAuctionIx(
       group,
@@ -5018,7 +5017,6 @@ export class MangoClient {
     opts?: MangoClientOptions,
   ): MangoClient {
     const idl = IDL;
-    console.log(opts)
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, programId, provider),
