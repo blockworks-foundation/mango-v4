@@ -58,7 +58,7 @@ pub struct TokenPosition {
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
-    16 + 2 + 2 + 4 + 16 + 8 + 8 + 8 + 120
+    16 + 2 + 2 + 1 + 3 + 16 + 8 + 8 + 8 + 120
 );
 const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
