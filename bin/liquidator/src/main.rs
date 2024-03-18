@@ -254,9 +254,9 @@ async fn main() -> anyhow::Result<()> {
         jupiter_version: cli.jupiter_version.into(),
         skip_tokens: cli.rebalance_skip_tokens.clone().unwrap_or(Vec::new()),
         alternate_jupiter_route_tokens: cli
-                    .rebalance_alternate_jupiter_route_tokens
-                    .clone()
-                    .unwrap_or_default(),
+            .rebalance_alternate_jupiter_route_tokens
+            .clone()
+            .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
     };
     rebalance_config.validate(&mango_client.context);

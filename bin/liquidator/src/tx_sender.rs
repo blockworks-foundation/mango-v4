@@ -4,7 +4,7 @@ use crate::SharedState;
 use anchor_lang::prelude::Pubkey;
 use async_channel::{Receiver, Sender};
 use mango_v4_client::AsyncChannelSendUnlessFull;
-use std::sync::{Arc, RwLock};
+use std::{cmp::max, sync::{Arc, RwLock}};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, trace};
 
@@ -83,7 +83,7 @@ async fn worker_loop(
     only_liquidation: bool,
 ) {
     loop {
-        debug!("Worker #{} waiting for task", id);
+        debug!("Worker #{} waiting for task (only_liq={})", id, only_liquidation);
 
         let _ = if only_liquidation {
             liq_receiver.recv().await.expect("receive failed")
@@ -163,7 +163,10 @@ fn worker_pull_task(
         return Ok(WorkerTask::Liquidation(liq_candidate));
     }
 
+    let tcs_todo = writer.interesting_tcs.len() - writer.processing_tcs.len();
+
     if only_liquidation {
+        debug!("worker #{} giving up TCS (todo count: {})", id, tcs_todo);
         return Ok(WorkerTask::GiveUpTcs);
     }
 
@@ -174,8 +177,7 @@ fn worker_pull_task(
     }
 
     // next tcs task to execute
-    let tcs_todo = writer.interesting_tcs.len() - writer.processing_tcs.len();
-    let max_tcs_batch_size = tcs_todo / tcs_capable_workers;
+    let max_tcs_batch_size = max(1, tcs_todo / tcs_capable_workers + 1);
     let tcs_candidates: Vec<(Pubkey, u64, u64)> = writer
         .interesting_tcs
         .iter()
@@ -194,6 +196,7 @@ fn worker_pull_task(
         writer.processing_tcs.insert(tcs_candidate.clone());
     }
 
+    debug!("worker #{} got nothing", id);
     Ok(WorkerTask::Tcs(tcs_candidates))
 }
 
