@@ -230,7 +230,7 @@ pub(crate) fn liquidation_action(
     let mut asset_transfer_from_liqee = asset_transfer_base * fee_factor_total;
 
     // Converting max asset to liab and back to asset can have introduced rounding errors, ensure
-    // the transfered amounts are guaranteed < max
+    // the transfered amounts are guaranteed <= max
     // The intuition here is:
     //   asset_to_liab = asset_oracle_price / liab_oracle_price / fee_factor_total
     //   min(max_asset_transfer * asset_to_liab, max_liab_transfer) / asset_to_liab <= max_asset_transfer

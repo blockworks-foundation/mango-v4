@@ -62,7 +62,7 @@ pub fn emit_token_balance_log(mango_account: Pubkey, bank: &Bank, token_position
         indexed_position: token_position.indexed_position.to_bits(),
         deposit_index: bank.deposit_index.to_bits(),
         borrow_index: bank.borrow_index.to_bits(),
-        native_position: token_position.unlendable_deposits,
+        unlendable_deposits: token_position.unlendable_deposits,
         allow_lending: token_position.allow_lending(),
     });
 }
@@ -85,7 +85,7 @@ pub struct TokenBalanceLogV2 {
     pub indexed_position: i128, // on client convert i128 to I80F48 easily by passing in the BN to I80F48 ctor
     pub deposit_index: i128,    // I80F48
     pub borrow_index: i128,     // I80F48
-    pub native_position: u64,
+    pub unlendable_deposits: u64,
     pub allow_lending: bool,
 }
 
