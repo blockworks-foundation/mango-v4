@@ -748,7 +748,8 @@ impl Bank {
         } else {
             assert!(position.indexed_position.is_zero());
 
-            // TODO: might there be trouble by rounding up here?
+            // Note: this rounds up native_amount, withdrawing a fraction of a token more
+            // than desired and dusting the difference!
             let withdraw_amount = native_amount.ceil();
             self.dust += withdraw_amount - native_amount;
 
