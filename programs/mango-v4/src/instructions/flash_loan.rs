@@ -258,7 +258,7 @@ struct TokenVaultChange {
     bank_index: usize,
     raw_token_index: usize,
     amount: I80F48,
-    vault_balance: u64,
+    after_vault_balance: u64,
 }
 
 pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
@@ -361,12 +361,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         max_swap_fee_rate = max_swap_fee_rate.max(bank.flash_loan_swap_fee_rate);
 
+        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
+
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
             bank_index: i,
             raw_token_index,
             amount: change,
-            vault_balance: token_account.amount,
+            after_vault_balance: vault.amount,
         });
     }
 
@@ -494,7 +496,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             // Verify that the no-lending amount on the vault remains. If the acting account
             // itself had a no-lending position, the unlendable_deposits has already been reduced.
             require_gte!(
-                change.vault_balance,
+                change.after_vault_balance,
                 bank.unlendable_deposits,
                 MangoError::InsufficentBankVaultFunds
             );
