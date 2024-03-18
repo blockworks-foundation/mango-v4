@@ -573,10 +573,18 @@ impl MangoClient {
         &self,
         account: &MangoAccountValue,
         min_health_value: f64,
+        affected_tokens: Vec<TokenIndex>,
+        writable_banks: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
         check_kind: HealthCheckKind,
     ) -> anyhow::Result<PreparedInstructions> {
         let (health_check_metas, health_cu) = self
-            .derive_health_check_remaining_account_metas(account, vec![], vec![], vec![])
+            .derive_health_check_remaining_account_metas(
+                account,
+                affected_tokens,
+                writable_banks,
+                affected_perp_markets,
+            )
             .await?;
 
         let ixs = PreparedInstructions::from_vec(
