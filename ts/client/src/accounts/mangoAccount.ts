@@ -571,7 +571,7 @@ export class MangoAccount {
       .mul(tokenBank.scaledInitLiabWeight(tokenBank.getLiabPrice()));
     let upperBound = existingTokenDeposits;
     if (allowLending) {
-      upperBound.iadd(initHealth.div(lowerBoundBorrowHealthFactor));
+      upperBound = upperBound.add(initHealth.div(lowerBoundBorrowHealthFactor));
     }
 
     // Step 2: Find the maximum withdraw amount
@@ -669,13 +669,9 @@ export class MangoAccount {
     }
 
     // Step 5: also limit by vault funds
-    const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
-    if (!vaultAmount) {
-      throw new Error(
-        `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
-      );
-    }
-    const vaultLimit = I80F48.fromU64(vaultAmount);
+    const vaultLimit = I80F48.fromU64(
+      group.getTokenVaultWithdrawableByBank(tokenBank, allowLending),
+    );
 
     return amount.min(vaultLimit).max(ZERO_I80F48());
   }
@@ -730,9 +726,10 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
-    const sourceAllowsLending = this.getToken(sourceBank.tokenIndex)?.allowLending() ?? true;
+    const sourceAllowsLending =
+      this.getToken(sourceBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = sourceBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(sourceBank.mint),
+      group.getTokenVaultWithdrawableByBank(sourceBank, sourceAllowsLending),
       sourceBalance,
       sourceAllowsLending,
     );
@@ -890,9 +887,10 @@ export class MangoAccount {
     let quoteAmount = nativeAmount.div(quoteBank.price);
 
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
-    const quoteAllowsLending = this.getToken(quoteBank.tokenIndex)?.allowLending() ?? true;
+    const quoteAllowsLending =
+      this.getToken(quoteBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = quoteBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(quoteBank.mint),
+      group.getTokenVaultWithdrawableByBank(quoteBank, quoteAllowsLending),
       quoteBalance,
       quoteAllowsLending,
     );
@@ -947,9 +945,10 @@ export class MangoAccount {
     let baseAmount = nativeAmount.div(baseBank.price);
 
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
-    const baseAllowsLending = this.getToken(baseBank.tokenIndex)?.allowLending() ?? true;
+    const baseAllowsLending =
+      this.getToken(baseBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = baseBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(baseBank.mint),
+      group.getTokenVaultWithdrawableByBank(baseBank, baseAllowsLending),
       baseBalance,
       baseAllowsLending,
     );

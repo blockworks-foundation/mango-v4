@@ -194,9 +194,9 @@ describe('maxWithdraw', () => {
       getFirstBankForPerpSettlement() {
         return bank0;
       },
-      vaultAmountsMap: new Map<string, BN>([
-        [bank0.vault.toBase58(), new BN(vaultAmount)],
-      ]),
+      getTokenVaultWithdrawableByBank(bank: Bank, allowLending: boolean): BN {
+        return new BN(vaultAmount);
+      },
     } as any as Group;
   }
 
@@ -281,10 +281,11 @@ describe('maxWithdraw', () => {
 
   it('pure borrow limited utilization', (done) => {
     const [group, bank0, bank1, account] = setup(1000000);
+    account.tokens[0].disableLending = false;
     const other = deepClone(account);
     deposit(bank0, other, 50);
     deposit(bank1, account, 100);
-    expect(maxWithdraw(group, account)).equal(44); // due to origination fees!
+    expect(maxWithdraw(group, account)).equal(44); // not 45 due to origination fees!
 
     bank0.loanOriginationFeeRate = ZERO_I80F48();
     expect(maxWithdraw(group, account)).equal(45);
@@ -306,8 +307,10 @@ describe('maxWithdraw', () => {
     const [group, bank0, bank1, account] = setup(1000000);
     bank0.scaledInitAssetWeight = function (price) {
       const startScale = I80F48.fromNumber(50);
-      if (this.nativeDeposits().gt(startScale)) {
-        return this.initAssetWeight.div(this.nativeDeposits().div(startScale));
+      if (this.nativeLendableDeposits().gt(startScale)) {
+        return this.initAssetWeight.div(
+          this.nativeLendableDeposits().div(startScale),
+        );
       }
       return this.initAssetWeight;
     };
