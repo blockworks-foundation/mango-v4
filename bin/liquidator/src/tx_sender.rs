@@ -14,6 +14,13 @@ use tracing::{debug, error, trace};
 enum WorkerTask {
     Liquidation(Pubkey),
     Tcs(Vec<(Pubkey, u64, u64)>),
+
+    // Given two workers: #0=LIQ_only, #1=LIQ+TCS
+    // If they are both busy, and the scanning jobs find a new TCS and a new LIQ candidates and enqueue them in the channel
+    // Then if #1 wake up first, it will consume the LIQ candidate (LIQ always have priority)
+    // Then when #0 wake up, it will not find any LIQ candidate, and would not do anything (it won't take a TCS)
+    // But if we do nothing, #1 would never wake up again (no new task in channel)
+    // So we use this `GiveUpTcs` that will be handled by #0 by queuing a new signal the channel and will wake up #1 again
     GiveUpTcs,
 }
 
