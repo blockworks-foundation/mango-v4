@@ -4,10 +4,7 @@ use crate::SharedState;
 use anchor_lang::prelude::Pubkey;
 use async_channel::{Receiver, Sender};
 use mango_v4_client::AsyncChannelSendUnlessFull;
-use std::{
-    cmp::max,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, trace};
 
@@ -41,12 +38,6 @@ pub fn spawn_tx_senders_job(
     }
 
     let reserve_one_worker_for_liquidation = max_parallel_operations > 1 && enable_liquidation;
-    let tcs_capable_worker_count = (max_parallel_operations as usize)
-        - if reserve_one_worker_for_liquidation {
-            1
-        } else {
-            0
-        };
 
     let workers: Vec<JoinHandle<()>> = (0..max_parallel_operations)
         .map(|worker_id| {
@@ -68,7 +59,6 @@ pub fn spawn_tx_senders_job(
                         liquidation,
                         tcs,
                         worker_id,
-                        tcs_capable_worker_count,
                         reserve_one_worker_for_liquidation && worker_id == 0,
                     )
                     .await;
@@ -89,7 +79,6 @@ async fn worker_loop(
     mut liquidation: Box<LiquidationState>,
     mut tcs: Box<TcsState>,
     id: u64,
-    tcs_capable_workers: usize,
     only_liquidation: bool,
 ) {
     loop {
@@ -109,7 +98,7 @@ async fn worker_loop(
 
         // a task must be available to process
         // find it in global shared state, and mark it as processing
-        let task = worker_pull_task(&shared_state, id, tcs_capable_workers, only_liquidation)
+        let task = worker_pull_task(&shared_state, id, only_liquidation)
             .expect("Worker woke up but has nothing to do");
 
         // execute the task
@@ -152,7 +141,6 @@ async fn worker_execute_liquidation(
 fn worker_pull_task(
     shared_state: &Arc<RwLock<SharedState>>,
     id: u64,
-    tcs_capable_workers: usize,
     only_liquidation: bool,
 ) -> anyhow::Result<WorkerTask> {
     let mut writer = shared_state.write().unwrap();
@@ -190,7 +178,7 @@ fn worker_pull_task(
     }
 
     // next tcs task to execute
-    let max_tcs_batch_size = max(1, tcs_todo / tcs_capable_workers + 1);
+    let max_tcs_batch_size = 20;
     let tcs_candidates: Vec<(Pubkey, u64, u64)> = writer
         .interesting_tcs
         .iter()
