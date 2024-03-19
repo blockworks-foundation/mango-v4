@@ -1248,7 +1248,6 @@ impl Context {
                     liqor,
                     self.config.min_health_ratio,
                     affected_tokens,
-                    vec![tcs.buy_token_index, tcs.sell_token_index],
                     vec![],
                     MaintRatio,
                 )

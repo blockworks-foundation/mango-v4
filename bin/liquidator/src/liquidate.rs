@@ -271,7 +271,6 @@ impl<'a> LiquidateHelper<'a> {
                     liqor,
                     self.config.min_health_ratio,
                     vec![],
-                    vec![],
                     vec![*perp_market_index],
                     MaintRatio,
                 )
@@ -525,7 +524,6 @@ impl<'a> LiquidateHelper<'a> {
                 .health_check_instruction(
                     &liqor,
                     self.config.min_health_ratio,
-                    vec![asset_token_index, liab_token_index],
                     vec![asset_token_index, liab_token_index],
                     vec![],
                     MaintRatio,

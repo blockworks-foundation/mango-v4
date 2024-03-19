@@ -574,7 +574,6 @@ impl MangoClient {
         account: &MangoAccountValue,
         min_health_value: f64,
         affected_tokens: Vec<TokenIndex>,
-        writable_banks: Vec<TokenIndex>,
         affected_perp_markets: Vec<PerpMarketIndex>,
         check_kind: HealthCheckKind,
     ) -> anyhow::Result<PreparedInstructions> {
@@ -582,7 +581,7 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas(
                 account,
                 affected_tokens,
-                writable_banks,
+                vec![],
                 affected_perp_markets,
             )
             .await?;
