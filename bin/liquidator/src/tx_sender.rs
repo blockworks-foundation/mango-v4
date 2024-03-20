@@ -19,6 +19,9 @@ enum WorkerTask {
     // But if we do nothing, #1 would never wake up again (no new task in channel)
     // So we use this `GiveUpTcs` that will be handled by #0 by queuing a new signal the channel and will wake up #1 again
     GiveUpTcs,
+
+    // Can happen if TCS is batched (2 TCS enqueued, 2 workers waken, but first one take both tasks)
+    NoWork,
 }
 
 pub fn spawn_tx_senders_job(
@@ -106,6 +109,7 @@ async fn worker_loop(
             WorkerTask::Liquidation(l) => worker_execute_liquidation(&mut liquidation, *l).await,
             WorkerTask::Tcs(t) => worker_execute_tcs(&mut tcs, t.clone()).await,
             WorkerTask::GiveUpTcs => worker_give_up_tcs(&tcs_sender).await,
+            WorkerTask::NoWork => false,
         };
 
         if need_rebalancing {
@@ -197,8 +201,12 @@ fn worker_pull_task(
         writer.processing_tcs.insert(tcs_candidate.clone());
     }
 
-    debug!("worker #{} got nothing", id);
-    Ok(WorkerTask::Tcs(tcs_candidates))
+    if tcs_candidates.len() > 0 {
+        Ok(WorkerTask::Tcs(tcs_candidates))
+    } else {
+        debug!("worker #{} got nothing", id);
+        Ok(WorkerTask::NoWork)
+    }
 }
 
 fn worker_finalize_task(
@@ -228,5 +236,6 @@ fn worker_finalize_task(
             }
         }
         WorkerTask::GiveUpTcs => {}
+        WorkerTask::NoWork => {}
     }
 }
