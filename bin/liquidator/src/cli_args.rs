@@ -250,4 +250,8 @@ pub struct Cli {
     /// override the sanctum http request timeout
     #[clap(long, env, default_value = "30")]
     pub(crate) sanctum_timeout_secs: u64,
+
+    /// max number of liquidation/tcs to do concurrently
+    #[clap(long, env, default_value = "5")]
+    pub(crate) max_parallel_operations: u64,
 }

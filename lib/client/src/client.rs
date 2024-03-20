@@ -2170,7 +2170,10 @@ impl MangoClient {
     }
 
     pub fn jupiter_v6(&self) -> swap::jupiter_v6::JupiterV6 {
-        swap::jupiter_v6::JupiterV6 { mango_client: self }
+        swap::jupiter_v6::JupiterV6 {
+            mango_client: self,
+            timeout_duration: self.client.config.jupiter_timeout,
+        }
     }
 
     pub fn sanctum(&self) -> swap::sanctum::Sanctum {
