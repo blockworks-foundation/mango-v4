@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -15,6 +16,7 @@ use mango_v4::{
 use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
+use mango_v4::accounts_ix::HealthCheckKind::MaintRatio;
 use solana_sdk::signature::Signature;
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -55,6 +57,7 @@ pub enum Mode {
 
 #[derive(Clone)]
 pub struct Config {
+    pub refresh_timeout: Duration,
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
     pub compute_limit_for_trigger: u32,
@@ -1000,7 +1003,7 @@ impl Context {
     pub async fn execute_tcs(
         &self,
         tcs: &mut [(Pubkey, u64, u64)],
-        error_tracking: &mut ErrorTracking<Pubkey, LiqErrorType>,
+        error_tracking: Arc<RwLock<ErrorTracking<Pubkey, LiqErrorType>>>,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
 
@@ -1049,7 +1052,7 @@ impl Context {
                     }
                     Err(e) => {
                         trace!(%result.pubkey, "preparation error {:?}", e);
-                        error_tracking.record(
+                        error_tracking.write().unwrap().record(
                             LiqErrorType::TcsExecution,
                             &result.pubkey,
                             e.to_string(),
@@ -1093,7 +1096,7 @@ impl Context {
             };
 
             // start the new one
-            if let Some(job) = self.prepare_job(&pubkey, tcs_id, volume, error_tracking) {
+            if let Some(job) = self.prepare_job(&pubkey, tcs_id, volume, error_tracking.clone()) {
                 pending_volume += volume;
                 pending.push(job);
             }
@@ -1130,7 +1133,11 @@ impl Context {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
                     trace!(%pubkey, "execution error {:?}", err);
-                    error_tracking.record(LiqErrorType::TcsExecution, &pubkey, err.to_string());
+                    error_tracking.write().unwrap().record(
+                        LiqErrorType::TcsExecution,
+                        &pubkey,
+                        err.to_string(),
+                    );
                     None
                 }
             });
@@ -1145,12 +1152,14 @@ impl Context {
         pubkey: &Pubkey,
         tcs_id: u64,
         volume: u64,
-        error_tracking: &ErrorTracking<Pubkey, LiqErrorType>,
+        error_tracking: Arc<RwLock<ErrorTracking<Pubkey, LiqErrorType>>>,
     ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) =
-            error_tracking.had_too_many_errors(LiqErrorType::TcsExecution, pubkey, Instant::now())
-        {
+        if let Some(error_entry) = error_tracking.read().unwrap().had_too_many_errors(
+            LiqErrorType::TcsExecution,
+            pubkey,
+            Instant::now(),
+        ) {
             trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count
@@ -1224,6 +1233,27 @@ impl Context {
         tx_builder
             .instructions
             .append(&mut trigger_ixs.instructions);
+
+        let (_, tcs) = liqee.token_conditional_swap_by_id(pending.tcs_id)?;
+        let affected_tokens = allowed_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
+        let liqor = &self.mango_client.mango_account().await?;
+        tx_builder.instructions.append(
+            &mut self
+                .mango_client
+                .health_check_instruction(
+                    liqor,
+                    self.config.min_health_ratio,
+                    affected_tokens,
+                    vec![],
+                    MaintRatio,
+                )
+                .await?
+                .instructions,
+        );
 
         let txsig = tx_builder
             .send_and_confirm(&self.mango_client.client)
