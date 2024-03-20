@@ -9,9 +9,9 @@ use crate::accounts_ix::*;
 use crate::accounts_zerocopy::AccountInfoRef;
 use crate::error::*;
 use crate::health::*;
+use crate::logs::emit_token_balance_log;
 use crate::logs::{
     emit_perp_balances, emit_stack, PerpLiqBankruptcyLog, PerpLiqNegativePnlOrBankruptcyLog,
-    TokenBalanceLog,
 };
 use crate::state::*;
 
@@ -138,37 +138,20 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
     if settlement > 0 {
         let settle_bank = ctx.accounts.settle_bank.load()?;
         let liqor_token_position = liqor.token_position(settle_token_index)?;
-        emit_stack(TokenBalanceLog {
-            mango_group,
-            mango_account: ctx.accounts.liqor.key(),
-            token_index: settle_token_index,
-            indexed_position: liqor_token_position.indexed_position.to_bits(),
-            deposit_index: settle_bank.deposit_index.to_bits(),
-            borrow_index: settle_bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(ctx.accounts.liqor.key(), &settle_bank, liqor_token_position);
 
         let liqee_token_position = liqee.token_position(settle_token_index)?;
-        emit_stack(TokenBalanceLog {
-            mango_group,
-            mango_account: ctx.accounts.liqee.key(),
-            token_index: settle_token_index,
-            indexed_position: liqee_token_position.indexed_position.to_bits(),
-            deposit_index: settle_bank.deposit_index.to_bits(),
-            borrow_index: settle_bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(ctx.accounts.liqee.key(), &settle_bank, liqee_token_position);
     }
 
     if insurance_transfer > 0 {
         let insurance_bank = ctx.accounts.insurance_bank.load()?;
         let liqor_token_position = liqor.token_position(insurance_bank.token_index)?;
-        emit_stack(TokenBalanceLog {
-            mango_group,
-            mango_account: ctx.accounts.liqor.key(),
-            token_index: insurance_bank.token_index,
-            indexed_position: liqor_token_position.indexed_position.to_bits(),
-            deposit_index: insurance_bank.deposit_index.to_bits(),
-            borrow_index: insurance_bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(
+            ctx.accounts.liqor.key(),
+            &insurance_bank,
+            liqor_token_position,
+        );
     }
 
     let liqee_perp_position = liqee.perp_position(perp_market_index)?;

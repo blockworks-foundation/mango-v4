@@ -165,7 +165,7 @@ async fn test_liq_tokens_force_cancel() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(85_000); // LiqTokenWithToken needs 79k
+    test_builder.test().set_compute_max_units(85_000); // LiqTokenWithToken needs 84k
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -346,7 +346,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
-    let res = send_tx(
+    send_tx_expect_error!(
         solana,
         TokenLiqWithTokenInstruction {
             liqee: account,
@@ -358,12 +358,7 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
             liab_bank_index: 0,
             max_liab_transfer: I80F48::from_num(10000.0),
         },
-    )
-    .await;
-    assert_mango_error(
-        &res,
-        MangoError::TokenAssetLiquidationDisabled.into(),
-        "liquidation disabled".to_string(),
+        MangoError::TokenAssetLiquidationDisabled
     );
     send_tx(
         solana,

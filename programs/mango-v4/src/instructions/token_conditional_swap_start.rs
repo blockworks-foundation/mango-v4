@@ -5,7 +5,8 @@ use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
-use crate::logs::{emit_stack, TokenBalanceLog, TokenConditionalSwapStartLog};
+use crate::logs::emit_token_balance_log;
+use crate::logs::{emit_stack, TokenConditionalSwapStartLog};
 use crate::state::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -98,22 +99,8 @@ pub fn token_conditional_swap_start(
     health_cache
         .adjust_token_balance(sell_bank, liqee_sell_post_balance - liqee_sell_pre_balance)?;
 
-    emit_stack(TokenBalanceLog {
-        mango_group: *group_pk,
-        mango_account: liqee_key,
-        token_index: sell_token_index,
-        indexed_position: liqee_sell_token.indexed_position.to_bits(),
-        deposit_index: sell_bank.deposit_index.to_bits(),
-        borrow_index: sell_bank.borrow_index.to_bits(),
-    });
-    emit_stack(TokenBalanceLog {
-        mango_group: *group_pk,
-        mango_account: liqor_key,
-        token_index: sell_token_index,
-        indexed_position: liqor_sell_token.indexed_position.to_bits(),
-        deposit_index: sell_bank.deposit_index.to_bits(),
-        borrow_index: sell_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(liqee_key, sell_bank, liqee_sell_token);
+    emit_token_balance_log(liqor_key, sell_bank, liqor_sell_token);
     emit_stack(TokenConditionalSwapStartLog {
         mango_group: *group_pk,
         mango_account: liqee_key,

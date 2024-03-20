@@ -3,11 +3,12 @@ use fixed::types::I80F48;
 
 use crate::accounts_zerocopy::*;
 use crate::error::MangoError;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 
 use crate::accounts_ix::*;
 
-use crate::logs::{emit_stack, AccountBuybackFeesWithMngoLog, TokenBalanceLog};
+use crate::logs::{emit_stack, AccountBuybackFeesWithMngoLog};
 
 pub fn account_buyback_fees_with_mngo(
     ctx: Context<AccountBuybackFeesWithMngo>,
@@ -107,14 +108,11 @@ pub fn account_buyback_fees_with_mngo(
     );
     let in_use =
         mngo_bank.withdraw_without_fee(account_mngo_token_position, max_buyback_mngo, now_ts)?;
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index: mngo_bank.token_index,
-        indexed_position: account_mngo_token_position.indexed_position.to_bits(),
-        deposit_index: mngo_bank.deposit_index.to_bits(),
-        borrow_index: mngo_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(
+        ctx.accounts.account.key(),
+        &mngo_bank,
+        account_mngo_token_position,
+    );
     if !in_use {
         account.deactivate_token_position_and_log(
             account_mngo_raw_token_index,
@@ -139,14 +137,11 @@ pub fn account_buyback_fees_with_mngo(
         );
     }
     let in_use = fees_bank.deposit(account_fees_token_position, max_buyback_fees, now_ts)?;
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index: fees_bank.token_index,
-        indexed_position: account_fees_token_position.indexed_position.to_bits(),
-        deposit_index: fees_bank.deposit_index.to_bits(),
-        borrow_index: fees_bank.borrow_index.to_bits(),
-    });
+    emit_token_balance_log(
+        ctx.accounts.account.key(),
+        &fees_bank,
+        account_fees_token_position,
+    );
     if !in_use {
         account.deactivate_token_position_and_log(
             account_fees_raw_token_index,

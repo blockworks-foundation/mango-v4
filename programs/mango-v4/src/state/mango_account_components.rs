@@ -15,22 +15,27 @@ pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 #[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct TokenPosition {
-    // TODO: Why did we have deposits and borrows as two different values
-    //       if only one of them was allowed to be != 0 at a time?
-    // todo: maybe we want to split collateral and lending?
-    // todo: see https://github.com/blockworks-foundation/mango-v4/issues/1
-    // todo: how does ftx do this?
-    /// The deposit_index (if positive) or borrow_index (if negative) scaled position
+    /// The token position, scaled with the deposit_index (if positive) or borrow_index (if negative)
+    /// to get the lendable/borrowed native token amount
     pub indexed_position: I80F48,
 
-    /// index into Group.tokens
+    /// index the token is registered with, same as in Bank and MintInfo
     pub token_index: TokenIndex,
 
     /// incremented when a market requires this position to stay alive
     pub in_use_count: u16,
 
+    /// set to 1 when these deposits may not be lent out
+    ///
+    /// This has consequences:
+    /// - only deposits possible, no borrows (also implying no perps with that settle token)
+    /// - not accounted for in Bank.indexed_deposits,
+    /// - instead tracked in Bank.unlendable_deposits (to ensure the vault always has them)
+    /// - indexed_position stays 0, instead use unlendable_deposits a straight native token amount
+    pub disable_lending: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 4],
+    pub padding: [u8; 3],
 
     // bookkeeping variable for onchain interest calculation
     // either deposit_index or borrow_index at last indexed_position change
@@ -42,13 +47,18 @@ pub struct TokenPosition {
     // Cumulative borrow interest in token native units
     pub cumulative_borrow_interest: f64,
 
+    /// deposited unlendable native token amount
+    ///
+    /// When this is set, indexed_position is always zero
+    pub unlendable_deposits: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 128],
+    pub reserved: [u8; 120],
 }
 
 const_assert_eq!(
     size_of::<TokenPosition>(),
-    16 + 2 + 2 + 4 + 16 + 8 + 8 + 128
+    16 + 2 + 2 + 1 + 3 + 16 + 8 + 8 + 8 + 120
 );
 const_assert_eq!(size_of::<TokenPosition>(), 184);
 const_assert_eq!(size_of::<TokenPosition>() % 8, 0);
@@ -59,11 +69,13 @@ impl Default for TokenPosition {
             indexed_position: I80F48::ZERO,
             token_index: TokenIndex::MAX,
             in_use_count: 0,
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposits: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         }
     }
 }
@@ -78,26 +90,30 @@ impl TokenPosition {
     }
 
     pub fn native(&self, bank: &Bank) -> I80F48 {
-        if self.indexed_position.is_positive() {
-            self.indexed_position * bank.deposit_index
+        if self.allow_lending() {
+            if self.indexed_position.is_positive() {
+                self.indexed_position * bank.deposit_index
+            } else {
+                self.indexed_position * bank.borrow_index
+            }
         } else {
-            self.indexed_position * bank.borrow_index
+            I80F48::from(self.unlendable_deposits)
         }
     }
 
     #[cfg(feature = "client")]
     pub fn ui(&self, bank: &Bank) -> I80F48 {
-        if self.indexed_position.is_positive() {
-            (self.indexed_position * bank.deposit_index)
-                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
-        } else {
-            (self.indexed_position * bank.borrow_index)
-                / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
-        }
+        let native = self.native(bank);
+        native / I80F48::from_num(10u64.pow(bank.mint_decimals as u32))
     }
 
     pub fn is_in_use(&self) -> bool {
         self.in_use_count > 0
+    }
+
+    // Positions that disable lending never auto-close
+    pub fn can_auto_close(&self) -> bool {
+        !self.is_in_use() && self.allow_lending()
     }
 
     pub fn increment_in_use(&mut self) {
@@ -106,6 +122,14 @@ impl TokenPosition {
 
     pub fn decrement_in_use(&mut self) {
         self.in_use_count = self.in_use_count.saturating_sub(1);
+    }
+
+    pub fn allow_lending(&self) -> bool {
+        self.disable_lending == 0
+    }
+
+    pub fn has_deposits(&self) -> bool {
+        self.indexed_position > 0 || self.unlendable_deposits > 0
     }
 }
 

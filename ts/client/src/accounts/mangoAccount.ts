@@ -565,12 +565,14 @@ export class MangoAccount {
     // To do that, we first get an upper bound that the search can start with.
 
     const existingTokenDeposits = tp ? tp.deposits(tokenBank) : ZERO_I80F48();
+    const allowLending = tp ? tp.allowLending() : true;
     const lowerBoundBorrowHealthFactor = tokenBank
       .getLiabPrice()
       .mul(tokenBank.scaledInitLiabWeight(tokenBank.getLiabPrice()));
-    const upperBound = existingTokenDeposits.add(
-      initHealth.div(lowerBoundBorrowHealthFactor),
-    );
+    let upperBound = existingTokenDeposits;
+    if (allowLending) {
+      upperBound = upperBound.add(initHealth.div(lowerBoundBorrowHealthFactor));
+    }
 
     // Step 2: Find the maximum withdraw amount
 
@@ -591,21 +593,34 @@ export class MangoAccount {
         .sub(borrowCost);
 
       // Update the bank and the scaled weights
-      mutTokenBank.indexedDeposits = tokenBank.indexedDeposits.sub(
-        withdrawOfDepositsAmount.div(tokenBank.depositIndex),
-      );
-      mutTokenBank.indexedBorrows = tokenBank.indexedBorrows.add(
-        borrowCost.div(tokenBank.borrowIndex),
-      );
-      if (mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeDeposits())) {
-        return invalidHealthValue;
-      }
-      if (borrowAmount.isPos()) {
+      if (allowLending) {
+        mutTokenBank.indexedDeposits = tokenBank.indexedDeposits.sub(
+          withdrawOfDepositsAmount.div(tokenBank.depositIndex),
+        );
+        mutTokenBank.indexedBorrows = tokenBank.indexedBorrows.add(
+          borrowCost.div(tokenBank.borrowIndex),
+        );
         if (
-          mutTokenBank
-            .nativeBorrows()
-            .gt(mutTokenBank.nativeDeposits().mul(maxBorrowUtilization))
+          mutTokenBank.nativeBorrows().gt(mutTokenBank.nativeLendableDeposits())
         ) {
+          return invalidHealthValue;
+        }
+        if (borrowAmount.isPos()) {
+          if (
+            mutTokenBank
+              .nativeBorrows()
+              .gt(
+                mutTokenBank.nativeLendableDeposits().mul(maxBorrowUtilization),
+              )
+          ) {
+            return invalidHealthValue;
+          }
+        }
+      } else {
+        mutTokenBank.unlendableDeposts = tokenBank.unlendableDeposts.sub(
+          withdrawOfDepositsAmount.ceil().toBN(),
+        );
+        if (borrowAmount.isPos()) {
           return invalidHealthValue;
         }
       }
@@ -654,13 +669,9 @@ export class MangoAccount {
     }
 
     // Step 5: also limit by vault funds
-    const vaultAmount = group.vaultAmountsMap.get(tokenBank.vault.toBase58());
-    if (!vaultAmount) {
-      throw new Error(
-        `No vault amount found for ${tokenBank.name} vault ${tokenBank.vault}!`,
-      );
-    }
-    const vaultLimit = I80F48.fromU64(vaultAmount);
+    const vaultLimit = I80F48.fromU64(
+      group.getTokenVaultWithdrawableByBank(tokenBank, allowLending),
+    );
 
     return amount.min(vaultLimit).max(ZERO_I80F48());
   }
@@ -715,9 +726,12 @@ export class MangoAccount {
       ),
     );
     const sourceBalance = this.getEffectiveTokenBalance(group, sourceBank);
+    const sourceAllowsLending =
+      this.getToken(sourceBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = sourceBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(sourceBank.mint),
+      group.getTokenVaultWithdrawableByBank(sourceBank, sourceAllowsLending),
       sourceBalance,
+      sourceAllowsLending,
     );
 
     maxSource = maxSource.min(maxWithdrawNative);
@@ -873,9 +887,12 @@ export class MangoAccount {
     let quoteAmount = nativeAmount.div(quoteBank.price);
 
     const quoteBalance = this.getEffectiveTokenBalance(group, quoteBank);
+    const quoteAllowsLending =
+      this.getToken(quoteBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = quoteBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(quoteBank.mint),
+      group.getTokenVaultWithdrawableByBank(quoteBank, quoteAllowsLending),
       quoteBalance,
+      quoteAllowsLending,
     );
     quoteAmount = quoteAmount.min(maxWithdrawNative);
 
@@ -928,9 +945,12 @@ export class MangoAccount {
     let baseAmount = nativeAmount.div(baseBank.price);
 
     const baseBalance = this.getEffectiveTokenBalance(group, baseBank);
+    const baseAllowsLending =
+      this.getToken(baseBank.tokenIndex)?.allowLending() ?? true;
     const maxWithdrawNative = baseBank.getMaxWithdraw(
-      group.getTokenVaultBalanceByMint(baseBank.mint),
+      group.getTokenVaultWithdrawableByBank(baseBank, baseAllowsLending),
       baseBalance,
+      baseAllowsLending,
     );
     baseAmount = baseAmount.min(maxWithdrawNative);
 
@@ -1270,6 +1290,8 @@ export class TokenPosition {
       I80F48.from(dto.previousIndex),
       dto.cumulativeDepositInterest,
       dto.cumulativeBorrowInterest,
+      dto.disableLending != 0,
+      dto.unlendableDeposits,
     );
   }
 
@@ -1280,10 +1302,16 @@ export class TokenPosition {
     public previousIndex: I80F48,
     public cumulativeDepositInterest: number,
     public cumulativeBorrowInterest: number,
+    public disableLending: boolean,
+    public unlendableDeposits: BN,
   ) {}
 
   public isActive(): boolean {
     return this.tokenIndex !== TokenPosition.TokenIndexUnset;
+  }
+
+  public allowLending(): boolean {
+    return !this.disableLending;
   }
 
   /**
@@ -1292,10 +1320,14 @@ export class TokenPosition {
    * @returns native balance
    */
   public balance(bank: Bank): I80F48 {
-    if (this.indexedPosition.isPos()) {
-      return bank.depositIndex.mul(this.indexedPosition);
+    if (this.allowLending()) {
+      if (this.indexedPosition.isPos()) {
+        return bank.depositIndex.mul(this.indexedPosition);
+      } else {
+        return bank.borrowIndex.mul(this.indexedPosition);
+      }
     } else {
-      return bank.borrowIndex.mul(this.indexedPosition);
+      return I80F48.fromU64(this.unlendableDeposits);
     }
   }
 
@@ -1317,10 +1349,10 @@ export class TokenPosition {
    * @returns native borrows, 0 if position has deposits
    */
   public borrows(bank: Bank): I80F48 {
-    if (this.indexedPosition && this.indexedPosition.gt(ZERO_I80F48())) {
-      return ZERO_I80F48();
+    if (this.indexedPosition && this.indexedPosition.lt(ZERO_I80F48())) {
+      return this.balance(bank).abs();
     }
-    return this.balance(bank).abs();
+    return ZERO_I80F48();
   }
 
   /**
@@ -1381,6 +1413,8 @@ export class TokenPositionDto {
     public previousIndex: I80F48Dto,
     public cumulativeDepositInterest: number,
     public cumulativeBorrowInterest: number,
+    public disableLending: number,
+    public unlendableDeposits: BN,
   ) {}
 }
 

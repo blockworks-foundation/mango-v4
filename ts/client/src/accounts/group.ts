@@ -597,7 +597,7 @@ export class Group {
     const totalAmount = new BN(0);
     for (const bank of banks) {
       const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
-      if (!amount) {
+      if (amount === undefined) {
         throw new Error(
           `Vault balance not found for bank ${bank.name} ${bank.bankNum}!`,
         );
@@ -606,6 +606,28 @@ export class Group {
     }
 
     return totalAmount;
+  }
+
+  /**
+   * If allowLending is true, the withdrawer has a lendable position (and can withdraw less
+   * than the full vault amount)
+   */
+  public getTokenVaultWithdrawableByBank(
+    bank: Bank,
+    allowLending: boolean,
+  ): BN {
+    const amount = this.vaultAmountsMap.get(bank.vault.toBase58());
+    if (amount === undefined) {
+      throw new Error(
+        `Vault balance not found for bank ${bank.name} ${bank.bankNum}!`,
+      );
+    }
+
+    if (allowLending) {
+      return amount.sub(bank.unlendableDeposts);
+    } else {
+      return amount;
+    }
   }
 
   /**

@@ -232,7 +232,13 @@ pub struct Bank {
     pub collateral_fee_per_day: f32,
 
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1900],
+    pub padding2: [u8; 4],
+
+    /// The sum of native tokens in unlendable token positions
+    pub unlendable_deposits: u64,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 1888],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -271,7 +277,9 @@ const_assert_eq!(
         + 8
         + 16 * 4
         + 4
-        + 1900
+        + 4
+        + 8
+        + 1888
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -322,6 +330,7 @@ impl Bank {
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: 0,
             potential_serum_tokens: 0,
+            unlendable_deposits: 0,
             bump,
             bank_num,
 
@@ -382,7 +391,8 @@ impl Bank {
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
             collateral_fee_per_day: existing_bank.collateral_fee_per_day,
-            reserved: [0; 1900],
+            padding2: [0; 4],
+            reserved: [0; 1888],
         }
     }
 
@@ -461,13 +471,23 @@ impl Bank {
     }
 
     #[inline(always)]
-    pub fn native_borrows(&self) -> I80F48 {
+    pub fn borrows(&self) -> I80F48 {
         self.borrow_index * self.indexed_borrows
     }
 
     #[inline(always)]
-    pub fn native_deposits(&self) -> I80F48 {
+    pub fn lendable_deposits(&self) -> I80F48 {
         self.deposit_index * self.indexed_deposits
+    }
+
+    #[inline(always)]
+    pub fn unlendable_deposits(&self) -> u64 {
+        self.unlendable_deposits
+    }
+
+    #[inline(always)]
+    pub fn deposits(&self) -> I80F48 {
+        self.lendable_deposits() + I80F48::from(self.unlendable_deposits())
     }
 
     pub fn maint_weights(&self, now_ts: u64) -> (I80F48, I80F48) {
@@ -505,14 +525,14 @@ impl Bank {
     /// Prevent borrowing away the full bank vault.
     /// Keep some in reserve to satisfy non-borrow withdraws.
     fn enforce_max_utilization(&self, max_utilization: I80F48) -> Result<()> {
-        let bank_native_deposits = self.native_deposits();
-        let bank_native_borrows = self.native_borrows();
+        let bank_lendable_deposits = self.lendable_deposits();
+        let bank_borrows = self.borrows();
 
-        if bank_native_borrows > max_utilization * bank_native_deposits {
+        if bank_borrows > max_utilization * bank_lendable_deposits {
             return err!(MangoError::BankBorrowLimitReached).with_context(|| {
                 format!(
                     "deposits {}, borrows {}, max utilization {}",
-                    bank_native_deposits, bank_native_borrows, max_utilization,
+                    bank_lendable_deposits, bank_borrows, max_utilization,
                 )
             });
         };
@@ -534,7 +554,7 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<bool> {
-        self.deposit_internal_wrapper(position, native_amount, !position.is_in_use(), now_ts)
+        self.deposit_internal_wrapper(position, native_amount, position.can_auto_close(), now_ts)
     }
 
     /// Like `deposit()`, but allows dusting of in-use accounts.
@@ -547,7 +567,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         self.deposit_internal_wrapper(position, native_amount, true, now_ts)
-            .map(|not_dusted| not_dusted || position.is_in_use())
+            .map(|not_dusted| not_dusted || !position.can_auto_close())
     }
 
     pub fn deposit_internal_wrapper(
@@ -557,10 +577,23 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<bool> {
-        let opening_indexed_position = position.indexed_position;
-        let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
-        self.update_cumulative_interest(position, opening_indexed_position);
-        Ok(result)
+        if position.allow_lending() {
+            assert!(position.unlendable_deposits == 0);
+            let opening_indexed_position = position.indexed_position;
+            let result = self.deposit_internal(position, native_amount, allow_dusting, now_ts)?;
+            self.update_cumulative_interest(position, opening_indexed_position);
+            Ok(result)
+        } else {
+            assert!(position.indexed_position.is_zero());
+            let deposit_amount = native_amount.floor();
+            self.dust += native_amount - deposit_amount;
+
+            let deposit_amount_u64 = deposit_amount.to_num::<u64>();
+            position.unlendable_deposits += deposit_amount_u64;
+            self.unlendable_deposits += deposit_amount_u64;
+
+            Ok(true)
+        }
     }
 
     /// Internal function to deposit funds
@@ -572,6 +605,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         require_gte!(native_amount, 0);
+        assert!(position.allow_lending());
 
         let native_position = position.native(self);
 
@@ -646,7 +680,7 @@ impl Bank {
                 position,
                 native_amount,
                 false,
-                !position.is_in_use(),
+                position.can_auto_close(),
                 now_ts,
             )?
             .position_is_active;
@@ -664,7 +698,7 @@ impl Bank {
         now_ts: u64,
     ) -> Result<bool> {
         self.withdraw_internal_wrapper(position, native_amount, false, true, now_ts)
-            .map(|withdraw_result| withdraw_result.position_is_active || position.is_in_use())
+            .map(|withdraw_result| withdraw_result.position_is_active || !position.can_auto_close())
     }
 
     /// Withdraws `native_amount` while applying the loan origination fee if a borrow is created.
@@ -681,7 +715,13 @@ impl Bank {
         native_amount: I80F48,
         now_ts: u64,
     ) -> Result<WithdrawResult> {
-        self.withdraw_internal_wrapper(position, native_amount, true, !position.is_in_use(), now_ts)
+        self.withdraw_internal_wrapper(
+            position,
+            native_amount,
+            true,
+            position.can_auto_close(),
+            now_ts,
+        )
     }
 
     /// Internal function to withdraw funds
@@ -693,16 +733,40 @@ impl Bank {
         allow_dusting: bool,
         now_ts: u64,
     ) -> Result<WithdrawResult> {
-        let opening_indexed_position = position.indexed_position;
-        let res = self.withdraw_internal(
-            position,
-            native_amount,
-            with_loan_origination_fee,
-            allow_dusting,
-            now_ts,
-        );
-        self.update_cumulative_interest(position, opening_indexed_position);
-        res
+        if position.allow_lending() {
+            assert!(position.unlendable_deposits == 0);
+            let opening_indexed_position = position.indexed_position;
+            let res = self.withdraw_internal(
+                position,
+                native_amount,
+                with_loan_origination_fee,
+                allow_dusting,
+                now_ts,
+            );
+            self.update_cumulative_interest(position, opening_indexed_position);
+            res
+        } else {
+            assert!(position.indexed_position.is_zero());
+
+            // Note: this rounds up native_amount, withdrawing a fraction of a token more
+            // than desired and dusting the difference!
+            let withdraw_amount = native_amount.ceil();
+            self.dust += withdraw_amount - native_amount;
+
+            let withdraw_amount_u64 = withdraw_amount.to_num::<u64>();
+            require_gte!(
+                position.unlendable_deposits,
+                withdraw_amount_u64,
+                MangoError::UnlendableTokenPositionCannotBeNegative
+            );
+            position.unlendable_deposits -= withdraw_amount_u64;
+            self.unlendable_deposits -= withdraw_amount_u64;
+            Ok(WithdrawResult {
+                position_is_active: true,
+                loan_amount: I80F48::ZERO,
+                loan_origination_fee: I80F48::ZERO,
+            })
+        }
     }
 
     /// Internal function to withdraw funds
@@ -789,7 +853,7 @@ impl Bank {
                 position,
                 loan_origination_fee,
                 false,
-                !position.is_in_use(),
+                position.can_auto_close(),
                 now_ts,
             )?
             .position_is_active;
@@ -804,7 +868,7 @@ impl Bank {
 
     /// Returns true if the position remains active
     pub fn dust_if_possible(&mut self, position: &mut TokenPosition, now_ts: u64) -> Result<bool> {
-        if position.is_in_use() {
+        if !position.can_auto_close() {
             return Ok(true);
         }
         let native = position.native(self);
@@ -881,7 +945,7 @@ impl Bank {
         let target_is_active = if !target_amount.is_zero() {
             let active = self.deposit(target, target_amount, now_ts)?;
             require!(
-                target.indexed_position <= 0 || !self.are_deposits_reduce_only(),
+                !target.has_deposits() || !self.are_deposits_reduce_only(),
                 MangoError::TokenInReduceOnlyMode
             );
             active
@@ -974,7 +1038,7 @@ impl Bank {
         // Intentionally does not use remaining_deposits_until_limit(): That function
         // returns slightly less than the true limit to make sure depositing that amount
         // will not cause a limit overrun.
-        let deposits = self.native_deposits();
+        let deposits = self.deposits();
         let serum = I80F48::from(self.potential_serum_tokens);
         let total = deposits + serum;
         let remaining = I80F48::from(self.deposit_limit) - total;
@@ -998,6 +1062,10 @@ impl Bank {
         position: &mut TokenPosition,
         opening_indexed_position: I80F48,
     ) {
+        if !position.allow_lending() {
+            return;
+        }
+
         if opening_indexed_position.is_positive() {
             let interest = ((self.deposit_index - position.previous_index)
                 * opening_indexed_position)
@@ -1242,8 +1310,7 @@ impl Bank {
         if self.deposit_weight_scale_start_quote == f64::MAX {
             return self.init_asset_weight;
         }
-        let all_deposits =
-            self.native_deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
+        let all_deposits = self.deposits().to_num::<f64>() + self.potential_serum_tokens as f64;
         let deposits_quote = all_deposits * price.to_num::<f64>();
         if deposits_quote <= self.deposit_weight_scale_start_quote {
             self.init_asset_weight
@@ -1259,7 +1326,7 @@ impl Bank {
         if self.borrow_weight_scale_start_quote == f64::MAX {
             return self.init_liab_weight;
         }
-        let borrows_quote = self.native_borrows().to_num::<f64>() * price.to_num::<f64>();
+        let borrows_quote = self.borrows().to_num::<f64>() * price.to_num::<f64>();
         if borrows_quote <= self.borrow_weight_scale_start_quote {
             self.init_liab_weight
         } else if self.borrow_weight_scale_start_quote == 0.0 {
@@ -1340,11 +1407,13 @@ mod tests {
             indexed_position: I80F48::ZERO,
             token_index: 0,
             in_use_count: u16::from(is_in_use),
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposits: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         };
 
         account.indexed_position = indexed(I80F48::from_num(start), &bank);
@@ -1467,11 +1536,13 @@ mod tests {
             indexed_position: I80F48::ZERO,
             token_index: 0,
             in_use_count: 1,
+            disable_lending: 0,
             cumulative_deposit_interest: 0.0,
             cumulative_borrow_interest: 0.0,
             previous_index: I80F48::ZERO,
+            unlendable_deposits: 0,
             padding: Default::default(),
-            reserved: [0; 128],
+            reserved: [0; 120],
         };
 
         //

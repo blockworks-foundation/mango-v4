@@ -151,6 +151,18 @@ pub enum MangoError {
     InvalidSequenceNumber,
     #[msg("invalid health")]
     InvalidHealth,
+    #[msg("perp settle token position does not support borrows")]
+    PerpSettleTokenPositionMustSupportBorrows,
+    #[msg("the token position is still in use by another position")]
+    TokenPositionIsInUse,
+    #[msg("the token position has a non-zero balance")]
+    TokenPositionBalanceNotZero,
+    #[msg("cannot have a lending and no-lending token position at the same time")]
+    TokenPositionWithDifferentSettingAlreadyExists,
+    #[msg("cannot borrow from unlendable token position")]
+    UnlendableTokenPositionCannotBeNegative,
+    #[msg("token conditional swaps currently don't support unlendable positions")]
+    TokenConditionalSwapUnsupportedUnlendablePosition,
 }
 
 impl MangoError {

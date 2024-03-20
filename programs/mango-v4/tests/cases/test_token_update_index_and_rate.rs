@@ -79,12 +79,12 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let fee_change = 5000.0 * loan_fee_rate * diff_ts / year;
 
     assert_eq_fixed_f64!(
-        bank_after.native_borrows() - bank_before.native_borrows(),
+        bank_after.borrows() - bank_before.borrows(),
         interest_change,
         0.1
     );
     assert_eq_fixed_f64!(
-        bank_after.native_deposits() - bank_before.native_deposits(),
+        bank_after.deposits() - bank_before.deposits(),
         interest_change,
         0.1
     );

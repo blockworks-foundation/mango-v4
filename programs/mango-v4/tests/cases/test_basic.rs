@@ -157,7 +157,7 @@ async fn test_basic() -> Result<(), TransportError> {
             deposit_amount as i64
         );
         let bank_data: Bank = solana.get_account(bank).await;
-        assert!(bank_data.native_deposits() - I80F48::from_num(deposit_amount) < dust_threshold);
+        assert!(bank_data.deposits() - I80F48::from_num(deposit_amount) < dust_threshold);
 
         let account_data: MangoAccount = solana.get_account(account).await;
         // Assumes oracle price of 1
@@ -204,7 +204,7 @@ async fn test_basic() -> Result<(), TransportError> {
         );
         let bank_data: Bank = solana.get_account(bank).await;
         assert!(
-            bank_data.native_deposits() - I80F48::from_num(start_amount - withdraw_amount)
+            bank_data.deposits() - I80F48::from_num(start_amount - withdraw_amount)
                 < dust_threshold
         );
 
@@ -233,7 +233,7 @@ async fn test_basic() -> Result<(), TransportError> {
     send_tx(
         solana,
         TokenWithdrawInstruction {
-            amount: bank_data.native_deposits().to_num(),
+            amount: bank_data.deposits().to_num(),
             allow_borrow: false,
             account,
             owner,
