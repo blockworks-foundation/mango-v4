@@ -2482,6 +2482,59 @@
 <a href="#2482" id="2482">2482</a>
 <a href="#2483" id="2483">2483</a>
 <a href="#2484" id="2484">2484</a>
+<a href="#2485" id="2485">2485</a>
+<a href="#2486" id="2486">2486</a>
+<a href="#2487" id="2487">2487</a>
+<a href="#2488" id="2488">2488</a>
+<a href="#2489" id="2489">2489</a>
+<a href="#2490" id="2490">2490</a>
+<a href="#2491" id="2491">2491</a>
+<a href="#2492" id="2492">2492</a>
+<a href="#2493" id="2493">2493</a>
+<a href="#2494" id="2494">2494</a>
+<a href="#2495" id="2495">2495</a>
+<a href="#2496" id="2496">2496</a>
+<a href="#2497" id="2497">2497</a>
+<a href="#2498" id="2498">2498</a>
+<a href="#2499" id="2499">2499</a>
+<a href="#2500" id="2500">2500</a>
+<a href="#2501" id="2501">2501</a>
+<a href="#2502" id="2502">2502</a>
+<a href="#2503" id="2503">2503</a>
+<a href="#2504" id="2504">2504</a>
+<a href="#2505" id="2505">2505</a>
+<a href="#2506" id="2506">2506</a>
+<a href="#2507" id="2507">2507</a>
+<a href="#2508" id="2508">2508</a>
+<a href="#2509" id="2509">2509</a>
+<a href="#2510" id="2510">2510</a>
+<a href="#2511" id="2511">2511</a>
+<a href="#2512" id="2512">2512</a>
+<a href="#2513" id="2513">2513</a>
+<a href="#2514" id="2514">2514</a>
+<a href="#2515" id="2515">2515</a>
+<a href="#2516" id="2516">2516</a>
+<a href="#2517" id="2517">2517</a>
+<a href="#2518" id="2518">2518</a>
+<a href="#2519" id="2519">2519</a>
+<a href="#2520" id="2520">2520</a>
+<a href="#2521" id="2521">2521</a>
+<a href="#2522" id="2522">2522</a>
+<a href="#2523" id="2523">2523</a>
+<a href="#2524" id="2524">2524</a>
+<a href="#2525" id="2525">2525</a>
+<a href="#2526" id="2526">2526</a>
+<a href="#2527" id="2527">2527</a>
+<a href="#2528" id="2528">2528</a>
+<a href="#2529" id="2529">2529</a>
+<a href="#2530" id="2530">2530</a>
+<a href="#2531" id="2531">2531</a>
+<a href="#2532" id="2532">2532</a>
+<a href="#2533" id="2533">2533</a>
+<a href="#2534" id="2534">2534</a>
+<a href="#2535" id="2535">2535</a>
+<a href="#2536" id="2536">2536</a>
+<a href="#2537" id="2537">2537</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_client::ClientError::AnchorError;
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
@@ -2501,7 +2554,9 @@
 <span class="kw">use </span>itertools::Itertools;
 <span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
-<span class="kw">use </span>mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+<span class="kw">use </span>mango_v4::accounts_ix::{
+    HealthCheckKind, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+};
 <span class="kw">use </span>mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 <span class="kw">use </span>mango_v4::health::HealthCache;
 <span class="kw">use </span>mango_v4::state::{
@@ -2563,6 +2618,12 @@
     /// confirmation is configured separately in rpc_confirm_transaction_config.
     </span><span class="attr">#[builder(default = <span class="string">&quot;Duration::from_secs(60)&quot;</span>)]
     </span><span class="kw">pub </span>timeout: Duration,
+
+    <span class="doccomment">/// Jupiter Timeout, defaults to 30s
+    ///
+    /// This timeout applies to jupiter requests.
+    </span><span class="attr">#[builder(default = <span class="string">&quot;Duration::from_secs(30)&quot;</span>)]
+    </span><span class="kw">pub </span>jupiter_timeout: Duration,
 
     <span class="attr">#[builder(default)]
     </span><span class="kw">pub </span>transaction_builder_config: TransactionBuilderConfig,
@@ -3043,6 +3104,48 @@
         );
         <span class="self">self</span>.send_and_confirm_owner_tx(ixs.to_instructions()).<span class="kw">await
     </span>}
+
+    <span class="doccomment">/// Assert that health of account is &gt; N
+    </span><span class="kw">pub async fn </span>health_check_instruction(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        account: <span class="kw-2">&amp;</span>MangoAccountValue,
+        min_health_value: f64,
+        affected_tokens: Vec&lt;TokenIndex&gt;,
+        affected_perp_markets: Vec&lt;PerpMarketIndex&gt;,
+        check_kind: HealthCheckKind,
+    ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
+        <span class="kw">let </span>(health_check_metas, health_cu) = <span class="self">self
+            </span>.derive_health_check_remaining_account_metas(
+                account,
+                affected_tokens,
+                <span class="macro">vec!</span>[],
+                affected_perp_markets,
+            )
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let </span>ixs = PreparedInstructions::from_vec(
+            <span class="macro">vec!</span>[Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        <span class="kw-2">&amp;</span>mango_v4::accounts::HealthCheck {
+                            group: <span class="self">self</span>.group(),
+                            account: <span class="self">self</span>.mango_account_address,
+                        },
+                        <span class="prelude-val">None</span>,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(<span class="kw-2">&amp;</span>mango_v4::instruction::HealthCheck {
+                    min_health_value,
+                    check_kind,
+                }),
+            }],
+            <span class="self">self</span>.instruction_cu(health_cu),
+        );
+        <span class="prelude-val">Ok</span>(ixs)
+    }
 
     <span class="doccomment">/// Creates token withdraw instructions for the MangoClient&#39;s account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
@@ -4578,7 +4681,10 @@
     <span class="comment">// jupiter
 
     </span><span class="kw">pub fn </span>jupiter_v6(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; jupiter::v6::JupiterV6 {
-        jupiter::v6::JupiterV6 { mango_client: <span class="self">self </span>}
+        jupiter::v6::JupiterV6 {
+            mango_client: <span class="self">self</span>,
+            timeout_duration: <span class="self">self</span>.client.config.jupiter_timeout,
+        }
     }
 
     <span class="kw">pub fn </span>jupiter(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; jupiter::Jupiter {

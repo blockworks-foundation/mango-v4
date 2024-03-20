@@ -420,7 +420,12 @@
 <a href="#420" id="420">420</a>
 <a href="#421" id="421">421</a>
 <a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
+<span class="kw">use </span>std::time::Duration;
 
 <span class="kw">use </span>anchor_lang::prelude::Pubkey;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
@@ -561,6 +566,7 @@
 
 <span class="kw">pub struct </span>JupiterV6&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub </span>mango_client: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MangoClient,
+    <span class="kw">pub </span>timeout_duration: Duration,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; JupiterV6&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -626,6 +632,7 @@
             .http_client
             .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, config.jupiter_v6_url))
             .query(<span class="kw-2">&amp;</span>query_args)
+            .timeout(<span class="self">self</span>.timeout_duration)
             .send()
             .<span class="kw">await
             </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
@@ -712,6 +719,7 @@
                 destination_token_account: <span class="prelude-val">None</span>, <span class="comment">// default to user ata
                 </span>quote_response: quote.clone(),
             })
+            .timeout(<span class="self">self</span>.timeout_duration)
             .send()
             .<span class="kw">await
             </span>.context(<span class="string">&quot;swap transaction request to jupiter&quot;</span>)<span class="question-mark">?</span>;
