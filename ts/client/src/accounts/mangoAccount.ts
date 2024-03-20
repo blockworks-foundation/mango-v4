@@ -1616,7 +1616,10 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     const cumulativeFunding = this.getCumulativeFunding(perpMarket);
-    return (-1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding)) + toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding);
+    return (
+      -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding) +
+      toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding)
+    );
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {
