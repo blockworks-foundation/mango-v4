@@ -89,6 +89,8 @@ async fn main() -> anyhow::Result<()> {
         .jupiter_timeout(Duration::from_secs(cli.jupiter_timeout_secs))
         .jupiter_v6_url(cli.jupiter_v6_url.clone())
         .jupiter_token(cli.jupiter_token.clone())
+        .sanctum_url(cli.sanctum_url.clone())
+        .sanctum_timeout(Duration::from_secs(cli.sanctum_timeout_secs))
         .transaction_builder_config(
             TransactionBuilderConfig::builder()
                 .priority_fee_provider(prio_provider)
@@ -257,7 +259,17 @@ async fn main() -> anyhow::Result<()> {
             .rebalance_alternate_jupiter_route_tokens
             .clone()
             .unwrap_or_default(),
+        alternate_sanctum_route_tokens: cli
+            .rebalance_alternate_sanctum_route_tokens
+            .clone()
+            .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
+        use_sanctum: cli.sanctum_enabled == BoolArg::True,
+        sanctum_supported_mints: cli
+            .sanctum_swap_supported_mints
+            .clone()
+            .map(|v| v.iter().copied().collect())
+            .unwrap_or(mango_v4_client::swap::sanctum::get_default_sanctum_mints()),
     };
     rebalance_config.validate(&mango_client.context);
 
