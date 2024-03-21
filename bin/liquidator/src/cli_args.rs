@@ -248,7 +248,7 @@ pub struct Cli {
     pub(crate) sanctum_enabled: BoolArg,
 
     /// override the url to sanctum
-    #[clap(long, env, default_value = "https://api.sanctum.so/v1/")]
+    #[clap(long, env, default_value = "https://api.sanctum.so/v1")]
     pub(crate) sanctum_url: String,
 
     /// override the sanctum http request timeout
