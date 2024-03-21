@@ -52,6 +52,10 @@ impl<'a> Sanctum<'a> {
         output_mint: Pubkey,
         amount: u64,
     ) -> anyhow::Result<QuoteResponse> {
+        if input_mint == output_mint {
+            anyhow::bail!("Need two distinct mint to swap");
+        }
+
         let mut account = self.mango_client.mango_account().await?;
         let input_token_index = self
             .mango_client
@@ -84,7 +88,7 @@ impl<'a> Sanctum<'a> {
             .context("quote request to sanctum")?;
         let quote: QuoteResponse =
             util::http_error_handling(response).await.with_context(|| {
-                format!("error requesting sanctum route between {input_mint} and {output_mint}")
+                format!("error requesting sanctum route between {input_mint} and {output_mint} (using url: {})", config.sanctum_url)
             })?;
 
         Ok(quote)
@@ -98,6 +102,8 @@ impl<'a> Sanctum<'a> {
         max_slippage_bps: u64,
         quote: &QuoteResponse,
     ) -> anyhow::Result<TransactionBuilder> {
+        tracing::info!("swapping using sanctum");
+
         let source_token = self.mango_client.context.token_by_mint(&input_mint)?;
         let target_token = self.mango_client.context.token_by_mint(&output_mint)?;
 

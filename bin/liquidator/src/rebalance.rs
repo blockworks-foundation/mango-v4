@@ -12,7 +12,7 @@ use mango_v4_client::{
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -186,18 +186,11 @@ impl Rebalancer {
             }
         }
 
-        // TODO FAS select sanctum or Jupi based on..?
-
-        let mut results = futures::future::join_all(jobs).await;
-        let full_route = results.remove(0)?;
-        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        let results = futures::future::join_all(jobs).await;
+        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (mut tx_builder, route) = self
-            .determine_best_jupiter_tx(
-                // If the best_route couldn't be fetched, something is wrong
-                &full_route,
-                &alternatives,
-            )
+            .determine_best_swap_tx(routes, quote_mint, output_mint)
             .await?;
 
         let seq_check_ix = self
@@ -242,7 +235,7 @@ impl Rebalancer {
         }
 
         if self.config.use_sanctum && self.is_lst(input_mint) {
-            for out_token_index in &self.config.alternate_jupiter_route_tokens {
+            for out_token_index in &self.config.alternate_sanctum_route_tokens {
                 let out_token = self.mango_client.context.token(*out_token_index);
                 let sanctum_job = self.swap_quote(
                     input_mint,
@@ -255,18 +248,11 @@ impl Rebalancer {
             }
         }
 
-        // TODO FAS select sanctum or Jupi based on..?
-
-        let mut results = futures::future::join_all(jobs).await;
-        let full_route = results.remove(0)?;
-        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        let results = futures::future::join_all(jobs).await;
+        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (mut tx_builder, route) = self
-            .determine_best_jupiter_tx(
-                // If the best_route couldn't be fetched, something is wrong
-                &full_route,
-                &alternatives,
-            )
+            .determine_best_swap_tx(routes, input_mint, quote_mint)
             .await?;
 
         let seq_check_ix = self
@@ -297,47 +283,77 @@ impl Rebalancer {
         Ok((in_token.mint, in_amount))
     }
 
-    async fn determine_best_jupiter_tx(
+    async fn determine_best_swap_tx(
         &self,
-        full: &swap::Quote,
-        alternatives: &[swap::Quote],
+        mut routes: Vec<swap::Quote>,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
-        let builder = self
-            .mango_client
-            .swap()
-            .prepare_swap_transaction(full)
-            .await?;
-        let tx_size = builder.transaction_size()?;
-        if tx_size.is_within_limit() {
-            return Ok((builder, full.clone()));
-        }
-        trace!(
-            route_label = full.first_route_label(),
-            %full.input_mint,
-            %full.output_mint,
-            ?tx_size,
-            limit = ?TransactionSize::limit(),
-            "full route does not fit in a tx",
-        );
+        let mut prices = HashMap::<Pubkey, I80F48>::new();
+        let mut get_or_fetch_price = |m| {
+            prices.get(&m).copied().unwrap_or_else(|| {
+                let token = self
+                    .mango_client
+                    .context
+                    .token_by_mint(&m)
+                    .expect("token for mint not found");
+                let p = self
+                    .account_fetcher
+                    .fetch_bank_price(&token.first_bank())
+                    .expect("failed to fetch price");
+                prices.insert(m, p);
+                p
+            })
+        };
 
-        if alternatives.is_empty() {
-            anyhow::bail!(
-                "no alternative routes from {} to {}",
-                full.input_mint,
-                full.output_mint
+        routes.sort_by_cached_key(|r| {
+            let in_price = get_or_fetch_price(r.input_mint);
+            let out_price = get_or_fetch_price(r.output_mint);
+            let amount = out_price * I80F48::from_num(r.out_amount)
+                - in_price * I80F48::from_num(r.in_amount);
+
+            let t = match r.raw {
+                swap::RawQuote::Mock => "mock",
+                swap::RawQuote::V6(_) => "jupiter",
+                swap::RawQuote::Sanctum(_) => "sanctum",
+            };
+            tracing::debug!(
+                "quote for {} vs {} [using {}] is {}@{} vs {}@{} -> amount={}",
+                r.input_mint,
+                r.output_mint,
+                t,
+                r.in_amount,
+                in_price,
+                r.out_amount,
+                out_price,
+                amount
+            );
+
+            std::cmp::Reverse(amount)
+        });
+
+        for route in routes {
+            let builder = self
+                .mango_client
+                .swap()
+                .prepare_swap_transaction(&route)
+                .await?;
+            let tx_size = builder.transaction_size()?;
+            if tx_size.is_within_limit() {
+                return Ok((builder, route.clone()));
+            }
+
+            trace!(
+                route_label = route.first_route_label(),
+                %route.input_mint,
+                %route.output_mint,
+                ?tx_size,
+                limit = ?TransactionSize::limit(),
+                "route does not fit in a tx",
             );
         }
 
-        let best = alternatives
-            .iter()
-            .min_by(|a, b| a.price_impact_pct.partial_cmp(&b.price_impact_pct).unwrap())
-            .unwrap();
-        let builder = self
-            .mango_client
-            .swap()
-            .prepare_swap_transaction(best)
-            .await?;
-        Ok((builder, best.clone()))
+        anyhow::bail!("no routes from {} to {}", input_mint, output_mint);
     }
 
     fn mango_account(&self) -> anyhow::Result<Box<MangoAccountValue>> {
