@@ -1,7 +1,7 @@
 use crate::trigger_tcs;
 use anchor_lang::prelude::Pubkey;
 use clap::Parser;
-use mango_v4_client::{jupiter, priority_fees_cli};
+use mango_v4_client::{priority_fees_cli, swap};
 use std::collections::HashSet;
 
 #[derive(Parser, Debug)]
@@ -28,11 +28,11 @@ pub(crate) enum JupiterVersionArg {
     V6,
 }
 
-impl From<JupiterVersionArg> for jupiter::Version {
+impl From<JupiterVersionArg> for swap::Version {
     fn from(a: JupiterVersionArg) -> Self {
         match a {
-            JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V6 => jupiter::Version::V6,
+            JupiterVersionArg::Mock => swap::Version::Mock,
+            JupiterVersionArg::V6 => swap::Version::V6,
         }
     }
 }
@@ -120,6 +120,12 @@ pub struct Cli {
     /// The alternate route with the lowest price impact will be used.
     #[clap(long, env, value_parser, value_delimiter = ',')]
     pub(crate) rebalance_alternate_jupiter_route_tokens: Option<Vec<u16>>,
+
+    /// query sanctum for routes to and from these tokens
+    ///
+    /// These routes will only be used when trying to rebalance a LST token
+    #[clap(long, env, value_parser, value_delimiter = ',')]
+    pub(crate) rebalance_alternate_sanctum_route_tokens: Option<Vec<u16>>,
 
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
@@ -236,4 +242,20 @@ pub struct Cli {
     /// max number of liquidation/tcs to do concurrently
     #[clap(long, env, default_value = "5")]
     pub(crate) max_parallel_operations: u64,
+
+    /// Also use sanctum for rebalancing
+    #[clap(long, env, value_enum, default_value = "false")]
+    pub(crate) sanctum_enabled: BoolArg,
+
+    /// override the url to sanctum
+    #[clap(long, env, default_value = "https://api.sanctum.so/v1/")]
+    pub(crate) sanctum_url: String,
+
+    /// override the sanctum http request timeout
+    #[clap(long, env, default_value = "30")]
+    pub(crate) sanctum_timeout_secs: u64,
+
+    /// override the sanctum http request timeout
+    #[clap(long, env)]
+    pub(crate) sanctum_swap_supported_mints: Option<Vec<Pubkey>>,
 }

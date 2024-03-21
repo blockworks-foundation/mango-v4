@@ -5,13 +5,14 @@ use mango_v4::state::{
     PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
+    chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -26,10 +27,13 @@ pub struct Config {
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
     pub borrow_settle_excess: f64,
     pub refresh_timeout: Duration,
-    pub jupiter_version: jupiter::Version,
+    pub jupiter_version: swap::Version,
     pub skip_tokens: Vec<TokenIndex>,
     pub alternate_jupiter_route_tokens: Vec<TokenIndex>,
+    pub alternate_sanctum_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
+    pub use_sanctum: bool,
+    pub sanctum_supported_mints: HashSet<Pubkey>,
 }
 
 impl Config {
@@ -105,16 +109,16 @@ impl Rebalancer {
         Ok(true)
     }
 
-    async fn jupiter_quote(
+    async fn swap_quote(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
         only_direct_routes: bool,
-        jupiter_version: jupiter::Version,
-    ) -> anyhow::Result<jupiter::Quote> {
+        jupiter_version: swap::Version,
+    ) -> anyhow::Result<swap::Quote> {
         self.mango_client
-            .jupiter()
+            .swap()
             .quote(
                 input_mint,
                 output_mint,
@@ -126,29 +130,30 @@ impl Rebalancer {
             .await
     }
 
-    /// Grab three possible routes:
+    /// Grab multiple possibles routes:
     /// 1. USDC -> output (complex routes)
     /// 2. USDC -> output (direct route only)
     /// 3. alternate_jupiter_route_tokens -> output (direct route only)
+    /// 4. if enabled, sanctum routes
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_buy(
         &self,
         account: &MangoAccountValue,
         output_mint: Pubkey,
         in_amount_quote: u64,
-    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
+    ) -> anyhow::Result<(Signature, swap::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let quote_mint = quote_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
-        let full_route_job = self.jupiter_quote(
+        let full_route_job = self.swap_quote(
             quote_mint,
             output_mint,
             in_amount_quote,
             false,
             jupiter_version,
         );
-        let direct_quote_route_job = self.jupiter_quote(
+        let direct_quote_route_job = self.swap_quote(
             quote_mint,
             output_mint,
             in_amount_quote,
@@ -158,18 +163,30 @@ impl Rebalancer {
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
         for in_token_index in &self.config.alternate_jupiter_route_tokens {
-            let in_token = self.mango_client.context.token(*in_token_index);
-            // For the alternate output routes we need to adjust the in amount by the token price
-            let in_price = self
-                .account_fetcher
-                .fetch_bank_price(&in_token.first_bank())?;
-            let in_amount = (I80F48::from(in_amount_quote) / in_price)
-                .ceil()
-                .to_num::<u64>();
+            let (alt_mint, alt_in_amount) =
+                self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
             let direct_route_job =
-                self.jupiter_quote(in_token.mint, output_mint, in_amount, true, jupiter_version);
+                self.swap_quote(alt_mint, output_mint, alt_in_amount, true, jupiter_version);
             jobs.push(direct_route_job);
         }
+
+        if self.config.use_sanctum && self.is_lst(output_mint) {
+            // go through an alternative token
+            for in_token_index in &self.config.alternate_sanctum_route_tokens {
+                let (alt_mint, alt_in_amount) =
+                    self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
+                let sanctum_alt_route_job = self.swap_quote(
+                    alt_mint,
+                    output_mint,
+                    alt_in_amount,
+                    true,
+                    swap::Version::Sanctum,
+                );
+                jobs.push(sanctum_alt_route_job);
+            }
+        }
+
+        // TODO FAS select sanctum or Jupi based on..?
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -199,29 +216,46 @@ impl Rebalancer {
     /// 1. input -> USDC (complex routes)
     /// 2. input -> USDC (direct route only)
     /// 3. input -> alternate_jupiter_route_tokens (direct route only)
+    /// 4. if enabled, sanctum routes
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_sell(
         &self,
         account: &MangoAccountValue,
         input_mint: Pubkey,
         in_amount: u64,
-    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
+    ) -> anyhow::Result<(Signature, swap::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let quote_mint = quote_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
-            self.jupiter_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
+            self.swap_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
         let direct_quote_route_job =
-            self.jupiter_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
+            self.swap_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
         for out_token_index in &self.config.alternate_jupiter_route_tokens {
             let out_token = self.mango_client.context.token(*out_token_index);
             let direct_route_job =
-                self.jupiter_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
+                self.swap_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
             jobs.push(direct_route_job);
         }
+
+        if self.config.use_sanctum && self.is_lst(input_mint) {
+            for out_token_index in &self.config.alternate_jupiter_route_tokens {
+                let out_token = self.mango_client.context.token(*out_token_index);
+                let sanctum_job = self.swap_quote(
+                    input_mint,
+                    out_token.mint,
+                    in_amount,
+                    false,
+                    swap::Version::Sanctum,
+                );
+                jobs.push(sanctum_job);
+            }
+        }
+
+        // TODO FAS select sanctum or Jupi based on..?
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -247,14 +281,30 @@ impl Rebalancer {
         Ok((sig, route))
     }
 
+    fn get_alternative_token_amount(
+        &self,
+        in_token_index: &u16,
+        in_amount_quote: u64,
+    ) -> anyhow::Result<(Pubkey, u64)> {
+        let in_token: &TokenContext = self.mango_client.context.token(*in_token_index);
+        let in_price = self
+            .account_fetcher
+            .fetch_bank_price(&in_token.first_bank())?;
+        let in_amount = (I80F48::from(in_amount_quote) / in_price)
+            .ceil()
+            .to_num::<u64>();
+
+        Ok((in_token.mint, in_amount))
+    }
+
     async fn determine_best_jupiter_tx(
         &self,
-        full: &jupiter::Quote,
-        alternatives: &[jupiter::Quote],
-    ) -> anyhow::Result<(TransactionBuilder, jupiter::Quote)> {
+        full: &swap::Quote,
+        alternatives: &[swap::Quote],
+    ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let builder = self
             .mango_client
-            .jupiter()
+            .swap()
             .prepare_swap_transaction(full)
             .await?;
         let tx_size = builder.transaction_size()?;
@@ -284,7 +334,7 @@ impl Rebalancer {
             .unwrap();
         let builder = self
             .mango_client
-            .jupiter()
+            .swap()
             .prepare_swap_transaction(best)
             .await?;
         Ok((builder, best.clone()))
@@ -619,5 +669,9 @@ impl Rebalancer {
         }
 
         result
+    }
+
+    fn is_lst(&self, mint: Pubkey) -> bool {
+        self.config.sanctum_supported_mints.contains(&mint)
     }
 }
