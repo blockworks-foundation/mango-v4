@@ -31,6 +31,7 @@ jsonrpc-core = "18.0.0"
 jsonrpc-core-client = { version = "18.0.0", features = ["ws", "http", "tls"] }
 mango-v4 = { path = "../../programs/mango-v4", features = ["client"] }
 mango-v4-client = { path = "../../lib/client" }
+mango-feeds-connector = { workspace = true }
 once_cell = "1.12.0"
 pyth-sdk-solana = { workspace = true }
 rand = "0.7"
@@ -51,3 +52,4 @@ tracing = "0.1"
 regex = "1.9.5"
 hdrhistogram = "7.5.4"
 indexmap = "2.0.0"
+toml = "0.5"
