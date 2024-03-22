@@ -1,7 +1,7 @@
 use mango_feeds_connector::{
     account_write_filter::{self, AccountWriteRoute},
     metrics::Metrics,
-    AccountWrite, SlotUpdate,
+    FeedWrite, SlotUpdate,
 };
 
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey};
@@ -18,7 +18,7 @@ pub fn init(
     group_pk: Pubkey,
     metrics_sender: Metrics,
 ) -> anyhow::Result<(
-    async_channel::Sender<AccountWrite>,
+    async_channel::Sender<FeedWrite>,
     async_channel::Sender<SlotUpdate>,
     async_channel::Receiver<Vec<Instruction>>,
 )> {

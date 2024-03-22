@@ -99,7 +99,7 @@ pub async fn save_snapshot(
 
         match message {
             Message::Account(_) => {}
-            Message::Snapshot(snapshot) => {
+            Message::Snapshot(snapshot, _) => {
                 for slot in snapshot.iter().map(|a| a.slot).unique() {
                     chain_data.update_slot(chain_data::SlotData {
                         slot,
