@@ -1,3 +1,4 @@
+use anchor_lang::AnchorDeserialize;
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
@@ -8,11 +9,17 @@ use mango_v4_client::{
     chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::account::{Account, ReadableAccount};
+use solana_address_lookup_table_program::state::AddressLookupTable;
+
+use crate::sanctum::sanctum_state::StakePool;
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -60,6 +67,7 @@ pub struct Rebalancer {
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
+    pub lst_mints: HashSet<Pubkey> 
 }
 
 impl Rebalancer {
@@ -688,6 +696,38 @@ impl Rebalancer {
     }
 
     fn is_lst(&self, mint: Pubkey) -> bool {
-        self.config.sanctum_supported_mints.contains(&mint)
+        let a = self.config.sanctum_supported_mints.contains(&mint);
+        let b = self.lst_mints.contains(&mint);
+        a || b
+    }
+
+    pub async fn init(&mut self, live_rpc_client: &RpcClient) {
+        if let Err(e) = self.load_lst_if_needed(live_rpc_client).await {
+            warn!("Could not load list of sanctum supported mint: {}", e);
+        }
+    }
+
+    async fn load_lst_if_needed(&mut self, live_rpc_client: &RpcClient) -> anyhow::Result<()> {
+        if !self.lst_mints.is_empty() {
+            return Ok(());
+        }
+
+        let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
+        
+        let lookup_table_data = live_rpc_client.get_account(&address).await?;
+        let lookup_table = AddressLookupTable::deserialize(&lookup_table_data.data())?;
+        let accounts: Vec<Account> = live_rpc_client.get_multiple_accounts(&lookup_table.addresses).await?
+        .drain(..).filter_map(|x| x).collect();        
+
+        for account in accounts {
+            let account = Account::from(account);
+            let mut account_data = account.data();
+            let t = StakePool::deserialize(&mut account_data);
+            if let Ok(d) = t {
+                self.lst_mints.insert(d.pool_mint);
+            }
+        }
+
+        Ok(())
     }
 }

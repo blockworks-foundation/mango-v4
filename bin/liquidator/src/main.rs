@@ -37,6 +37,7 @@ pub mod trigger_tcs;
 mod tx_sender;
 mod unwrappable_oracle_error;
 pub mod util;
+mod sanctum;
 
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
@@ -273,12 +274,18 @@ async fn main() -> anyhow::Result<()> {
     };
     rebalance_config.validate(&mango_client.context);
 
-    let rebalancer = Arc::new(rebalance::Rebalancer {
+    let mut rebalancer = rebalance::Rebalancer {
         mango_client: mango_client.clone(),
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
-    });
+        lst_mints: HashSet::<Pubkey>::new()
+    };
+    
+    let live_rpc_client = mango_client.client.new_rpc_async();
+    rebalancer.init(&live_rpc_client).await;
+    let rebalancer = Arc::new(rebalancer);    
+
 
     let liquidation = Box::new(LiquidationState {
         mango_client: mango_client.clone(),
@@ -419,7 +426,7 @@ async fn main() -> anyhow::Result<()> {
     // But need to take care to abort if the above job aborts beforehand.
     if cli.rebalance == BoolArg::True {
         let rebalance_job =
-            spawn_rebalance_job(&shared_state, rebalance_trigger_receiver, rebalancer);
+            spawn_rebalance_job(shared_state.clone(), rebalance_trigger_receiver, rebalancer);
         optional_jobs.push(rebalance_job);
     }
 
@@ -535,14 +542,13 @@ fn spawn_telemetry_job(cli: &Cli, mango_client: Arc<MangoClient>) -> JoinHandle<
 }
 
 fn spawn_rebalance_job(
-    shared_state: &Arc<RwLock<SharedState>>,
+    shared_state: Arc<RwLock<SharedState>>,
     rebalance_trigger_receiver: async_channel::Receiver<()>,
     rebalancer: Arc<Rebalancer>,
 ) -> JoinHandle<()> {
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
 
     tokio::spawn({
-        let shared_state = shared_state.clone();
         async move {
             loop {
                 tokio::select! {
