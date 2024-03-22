@@ -1,12 +1,7 @@
-
 use {
-    borsh::BorshDeserialize, 
-     solana_sdk::{
-        pubkey::Pubkey,
-        stake::state::Lockup,
-    }
+    borsh::BorshDeserialize,
+    solana_sdk::{pubkey::Pubkey, stake::state::Lockup},
 };
-
 
 #[derive(Clone, Debug, PartialEq, BorshDeserialize)]
 pub enum AccountType {

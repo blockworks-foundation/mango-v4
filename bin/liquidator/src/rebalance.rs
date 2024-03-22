@@ -9,9 +9,9 @@ use mango_v4_client::{
     chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
+use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::account::{Account, ReadableAccount};
-use solana_address_lookup_table_program::state::AddressLookupTable;
 
 use crate::sanctum::sanctum_state::StakePool;
 
@@ -40,7 +40,6 @@ pub struct Config {
     pub alternate_sanctum_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
     pub use_sanctum: bool,
-    pub sanctum_supported_mints: HashSet<Pubkey>,
 }
 
 impl Config {
@@ -67,7 +66,7 @@ pub struct Rebalancer {
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
-    pub lst_mints: HashSet<Pubkey> 
+    pub lst_mints: HashSet<Pubkey>,
 }
 
 impl Rebalancer {
@@ -696,9 +695,7 @@ impl Rebalancer {
     }
 
     fn is_lst(&self, mint: Pubkey) -> bool {
-        let a = self.config.sanctum_supported_mints.contains(&mint);
-        let b = self.lst_mints.contains(&mint);
-        a || b
+        self.lst_mints.contains(&mint)
     }
 
     pub async fn init(&mut self, live_rpc_client: &RpcClient) {
@@ -713,11 +710,15 @@ impl Rebalancer {
         }
 
         let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
-        
+
         let lookup_table_data = live_rpc_client.get_account(&address).await?;
         let lookup_table = AddressLookupTable::deserialize(&lookup_table_data.data())?;
-        let accounts: Vec<Account> = live_rpc_client.get_multiple_accounts(&lookup_table.addresses).await?
-        .drain(..).filter_map(|x| x).collect();        
+        let accounts: Vec<Account> = live_rpc_client
+            .get_multiple_accounts(&lookup_table.addresses)
+            .await?
+            .drain(..)
+            .filter_map(|x| x)
+            .collect();
 
         for account in accounts {
             let account = Account::from(account);
