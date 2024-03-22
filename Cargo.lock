@@ -3544,6 +3544,7 @@ dependencies = [
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-core-client",
+ "mango-feeds-connector",
  "mango-v4",
  "mango-v4-client",
  "once_cell",
@@ -3563,6 +3564,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.16.1",
+ "toml",
  "tracing",
 ]
 

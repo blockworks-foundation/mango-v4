@@ -60,7 +60,7 @@ pub struct ChainSlotUpdate {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotType {
     Full,
-    Partial
+    Partial,
 }
 
 #[derive(Clone)]
