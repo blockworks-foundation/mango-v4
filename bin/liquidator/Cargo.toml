@@ -42,6 +42,7 @@ shellexpand = "2.1.0"
 solana-account-decoder = { workspace = true }
 solana-client = { workspace = true }
 solana-logger = { workspace = true }
+solana-address-lookup-table-program = "~1.16.7"
 solana-rpc = { workspace = true }
 solana-sdk = { workspace = true }
 tokio = { version = "1", features = ["full"] }
@@ -51,3 +52,4 @@ tracing = "0.1"
 regex = "1.9.5"
 hdrhistogram = "7.5.4"
 indexmap = "2.0.0"
+borsh = { version = "0.10.3", features = ["const-generics"] }
