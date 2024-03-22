@@ -254,8 +254,4 @@ pub struct Cli {
     /// override the sanctum http request timeout
     #[clap(long, env, default_value = "30")]
     pub(crate) sanctum_timeout_secs: u64,
-
-    /// override the sanctum http request timeout
-    #[clap(long, env)]
-    pub(crate) sanctum_swap_supported_mints: Option<Vec<Pubkey>>,
 }

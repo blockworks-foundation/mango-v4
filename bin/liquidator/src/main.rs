@@ -30,6 +30,7 @@ pub mod liquidate;
 mod liquidation_state;
 pub mod metrics;
 pub mod rebalance;
+mod sanctum;
 mod tcs_state;
 pub mod telemetry;
 pub mod token_swap_info;
@@ -37,7 +38,6 @@ pub mod trigger_tcs;
 mod tx_sender;
 mod unwrappable_oracle_error;
 pub mod util;
-mod sanctum;
 
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
@@ -266,11 +266,6 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
         use_sanctum: cli.sanctum_enabled == BoolArg::True,
-        sanctum_supported_mints: cli
-            .sanctum_swap_supported_mints
-            .clone()
-            .map(|v| v.iter().copied().collect())
-            .unwrap_or(mango_v4_client::swap::sanctum::get_default_sanctum_mints()),
     };
     rebalance_config.validate(&mango_client.context);
 
@@ -279,13 +274,12 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
-        lst_mints: HashSet::<Pubkey>::new()
+        lst_mints: HashSet::<Pubkey>::new(),
     };
-    
+
     let live_rpc_client = mango_client.client.new_rpc_async();
     rebalancer.init(&live_rpc_client).await;
-    let rebalancer = Arc::new(rebalancer);    
-
+    let rebalancer = Arc::new(rebalancer);
 
     let liquidation = Box::new(LiquidationState {
         mango_client: mango_client.clone(),
