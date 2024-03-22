@@ -128,7 +128,7 @@ impl DataProcessor {
                     }));
                 }
             }
-            Message::Snapshot(snapshot) => {
+            Message::Snapshot(snapshot, _) => {
                 let mut result = Vec::new();
                 for update in snapshot.iter() {
                     if is_mango_account(&update.account, &mango_group).is_some() {

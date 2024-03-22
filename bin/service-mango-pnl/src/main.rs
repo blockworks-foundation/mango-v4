@@ -320,8 +320,8 @@ async fn main() -> anyhow::Result<()> {
         ),
     };
     grpc_plugin_source::process_events(
-        &config.source,
-        &filter_config,
+        config.source,
+        filter_config,
         account_write_queue_sender,
         slot_queue_sender,
         metrics_tx.clone(),
