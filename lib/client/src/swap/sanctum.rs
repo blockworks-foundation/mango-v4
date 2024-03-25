@@ -94,7 +94,7 @@ impl<'a> Sanctum<'a> {
         Ok(quote)
     }
 
-    /// Find the instructions and account lookup tables for a jupiter swap through mango
+    /// Find the instructions and account lookup tables for a sanctum swap through mango
     pub async fn prepare_swap_transaction(
         &self,
         input_mint: Pubkey,
@@ -181,7 +181,6 @@ impl<'a> Sanctum<'a> {
             .await
             .context("error requesting sanctum swap")?;
 
-        // let tx: SanctumSwapInstructionsResponse = SanctumSwapInstructionsResponse::deserialize(tx.as_slice())?;
         let tx = bincode::options()
             .with_fixint_encoding()
             .reject_trailing_bytes()
@@ -206,7 +205,7 @@ impl<'a> Sanctum<'a> {
         let sync_native_pack =
             anchor_spl::token::spl_token::instruction::TokenInstruction::SyncNative.pack();
 
-        // Remove auto wrapping of SOL->mSOL
+        // Remove auto wrapping of SOL->wSOL
         let sanctum_ixs: Vec<Instruction> = sanctum_ixs_orig
             .clone()
             .drain(..)
@@ -235,7 +234,7 @@ impl<'a> Sanctum<'a> {
             instructions.push(ix.clone());
         }
 
-        // Ensure the source token account is created (jupiter takes care of the output account)
+        // Ensure the source token account is created (sanctum takes care of the output account)
         instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 &owner,
@@ -333,36 +332,4 @@ impl<'a> Sanctum<'a> {
 
         tx_builder.send_and_confirm(&self.mango_client.client).await
     }
-}
-
-pub fn get_default_sanctum_mints() -> HashSet<Pubkey> {
-    [
-        Pubkey::from_str("pWrSoLAhue6jUxUkbWgmEy5rD9VJzkFmvfTDV5KgNuu").unwrap(),
-        Pubkey::from_str("suPer8CPwxoJPQ7zksGMwFvjBQhjAHwUMmPV4FVatBw").unwrap(),
-        Pubkey::from_str("jucy5XJ76pHVvtPZb5TKRcGQExkwit2P5s4vY8UzmpC").unwrap(),
-        Pubkey::from_str("BonK1YhkXEGLZzwtcvRTip3gAL9nCeQD7ppZBLXhtTs").unwrap(),
-        Pubkey::from_str("Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ").unwrap(),
-        Pubkey::from_str("Comp4ssDzXcLeu2MnLuGNNFC4cmLPMng8qWHPvzAMU1h").unwrap(),
-        Pubkey::from_str("picobAEvs6w7QEknPce34wAE4gknZA9v5tTonnmHYdX").unwrap(),
-        Pubkey::from_str("GRJQtWwdJmp5LLpy8JWjPgn5FnLyqSJGNhn5ZnCTFUwM").unwrap(),
-        Pubkey::from_str("HUBsveNpjo5pWqNkH57QzxjQASdTVXcSK7bVKTSZtcSX").unwrap(),
-        Pubkey::from_str("strng7mqqc1MBJJV6vMzYbEqnwVGvKKGKedeCvtktWA").unwrap(),
-        Pubkey::from_str("LnTRntk2kTfWEY6cVB8K9649pgJbt6dJLS1Ns1GZCWg").unwrap(),
-        Pubkey::from_str("CgnTSoL3DgY9SFHxcLj6CgCgKKoTBr6tp4CPAEWy25DE").unwrap(),
-        Pubkey::from_str("LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X").unwrap(),
-        Pubkey::from_str("vSoLxydx6akxyMD9XEcPvGYNGq6Nn66oqVb3UkGkei7").unwrap(),
-        Pubkey::from_str("bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1").unwrap(),
-        Pubkey::from_str("GEJpt3Wjmr628FqXxTgxMce1pLntcPV4uFi8ksxMyPQh").unwrap(),
-        Pubkey::from_str("J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn").unwrap(),
-        Pubkey::from_str("7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn").unwrap(),
-        Pubkey::from_str("LSTxxxnJzKDFSLr4dUkPcmCf5VyryEqzPLz5j4bpxFp").unwrap(),
-        Pubkey::from_str("Zippybh3S5xYYam2nvL6hVJKz1got6ShgV4DyD1XQYF").unwrap(),
-        Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap(),
-        Pubkey::from_str("5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm").unwrap(),
-        Pubkey::from_str("7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj").unwrap(),
-        Pubkey::from_str("mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So").unwrap(),
-    ]
-    .iter()
-    .copied()
-    .collect()
 }
