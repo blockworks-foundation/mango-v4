@@ -6,7 +6,6 @@ use anyhow::Context;
 use bincode::Options;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Signature};
-use std::collections::HashSet;
 use std::time::Duration;
 
 use crate::{util, MangoClient, TransactionBuilder};
