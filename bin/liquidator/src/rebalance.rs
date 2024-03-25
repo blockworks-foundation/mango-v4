@@ -1,3 +1,4 @@
+use anchor_lang::AnchorDeserialize;
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
@@ -5,13 +6,20 @@ use mango_v4::state::{
     PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, jupiter, perp_pnl, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
+    chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
 };
+use solana_address_lookup_table_program::state::AddressLookupTable;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::account::{Account, ReadableAccount};
+
+use crate::sanctum::sanctum_state::StakePool;
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
+use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -26,10 +34,12 @@ pub struct Config {
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
     pub borrow_settle_excess: f64,
     pub refresh_timeout: Duration,
-    pub jupiter_version: jupiter::Version,
+    pub jupiter_version: swap::Version,
     pub skip_tokens: Vec<TokenIndex>,
     pub alternate_jupiter_route_tokens: Vec<TokenIndex>,
+    pub alternate_sanctum_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
+    pub use_sanctum: bool,
 }
 
 impl Config {
@@ -56,6 +66,7 @@ pub struct Rebalancer {
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
+    pub lst_mints: HashSet<Pubkey>,
 }
 
 impl Rebalancer {
@@ -95,16 +106,16 @@ impl Rebalancer {
         Ok(true)
     }
 
-    async fn jupiter_quote(
+    async fn swap_quote(
         &self,
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
         only_direct_routes: bool,
-        jupiter_version: jupiter::Version,
-    ) -> anyhow::Result<jupiter::Quote> {
+        jupiter_version: swap::Version,
+    ) -> anyhow::Result<swap::Quote> {
         self.mango_client
-            .jupiter()
+            .swap()
             .quote(
                 input_mint,
                 output_mint,
@@ -116,28 +127,29 @@ impl Rebalancer {
             .await
     }
 
-    /// Grab three possible routes:
+    /// Grab multiple possibles routes:
     /// 1. USDC -> output (complex routes)
     /// 2. USDC -> output (direct route only)
     /// 3. alternate_jupiter_route_tokens -> output (direct route only)
+    /// 4. if enabled, sanctum routes
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_buy(
         &self,
         output_mint: Pubkey,
         in_amount_quote: u64,
-    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
+    ) -> anyhow::Result<(Signature, swap::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let quote_mint = quote_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
-        let full_route_job = self.jupiter_quote(
+        let full_route_job = self.swap_quote(
             quote_mint,
             output_mint,
             in_amount_quote,
             false,
             jupiter_version,
         );
-        let direct_quote_route_job = self.jupiter_quote(
+        let direct_quote_route_job = self.swap_quote(
             quote_mint,
             output_mint,
             in_amount_quote,
@@ -147,29 +159,34 @@ impl Rebalancer {
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
         for in_token_index in &self.config.alternate_jupiter_route_tokens {
-            let in_token = self.mango_client.context.token(*in_token_index);
-            // For the alternate output routes we need to adjust the in amount by the token price
-            let in_price = self
-                .account_fetcher
-                .fetch_bank_price(&in_token.first_bank())?;
-            let in_amount = (I80F48::from(in_amount_quote) / in_price)
-                .ceil()
-                .to_num::<u64>();
+            let (alt_mint, alt_in_amount) =
+                self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
             let direct_route_job =
-                self.jupiter_quote(in_token.mint, output_mint, in_amount, true, jupiter_version);
+                self.swap_quote(alt_mint, output_mint, alt_in_amount, true, jupiter_version);
             jobs.push(direct_route_job);
         }
 
-        let mut results = futures::future::join_all(jobs).await;
-        let full_route = results.remove(0)?;
-        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        if self.config.use_sanctum && self.is_lst(output_mint) {
+            // go through an alternative token
+            for in_token_index in &self.config.alternate_sanctum_route_tokens {
+                let (alt_mint, alt_in_amount) =
+                    self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
+                let sanctum_alt_route_job = self.swap_quote(
+                    alt_mint,
+                    output_mint,
+                    alt_in_amount,
+                    true,
+                    swap::Version::Sanctum,
+                );
+                jobs.push(sanctum_alt_route_job);
+            }
+        }
+
+        let results = futures::future::join_all(jobs).await;
+        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (tx_builder, route) = self
-            .determine_best_jupiter_tx(
-                // If the best_route couldn't be fetched, something is wrong
-                &full_route,
-                &alternatives,
-            )
+            .determine_best_swap_tx(routes, quote_mint, output_mint)
             .await?;
         let sig = tx_builder
             .send_and_confirm(&self.mango_client.client)
@@ -181,39 +198,49 @@ impl Rebalancer {
     /// 1. input -> USDC (complex routes)
     /// 2. input -> USDC (direct route only)
     /// 3. input -> alternate_jupiter_route_tokens (direct route only)
+    /// 4. if enabled, sanctum routes
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_sell(
         &self,
         input_mint: Pubkey,
         in_amount: u64,
-    ) -> anyhow::Result<(Signature, jupiter::Quote)> {
+    ) -> anyhow::Result<(Signature, swap::Quote)> {
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
         let quote_mint = quote_token.mint;
         let jupiter_version = self.config.jupiter_version;
 
         let full_route_job =
-            self.jupiter_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
+            self.swap_quote(input_mint, quote_mint, in_amount, false, jupiter_version);
         let direct_quote_route_job =
-            self.jupiter_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
+            self.swap_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
         for out_token_index in &self.config.alternate_jupiter_route_tokens {
             let out_token = self.mango_client.context.token(*out_token_index);
             let direct_route_job =
-                self.jupiter_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
+                self.swap_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
             jobs.push(direct_route_job);
         }
 
-        let mut results = futures::future::join_all(jobs).await;
-        let full_route = results.remove(0)?;
-        let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        if self.config.use_sanctum && self.is_lst(input_mint) {
+            for out_token_index in &self.config.alternate_sanctum_route_tokens {
+                let out_token = self.mango_client.context.token(*out_token_index);
+                let sanctum_job = self.swap_quote(
+                    input_mint,
+                    out_token.mint,
+                    in_amount,
+                    false,
+                    swap::Version::Sanctum,
+                );
+                jobs.push(sanctum_job);
+            }
+        }
+
+        let results = futures::future::join_all(jobs).await;
+        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let (tx_builder, route) = self
-            .determine_best_jupiter_tx(
-                // If the best_route couldn't be fetched, something is wrong
-                &full_route,
-                &alternatives,
-            )
+            .determine_best_swap_tx(routes, input_mint, quote_mint)
             .await?;
 
         let sig = tx_builder
@@ -222,47 +249,93 @@ impl Rebalancer {
         Ok((sig, route))
     }
 
-    async fn determine_best_jupiter_tx(
+    fn get_alternative_token_amount(
         &self,
-        full: &jupiter::Quote,
-        alternatives: &[jupiter::Quote],
-    ) -> anyhow::Result<(TransactionBuilder, jupiter::Quote)> {
-        let builder = self
-            .mango_client
-            .jupiter()
-            .prepare_swap_transaction(full)
-            .await?;
-        let tx_size = builder.transaction_size()?;
-        if tx_size.is_within_limit() {
-            return Ok((builder, full.clone()));
-        }
-        trace!(
-            route_label = full.first_route_label(),
-            %full.input_mint,
-            %full.output_mint,
-            ?tx_size,
-            limit = ?TransactionSize::limit(),
-            "full route does not fit in a tx",
-        );
+        in_token_index: &u16,
+        in_amount_quote: u64,
+    ) -> anyhow::Result<(Pubkey, u64)> {
+        let in_token: &TokenContext = self.mango_client.context.token(*in_token_index);
+        let in_price = self
+            .account_fetcher
+            .fetch_bank_price(&in_token.first_bank())?;
+        let in_amount = (I80F48::from(in_amount_quote) / in_price)
+            .ceil()
+            .to_num::<u64>();
 
-        if alternatives.is_empty() {
-            anyhow::bail!(
-                "no alternative routes from {} to {}",
-                full.input_mint,
-                full.output_mint
+        Ok((in_token.mint, in_amount))
+    }
+
+    async fn determine_best_swap_tx(
+        &self,
+        mut routes: Vec<swap::Quote>,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+    ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
+        let mut prices = HashMap::<Pubkey, I80F48>::new();
+        let mut get_or_fetch_price = |m| {
+            prices.get(&m).copied().unwrap_or_else(|| {
+                let token = self
+                    .mango_client
+                    .context
+                    .token_by_mint(&m)
+                    .expect("token for mint not found");
+                let p = self
+                    .account_fetcher
+                    .fetch_bank_price(&token.first_bank())
+                    .expect("failed to fetch price");
+                prices.insert(m, p);
+                p
+            })
+        };
+
+        routes.sort_by_cached_key(|r| {
+            let in_price = get_or_fetch_price(r.input_mint);
+            let out_price = get_or_fetch_price(r.output_mint);
+            let amount = out_price * I80F48::from_num(r.out_amount)
+                - in_price * I80F48::from_num(r.in_amount);
+
+            let t = match r.raw {
+                swap::RawQuote::Mock => "mock",
+                swap::RawQuote::V6(_) => "jupiter",
+                swap::RawQuote::Sanctum(_) => "sanctum",
+            };
+            tracing::debug!(
+                "quote for {} vs {} [using {}] is {}@{} vs {}@{} -> amount={}",
+                r.input_mint,
+                r.output_mint,
+                t,
+                r.in_amount,
+                in_price,
+                r.out_amount,
+                out_price,
+                amount
+            );
+
+            std::cmp::Reverse(amount)
+        });
+
+        for route in routes {
+            let builder = self
+                .mango_client
+                .swap()
+                .prepare_swap_transaction(&route)
+                .await?;
+            let tx_size = builder.transaction_size()?;
+            if tx_size.is_within_limit() {
+                return Ok((builder, route.clone()));
+            }
+
+            trace!(
+                route_label = route.first_route_label(),
+                %route.input_mint,
+                %route.output_mint,
+                ?tx_size,
+                limit = ?TransactionSize::limit(),
+                "route does not fit in a tx",
             );
         }
 
-        let best = alternatives
-            .iter()
-            .min_by(|a, b| a.price_impact_pct.partial_cmp(&b.price_impact_pct).unwrap())
-            .unwrap();
-        let builder = self
-            .mango_client
-            .jupiter()
-            .prepare_swap_transaction(best)
-            .await?;
-        Ok((builder, best.clone()))
+        anyhow::bail!("no routes from {} to {}", input_mint, output_mint);
     }
 
     fn mango_account(&self) -> anyhow::Result<Box<MangoAccountValue>> {
@@ -560,6 +633,44 @@ impl Rebalancer {
             let perp = self.mango_client.context.perp(perp_position.market_index);
             if !self.rebalance_perp(&account, perp, perp_position).await? {
                 return Ok(());
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_lst(&self, mint: Pubkey) -> bool {
+        self.lst_mints.contains(&mint)
+    }
+
+    pub async fn init(&mut self, live_rpc_client: &RpcClient) {
+        if let Err(e) = self.load_lst_if_needed(live_rpc_client).await {
+            warn!("Could not load list of sanctum supported mint: {}", e);
+        }
+    }
+
+    async fn load_lst_if_needed(&mut self, live_rpc_client: &RpcClient) -> anyhow::Result<()> {
+        if !self.lst_mints.is_empty() {
+            return Ok(());
+        }
+
+        let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
+
+        let lookup_table_data = live_rpc_client.get_account(&address).await?;
+        let lookup_table = AddressLookupTable::deserialize(&lookup_table_data.data())?;
+        let accounts: Vec<Account> = live_rpc_client
+            .get_multiple_accounts(&lookup_table.addresses)
+            .await?
+            .drain(..)
+            .filter_map(|x| x)
+            .collect();
+
+        for account in accounts {
+            let account = Account::from(account);
+            let mut account_data = account.data();
+            let t = StakePool::deserialize(&mut account_data);
+            if let Ok(d) = t {
+                self.lst_mints.insert(d.pool_mint);
             }
         }
 
