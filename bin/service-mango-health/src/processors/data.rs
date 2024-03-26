@@ -3,7 +3,7 @@ use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
 use async_channel::Receiver;
 use chrono::Utc;
 use itertools::Itertools;
-use mango_v4_client::account_update_stream::Message;
+use mango_v4_client::account_update_stream::{Message, SnapshotType};
 use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{
     account_update_stream, chain_data, snapshot_source, websocket_source, MangoGroupContext,
@@ -37,6 +37,7 @@ pub enum DataEvent {
 pub struct SnapshotEvent {
     pub received_at: chrono::DateTime<Utc>,
     pub accounts: Vec<Pubkey>,
+    pub is_full: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -128,7 +129,7 @@ impl DataProcessor {
                     }));
                 }
             }
-            Message::Snapshot(snapshot, _) => {
+            Message::Snapshot(snapshot, snapshot_type) => {
                 let mut result = Vec::new();
                 for update in snapshot.iter() {
                     if is_mango_account(&update.account, &mango_group).is_some() {
@@ -139,6 +140,7 @@ impl DataProcessor {
                 return Some(Snapshot(SnapshotEvent {
                     accounts: result,
                     received_at,
+                    is_full: snapshot_type == SnapshotType::Full
                 }));
             }
             _ => {}

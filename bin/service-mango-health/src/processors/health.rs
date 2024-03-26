@@ -85,7 +85,9 @@ impl HealthProcessor {
                                 for account in snap.accounts {
                                     accounts.insert(account);
                                 }
-                                snapshot_received = true;
+                                if snap.is_full {
+                                    snapshot_received = true;
+                                }
                             },
                             DataEvent::Other => {
                             }
