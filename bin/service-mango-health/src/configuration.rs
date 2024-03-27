@@ -1,3 +1,4 @@
+use mango_feeds_connector::GrpcSourceConfig;
 use serde_derive::Deserialize;
 use services_mango_lib::env_helper::string_or_env;
 use services_mango_lib::postgres_configuration::PostgresConfiguration;
@@ -7,16 +8,25 @@ use std::collections::HashSet;
 pub struct Configuration {
     pub postgres: Option<PostgresConfiguration>,
     #[serde(deserialize_with = "string_or_env")]
-    pub rpc_http_url: String,
-    #[serde(deserialize_with = "string_or_env")]
-    pub rpc_ws_url: String,
-    #[serde(deserialize_with = "string_or_env")]
     pub mango_group: String,
+    pub source_configuration: SourceConfiguration,
     pub computing_configuration: ComputingConfiguration,
     pub logging_configuration: LoggingConfiguration,
     pub persistence_configuration: PersistenceConfiguration,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct SourceConfiguration {
+    #[serde(deserialize_with = "string_or_env")]
+    pub rpc_http_url: String,
+    #[serde(deserialize_with = "string_or_env")]
+    pub rpc_ws_url: String,
 
     pub snapshot_interval_secs: u64,
+
+    pub use_grpc: bool,
+    pub dedup_queue_size: usize,
+    pub grpc_sources: Vec<GrpcSourceConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
