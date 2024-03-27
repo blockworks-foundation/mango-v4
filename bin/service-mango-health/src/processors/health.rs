@@ -59,7 +59,7 @@ impl HealthProcessor {
 
         let account_fetcher = chain_data::AccountFetcher {
             chain_data: chain_data.clone(),
-            rpc: RpcClient::new(configuration.rpc_http_url.clone()),
+            rpc: RpcClient::new(configuration.source_configuration.rpc_http_url.clone()),
         };
 
         let mango_group_context = MangoGroupContext::new_from_rpc(

@@ -6,7 +6,8 @@ use itertools::Itertools;
 use mango_v4_client::account_update_stream::{Message, SnapshotType};
 use mango_v4_client::snapshot_source::is_mango_account;
 use mango_v4_client::{
-    account_update_stream, chain_data, snapshot_source, websocket_source, MangoGroupContext,
+    account_update_stream, chain_data, grpc_source, snapshot_source, websocket_source,
+    MangoGroupContext,
 };
 use services_mango_lib::fail_or_retry;
 use services_mango_lib::retry_counter::RetryCounter;
@@ -54,7 +55,7 @@ impl DataProcessor {
         let mut retry_counter = RetryCounter::new(2);
         let mango_group = Pubkey::from_str(&configuration.mango_group)?;
         let (mango_stream, snapshot_job) =
-            fail_or_retry!(retry_counter, Self::init_mango_source(configuration).await)?;
+            fail_or_retry!(retry_counter, Self::init_mango_source(configuration, exit.clone()).await)?;
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
 
@@ -109,7 +110,7 @@ impl DataProcessor {
     fn new_rpc_async(configuration: &Configuration) -> RpcClientAsync {
         let commitment = CommitmentConfig::processed();
         RpcClientAsync::new_with_timeout_and_commitment(
-            configuration.rpc_http_url.clone(),
+            configuration.source_configuration.rpc_http_url.clone(),
             Duration::from_secs(60),
             commitment,
         )
@@ -151,6 +152,7 @@ impl DataProcessor {
 
     async fn init_mango_source(
         configuration: &Configuration,
+        exit: Arc<AtomicBool>,
     ) -> anyhow::Result<(Receiver<Message>, JoinHandle<()>)> {
         //
         // Client setup
@@ -178,16 +180,42 @@ impl DataProcessor {
         let (account_update_sender, account_update_receiver) =
             async_channel::unbounded::<account_update_stream::Message>();
 
-        websocket_source::start(
-            websocket_source::Config {
-                rpc_http_url: configuration.rpc_http_url.clone(),
-                rpc_ws_url: configuration.rpc_ws_url.clone(),
-                serum_programs,
-                open_orders_authority: mango_group,
-            },
-            mango_oracles.clone(),
-            account_update_sender.clone(),
-        );
+        if configuration.source_configuration.use_grpc {
+            let metrics_config = mango_feeds_connector::MetricsConfig {
+                output_stdout: true,
+                output_http: false,
+            };
+            let metrics = mango_feeds_connector::metrics::start(
+                metrics_config,
+                "service-mango-health".to_string(),
+            );
+            let sources = configuration.source_configuration.grpc_sources.clone();
+
+            grpc_source::start(
+                grpc_source::Config {
+                    rpc_http_url: configuration.source_configuration.rpc_http_url.clone(),
+                    rpc_ws_url: configuration.source_configuration.rpc_ws_url.clone(),
+                    serum_programs,
+                    open_orders_authority: mango_group,
+                    grpc_sources: sources,
+                },
+                mango_oracles.clone(),
+                account_update_sender.clone(),
+                metrics,
+                exit,
+            );
+        } else {
+            websocket_source::start(
+                websocket_source::Config {
+                    rpc_http_url: configuration.source_configuration.rpc_http_url.clone(),
+                    rpc_ws_url: configuration.source_configuration.rpc_ws_url.clone(),
+                    serum_programs,
+                    open_orders_authority: mango_group,
+                },
+                mango_oracles.clone(),
+                account_update_sender.clone(),
+            );
+        }
 
         let first_websocket_slot = websocket_source::get_next_create_bank_slot(
             account_update_receiver.clone(),
@@ -199,11 +227,13 @@ impl DataProcessor {
         // FUTURE: of what to fetch a snapshot - should probably take as an input
         let snapshot_job = snapshot_source::start(
             snapshot_source::Config {
-                rpc_http_url: configuration.rpc_http_url.clone(),
+                rpc_http_url: configuration.source_configuration.rpc_http_url.clone(),
                 mango_group,
                 get_multiple_accounts_count: 100,
                 parallel_rpc_requests: 10,
-                snapshot_interval: Duration::from_secs(configuration.snapshot_interval_secs),
+                snapshot_interval: Duration::from_secs(
+                    configuration.source_configuration.snapshot_interval_secs,
+                ),
                 min_slot: first_websocket_slot + 10,
             },
             mango_oracles,

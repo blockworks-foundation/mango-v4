@@ -1,7 +1,17 @@
+mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
+
+[source_configuration]
 rpc_ws_url = "wss://mango.rpcpool.com/<TOKEN>"
 rpc_http_url = "http://mango.rpcpool.com/<TOKEN>"
-mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
 snapshot_interval_secs = 900
+use_grpc = false
+dedup_queue_size = 50000
+
+[[source_configuration.grpc_sources]]
+name = "service-mango-health"
+connection_string = "http://tyo64.rpcpool.com/"
+#token = "<TOKEN>"
+retry_connection_sleep_secs = 30
 
 # [postgres]
 # connection_string = "$PG_CONNECTION_STRING"
