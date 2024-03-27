@@ -610,6 +610,34 @@ impl MangoClient {
         Ok(ixs)
     }
 
+    /// Avoid executing same instruction multiple time
+    pub async fn sequence_check_instruction(
+        &self,
+        mango_account_address: &Pubkey,
+        mango_account: &MangoAccountValue,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let ixs = PreparedInstructions::from_vec(
+            vec![Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::SequenceCheck {
+                            group: self.group(),
+                            account: *mango_account_address,
+                            owner: mango_account.fixed.owner,
+                        },
+                        None,
+                    )
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::SequenceCheck {
+                    expected_sequence_number: mango_account.fixed.sequence_number,
+                }),
+            }],
+            self.context.compute_estimates.cu_per_mango_instruction,
+        );
+        Ok(ixs)
+    }
+
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
@@ -2454,6 +2482,30 @@ impl TransactionBuilder {
             &signature,
             recent_blockhash,
             &client.config.rpc_confirm_transaction_config,
+        )
+        .await?;
+        Ok(signature)
+    }
+
+    pub async fn send_and_confirm_with_sequence_check(
+        mut self,
+        mango_client: &MangoClient,
+        mango_account_address: &Pubkey,
+        mango_account: &MangoAccountValue,
+    ) -> anyhow::Result<Signature> {
+        let rpc = mango_client.client.rpc_async();
+        let mut seq_check_ix = mango_client
+            .sequence_check_instruction(mango_account_address, mango_account)
+            .await?;
+        self.instructions.append(&mut seq_check_ix.instructions);
+        let tx = self.transaction(&rpc).await?;
+        let recent_blockhash = tx.message.recent_blockhash();
+        let signature = mango_client.client.send_transaction(&tx).await?;
+        wait_for_transaction_confirmation(
+            &rpc,
+            &signature,
+            recent_blockhash,
+            &mango_client.client.config.rpc_confirm_transaction_config,
         )
         .await?;
         Ok(signature)

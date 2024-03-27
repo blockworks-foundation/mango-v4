@@ -133,6 +133,7 @@ impl Rebalancer {
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_buy(
         &self,
+        account: &MangoAccountValue,
         output_mint: Pubkey,
         in_amount_quote: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
@@ -181,8 +182,13 @@ impl Rebalancer {
                 &alternatives,
             )
             .await?;
+
         let sig = tx_builder
-            .send_and_confirm(&self.mango_client.client)
+            .send_and_confirm_with_sequence_check(
+                &self.mango_client,
+                &self.mango_account_address,
+                account,
+            )
             .await?;
         Ok((sig, route))
     }
@@ -194,6 +200,7 @@ impl Rebalancer {
     /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
     async fn token_swap_sell(
         &self,
+        account: &MangoAccountValue,
         input_mint: Pubkey,
         in_amount: u64,
     ) -> anyhow::Result<(Signature, jupiter::Quote)> {
@@ -227,7 +234,11 @@ impl Rebalancer {
             .await?;
 
         let sig = tx_builder
-            .send_and_confirm(&self.mango_client.client)
+            .send_and_confirm_with_sequence_check(
+                &self.mango_client,
+                &self.mango_account_address,
+                account,
+            )
             .await?;
         Ok((sig, route))
     }
@@ -331,7 +342,7 @@ impl Rebalancer {
                 let input_amount =
                     buy_amount * token_price * I80F48::from_num(self.config.borrow_settle_excess);
                 let (txsig, route) = self
-                    .token_swap_buy(token_mint, input_amount.to_num())
+                    .token_swap_buy(&account, token_mint, input_amount.to_num())
                     .await?;
                 let in_token = self
                     .mango_client
@@ -355,7 +366,7 @@ impl Rebalancer {
             if amount > dust_threshold {
                 // Sell
                 let (txsig, route) = self
-                    .token_swap_sell(token_mint, amount.to_num::<u64>())
+                    .token_swap_sell(&account, token_mint, amount.to_num::<u64>())
                     .await?;
                 let out_token = self
                     .mango_client
@@ -477,9 +488,10 @@ impl Rebalancer {
                 return Ok(true);
             }
 
-            let txsig = self
+            let ixs = self
                 .mango_client
-                .perp_place_order(
+                .perp_place_order_instruction(
+                    account,
                     perp_position.market_index,
                     side,
                     price_lots,
@@ -493,6 +505,20 @@ impl Rebalancer {
                     mango_v4::state::SelfTradeBehavior::DecrementTake,
                 )
                 .await?;
+
+            let tx_builder = TransactionBuilder {
+                instructions: ixs.to_instructions(),
+                signers: vec![self.mango_client.owner.clone()],
+                ..self.mango_client.transaction_builder().await?
+            };
+            let txsig = tx_builder
+                .send_and_confirm_with_sequence_check(
+                    &self.mango_client,
+                    &self.mango_account_address,
+                    account,
+                )
+                .await?;
+
             info!(
                 %txsig,
                 %order_price,
