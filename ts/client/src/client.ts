@@ -141,7 +141,7 @@ export class MangoClient {
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
   private fallbackOracleConfig: FallbackOracleConfig = 'never';
-  private fixedFallbacks: Map<PublicKey, [PublicKey, PublicKey]> = new Map();
+  private fixedFallbacks: Map<string, [PublicKey, PublicKey]> = new Map();
   multipleConnections: Connection[] = [];
 
   constructor(
@@ -5035,6 +5035,7 @@ export class MangoClient {
     opts?: MangoClientOptions,
   ): MangoClient {
     const idl = IDL;
+    console.log(opts);
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, programId, provider),
@@ -5226,8 +5227,8 @@ export class MangoClient {
     const fallbacks: PublicKey[] = [];
 
     for (const oracle of mintInfos.map((mintInfo) => mintInfo.oracle)) {
-      if (fallbackMap.has(oracle)) {
-        fallbacks.push(...fallbackMap.get(oracle)!);
+      if (fallbackMap.has(oracle.toBase58())) {
+        fallbacks.push(...fallbackMap.get(oracle.toBase58())!);
       }
     }
 
@@ -5245,10 +5246,10 @@ export class MangoClient {
   /**This function assumes that the provided group has loaded banks*/
   public async deriveFallbackOracleContexts(
     group: Group,
-  ): Promise<Map<PublicKey, [PublicKey, PublicKey]>> {
+  ): Promise<Map<string, [PublicKey, PublicKey]>> {
     // fixed
     if (typeof this.fallbackOracleConfig !== 'string') {
-      if (this.fixedFallbacks.size == 0) {
+      if (this.fixedFallbacks.size === 0) {
         const oracles: PublicKey[] = this.fallbackOracleConfig;
         const fallbacks: PublicKey[] = [];
         Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
