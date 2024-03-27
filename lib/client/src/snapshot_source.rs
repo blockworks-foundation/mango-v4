@@ -227,7 +227,7 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
     let mut poll_wait_first_snapshot = crate::delay_interval(time::Duration::from_secs(2));
     let mut interval_between_snapshots = crate::delay_interval(config.snapshot_interval);
 
-    tokio::spawn(async move {
+    let snapshot_job = tokio::spawn(async move {
         let rpc_client = http::connect_with_options::<MinimalClient>(&config.rpc_http_url, true)
             .await
             .expect("always Ok");
@@ -259,5 +259,11 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
                 info!("snapshot success");
             };
         }
+    });
+
+    tokio::spawn(async move {
+        let res = snapshot_job.await;
+        tracing::error!("Snapshot job exited, terminating process.. ({:?})", res);
+        std::process::exit(-1);
     });
 }
