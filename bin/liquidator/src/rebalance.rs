@@ -69,9 +69,19 @@ impl Rebalancer {
             "checking for rebalance"
         );
 
-        self.rebalance_perps().await?;
-        self.rebalance_tokens().await?;
+        let rebalance_perps_res = self.rebalance_perps().await;
+        let rebalance_tokens_res = self.rebalance_tokens().await;
 
+        if rebalance_perps_res.is_err() && rebalance_tokens_res.is_err() {
+            anyhow::bail!(
+                "Failed to rebalance perps ({}) and tokens ({})",
+                rebalance_perps_res.unwrap_err(),
+                rebalance_tokens_res.unwrap_err()
+            )
+        }
+
+        rebalance_perps_res.expect("rebalancing perps failed");
+        rebalance_tokens_res.expect("rebalancing tokens failed");
         Ok(())
     }
 
@@ -278,7 +288,7 @@ impl Rebalancer {
         // TODO: configurable?
         let quote_token = self.mango_client.context.token(QUOTE_TOKEN_INDEX);
 
-        for token_position in account.active_token_positions() {
+        for token_position in Self::shuffle(account.active_token_positions()) {
             let token_index = token_position.token_index;
             let token = self.mango_client.context.token(token_index);
             if token_index == quote_token.token_index
@@ -556,7 +566,7 @@ impl Rebalancer {
     async fn rebalance_perps(&self) -> anyhow::Result<()> {
         let account = self.mango_account()?;
 
-        for perp_position in account.active_perp_positions() {
+        for perp_position in Self::shuffle(account.active_perp_positions()) {
             let perp = self.mango_client.context.perp(perp_position.market_index);
             if !self.rebalance_perp(&account, perp, perp_position).await? {
                 return Ok(());
@@ -564,5 +574,17 @@ impl Rebalancer {
         }
 
         Ok(())
+    }
+
+    fn shuffle<T>(iterator: impl Iterator<Item = T>) -> Vec<T> {
+        use rand::seq::SliceRandom;
+
+        let mut result = iterator.collect::<Vec<T>>();
+        {
+            let mut rng = rand::thread_rng();
+            result.shuffle(&mut rng);
+        }
+
+        result
     }
 }
