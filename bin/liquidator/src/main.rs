@@ -1,19 +1,25 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::Read;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use anchor_client::Cluster;
 use clap::Parser;
 use futures_util::StreamExt;
+use mango_feeds_connector::MetricsConfig;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::account_update_stream::SnapshotType;
 use mango_v4_client::{
-    account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
-    snapshot_source, websocket_source, Client, MangoClient, MangoGroupContext,
+    account_update_stream, chain_data, error_tracking::ErrorTracking, grpc_source,
+    keypair_from_cli, snapshot_source, websocket_source, Client, MangoClient, MangoGroupContext,
     TransactionBuilderConfig,
 };
 
 use crate::cli_args::{BoolArg, Cli, CliDotenv};
+use crate::configuration::Configuration;
 use crate::liquidation_state::LiquidationState;
 use crate::rebalance::Rebalancer;
 use crate::tcs_state::TcsState;
@@ -26,6 +32,7 @@ use tokio::task::JoinHandle;
 use tracing::*;
 
 pub mod cli_args;
+mod configuration;
 pub mod liquidate;
 mod liquidation_state;
 pub mod metrics;
@@ -51,6 +58,7 @@ pub fn encode_address(addr: &Pubkey) -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // env_logger::init();
     mango_v4_client::tracing_subscriber_init();
 
     let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
@@ -63,6 +71,7 @@ async fn main() -> anyhow::Result<()> {
         dotenv::dotenv().ok();
         std::env::args_os().collect()
     };
+
     let cli = Cli::parse_from(args);
 
     //
@@ -149,17 +158,56 @@ async fn main() -> anyhow::Result<()> {
     let (account_update_sender, account_update_receiver) =
         async_channel::unbounded::<account_update_stream::Message>();
 
-    // Sourcing account and slot data from solana via websockets
+    // Sourcing account and slot data from solana via websockets/grpc
     // FUTURE: websocket feed should take which accounts to listen to as an input
-    websocket_source::start(
-        websocket_source::Config {
-            rpc_ws_url: ws_url.clone(),
-            serum_programs,
-            open_orders_authority: mango_group,
-        },
-        mango_oracles.clone(),
-        account_update_sender.clone(),
-    );
+    if cli.geyser_config.is_some() {
+        let configuration = cli
+            .geyser_config
+            .as_ref()
+            .map(|path| {
+                let mut file = File::open(path).expect("invalid config file path");
+                let mut contents = String::new();
+                file.read_to_string(&mut contents)
+                    .expect("failed to read config file");
+                let config: Configuration =
+                    toml::from_str(&contents).expect("invalid config file content");
+                config
+            })
+            .unwrap_or_default();
+
+        let feed_metrics = mango_feeds_connector::metrics::start(
+            MetricsConfig {
+                output_http: false,
+                output_stdout: true,
+            },
+            "liquidator".to_string(),
+        );
+        let exit = Arc::new(AtomicBool::new(false));
+        grpc_source::start(
+            grpc_source::Config {
+                rpc_ws_url: ws_url.clone(),
+                rpc_http_url: rpc_url.clone(),
+                serum_programs,
+                open_orders_authority: mango_group,
+                grpc_sources: configuration.grpc_sources,
+            },
+            mango_oracles.clone(),
+            account_update_sender.clone(),
+            feed_metrics,
+            exit,
+        );
+    } else {
+        websocket_source::start(
+            websocket_source::Config {
+                rpc_ws_url: ws_url.clone(),
+                rpc_http_url: rpc_url.clone(),
+                serum_programs,
+                open_orders_authority: mango_group,
+            },
+            mango_oracles.clone(),
+            account_update_sender.clone(),
+        );
+    }
 
     let first_websocket_slot = websocket_source::get_next_create_bank_slot(
         account_update_receiver.clone(),
@@ -356,7 +404,8 @@ async fn main() -> anyhow::Result<()> {
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
                         }
                     }
-                    Message::Snapshot(snapshot) => {
+                    Message::Snapshot(snapshot, snapshot_type) => {
+                        debug!("Got a new snapshot ({:?})", snapshot_type);
                         let mut state = shared_state.write().unwrap();
                         let mut reception_time = None;
 
@@ -393,7 +442,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
-                        state.one_snapshot_done = true;
+                        if snapshot_type == SnapshotType::Full {
+                            state.one_snapshot_done = true;
+                        }
                     }
                     _ => {}
                 }

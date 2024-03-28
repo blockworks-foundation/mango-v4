@@ -5,6 +5,7 @@ use std::time::Duration;
 use anchor_client::Cluster;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
+use mango_v4_client::account_update_stream::SnapshotType;
 use mango_v4_client::{
     account_update_stream, chain_data, keypair_from_cli, priority_fees_cli, snapshot_source,
     websocket_source, Client, MangoClient, MangoGroupContext, TransactionBuilderConfig,
@@ -162,6 +163,7 @@ async fn main() -> anyhow::Result<()> {
     // FUTURE: websocket feed should take which accounts to listen to as an input
     websocket_source::start(
         websocket_source::Config {
+            rpc_http_url: rpc_url.clone(),
             rpc_ws_url: ws_url.clone(),
             serum_programs,
             open_orders_authority: mango_group,
@@ -272,7 +274,7 @@ async fn main() -> anyhow::Result<()> {
                             metric_mango_accounts.set(state.mango_accounts.len() as u64);
                         }
                     }
-                    Message::Snapshot(snapshot) => {
+                    Message::Snapshot(snapshot, snapshot_type) => {
                         let mut state = shared_state.write().unwrap();
                         // Track all mango account pubkeys
                         for update in snapshot.iter() {
@@ -291,7 +293,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                         metric_mango_accounts.set(state.mango_accounts.len() as u64);
 
-                        state.one_snapshot_done = true;
+                        if snapshot_type == SnapshotType::Full {
+                            state.one_snapshot_done = true;
+                        }
                     }
                     _ => {}
                 }

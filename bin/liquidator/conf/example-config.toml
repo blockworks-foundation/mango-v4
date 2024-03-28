@@ -1,0 +1,5 @@
+[[grpc_sources]]
+name = "liquidator"
+connection_string = "http://tyo64.rpcpool.com/"
+retry_connection_sleep_secs = 30
+

@@ -12,6 +12,7 @@ pub mod confirm_transaction;
 mod context;
 pub mod error_tracking;
 pub mod gpa;
+pub mod grpc_source;
 pub mod health_cache;
 pub mod jupiter;
 pub mod perp_pnl;

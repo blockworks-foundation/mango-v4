@@ -1,6 +1,8 @@
 use solana_client::rpc_response::{Response, RpcKeyedAccount};
 use solana_sdk::{account::AccountSharedData, pubkey::Pubkey};
 
+use mango_feeds_connector::AccountWrite;
+use solana_sdk::account::WritableAccount;
 use std::time::Instant;
 use std::{str::FromStr, sync::Arc};
 use tracing::*;
@@ -30,6 +32,23 @@ impl AccountUpdate {
             reception_time: Instant::now(),
         })
     }
+    pub fn from_feed(rpc: AccountWrite) -> Self {
+        let pubkey = rpc.pubkey;
+        let account = AccountSharedData::create(
+            rpc.lamports,
+            rpc.data,
+            rpc.owner,
+            rpc.executable,
+            rpc.rent_epoch,
+        );
+
+        AccountUpdate {
+            pubkey,
+            slot: rpc.slot,
+            account,
+            reception_time: Instant::now(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -38,10 +57,16 @@ pub struct ChainSlotUpdate {
     pub reception_time: Instant,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SnapshotType {
+    Full,
+    Partial,
+}
+
 #[derive(Clone)]
 pub enum Message {
     Account(AccountUpdate),
-    Snapshot(Vec<AccountUpdate>),
+    Snapshot(Vec<AccountUpdate>, SnapshotType),
     Slot(ChainSlotUpdate),
 }
 
@@ -60,7 +85,8 @@ impl Message {
                     },
                 );
             }
-            Message::Snapshot(snapshot) => {
+            Message::Snapshot(snapshot, snapshot_type) => {
+                trace!("websocket snapshot '{:?}' message", snapshot_type);
                 for account_update in snapshot {
                     chain.update_account(
                         account_update.pubkey,
@@ -73,7 +99,7 @@ impl Message {
                 }
             }
             Message::Slot(slot_update) => {
-                trace!("websocket slot message");
+                // trace!("websocket slot message");
                 let slot_update = match *(slot_update.slot_update) {
                     solana_client::rpc_response::SlotUpdate::CreatedBank {
                         slot, parent, ..
