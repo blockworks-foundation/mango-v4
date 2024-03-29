@@ -11,6 +11,7 @@ use std::sync::atomic::Ordering;
 use crate::configuration::Configuration;
 use crate::processors::data::{DataEventSource, DataProcessor};
 use crate::processors::exit::ExitProcessor;
+use crate::processors::exporter::ExporterProcessor;
 use crate::processors::logger::LoggerProcessor;
 
 #[tokio::main]
@@ -53,11 +54,20 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
+    let exporter_processor = ExporterProcessor::init(
+        &configuration,
+        &ws_processor.channel,
+        &grpc_processor.channel,
+        exit_processor.exit.clone(),
+    )
+    .await?;
+
     let jobs = vec![
         exit_processor.job,
         ws_processor.job,
         grpc_processor.job,
         logger_processor.job,
+        exporter_processor.job,
     ];
     let mut jobs: futures::stream::FuturesUnordered<_> = jobs.into_iter().collect();
 

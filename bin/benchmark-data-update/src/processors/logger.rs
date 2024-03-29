@@ -36,6 +36,7 @@ impl LoggerProcessor {
                     warn!("shutting down logger processor...");
                     break;
                 }
+
                 tokio::select! {
                     _ = interval.tick() => {
                         if !first {

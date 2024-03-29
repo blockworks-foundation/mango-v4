@@ -6,6 +6,8 @@ use services_mango_lib::env_helper::string_or_env;
 pub struct Configuration {
     #[serde(deserialize_with = "string_or_env")]
     pub mango_group: String,
+    #[serde(deserialize_with = "string_or_env")]
+    pub export_csv_path: String,
     pub source_configuration: SourceConfiguration,
 }
 
