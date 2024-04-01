@@ -33,12 +33,7 @@ import {
   findLargestAssetBatchUi,
   getEquityForMangoAccounts,
 } from '../src/risk';
-import {
-  buildFetch,
-  toNative,
-  toNativeI80F48ForQuote,
-  toUiDecimalsForQuote,
-} from '../src/utils';
+import { buildFetch, toNative, toUiDecimalsForQuote } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -144,7 +139,10 @@ async function updateTokenParams(): Promise<void> {
 
   const instructions: TransactionInstruction[] = [];
 
-  const allMangoAccounts = await client.getAllMangoAccounts(group, true);
+  let allMangoAccounts = await client.getAllMangoAccounts(group, true);
+  allMangoAccounts = allMangoAccounts.filter(
+    (a) => toUiDecimalsForQuote(a.getEquity(group)) > 100,
+  );
 
   const stepSize = 1;
 
@@ -156,14 +154,10 @@ async function updateTokenParams(): Promise<void> {
 
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
-  const pisForLiqor: LiqorPriceImpact[][] = [];
+  let pisForLiqor: LiqorPriceImpact[][] = [];
   // eslint-disable-next-line no-constant-condition
-  if (false) {
-    const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
-      group,
-      allMangoAccounts,
-      stepSize,
-    );
+  if (true) {
+    pisForLiqor = await buildGroupGrid(group, allMangoAccounts, stepSize);
   }
 
   // eslint-disable-next-line no-constant-condition
@@ -200,21 +194,21 @@ async function updateTokenParams(): Promise<void> {
         );
 
         // eslint-disable-next-line no-constant-condition
-        if (true) {
-          if (
-            bank.uiBorrows() == 0 &&
-            bank.reduceOnly == 2 &&
-            bank.initAssetWeight.toNumber() == 0 &&
-            bank.maintAssetWeight.toNumber() == 0
-          ) {
-            builder.disableAssetLiquidation(true);
-            builder.oracleConfig({
-              confFilter: 1000,
-              maxStalenessSlots: -1,
-            });
-            change = true;
-          }
-        }
+        // if (true) {
+        //   if (
+        //     bank.uiBorrows() == 0 &&
+        //     bank.reduceOnly == 2 &&
+        //     bank.initAssetWeight.toNumber() == 0 &&
+        //     bank.maintAssetWeight.toNumber() == 0
+        //   ) {
+        //     builder.disableAssetLiquidation(true);
+        //     builder.oracleConfig({
+        //       confFilter: 1000,
+        //       maxStalenessSlots: -1,
+        //     });
+        //     change = true;
+        //   }
+        // }
 
         // // eslint-disable-next-line no-constant-condition
         // if (true) {
@@ -277,35 +271,40 @@ async function updateTokenParams(): Promise<void> {
         // );
 
         // eslint-disable-next-line no-constant-condition
-        if (false) {
-          // Net borrow limits
-          const netBorrowLimitPerWindowQuote = Math.max(
-            10_000,
-            Math.min(bank.uiDeposits() * bank.uiPrice, 300_000) / 3 +
-              Math.max(0, bank.uiDeposits() * bank.uiPrice - 300_000) / 5,
-          );
-          builder.netBorrowLimitPerWindowQuote(
-            toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
-          );
-          change = true;
-          if (
-            netBorrowLimitPerWindowQuote !=
-            toUiDecimalsForQuote(bank.netBorrowLimitPerWindowQuote)
-          ) {
-            console.log(
-              `${
-                bank.name
-              } new - ${netBorrowLimitPerWindowQuote.toLocaleString()}, old - ${toUiDecimalsForQuote(
-                bank.netBorrowLimitPerWindowQuote,
-              ).toLocaleString()}`,
-            );
-          }
-        }
+        // if (true) {
+        //   // Net borrow limits
+        //   const netBorrowLimitPerWindowQuote = Math.max(
+        //     10_000,
+        //     Math.min(bank.uiDeposits() * bank.uiPrice, 300_000) / 3 +
+        //       Math.max(0, bank.uiDeposits() * bank.uiPrice - 300_000) / 5,
+        //   );
+        //   builder.netBorrowLimitPerWindowQuote(
+        //     toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
+        //   );
+        //   change = true;
+        //   if (
+        //     netBorrowLimitPerWindowQuote !=
+        //     toUiDecimalsForQuote(bank.netBorrowLimitPerWindowQuote)
+        //   ) {
+        //     console.log(
+        //       `${
+        //         bank.name
+        //       } new - ${netBorrowLimitPerWindowQuote.toLocaleString()}, old - ${toUiDecimalsForQuote(
+        //         bank.netBorrowLimitPerWindowQuote,
+        //       ).toLocaleString()}`,
+        //     );
+        //   }
+        // }
 
         // Deposit limits
         // eslint-disable-next-line no-constant-condition
-        if (false) {
-          if (bank.maintAssetWeight.toNumber() > 0) {
+        if (true) {
+          if (
+            bank.maintAssetWeight.toNumber() > 0 &&
+            (bank.depositLimit.toNumber() - bank.nativeDeposits().toNumber()) /
+              bank.depositLimit.toNumber() <
+              0.2
+          ) {
             {
               // Find asset's largest batch in $ we would need to liquidate, batches are extreme points of a range of price drop,
               // range is constrained by leverage provided
@@ -337,28 +336,28 @@ async function updateTokenParams(): Promise<void> {
               const depositLimitUi = bank.uiDeposits() + allowedNewDepositsUi;
 
               // LOG
-              // console.log(
-              //   `${bank.name.padStart(20)} ${maxLiqBatchUi
-              //     .toLocaleString()
-              //     .padStart(15)} ${maxLiqBatchQuoteUi
-              //     .toLocaleString()
-              //     .padStart(15)}$ ${sellImpact.target_amount
-              //     .toLocaleString()
-              //     .padStart(12)}$ ${sellImpact.avg_price_impact_percent
-              //     .toLocaleString()
-              //     .padStart(12)}% ${allowedNewDepositsUi
-              //     .toLocaleString()
-              //     .padStart(20)}${allowedNewDepositsQuoteUi
-              //     .toLocaleString()
-              //     .padStart(20)}$ ${bank
-              //     .uiDeposits()
-              //     .toLocaleString()
-              //     .padStart(12)} ${(bank.uiDeposits() * bank.uiPrice)
-              //     .toLocaleString()
-              //     .padStart(12)}$ ${depositLimitUi
-              //     .toLocaleString()
-              //     .padStart(12)}`,
-              // );
+              console.log(
+                `${bank.name.padStart(20)} ${maxLiqBatchUi
+                  .toLocaleString()
+                  .padStart(15)} ${maxLiqBatchQuoteUi
+                  .toLocaleString()
+                  .padStart(15)}$ ${sellImpact.target_amount
+                  .toLocaleString()
+                  .padStart(12)}$ ${sellImpact.avg_price_impact_percent
+                  .toLocaleString()
+                  .padStart(12)}% ${allowedNewDepositsUi
+                  .toLocaleString()
+                  .padStart(20)}${allowedNewDepositsQuoteUi
+                  .toLocaleString()
+                  .padStart(20)}$ ${bank
+                  .uiDeposits()
+                  .toLocaleString()
+                  .padStart(12)} ${(bank.uiDeposits() * bank.uiPrice)
+                  .toLocaleString()
+                  .padStart(12)}$ ${depositLimitUi
+                  .toLocaleString()
+                  .padStart(12)}`,
+              );
 
               builder.depositLimit(toNative(depositLimitUi, bank.mintDecimals));
               change = true;
