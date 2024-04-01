@@ -138,12 +138,13 @@ impl Rebalancer {
             .await
     }
 
-    /// Grab multiple possibles routes:
+    /// Grab multiples possible routes:
     /// 1. USDC -> output (complex routes)
     /// 2. USDC -> output (direct route only)
-    /// 3. alternate_jupiter_route_tokens -> output (direct route only)
-    /// 4. if enabled, sanctum routes
-    /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
+    /// 3. if enabled, sanctum routes - might generate 0, 1 or more routes
+    /// 4. input -> alternate_jupiter_route_tokens (direct route only) - might generate 0, 1 or more routes
+    /// Use best of 1/2/3. if it fits into a tx,
+    /// Otherwise use the best of 4.
     async fn token_swap_buy(
         &self,
         account: &MangoAccountValue,
@@ -170,16 +171,7 @@ impl Rebalancer {
         );
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
-        for in_token_index in &self.config.alternate_jupiter_route_tokens {
-            let (alt_mint, alt_in_amount) =
-                self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
-            let direct_route_job =
-                self.swap_quote(alt_mint, output_mint, alt_in_amount, true, jupiter_version);
-            jobs.push(direct_route_job);
-        }
-
-        if self.config.use_sanctum && self.is_lst(output_mint) {
-            // go through an alternative token
+        if self.can_use_sanctum_for_token(output_mint)? {
             for in_token_index in &self.config.alternate_sanctum_route_tokens {
                 let (alt_mint, alt_in_amount) =
                     self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
@@ -187,7 +179,7 @@ impl Rebalancer {
                     alt_mint,
                     output_mint,
                     alt_in_amount,
-                    true,
+                    false,
                     swap::Version::Sanctum,
                 );
                 jobs.push(sanctum_alt_route_job);
@@ -195,11 +187,30 @@ impl Rebalancer {
         }
 
         let results = futures::future::join_all(jobs).await;
-        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        let routes: Vec<_> = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
-        let (mut tx_builder, route) = self
+        let best_route_res = self
             .determine_best_swap_tx(routes, quote_mint, output_mint)
-            .await?;
+            .await;
+
+        let (mut tx_builder, route) = match best_route_res {
+            Ok(x) => x,
+            Err(e) => {
+                warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
+
+                self.get_jupiter_alt_route(
+                    |in_token_index| {
+                        let (alt_mint, alt_in_amount) =
+                            self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
+                        Ok((alt_mint, output_mint, alt_in_amount, true))
+                    },
+                    output_mint,
+                    jupiter_version,
+                    quote_mint,
+                )
+                .await?
+            }
+        };
 
         let seq_check_ix = self
             .mango_client
@@ -213,12 +224,13 @@ impl Rebalancer {
         Ok((sig, route))
     }
 
-    /// Grab three possible routes:
+    /// Grab multiples possible routes:
     /// 1. input -> USDC (complex routes)
     /// 2. input -> USDC (direct route only)
-    /// 3. input -> alternate_jupiter_route_tokens (direct route only)
-    /// 4. if enabled, sanctum routes
-    /// Use 1. if it fits into a tx. Otherwise use the better of 2./3.
+    /// 3. if enabled, sanctum routes - might generate 0, 1 or more routes
+    /// 4. input -> alternate_jupiter_route_tokens (direct route only) - might generate 0, 1 or more routes
+    /// Use best of 1/2/3. if it fits into a tx,
+    /// Otherwise use the best of 4.
     async fn token_swap_sell(
         &self,
         account: &MangoAccountValue,
@@ -235,14 +247,7 @@ impl Rebalancer {
             self.swap_quote(input_mint, quote_mint, in_amount, true, jupiter_version);
         let mut jobs = vec![full_route_job, direct_quote_route_job];
 
-        for out_token_index in &self.config.alternate_jupiter_route_tokens {
-            let out_token = self.mango_client.context.token(*out_token_index);
-            let direct_route_job =
-                self.swap_quote(input_mint, out_token.mint, in_amount, true, jupiter_version);
-            jobs.push(direct_route_job);
-        }
-
-        if self.config.use_sanctum && self.is_lst(input_mint) {
+        if self.can_use_sanctum_for_token(input_mint)? {
             for out_token_index in &self.config.alternate_sanctum_route_tokens {
                 let out_token = self.mango_client.context.token(*out_token_index);
                 let sanctum_job = self.swap_quote(
@@ -257,11 +262,29 @@ impl Rebalancer {
         }
 
         let results = futures::future::join_all(jobs).await;
-        let routes = results.into_iter().filter_map(|v| v.ok()).collect_vec();
+        let routes: Vec<_> = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
-        let (mut tx_builder, route) = self
+        let best_route_res = self
             .determine_best_swap_tx(routes, input_mint, quote_mint)
-            .await?;
+            .await;
+
+        let (mut tx_builder, route) = match best_route_res {
+            Ok(x) => x,
+            Err(e) => {
+                warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
+
+                self.get_jupiter_alt_route(
+                    |out_token_index| {
+                        let out_token = self.mango_client.context.token(*out_token_index);
+                        Ok((input_mint, out_token.mint, in_amount, true))
+                    },
+                    quote_mint,
+                    jupiter_version,
+                    input_mint,
+                )
+                .await?
+            }
+        };
 
         let seq_check_ix = self
             .mango_client
@@ -289,6 +312,45 @@ impl Rebalancer {
             .to_num::<u64>();
 
         Ok((in_token.mint, in_amount))
+    }
+
+    fn can_use_sanctum_for_token(&self, mint: Pubkey) -> anyhow::Result<bool> {
+        if !self.config.use_sanctum {
+            return Ok(false);
+        }
+
+        let token = self.mango_client.context.token_by_mint(&mint)?;
+
+        let is_lst = self.is_lst(mint);
+
+        // forbid swapping to something that could be used in another sanctum swap, creating a cycle
+        let is_an_alt_for_sanctum = self
+            .config
+            .alternate_sanctum_route_tokens
+            .contains(&token.token_index);
+
+        Ok(is_lst && !is_an_alt_for_sanctum)
+    }
+
+    async fn get_jupiter_alt_route(
+        &self,
+        quote_fetcher: impl Fn(&u16) -> anyhow::Result<(Pubkey, Pubkey, u64, bool)>,
+        output_mint: Pubkey,
+        jupiter_version: swap::Version,
+        quote_mint: Pubkey,
+    ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
+        let mut alt_jobs = vec![];
+        for in_token_index in &self.config.alternate_jupiter_route_tokens {
+            let args = quote_fetcher(in_token_index)?;
+            alt_jobs.push(self.swap_quote(args.0, args.1, args.2, args.3, jupiter_version));
+        }
+        let alt_results = futures::future::join_all(alt_jobs).await;
+        let alt_routes: Vec<_> = alt_results.into_iter().filter_map(|v| v.ok()).collect_vec();
+
+        let best_route = self
+            .determine_best_swap_tx(alt_routes, quote_mint, output_mint)
+            .await?;
+        Ok(best_route)
     }
 
     async fn determine_best_swap_tx(
@@ -325,7 +387,8 @@ impl Rebalancer {
                 swap::RawQuote::V6(_) => "jupiter",
                 swap::RawQuote::Sanctum(_) => "sanctum",
             };
-            tracing::debug!(
+
+            debug!(
                 "quote for {} vs {} [using {}] is {}@{} vs {}@{} -> amount={}",
                 r.input_mint,
                 r.output_mint,
