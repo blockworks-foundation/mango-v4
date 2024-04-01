@@ -17,7 +17,6 @@ use mango_v4_client::{
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::Signer;
 use tracing::*;
 
 pub mod cli_args;
@@ -105,11 +104,6 @@ async fn main() -> anyhow::Result<()> {
         .fetch_fresh_mango_account(&cli.liqor_mango_account)
         .await?;
     let mango_group = mango_account.fixed.group;
-
-    let signer_is_owner = mango_account.fixed.owner == liqor_owner.pubkey();
-    if cli.rebalance == BoolArg::True && !signer_is_owner {
-        warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
-    }
 
     let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
@@ -246,7 +240,7 @@ async fn main() -> anyhow::Result<()> {
         alternate_jupiter_route_tokens: cli
             .rebalance_alternate_jupiter_route_tokens
             .unwrap_or_default(),
-        allow_withdraws: signer_is_owner,
+        allow_withdraws: true,
     };
     rebalance_config.validate(&mango_client.context);
 

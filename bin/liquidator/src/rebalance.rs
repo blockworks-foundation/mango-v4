@@ -295,11 +295,12 @@ impl Rebalancer {
             // Imagine SOL at 0.04 USDC-native per SOL-native: Any amounts below 25 SOL-native
             // would not be worth a single USDC-native.
             //
-            // To avoid errors, we consider all amounts below 2 * (1/oracle) dust and don't try
+            // To avoid errors, we consider all amounts below 1000 * (1/oracle) dust and don't try
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.
-            let dust_threshold = I80F48::from(2) / token_price;
+            // 1000 USD-native is $0.001; note that delegates are allowed to withdraw up to DELEGATE_WITHDRAW_MAX ($0.1)
+            let dust_threshold = I80F48::from(1_000) / token_price;
 
             // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
             // So re-fetch the current token position amount
