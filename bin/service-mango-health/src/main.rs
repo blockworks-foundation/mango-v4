@@ -64,7 +64,8 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    let mut jobs = vec![exit_processor.job, data_processor.job, health_processor.job];
+    let mut jobs = vec![exit_processor.job, health_processor.job];
+    jobs.extend(data_processor.jobs);
 
     if let Some(logger) = logger {
         jobs.push(logger.job)

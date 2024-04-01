@@ -155,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Getting solana account snapshots via jsonrpc
     // FUTURE: of what to fetch a snapshot - should probably take as an input
-    snapshot_source::start(
+    let snapshot_job = snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
             mango_group,
@@ -457,6 +457,7 @@ async fn main() -> anyhow::Result<()> {
         liquidation_job,
         token_swap_info_job,
         check_changes_for_abort_job,
+        snapshot_job,
     ]
     .into_iter()
     .chain(prio_jobs.into_iter())
