@@ -80,8 +80,8 @@ impl Rebalancer {
             )
         }
 
-        rebalance_perps_res.expect("rebalancing perps failed");
-        rebalance_tokens_res.expect("rebalancing tokens failed");
+        rebalance_perps_res?;
+        rebalance_tokens_res?;
         Ok(())
     }
 
