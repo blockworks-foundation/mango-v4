@@ -169,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Getting solana account snapshots via jsonrpc
     // FUTURE: of what to fetch a snapshot - should probably take as an input
-    snapshot_source::start(
+    let snapshot_job = snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
             mango_group,
@@ -456,12 +456,16 @@ async fn main() -> anyhow::Result<()> {
         spawn_token_swap_refresh_job(&cli, shared_state, token_swap_info_updater);
     let check_changes_for_abort_job = spawn_context_change_watchdog_job(mango_client.clone());
 
-    let mut jobs: futures::stream::FuturesUnordered<_> =
-        vec![data_job, token_swap_info_job, check_changes_for_abort_job]
-            .into_iter()
-            .chain(optional_jobs)
-            .chain(prio_jobs.into_iter())
-            .collect();
+    let mut jobs: futures::stream::FuturesUnordered<_> = vec![
+        snapshot_job,
+        data_job,
+        token_swap_info_job,
+        check_changes_for_abort_job,
+    ]
+    .into_iter()
+    .chain(optional_jobs)
+    .chain(prio_jobs.into_iter())
+    .collect();
     jobs.next().await;
 
     error!("a critical job aborted, exiting");
