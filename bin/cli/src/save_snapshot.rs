@@ -67,7 +67,7 @@ pub async fn save_snapshot(
     .await?;
 
     // Getting solana account snapshots via jsonrpc
-    snapshot_source::start(
+    let snapshot_job = snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
             mango_group,
@@ -79,6 +79,11 @@ pub async fn save_snapshot(
         extra_accounts,
         account_update_sender,
     );
+    tokio::spawn(async move {
+        let res = snapshot_job.await;
+        tracing::error!("Snapshot job exited, terminating process.. ({:?})", res);
+        std::process::exit(-1);
+    });
 
     let mut chain_data = chain_data::ChainData::new();
 

@@ -22,7 +22,7 @@ use tracing::warn;
 
 pub struct DataProcessor {
     pub channel: tokio::sync::broadcast::Sender<DataEvent>,
-    pub job: JoinHandle<()>,
+    pub jobs: Vec<JoinHandle<()>>,
     pub chain_data: Arc<RwLock<chain_data::ChainData>>,
 }
 
@@ -52,7 +52,7 @@ impl DataProcessor {
     ) -> anyhow::Result<DataProcessor> {
         let mut retry_counter = RetryCounter::new(2);
         let mango_group = Pubkey::from_str(&configuration.mango_group)?;
-        let mango_stream =
+        let (mango_stream, snapshot_job) =
             fail_or_retry!(retry_counter, Self::init_mango_source(configuration).await)?;
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
@@ -98,7 +98,7 @@ impl DataProcessor {
 
         let result = DataProcessor {
             channel: sender,
-            job,
+            jobs: vec![job, snapshot_job],
             chain_data,
         };
 
@@ -147,7 +147,9 @@ impl DataProcessor {
         return Some(Other);
     }
 
-    async fn init_mango_source(configuration: &Configuration) -> anyhow::Result<Receiver<Message>> {
+    async fn init_mango_source(
+        configuration: &Configuration,
+    ) -> anyhow::Result<(Receiver<Message>, JoinHandle<()>)> {
         //
         // Client setup
         //
@@ -192,7 +194,7 @@ impl DataProcessor {
 
         // Getting solana account snapshots via jsonrpc
         // FUTURE: of what to fetch a snapshot - should probably take as an input
-        snapshot_source::start(
+        let snapshot_job = snapshot_source::start(
             snapshot_source::Config {
                 rpc_http_url: configuration.rpc_http_url.clone(),
                 mango_group,
@@ -205,6 +207,6 @@ impl DataProcessor {
             account_update_sender,
         );
 
-        Ok(account_update_receiver)
+        Ok((account_update_receiver, snapshot_job))
     }
 }
