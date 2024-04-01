@@ -245,21 +245,21 @@ pub async fn loop_update_index_and_rate(
             .send_and_confirm_permissionless_tx(instructions)
             .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
             info!(
                 "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                token_names, confirmation_time, e
+                token_names, duration_ms, e
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_TOKENS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                token_names, confirmation_time,
+                token_names, duration_ms,
             );
             info!("{:?}", sig_result);
         }
