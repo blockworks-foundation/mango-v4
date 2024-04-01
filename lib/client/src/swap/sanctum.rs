@@ -154,9 +154,9 @@ impl<'a> Sanctum<'a> {
             .in_amount
             .clone()
             .expect("sanctum require a in amount");
-        let in_amount_u64 = in_amount.parse::<u64>()?;
-        let out_amount =
-            ((in_amount_u64 as f64) * (1.0 - (max_slippage_bps as f64) / 10_000.0)).ceil() as u64;
+        let quote_amount_u64 = quote.out_amount.parse::<u64>()?;
+        let out_amount = ((quote_amount_u64 as f64) * (1.0 - (max_slippage_bps as f64) / 10_000.0))
+            .ceil() as u64;
 
         let swap_response = self
             .mango_client

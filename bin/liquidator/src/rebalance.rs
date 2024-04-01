@@ -5,6 +5,7 @@ use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
     PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
+use mango_v4_client::gpa::fetch_multiple_accounts_in_chunks;
 use mango_v4_client::{
     chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
     TransactionBuilder, TransactionSize,
@@ -298,7 +299,7 @@ impl Rebalancer {
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let mut prices = HashMap::<Pubkey, I80F48>::new();
         let mut get_or_fetch_price = |m| {
-            prices.get(&m).copied().unwrap_or_else(|| {
+            let entry = prices.entry(m).or_insert_with(|| {
                 let token = self
                     .mango_client
                     .context
@@ -308,9 +309,9 @@ impl Rebalancer {
                     .account_fetcher
                     .fetch_bank_price(&token.first_bank())
                     .expect("failed to fetch price");
-                prices.insert(m, p);
                 p
-            })
+            });
+            *entry
         };
 
         routes.sort_by_cached_key(|r| {
@@ -699,36 +700,76 @@ impl Rebalancer {
     }
 
     pub async fn init(&mut self, live_rpc_client: &RpcClient) {
-        if let Err(e) = self.load_lst_if_needed(live_rpc_client).await {
-            warn!("Could not load list of sanctum supported mint: {}", e);
+        match self.load_lst(live_rpc_client).await {
+            Err(e) => warn!("Could not load list of sanctum supported mint: {}", e),
+            Ok(lst) => self.lst_mints.extend(lst),
         }
     }
 
-    async fn load_lst_if_needed(&mut self, live_rpc_client: &RpcClient) -> anyhow::Result<()> {
-        if !self.lst_mints.is_empty() {
-            return Ok(());
-        }
-
+    async fn load_lst(&mut self, live_rpc_client: &RpcClient) -> anyhow::Result<HashSet<Pubkey>> {
         let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
 
         let lookup_table_data = live_rpc_client.get_account(&address).await?;
         let lookup_table = AddressLookupTable::deserialize(&lookup_table_data.data())?;
-        let accounts: Vec<Account> = live_rpc_client
-            .get_multiple_accounts(&lookup_table.addresses)
-            .await?
-            .drain(..)
-            .filter_map(|x| x)
-            .collect();
+        let accounts: Vec<Account> =
+            fetch_multiple_accounts_in_chunks(live_rpc_client, &lookup_table.addresses, 100, 1)
+                .await?
+                .drain(..)
+                .map(|x| x.1)
+                .collect();
 
+        let mut lst_mints = HashSet::new();
         for account in accounts {
             let account = Account::from(account);
             let mut account_data = account.data();
             let t = StakePool::deserialize(&mut account_data);
             if let Ok(d) = t {
-                self.lst_mints.insert(d.pool_mint);
+                lst_mints.insert(d.pool_mint);
             }
         }
 
-        Ok(())
+        // Hardcoded for now
+        lst_mints.insert(
+            Pubkey::from_str("CgntPoLka5pD5fesJYhGmUCF8KU1QS1ZmZiuAuMZr2az")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("7ge2xKsZXmqPxa3YmXxXmzCp9Hc2ezrTxh6PECaxCwrL")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("GUAMR8ciiaijraJeLDEDrFVaueLm9YzWWY9R7CBPL9rA")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("CtMyWsrUtAwXWiGr9WjHT5fC3p3fgV8cyGpLTo2LJzG1")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("2qyEeSAWKfU18AFthrF7JA8z8ZCi1yt76Tqs917vwQTV")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("DqhH94PjkZsjAqEze2BEkWhFQJ6EyU6MdtMphMgnXqeK")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("F8h46pYkaqPJNP2MRkUUUtRkf8efCkpoqehn9g1bTTm7")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ")
+                .expect("invalid lst mint"),
+        );
+        lst_mints.insert(
+            Pubkey::from_str("stk9ApL5HeVAwPLr3TLhDXdZS8ptVu7zp6ov8HFDuMi")
+                .expect("invalid lst mint"),
+        );
+
+        Ok(lst_mints)
     }
 }

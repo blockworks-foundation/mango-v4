@@ -1,11 +1,12 @@
 use anchor_lang::{AccountDeserialize, Discriminator};
+use futures::{stream, StreamExt};
 use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, MintInfo, PerpMarket, Serum3Market};
 
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
 use solana_client::rpc_filter::{Memcmp, RpcFilterType};
-use solana_sdk::account::AccountSharedData;
+use solana_sdk::account::{Account, AccountSharedData};
 use solana_sdk::pubkey::Pubkey;
 
 pub async fn fetch_mango_accounts(
@@ -147,4 +148,45 @@ pub async fn fetch_multiple_accounts(
         .filter(|(maybe_acc, _)| maybe_acc.is_some())
         .map(|(acc, key)| (*key, acc.unwrap().into()))
         .collect())
+}
+
+pub async fn fetch_multiple_accounts_in_chunks(
+    rpc: &RpcClientAsync,
+    keys: &[Pubkey],
+    max_chunk_size: usize,
+    parallel_rpc_requests: usize,
+) -> anyhow::Result<Vec<(Pubkey, Account)>> {
+    let config = RpcAccountInfoConfig {
+        encoding: Some(UiAccountEncoding::Base64),
+        ..RpcAccountInfoConfig::default()
+    };
+
+    let mut raw_result = stream::iter(keys)
+        .chunks(max_chunk_size)
+        .map(|keys| {
+            let account_info_config = config.clone();
+            async move {
+                let mut keys = keys.iter().map(|x| **x).collect::<Vec<Pubkey>>();
+                let req_res = rpc
+                    .get_multiple_accounts_with_config(&keys, account_info_config)
+                    .await;
+
+                match req_res {
+                    Ok(v) => Ok(keys.drain(..).zip(v.value).collect::<Vec<_>>()),
+                    Err(e) => Err(e),
+                }
+            }
+        })
+        .buffer_unordered(parallel_rpc_requests)
+        .collect::<Vec<_>>()
+        .await;
+
+    let result = raw_result
+        .drain(..)
+        .map(|v| v.unwrap())
+        .flatten()
+        .filter_map(|x| x.1.map(|o| (x.0, o)))
+        .collect::<Vec<_>>();
+
+    Ok(result)
 }
