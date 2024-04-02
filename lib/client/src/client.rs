@@ -2487,30 +2487,6 @@ impl TransactionBuilder {
         Ok(signature)
     }
 
-    pub async fn send_and_confirm_with_sequence_check(
-        mut self,
-        mango_client: &MangoClient,
-        mango_account_address: &Pubkey,
-        mango_account: &MangoAccountValue,
-    ) -> anyhow::Result<Signature> {
-        let rpc = mango_client.client.rpc_async();
-        let mut seq_check_ix = mango_client
-            .sequence_check_instruction(mango_account_address, mango_account)
-            .await?;
-        self.instructions.append(&mut seq_check_ix.instructions);
-        let tx = self.transaction(&rpc).await?;
-        let recent_blockhash = tx.message.recent_blockhash();
-        let signature = mango_client.client.send_transaction(&tx).await?;
-        wait_for_transaction_confirmation(
-            &rpc,
-            &signature,
-            recent_blockhash,
-            &mango_client.client.config.rpc_confirm_transaction_config,
-        )
-        .await?;
-        Ok(signature)
-    }
-
     pub fn transaction_size(&self) -> anyhow::Result<TransactionSize> {
         let tx = self.transaction_with_blockhash(solana_sdk::hash::Hash::default())?;
         let bytes = bincode::serialize(&tx)?;
@@ -2527,6 +2503,11 @@ impl TransactionBuilder {
             accounts,
             length: bytes.len(),
         })
+    }
+
+    pub fn append(&mut self, prepared_instructions: PreparedInstructions) {
+        self.instructions
+            .extend(prepared_instructions.to_instructions());
     }
 }
 

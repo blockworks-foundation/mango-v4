@@ -175,7 +175,7 @@ impl Rebalancer {
         let full_route = results.remove(0)?;
         let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
-        let (tx_builder, route) = self
+        let (mut tx_builder, route) = self
             .determine_best_jupiter_tx(
                 // If the best_route couldn't be fetched, something is wrong
                 &full_route,
@@ -183,12 +183,13 @@ impl Rebalancer {
             )
             .await?;
 
+        let seq_check_ix = self.mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+        tx_builder.append(seq_check_ix);
+
         let sig = tx_builder
-            .send_and_confirm_with_sequence_check(
-                &self.mango_client,
-                &self.mango_account_address,
-                account,
-            )
+            .send_and_confirm(&self.mango_client.client)
             .await?;
         Ok((sig, route))
     }
@@ -225,7 +226,7 @@ impl Rebalancer {
         let full_route = results.remove(0)?;
         let alternatives = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
-        let (tx_builder, route) = self
+        let (mut tx_builder, route) = self
             .determine_best_jupiter_tx(
                 // If the best_route couldn't be fetched, something is wrong
                 &full_route,
@@ -233,12 +234,13 @@ impl Rebalancer {
             )
             .await?;
 
+        let seq_check_ix = self.mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+        tx_builder.append(seq_check_ix);
+
         let sig = tx_builder
-            .send_and_confirm_with_sequence_check(
-                &self.mango_client,
-                &self.mango_account_address,
-                account,
-            )
+            .send_and_confirm(&self.mango_client.client)
             .await?;
         Ok((sig, route))
     }
@@ -506,17 +508,19 @@ impl Rebalancer {
                 )
                 .await?;
 
-            let tx_builder = TransactionBuilder {
+            let mut tx_builder = TransactionBuilder {
                 instructions: ixs.to_instructions(),
                 signers: vec![self.mango_client.owner.clone()],
                 ..self.mango_client.transaction_builder().await?
             };
+
+            let seq_check_ix = self.mango_client
+                .sequence_check_instruction(&self.mango_account_address, account)
+                .await?;
+            tx_builder.append(seq_check_ix);
+
             let txsig = tx_builder
-                .send_and_confirm_with_sequence_check(
-                    &self.mango_client,
-                    &self.mango_account_address,
-                    account,
-                )
+                .send_and_confirm(&self.mango_client.client)
                 .await?;
 
             info!(
