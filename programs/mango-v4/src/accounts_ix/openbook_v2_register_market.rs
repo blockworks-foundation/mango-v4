@@ -19,6 +19,9 @@ pub struct OpenbookV2RegisterMarket<'info> {
     #[account(
         constraint = openbook_v2_market_external.load()?.base_mint == base_bank.load()?.mint,
         constraint = openbook_v2_market_external.load()?.quote_mint == quote_bank.load()?.mint,
+        constraint = openbook_v2_market_external.load()?.close_market_admin.is_none(),
+        constraint = openbook_v2_market_external.load()?.open_orders_admin.is_none(),
+        constraint = openbook_v2_market_external.load()?.consume_events_admin.is_none(),
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
