@@ -633,7 +633,7 @@ impl MangoClient {
                     expected_sequence_number: mango_account.fixed.sequence_number,
                 }),
             }],
-            self.context.compute_estimates.cu_per_mango_instruction,
+            self.context.compute_estimates.cu_for_sequence_check,
         );
         Ok(ixs)
     }
