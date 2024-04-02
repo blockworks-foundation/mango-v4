@@ -183,7 +183,8 @@ impl Rebalancer {
             )
             .await?;
 
-        let seq_check_ix = self.mango_client
+        let seq_check_ix = self
+            .mango_client
             .sequence_check_instruction(&self.mango_account_address, account)
             .await?;
         tx_builder.append(seq_check_ix);
@@ -234,7 +235,8 @@ impl Rebalancer {
             )
             .await?;
 
-        let seq_check_ix = self.mango_client
+        let seq_check_ix = self
+            .mango_client
             .sequence_check_instruction(&self.mango_account_address, account)
             .await?;
         tx_builder.append(seq_check_ix);
@@ -514,7 +516,8 @@ impl Rebalancer {
                 ..self.mango_client.transaction_builder().await?
             };
 
-            let seq_check_ix = self.mango_client
+            let seq_check_ix = self
+                .mango_client
                 .sequence_check_instruction(&self.mango_account_address, account)
                 .await?;
             tx_builder.append(seq_check_ix);
