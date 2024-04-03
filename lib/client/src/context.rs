@@ -122,6 +122,7 @@ pub struct ComputeEstimates {
     pub cu_per_oracle_fallback: u32,
     pub cu_per_charge_collateral_fees: u32,
     pub cu_per_charge_collateral_fees_token: u32,
+    pub cu_for_sequence_check: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -145,6 +146,8 @@ impl Default for ComputeEstimates {
             cu_per_charge_collateral_fees: 20_000,
             // per-chargable-token cost
             cu_per_charge_collateral_fees_token: 15_000,
+            // measured around 8k, see test_basics
+            cu_for_sequence_check: 10_000,
         }
     }
 }

@@ -543,6 +543,7 @@ fn spawn_rebalance_job(
                 if let Err(err) = rebalancer.zero_all_non_quote().await {
                     error!("failed to rebalance liqor: {:?}", err);
 
+                    // TODO FAS Are there other scenario where this sleep is useful ?
                     // Workaround: We really need a sequence enforcer in the liquidator since we don't want to
                     // accidentally send a similar tx again when we incorrectly believe an earlier one got forked
                     // off. For now, hard sleep on error to avoid the most frequent error cases.

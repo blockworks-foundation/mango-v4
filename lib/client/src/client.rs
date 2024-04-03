@@ -610,6 +610,34 @@ impl MangoClient {
         Ok(ixs)
     }
 
+    /// Avoid executing same instruction multiple time
+    pub async fn sequence_check_instruction(
+        &self,
+        mango_account_address: &Pubkey,
+        mango_account: &MangoAccountValue,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let ixs = PreparedInstructions::from_vec(
+            vec![Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::SequenceCheck {
+                            group: self.group(),
+                            account: *mango_account_address,
+                            owner: mango_account.fixed.owner,
+                        },
+                        None,
+                    )
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::SequenceCheck {
+                    expected_sequence_number: mango_account.fixed.sequence_number,
+                }),
+            }],
+            self.context.compute_estimates.cu_for_sequence_check,
+        );
+        Ok(ixs)
+    }
+
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
@@ -2475,6 +2503,11 @@ impl TransactionBuilder {
             accounts,
             length: bytes.len(),
         })
+    }
+
+    pub fn append(&mut self, prepared_instructions: PreparedInstructions) {
+        self.instructions
+            .extend(prepared_instructions.to_instructions());
     }
 }
 
