@@ -141,6 +141,7 @@ impl Rebalancer {
     /// Otherwise use the best of 4.
     async fn token_swap_buy(
         &self,
+        account: &MangoAccountValue,
         output_mint: Pubkey,
         in_amount_quote: u64,
     ) -> anyhow::Result<(Signature, swap::Quote)> {
@@ -186,7 +187,7 @@ impl Rebalancer {
             .determine_best_swap_tx(routes, quote_mint, output_mint)
             .await;
 
-        let (tx_builder, route) = match best_route_res {
+        let (mut tx_builder, route) = match best_route_res {
             Ok(x) => x,
             Err(e) => {
                 warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
@@ -211,6 +212,12 @@ impl Rebalancer {
             }
         };
 
+        let seq_check_ix = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+        tx_builder.append(seq_check_ix);
+
         let sig = tx_builder
             .send_and_confirm(&self.mango_client.client)
             .await?;
@@ -226,6 +233,7 @@ impl Rebalancer {
     /// Otherwise use the best of 4.
     async fn token_swap_sell(
         &self,
+        account: &MangoAccountValue,
         input_mint: Pubkey,
         in_amount: u64,
     ) -> anyhow::Result<(Signature, swap::Quote)> {
@@ -260,7 +268,7 @@ impl Rebalancer {
             .determine_best_swap_tx(routes, input_mint, quote_mint)
             .await;
 
-        let (tx_builder, route) = match best_route_res {
+        let (mut tx_builder, route) = match best_route_res {
             Ok(x) => x,
             Err(e) => {
                 warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
@@ -282,6 +290,12 @@ impl Rebalancer {
                 .await?
             }
         };
+
+        let seq_check_ix = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+        tx_builder.append(seq_check_ix);
 
         let sig = tx_builder
             .send_and_confirm(&self.mango_client.client)
@@ -475,7 +489,7 @@ impl Rebalancer {
                 let input_amount =
                     buy_amount * token_price * I80F48::from_num(self.config.borrow_settle_excess);
                 let (txsig, route) = self
-                    .token_swap_buy(token_mint, input_amount.to_num())
+                    .token_swap_buy(&account, token_mint, input_amount.to_num())
                     .await?;
                 let in_token = self
                     .mango_client
@@ -502,7 +516,7 @@ impl Rebalancer {
                 // To avoid creating a borrow when paying flash loan fees, sell only a fraction
                 let input_amount = amount * I80F48::from_num(0.99);
                 let (txsig, route) = self
-                    .token_swap_sell(token_mint, input_amount.to_num::<u64>())
+                    .token_swap_sell(&account, token_mint, input_amount.to_num::<u64>())
                     .await?;
                 let out_token = self
                     .mango_client
@@ -556,13 +570,13 @@ impl Rebalancer {
     }
 
     #[instrument(
-    skip_all,
-    fields(
-    perp_market_name = perp.name,
-    base_lots = perp_position.base_position_lots(),
-    effective_lots = perp_position.effective_base_position_lots(),
-    quote_native = %perp_position.quote_position_native()
-    )
+        skip_all,
+        fields(
+            perp_market_name = perp.name,
+            base_lots = perp_position.base_position_lots(),
+            effective_lots = perp_position.effective_base_position_lots(),
+            quote_native = %perp_position.quote_position_native()
+        )
     )]
     async fn rebalance_perp(
         &self,
@@ -624,7 +638,7 @@ impl Rebalancer {
                 return Ok(true);
             }
 
-            let ixs = self
+            let mut ixs = self
                 .mango_client
                 .perp_place_order_instruction(
                     account,
@@ -641,6 +655,12 @@ impl Rebalancer {
                     mango_v4::state::SelfTradeBehavior::DecrementTake,
                 )
                 .await?;
+
+            let seq_check_ix = self
+                .mango_client
+                .sequence_check_instruction(&self.mango_account_address, account)
+                .await?;
+            ixs.append(seq_check_ix);
 
             let tx_builder = TransactionBuilder {
                 instructions: ixs.to_instructions(),
