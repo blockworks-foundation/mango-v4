@@ -360,24 +360,24 @@ pub async fn loop_consume_events(
 
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_CONSUME_EVENTS_FAILURE.inc();
             info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 num_of_events,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_CONSUME_EVENTS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
-                perp_market.name, confirmation_time, num_of_events,
+                perp_market.name, duration_ms, num_of_events,
             );
             info!("{:?}", sig_result);
         }
@@ -413,23 +413,23 @@ pub async fn loop_update_funding(
         };
         let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_FUNDING_FAILURE.inc();
             error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_FUNDING_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
-                perp_market.name, confirmation_time,
+                perp_market.name, duration_ms,
             );
             info!("{:?}", sig_result);
         }
