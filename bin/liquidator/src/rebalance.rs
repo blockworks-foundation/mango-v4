@@ -492,7 +492,7 @@ impl Rebalancer {
                 return Ok(true);
             }
 
-            let ixs = self
+            let mut ixs = self
                 .mango_client
                 .perp_place_order_instruction(
                     account,
@@ -510,17 +510,17 @@ impl Rebalancer {
                 )
                 .await?;
 
-            let mut tx_builder = TransactionBuilder {
-                instructions: ixs.to_instructions(),
-                signers: vec![self.mango_client.owner.clone()],
-                ..self.mango_client.transaction_builder().await?
-            };
-
             let seq_check_ix = self
                 .mango_client
                 .sequence_check_instruction(&self.mango_account_address, account)
                 .await?;
-            tx_builder.append(seq_check_ix);
+            ixs.append(seq_check_ix);
+
+            let tx_builder = TransactionBuilder {
+                instructions: ixs.to_instructions(),
+                signers: vec![self.mango_client.owner.clone()],
+                ..self.mango_client.transaction_builder().await?
+            };
 
             let txsig = tx_builder
                 .send_and_confirm(&self.mango_client.client)
