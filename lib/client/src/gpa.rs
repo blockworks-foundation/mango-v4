@@ -161,7 +161,7 @@ pub async fn fetch_multiple_accounts_in_chunks(
         ..RpcAccountInfoConfig::default()
     };
 
-    let mut raw_result = stream::iter(keys)
+    let raw_results = stream::iter(keys)
         .chunks(max_chunk_size)
         .map(|keys| {
             let account_info_config = config.clone();
@@ -181,11 +181,12 @@ pub async fn fetch_multiple_accounts_in_chunks(
         .collect::<Vec<_>>()
         .await;
 
-    let result = raw_result
-        .drain(..)
-        .map(|v| v.unwrap())
+    let result = raw_results
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
         .flatten()
-        .filter_map(|x| x.1.map(|o| (x.0, o)))
+        .filter_map(|(pubkey, account_opt)| account_opt.map(|acc| (pubkey, acc)))
         .collect::<Vec<_>>();
 
     Ok(result)

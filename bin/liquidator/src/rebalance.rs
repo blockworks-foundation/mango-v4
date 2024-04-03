@@ -14,6 +14,7 @@ use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 use solana_sdk::signature::Signature;
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::*;
@@ -195,11 +196,17 @@ impl Rebalancer {
                     |in_token_index| {
                         let (alt_mint, alt_in_amount) =
                             self.get_alternative_token_amount(in_token_index, in_amount_quote)?;
-                        Ok((alt_mint, output_mint, alt_in_amount, true))
+                        let swap = self.swap_quote(
+                            alt_mint,
+                            output_mint,
+                            alt_in_amount,
+                            true,
+                            jupiter_version,
+                        );
+                        Ok(swap)
                     },
-                    output_mint,
-                    jupiter_version,
                     quote_mint,
+                    output_mint,
                 )
                 .await?
             }
@@ -269,11 +276,16 @@ impl Rebalancer {
                 self.get_jupiter_alt_route(
                     |out_token_index| {
                         let out_token = self.mango_client.context.token(*out_token_index);
-                        Ok((input_mint, out_token.mint, in_amount, true))
+                        Ok(self.swap_quote(
+                            input_mint,
+                            out_token.mint,
+                            in_amount,
+                            true,
+                            jupiter_version,
+                        ))
                     },
-                    quote_mint,
-                    jupiter_version,
                     input_mint,
+                    quote_mint,
                 )
                 .await?
             }
@@ -325,23 +337,21 @@ impl Rebalancer {
         Ok(can_swap_on_sanctum && !is_an_alt_for_sanctum)
     }
 
-    async fn get_jupiter_alt_route(
+    async fn get_jupiter_alt_route<T: Future<Output = anyhow::Result<swap::Quote>>>(
         &self,
-        quote_fetcher: impl Fn(&u16) -> anyhow::Result<(Pubkey, Pubkey, u64, bool)>,
-        output_mint: Pubkey,
-        jupiter_version: swap::Version,
-        quote_mint: Pubkey,
+        quote_fetcher: impl Fn(&u16) -> anyhow::Result<T>,
+        original_input_mint: Pubkey,
+        original_output_mint: Pubkey,
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let mut alt_jobs = vec![];
         for in_token_index in &self.config.alternate_jupiter_route_tokens {
-            let args = quote_fetcher(in_token_index)?;
-            alt_jobs.push(self.swap_quote(args.0, args.1, args.2, args.3, jupiter_version));
+            alt_jobs.push(quote_fetcher(in_token_index)?);
         }
         let alt_results = futures::future::join_all(alt_jobs).await;
         let alt_routes: Vec<_> = alt_results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let best_route = self
-            .determine_best_swap_tx(alt_routes, quote_mint, output_mint)
+            .determine_best_swap_tx(alt_routes, original_input_mint, original_output_mint)
             .await?;
         Ok(best_route)
     }
@@ -349,8 +359,8 @@ impl Rebalancer {
     async fn determine_best_swap_tx(
         &self,
         mut routes: Vec<swap::Quote>,
-        input_mint: Pubkey,
-        output_mint: Pubkey,
+        original_input_mint: Pubkey,
+        original_output_mint: Pubkey,
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let mut prices = HashMap::<Pubkey, I80F48>::new();
         let mut get_or_fetch_price = |m| {
@@ -360,11 +370,9 @@ impl Rebalancer {
                     .context
                     .token_by_mint(&m)
                     .expect("token for mint not found");
-                let p = self
-                    .account_fetcher
+                self.account_fetcher
                     .fetch_bank_price(&token.first_bank())
-                    .expect("failed to fetch price");
-                p
+                    .expect("failed to fetch price")
             });
             *entry
         };
@@ -417,7 +425,11 @@ impl Rebalancer {
             );
         }
 
-        anyhow::bail!("no routes from {} to {}", input_mint, output_mint);
+        anyhow::bail!(
+            "no routes from {} to {}",
+            original_input_mint,
+            original_output_mint
+        );
     }
 
     fn mango_account(&self) -> anyhow::Result<Box<MangoAccountValue>> {
