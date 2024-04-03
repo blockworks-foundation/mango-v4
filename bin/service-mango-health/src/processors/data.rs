@@ -54,8 +54,10 @@ impl DataProcessor {
     ) -> anyhow::Result<DataProcessor> {
         let mut retry_counter = RetryCounter::new(2);
         let mango_group = Pubkey::from_str(&configuration.mango_group)?;
-        let (mango_stream, snapshot_job) =
-            fail_or_retry!(retry_counter, Self::init_mango_source(configuration, exit.clone()).await)?;
+        let (mango_stream, snapshot_job) = fail_or_retry!(
+            retry_counter,
+            Self::init_mango_source(configuration, exit.clone()).await
+        )?;
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
 
@@ -141,7 +143,7 @@ impl DataProcessor {
                 return Some(Snapshot(SnapshotEvent {
                     accounts: result,
                     received_at,
-                    is_full: snapshot_type == SnapshotType::Full
+                    is_full: snapshot_type == SnapshotType::Full,
                 }));
             }
             _ => {}
