@@ -207,7 +207,7 @@ impl<'a> Sanctum<'a> {
         // Remove auto wrapping of SOL->wSOL
         let sanctum_ixs: Vec<Instruction> = sanctum_ixs_orig
             .clone()
-            .drain(..)
+            .into_iter()
             .filter(|ix| {
                 !(ix.program_id == system_program)
                     && !(ix.program_id == token_program && ix.data == sync_native_pack)

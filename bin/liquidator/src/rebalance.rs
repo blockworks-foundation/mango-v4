@@ -763,13 +763,13 @@ impl Rebalancer {
     }
 
     pub async fn init(&mut self, live_rpc_client: &RpcClient) {
-        match self.load_lst(live_rpc_client).await {
+        match Self::load_lst(live_rpc_client).await {
             Err(e) => warn!("Could not load list of sanctum supported mint: {}", e),
             Ok(lst) => self.lst_mints.extend(lst),
         }
     }
 
-    async fn load_lst(&mut self, live_rpc_client: &RpcClient) -> anyhow::Result<HashSet<Pubkey>> {
+    async fn load_lst(live_rpc_client: &RpcClient) -> anyhow::Result<HashSet<Pubkey>> {
         let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
 
         let lookup_table_data = live_rpc_client.get_account(&address).await?;
@@ -777,7 +777,7 @@ impl Rebalancer {
         let accounts: Vec<Account> =
             fetch_multiple_accounts_in_chunks(live_rpc_client, &lookup_table.addresses, 100, 1)
                 .await?
-                .drain(..)
+                .into_iter()
                 .map(|x| x.1)
                 .collect();
 
