@@ -30,7 +30,6 @@ pub mod liquidate;
 mod liquidation_state;
 pub mod metrics;
 pub mod rebalance;
-mod sanctum;
 mod tcs_state;
 pub mod telemetry;
 pub mod token_swap_info;
@@ -274,7 +273,7 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
-        lst_mints: HashSet::<Pubkey>::new(),
+        sanctum_supported_mints: HashSet::<Pubkey>::new(),
     };
 
     let live_rpc_client = mango_client.client.new_rpc_async();

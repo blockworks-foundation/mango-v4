@@ -1,5 +1,6 @@
 pub mod jupiter_v6;
 pub mod sanctum;
+pub mod sanctum_state;
 
 use anchor_lang::prelude::*;
 use std::str::FromStr;

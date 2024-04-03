@@ -1,14 +1,22 @@
+use std::collections::HashSet;
 use std::str::FromStr;
 
 use anchor_lang::{system_program, Id};
 use anchor_spl::token::Token;
 use anyhow::Context;
 use bincode::Options;
+use mango_v4::accounts_zerocopy::AccountReader;
 use serde::{Deserialize, Serialize};
+use solana_address_lookup_table_program::state::AddressLookupTable;
+use solana_client::nonblocking::rpc_client::RpcClient;
+use solana_sdk::account::Account;
 use solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Signature};
 use std::time::Duration;
 
+use crate::gpa::fetch_multiple_accounts_in_chunks;
+use crate::swap::sanctum_state;
 use crate::{util, MangoClient, TransactionBuilder};
+use borsh::BorshDeserialize;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -331,4 +339,63 @@ impl<'a> Sanctum<'a> {
 
         tx_builder.send_and_confirm(&self.mango_client.client).await
     }
+}
+
+pub async fn load_supported_token_mints(
+    live_rpc_client: &RpcClient,
+) -> anyhow::Result<HashSet<Pubkey>> {
+    let address = Pubkey::from_str("EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5")?;
+
+    let lookup_table_data = live_rpc_client.get_account(&address).await?;
+    let lookup_table = AddressLookupTable::deserialize(&lookup_table_data.data())?;
+    let accounts: Vec<Account> =
+        fetch_multiple_accounts_in_chunks(live_rpc_client, &lookup_table.addresses, 100, 1)
+            .await?
+            .into_iter()
+            .map(|x| x.1)
+            .collect();
+
+    let mut lst_mints = HashSet::new();
+    for account in accounts {
+        let account = Account::from(account);
+        let mut account_data = account.data();
+        let t = sanctum_state::StakePool::deserialize(&mut account_data);
+        if let Ok(d) = t {
+            lst_mints.insert(d.pool_mint);
+        }
+    }
+
+    // Hardcoded for now
+    lst_mints.insert(
+        Pubkey::from_str("CgntPoLka5pD5fesJYhGmUCF8KU1QS1ZmZiuAuMZr2az").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("7ge2xKsZXmqPxa3YmXxXmzCp9Hc2ezrTxh6PECaxCwrL").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("GUAMR8ciiaijraJeLDEDrFVaueLm9YzWWY9R7CBPL9rA").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("CtMyWsrUtAwXWiGr9WjHT5fC3p3fgV8cyGpLTo2LJzG1").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("2qyEeSAWKfU18AFthrF7JA8z8ZCi1yt76Tqs917vwQTV").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("DqhH94PjkZsjAqEze2BEkWhFQJ6EyU6MdtMphMgnXqeK").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("F8h46pYkaqPJNP2MRkUUUtRkf8efCkpoqehn9g1bTTm7").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ").expect("invalid lst mint"),
+    );
+    lst_mints.insert(
+        Pubkey::from_str("stk9ApL5HeVAwPLr3TLhDXdZS8ptVu7zp6ov8HFDuMi").expect("invalid lst mint"),
+    );
+
+    Ok(lst_mints)
 }
