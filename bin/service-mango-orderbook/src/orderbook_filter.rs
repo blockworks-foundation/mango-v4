@@ -3,7 +3,7 @@ use fixed::types::I80F48;
 use itertools::Itertools;
 use log::*;
 use mango_feeds_connector::metrics::MetricU64;
-use mango_feeds_connector::FeedWrite;
+use mango_feeds_connector::AccountWrite;
 use mango_feeds_connector::{
     chain_data::{AccountData, ChainData, ChainDataMetrics, SlotData},
     metrics::{MetricType, Metrics},
@@ -244,7 +244,7 @@ pub async fn init(
     metrics_sender: Metrics,
     exit: Arc<AtomicBool>,
 ) -> anyhow::Result<(
-    async_channel::Sender<FeedWrite>,
+    async_channel::Sender<AccountWrite>,
     async_channel::Sender<SlotUpdate>,
     async_channel::Receiver<OrderbookFilterMessage>,
 )> {
@@ -255,7 +255,7 @@ pub async fn init(
 
     // The actual message may want to also contain a retry count, if it self-reinserts on failure?
     let (account_write_queue_sender, account_write_queue_receiver) =
-        async_channel::unbounded::<FeedWrite>();
+        async_channel::unbounded::<AccountWrite>();
 
     // Slot updates flowing from the outside into the single processing thread. From
     // there they'll flow into the postgres sending thread.
@@ -288,7 +288,7 @@ pub async fn init(
                 break;
             }
             tokio::select! {
-                Ok(FeedWrite::Account(account_write)) = account_write_queue_receiver.recv() => {
+                Ok(account_write) = account_write_queue_receiver.recv() => {
                     if !relevant_pubkeys.contains(&account_write.pubkey) {
                         continue;
                     }
@@ -307,27 +307,6 @@ pub async fn init(
                         },
                     );
                 },
-                Ok(FeedWrite::Snapshot(snapshot_write)) = account_write_queue_receiver.recv() => {
-                    for account_write in snapshot_write.accounts {
-                        if !relevant_pubkeys.contains(&account_write.pubkey) {
-                            continue;
-                        }
-                        chain_cache.update_account(
-                            account_write.pubkey,
-                            AccountData {
-                                slot: account_write.slot,
-                                write_version: account_write.write_version,
-                                account: WritableAccount::create(
-                                    account_write.lamports,
-                                    account_write.data.clone(),
-                                    account_write.owner,
-                                    account_write.executable,
-                                    account_write.rent_epoch as Epoch,
-                                ),
-                            },
-                        );
-                    }
-                },
                 Ok(slot_update) = slot_queue_receiver.recv() => {
                     chain_cache.update_slot(SlotData {
                         slot: slot_update.slot,
@@ -335,7 +314,6 @@ pub async fn init(
                         status: slot_update.status,
                         chain: 0,
                     });
-
                 }
             }
 

@@ -6,7 +6,7 @@ use solana_sdk::pubkey::Pubkey;
 use anyhow::Context;
 use async_channel::{RecvError, Sender};
 use mango_feeds_connector::{
-    EntityFilter, FeedFilterType, FeedWrite, FilterConfig, Memcmp, SnapshotSourceConfig,
+    AccountWrite, EntityFilter, FeedFilterType, FilterConfig, Memcmp, SnapshotSourceConfig,
     SourceConfig,
 };
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
@@ -89,7 +89,7 @@ async fn feed_data(
         let (serum3_oo_sender, serum3_oo_receiver) = async_channel::unbounded();
         let (serum3_oo_slot_sender, serum3_oo_slot_receiver) = async_channel::unbounded();
         let filters = FilterConfig {
-            entity_filter: EntityFilter::FilterByProgramIdAndCustomCriteria(
+            entity_filter: EntityFilter::FilterByProgramIdSelective(
                 *serum_program,
                 serum3_oo_custom_filters.clone(),
             ),
@@ -110,7 +110,7 @@ async fn feed_data(
     // Make sure the serum3_oo_sub_map does not exit when there's no serum_programs
     let _unused_serum_sender;
     if config.serum_programs.is_empty() {
-        let (sender, receiver) = async_channel::unbounded::<FeedWrite>();
+        let (sender, receiver) = async_channel::unbounded::<AccountWrite>();
         _unused_serum_sender = sender;
         serum3_oo_sub_map.insert(Pubkey::default(), receiver);
     }
@@ -156,7 +156,7 @@ async fn feed_data(
 
 async fn handle_message(
     name: &str,
-    message: Result<FeedWrite, RecvError>,
+    message: Result<AccountWrite, RecvError>,
     sender: &Sender<Message>,
 ) -> bool {
     if let Ok(data) = message {
@@ -168,24 +168,11 @@ async fn handle_message(
     }
 }
 
-async fn handle_feed_write(sender: &Sender<Message>, data: FeedWrite) {
-    match data {
-        FeedWrite::Account(account) => sender
-            .send(Message::Account(AccountUpdate::from_feed(account)))
-            .await
-            .expect("sending must succeed"),
-        FeedWrite::Snapshot(mut snapshot) => sender
-            .send(Message::Snapshot(
-                snapshot
-                    .accounts
-                    .drain(0..)
-                    .map(|a| AccountUpdate::from_feed(a))
-                    .collect(),
-                crate::account_update_stream::SnapshotType::Partial,
-            ))
-            .await
-            .expect("sending must succeed"),
-    }
+async fn handle_feed_write(sender: &Sender<Message>, account: AccountWrite) {
+    sender
+        .send(Message::Account(AccountUpdate::from_feed(account)))
+        .await
+        .expect("sending must succeed");
 }
 
 pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {

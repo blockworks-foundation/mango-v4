@@ -3392,7 +3392,7 @@ dependencies = [
 [[package]]
 name = "mango-feeds-connector"
 version = "0.2.2"
-source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=serge/custom_filtering#0e1cef027c68a261b0fdbd78cffef602eed09cdd"
+source = "git+https://github.com/blockworks-foundation/mango-feeds.git?branch=serge/custom_filtering#7165e7dfd3bbddd0c00a39f91e845bae1ce618ed"
 dependencies = [
  "anyhow",
  "async-channel",
