@@ -83,6 +83,7 @@ export class Bank implements BankForHealth {
   public zeroUtilRate: I80F48;
   public platformLiquidationFee: I80F48;
   public collectedLiquidationFees: I80F48;
+  public collectedCollateralFees: I80F48;
 
   static from(
     publicKey: PublicKey,
@@ -131,6 +132,7 @@ export class Bank implements BankForHealth {
       reduceOnly: number;
       forceClose: number;
       disableAssetLiquidation: number;
+      forceWithdraw: number;
       feesWithdrawn: BN;
       tokenConditionalSwapTakerFeeRate: number;
       tokenConditionalSwapMakerFeeRate: number;
@@ -148,6 +150,8 @@ export class Bank implements BankForHealth {
       zeroUtilRate: I80F48Dto;
       platformLiquidationFee: I80F48Dto;
       collectedLiquidationFees: I80F48Dto;
+      collectedCollateralFees: I80F48Dto;
+      collateralFeePerDay: number;
     },
   ): Bank {
     return new Bank(
@@ -213,6 +217,9 @@ export class Bank implements BankForHealth {
       obj.platformLiquidationFee,
       obj.collectedLiquidationFees,
       obj.disableAssetLiquidation == 0,
+      obj.collectedCollateralFees,
+      obj.collateralFeePerDay,
+      obj.forceWithdraw == 1,
     );
   }
 
@@ -279,6 +286,9 @@ export class Bank implements BankForHealth {
     platformLiquidationFee: I80F48Dto,
     collectedLiquidationFees: I80F48Dto,
     public allowAssetLiquidation: boolean,
+    collectedCollateralFees: I80F48Dto,
+    public collateralFeePerDay: number,
+    public forceWithdraw: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -311,6 +321,7 @@ export class Bank implements BankForHealth {
     this.zeroUtilRate = I80F48.from(zeroUtilRate);
     this.platformLiquidationFee = I80F48.from(platformLiquidationFee);
     this.collectedLiquidationFees = I80F48.from(collectedLiquidationFees);
+    this.collectedCollateralFees = I80F48.from(collectedCollateralFees);
     this._price = undefined;
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
@@ -407,7 +418,9 @@ export class Bank implements BankForHealth {
   }
 
   scaledInitAssetWeight(price: I80F48): I80F48 {
-    const depositsQuote = this.nativeDeposits().mul(price);
+    const depositsQuote = this.nativeDeposits()
+      .add(I80F48.fromU64(this.potentialSerumTokens))
+      .mul(price);
     if (
       this.depositWeightScaleStartQuote >= Number.MAX_SAFE_INTEGER ||
       depositsQuote.lte(I80F48.fromNumber(this.depositWeightScaleStartQuote))
@@ -637,6 +650,28 @@ export class Bank implements BankForHealth {
       .sub(new BN(Date.now() / 1000).sub(this.lastNetBorrowsWindowStartTs))
       .toNumber();
     return Math.max(timeToNextBorrowLimitWindowStartsTs, 0);
+  }
+
+  /**
+   *
+   * @param mintPk
+   * @returns remaining deposit limit for mint, returns null if there is no limit for bank
+   */
+  public getRemainingDepositLimit(): BN | null {
+    const nativeDeposits = this.nativeDeposits();
+    const isNoLimit = this.depositLimit.isZero();
+
+    const remainingDepositLimit = !isNoLimit
+      ? this.depositLimit
+          .sub(new BN(nativeDeposits.toNumber()))
+          .sub(this.potentialSerumTokens)
+      : null;
+
+    return remainingDepositLimit
+      ? remainingDepositLimit.isNeg()
+        ? new BN(0)
+        : remainingDepositLimit
+      : null;
   }
 }
 

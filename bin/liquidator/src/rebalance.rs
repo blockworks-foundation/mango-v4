@@ -151,18 +151,7 @@ impl Rebalancer {
         let direct_sol_route_job =
             self.jupiter_quote(sol_mint, output_mint, in_amount_sol, true, jupiter_version);
 
-        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
-
-        // for v6, add a v4 fallback
-        if self.config.jupiter_version == jupiter::Version::V6 {
-            jobs.push(self.jupiter_quote(
-                quote_mint,
-                output_mint,
-                in_amount_quote,
-                false,
-                jupiter::Version::V4,
-            ));
-        }
+        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -211,18 +200,7 @@ impl Rebalancer {
         let direct_sol_route_job =
             self.jupiter_quote(input_mint, sol_mint, in_amount, true, jupiter_version);
 
-        let mut jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
-
-        // for v6, add a v4 fallback
-        if self.config.jupiter_version == jupiter::Version::V6 {
-            jobs.push(self.jupiter_quote(
-                input_mint,
-                quote_mint,
-                in_amount,
-                false,
-                jupiter::Version::V4,
-            ));
-        }
+        let jobs = vec![full_route_job, direct_quote_route_job, direct_sol_route_job];
 
         let mut results = futures::future::join_all(jobs).await;
         let full_route = results.remove(0)?;
@@ -253,7 +231,7 @@ impl Rebalancer {
             .prepare_swap_transaction(full)
             .await?;
         let tx_size = builder.transaction_size()?;
-        if tx_size.is_ok() {
+        if tx_size.is_within_limit() {
             return Ok((builder, full.clone()));
         }
         trace!(

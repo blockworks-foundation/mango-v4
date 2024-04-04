@@ -17,66 +17,53 @@ import {
   TransactionSignature,
   VersionedTransaction,
 } from '@solana/web3.js';
-import { Tracing } from 'trace_events';
 import { COMPUTE_BUDGET_PROGRAM_ID } from '../constants';
+import { TxCallbackOptions } from '../client';
+import { awaitTransactionSignatureConfirmation } from '@blockworks-foundation/mangolana/lib/transactions';
+import { tryStringify } from '../utils';
 
 export interface MangoSignatureStatus {
   confirmations?: number | null;
   confirmationStatus?: TransactionConfirmationStatus;
-  err: TransactionError | null;
+  err?: TransactionError | null;
   signature: TransactionSignature;
-  slot: number;
+  slot?: number;
 }
 
-export interface MangoSignature {
-  signature: TransactionSignature;
+export interface LatestBlockhash {
+  slot: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
+}
+
+export interface LatestBlockhash {
+  slot: number;
+  blockhash: string;
+  lastValidBlockHeight: number;
 }
 
 export type SendTransactionOpts = Partial<{
   preflightCommitment: Commitment;
-  latestBlockhash: Readonly<{
-    blockhash: string;
-    lastValidBlockHeight: number;
-  }>;
+  latestBlockhash: Readonly<LatestBlockhash>;
   prioritizationFee: number;
   estimateFee: boolean;
   additionalSigners: Keypair[];
-  postSendTxCallback: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback: ({ txid }: { txid: string }) => void;
+  postSendTxCallback: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback: (callbackOpts: TxCallbackOptions) => void;
   txConfirmationCommitment: Commitment;
   confirmInBackground: boolean;
   alts: AddressLookupTableAccount[];
   multipleConnections: Connection[];
 }>;
 
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: { confirmInBackground: true } & SendTransactionOpts,
-): Promise<MangoSignature>;
-
-export function sendTransaction(
-  provider: AnchorProvider,
-  ixs: TransactionInstruction[],
-  alts: AddressLookupTableAccount[],
-  opts?: SendTransactionOpts,
-): Promise<MangoSignatureStatus>;
-
 export async function sendTransaction(
   provider: AnchorProvider,
   ixs: TransactionInstruction[],
   alts: AddressLookupTableAccount[],
   opts: SendTransactionOpts = {},
-): Promise<MangoSignatureStatus | MangoSignature> {
+): Promise<MangoSignatureStatus> {
   const connection = provider.connection;
-  const latestBlockhash =
-    opts.latestBlockhash ??
-    (await connection.getLatestBlockhash(
-      opts.preflightCommitment ??
-        provider.opts.preflightCommitment ??
-        'finalized',
-    ));
+  const latestBlockhash = await fetchLatestBlockHash(provider, opts);
 
   const payer = (provider as AnchorProvider).wallet;
 
@@ -152,12 +139,14 @@ export async function sendTransaction(
 
   if (opts.postSendTxCallback) {
     try {
-      opts.postSendTxCallback({ txid: signature });
+      opts.postSendTxCallback({
+        txid: signature,
+        txSignatureBlockHash: latestBlockhash,
+      });
     } catch (e) {
       console.warn(`postSendTxCallback error ${e}`);
     }
   }
-
   if (!opts.confirmInBackground) {
     return await confirmTransaction(
       connection,
@@ -174,49 +163,120 @@ export async function sendTransaction(
 const confirmTransaction = async (
   connection: Connection,
   opts: Partial<SendTransactionOpts> = {},
-  latestBlockhash: Readonly<{
-    blockhash: string;
-    lastValidBlockHeight: number;
-  }>,
+  latestBlockhash: Readonly<LatestBlockhash>,
   signature: string,
 ): Promise<MangoSignatureStatus> => {
-  const txConfirmationCommitment = opts.txConfirmationCommitment ?? 'processed';
   let status: RpcResponseAndContext<SignatureResult>;
-  if (
-    latestBlockhash.blockhash != null &&
-    latestBlockhash.lastValidBlockHeight != null
-  ) {
-    status = await connection.confirmTransaction(
-      {
-        signature: signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      },
-      txConfirmationCommitment,
-    );
-  } else {
-    status = await connection.confirmTransaction(
-      signature,
-      txConfirmationCommitment,
-    );
+  const allConnections = [connection];
+  if (opts.multipleConnections && opts.multipleConnections.length) {
+    allConnections.push(...opts.multipleConnections);
   }
-  const signatureResult = status.value;
-  if (signatureResult.err) {
-    console.warn('Tx status: ', status);
+  const abortController = new AbortController();
+  try {
+    if (
+      latestBlockhash.blockhash != null &&
+      latestBlockhash.lastValidBlockHeight != null
+    ) {
+      status = await Promise.any(
+        allConnections.map((c) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection: c,
+            timeoutStrategy: {
+              block: latestBlockhash,
+            },
+            abortSignal: abortController.signal,
+          }),
+        ),
+      );
+    } else {
+      status = await Promise.any(
+        allConnections.map((c) =>
+          awaitTransactionSignatureConfirmation({
+            txid: signature,
+            confirmLevel: 'processed',
+            connection: c,
+            timeoutStrategy: {
+              timeout: 90,
+            },
+            abortSignal: abortController.signal,
+          }),
+        ),
+      );
+    }
+    abortController.abort();
+
+    const signatureResult = status.value;
+    if (signatureResult.err) {
+      console.warn('Tx status: ', status);
+      throw new MangoError({
+        txid: signature,
+        message: `${JSON.stringify(status)}`,
+      });
+    }
+    if (opts.postTxConfirmationCallback) {
+      try {
+        opts.postTxConfirmationCallback({
+          txid: signature,
+          txSignatureBlockHash: latestBlockhash,
+        });
+      } catch (e) {
+        console.warn(`postTxConfirmationCallback error ${e}`);
+      }
+    }
+    return { signature, slot: status.context.slot, ...signatureResult };
+  } catch (e) {
+    abortController.abort();
+    if (e instanceof AggregateError) {
+      for (const individualError of e.errors) {
+        const stringifiedError = tryStringify(individualError);
+        throw new MangoError({
+          txid: signature,
+          message: `${
+            stringifiedError
+              ? stringifiedError
+              : individualError
+              ? individualError
+              : 'Unknown error'
+          }`,
+        });
+      }
+    }
+    if (isErrorWithSignatureResult(e)) {
+      const stringifiedError = tryStringify(e?.value?.err);
+      throw new MangoError({
+        txid: signature,
+        message: `${stringifiedError ? stringifiedError : e?.value?.err}`,
+      });
+    }
+    const stringifiedError = tryStringify(e);
     throw new MangoError({
       txid: signature,
-      message: `${JSON.stringify(status)}`,
+      message: `${stringifiedError ? stringifiedError : e}`,
     });
   }
-  if (opts.postTxConfirmationCallback) {
-    try {
-      opts.postTxConfirmationCallback({ txid: signature });
-    } catch (e) {
-      console.warn(`postTxConfirmationCallback error ${e}`);
-    }
-  }
-  return { signature, slot: status.context.slot, ...signatureResult };
 };
+
+export async function fetchLatestBlockHash(
+  provider: AnchorProvider,
+  opts: SendTransactionOpts = {},
+): Promise<LatestBlockhash> {
+  if (opts.latestBlockhash) {
+    return opts.latestBlockhash;
+  }
+  const commitment =
+    opts.preflightCommitment ??
+    provider.opts.preflightCommitment ??
+    'finalized';
+  const blockhashRequest =
+    await provider.connection.getLatestBlockhashAndContext(commitment);
+  return {
+    slot: blockhashRequest.context.slot,
+    lastValidBlockHeight: blockhashRequest.value.lastValidBlockHeight,
+    blockhash: blockhashRequest.value.blockhash,
+  };
+}
 
 export const createComputeBudgetIx = (
   microLamports: number,
@@ -236,4 +296,10 @@ export class MangoError extends Error {
     this.message = message;
     this.txid = txid;
   }
+}
+
+function isErrorWithSignatureResult(
+  err: any,
+): err is RpcResponseAndContext<SignatureResult> {
+  return err && typeof err.value !== 'undefined';
 }

@@ -84,6 +84,7 @@ pub mod mango_v4 {
         mngo_token_index_opt: Option<TokenIndex>,
         buyback_fees_expiry_interval_opt: Option<u64>,
         allowed_fast_listings_per_interval_opt: Option<u16>,
+        collateral_fee_interval_opt: Option<u64>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::group_edit(
@@ -100,6 +101,7 @@ pub mod mango_v4 {
             mngo_token_index_opt,
             buyback_fees_expiry_interval_opt,
             allowed_fast_listings_per_interval_opt,
+            collateral_fee_interval_opt,
         )?;
         Ok(())
     }
@@ -158,6 +160,7 @@ pub mod mango_v4 {
         zero_util_rate: f32,
         platform_liquidation_fee: f32,
         disable_asset_liquidation: bool,
+        collateral_fee_per_day: f32,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -192,6 +195,7 @@ pub mod mango_v4 {
             zero_util_rate,
             platform_liquidation_fee,
             disable_asset_liquidation,
+            collateral_fee_per_day,
         )?;
         Ok(())
     }
@@ -248,6 +252,8 @@ pub mod mango_v4 {
         zero_util_rate_opt: Option<f32>,
         platform_liquidation_fee_opt: Option<f32>,
         disable_asset_liquidation_opt: Option<bool>,
+        collateral_fee_per_day_opt: Option<f32>,
+        force_withdraw_opt: Option<bool>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -291,6 +297,8 @@ pub mod mango_v4 {
             zero_util_rate_opt,
             platform_liquidation_fee_opt,
             disable_asset_liquidation_opt,
+            collateral_fee_per_day_opt,
+            force_withdraw_opt,
         )?;
         Ok(())
     }
@@ -808,6 +816,12 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_liq_bankruptcy(ctx, max_liab_transfer)?;
+        Ok(())
+    }
+
+    pub fn token_force_withdraw(ctx: Context<TokenForceWithdraw>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_force_withdraw(ctx)?;
         Ok(())
     }
 
@@ -1606,6 +1620,12 @@ pub mod mango_v4 {
             token_conditional_swap_index.into(),
             token_conditional_swap_id,
         )?;
+        Ok(())
+    }
+
+    pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_charge_collateral_fees(ctx)?;
         Ok(())
     }
 

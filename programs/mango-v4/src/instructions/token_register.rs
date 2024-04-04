@@ -45,6 +45,7 @@ pub fn token_register(
     zero_util_rate: f32,
     platform_liquidation_fee: f32,
     disable_asset_liquidation: bool,
+    collateral_fee_per_day: f32,
 ) -> Result<()> {
     // Require token 0 to be in the insurance token
     if token_index == INSURANCE_TOKEN_INDEX {
@@ -111,6 +112,7 @@ pub fn token_register(
         reduce_only,
         force_close: 0,
         disable_asset_liquidation: u8::from(disable_asset_liquidation),
+        force_withdraw: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
@@ -129,7 +131,9 @@ pub fn token_register(
         zero_util_rate: I80F48::from_num(zero_util_rate),
         platform_liquidation_fee: I80F48::from_num(platform_liquidation_fee),
         collected_liquidation_fees: I80F48::ZERO,
-        reserved: [0; 1920],
+        collected_collateral_fees: I80F48::ZERO,
+        collateral_fee_per_day,
+        reserved: [0; 1900],
     };
 
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;

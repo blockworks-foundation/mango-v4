@@ -91,6 +91,7 @@ pub fn token_register_trustless(
         reduce_only: 2,                                   // deposit-only
         force_close: 0,
         disable_asset_liquidation: 1,
+        force_withdraw: 0,
         padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate: 0.0,
@@ -108,7 +109,9 @@ pub fn token_register_trustless(
         deposit_limit: 0,
         zero_util_rate: I80F48::ZERO,
         collected_liquidation_fees: I80F48::ZERO,
-        reserved: [0; 1920],
+        collected_collateral_fees: I80F48::ZERO,
+        collateral_fee_per_day: 0.0, // TODO
+        reserved: [0; 1900],
     };
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)

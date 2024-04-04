@@ -7,10 +7,9 @@ use anchor_client::Cluster;
 use anyhow::Context;
 use clap::Parser;
 use mango_v4::state::{PerpMarketIndex, TokenIndex};
-use mango_v4_client::priority_fees_cli;
 use mango_v4_client::AsyncChannelSendUnlessFull;
 use mango_v4_client::{
-    account_update_stream, chain_data, error_tracking::ErrorTracking, jupiter, keypair_from_cli,
+    account_update_stream, chain_data, error_tracking::ErrorTracking, keypair_from_cli,
     snapshot_source, websocket_source, Client, MangoClient, MangoClientError, MangoGroupContext,
     TransactionBuilderConfig,
 };
@@ -21,169 +20,23 @@ use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signer::Signer;
 use tracing::*;
 
+pub mod cli_args;
 pub mod liquidate;
 pub mod metrics;
 pub mod rebalance;
 pub mod telemetry;
 pub mod token_swap_info;
 pub mod trigger_tcs;
+mod unwrappable_oracle_error;
 pub mod util;
 
+use crate::unwrappable_oracle_error::UnwrappableOracleError;
 use crate::util::{is_mango_account, is_mint_info, is_perp_market};
 
 // jemalloc seems to be better at keeping the memory footprint reasonable over
 // longer periods of time
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-#[derive(Parser, Debug)]
-#[clap()]
-struct CliDotenv {
-    // When --dotenv <file> is passed, read the specified dotenv file before parsing args
-    #[clap(long)]
-    dotenv: std::path::PathBuf,
-
-    remaining_args: Vec<std::ffi::OsString>,
-}
-
-// Prefer "--rebalance false" over "--no-rebalance" because it works
-// better with REBALANCE=false env values.
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum BoolArg {
-    True,
-    False,
-}
-
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum JupiterVersionArg {
-    Mock,
-    V4,
-    V6,
-}
-
-impl From<JupiterVersionArg> for jupiter::Version {
-    fn from(a: JupiterVersionArg) -> Self {
-        match a {
-            JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V4 => jupiter::Version::V4,
-            JupiterVersionArg::V6 => jupiter::Version::V6,
-        }
-    }
-}
-
-#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
-enum TcsMode {
-    BorrowBuy,
-    SwapSellIntoBuy,
-    SwapCollateralIntoBuy,
-}
-
-impl From<TcsMode> for trigger_tcs::Mode {
-    fn from(a: TcsMode) -> Self {
-        match a {
-            TcsMode::BorrowBuy => trigger_tcs::Mode::BorrowBuyToken,
-            TcsMode::SwapSellIntoBuy => trigger_tcs::Mode::SwapSellIntoBuy,
-            TcsMode::SwapCollateralIntoBuy => trigger_tcs::Mode::SwapCollateralIntoBuy,
-        }
-    }
-}
-
-#[derive(Parser)]
-#[clap()]
-struct Cli {
-    #[clap(short, long, env)]
-    rpc_url: String,
-
-    #[clap(long, env, value_delimiter = ';')]
-    override_send_transaction_url: Option<Vec<String>>,
-
-    #[clap(long, env)]
-    liqor_mango_account: Pubkey,
-
-    #[clap(long, env)]
-    liqor_owner: String,
-
-    #[clap(long, env, default_value = "1000")]
-    check_interval_ms: u64,
-
-    #[clap(long, env, default_value = "300")]
-    snapshot_interval_secs: u64,
-
-    /// how many getMultipleAccounts requests to send in parallel
-    #[clap(long, env, default_value = "10")]
-    parallel_rpc_requests: usize,
-
-    /// typically 100 is the max number of accounts getMultipleAccounts will retrieve at once
-    #[clap(long, env, default_value = "100")]
-    get_multiple_accounts_count: usize,
-
-    /// liquidator health ratio should not fall below this value
-    #[clap(long, env, default_value = "50")]
-    min_health_ratio: f64,
-
-    /// if rebalancing is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    rebalance: BoolArg,
-
-    /// max slippage to request on swaps to rebalance spot tokens
-    #[clap(long, env, default_value = "100")]
-    rebalance_slippage_bps: u64,
-
-    /// tokens to not rebalance (in addition to USDC); use a comma separated list of names
-    #[clap(long, env, default_value = "")]
-    rebalance_skip_tokens: String,
-
-    /// if taking tcs orders is enabled
-    ///
-    /// typically only disabled for tests where swaps are unavailable
-    #[clap(long, env, value_enum, default_value = "true")]
-    take_tcs: BoolArg,
-
-    /// profit margin at which to take tcs orders
-    #[clap(long, env, default_value = "0.0005")]
-    tcs_profit_fraction: f64,
-
-    /// control how tcs triggering provides buy tokens
-    #[clap(long, env, value_enum, default_value = "swap-sell-into-buy")]
-    tcs_mode: TcsMode,
-
-    #[clap(flatten)]
-    prioritization_fee_cli: priority_fees_cli::PriorityFeeArgs,
-
-    /// url to the lite-rpc websocket, optional
-    #[clap(long, env, default_value = "")]
-    lite_rpc_url: String,
-
-    /// compute limit requested for liquidation instructions
-    #[clap(long, env, default_value = "250000")]
-    compute_limit_for_liquidation: u32,
-
-    /// compute limit requested for tcs trigger instructions
-    #[clap(long, env, default_value = "300000")]
-    compute_limit_for_tcs: u32,
-
-    /// control which version of jupiter to use
-    #[clap(long, env, value_enum, default_value = "v6")]
-    jupiter_version: JupiterVersionArg,
-
-    /// override the url to jupiter v4
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v4")]
-    jupiter_v4_url: String,
-
-    /// override the url to jupiter v6
-    #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
-    jupiter_v6_url: String,
-
-    /// provide a jupiter token, currently only for jup v6
-    #[clap(long, env, default_value = "")]
-    jupiter_token: String,
-
-    /// report liquidator's existence and pubkey
-    #[clap(long, env, value_enum, default_value = "true")]
-    telemetry: BoolArg,
-}
 
 pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
@@ -226,7 +79,6 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
-        .jupiter_v4_url(cli.jupiter_v4_url)
         .jupiter_v6_url(cli.jupiter_v6_url)
         .jupiter_token(cli.jupiter_token)
         .transaction_builder_config(
@@ -340,8 +192,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let token_swap_info_config = token_swap_info::Config {
-        quote_index: 0,              // USDC
-        quote_amount: 1_000_000_000, // TODO: config, $1000, should be >= tcs_config.max_trigger_quote_amount
+        quote_index: 0, // USDC
+        quote_amount: (cli.jupiter_swap_info_amount * 1e6) as u64,
         jupiter_version: cli.jupiter_version.into(),
     };
 
@@ -354,24 +206,32 @@ async fn main() -> anyhow::Result<()> {
         min_health_ratio: cli.min_health_ratio,
         compute_limit_for_liq_ix: cli.compute_limit_for_liquidation,
         max_cu_per_transaction: 1_000_000,
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
+        refresh_timeout: Duration::from_secs(cli.liquidation_refresh_timeout_secs as u64),
+        only_allowed_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.only_allow_tokens),
+        forbidden_tokens: cli_args::cli_to_hashset::<TokenIndex>(cli.forbidden_tokens),
+        only_allowed_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_only_allow_perp_markets,
+        ),
+        forbidden_perp_markets: cli_args::cli_to_hashset::<PerpMarketIndex>(
+            cli.liquidation_forbidden_perp_markets,
+        ),
     };
 
     let tcs_config = trigger_tcs::Config {
         min_health_ratio: cli.min_health_ratio,
-        max_trigger_quote_amount: 1_000_000_000, // TODO: config, $1000
+        max_trigger_quote_amount: (cli.tcs_max_trigger_amount * 1e6) as u64,
         compute_limit_for_trigger: cli.compute_limit_for_tcs,
         profit_fraction: cli.tcs_profit_fraction,
         collateral_token_index: 0, // USDC
-        // TODO: config
-        refresh_timeout: Duration::from_secs(30),
 
         jupiter_version: cli.jupiter_version.into(),
         jupiter_slippage_bps: cli.rebalance_slippage_bps,
 
         mode: cli.tcs_mode.into(),
-        min_buy_fraction: 0.7,
+        min_buy_fraction: cli.tcs_min_buy_fraction,
+
+        only_allowed_tokens: liq_config.only_allowed_tokens.clone(),
+        forbidden_tokens: liq_config.forbidden_tokens.clone(),
     };
 
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
@@ -379,16 +239,10 @@ async fn main() -> anyhow::Result<()> {
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
-        // TODO: config
-        borrow_settle_excess: 1.05,
-        refresh_timeout: Duration::from_secs(30),
+        borrow_settle_excess: (1f64 + cli.rebalance_borrow_settle_excess).max(1f64),
+        refresh_timeout: Duration::from_secs(cli.rebalance_refresh_timeout_secs),
         jupiter_version: cli.jupiter_version.into(),
-        skip_tokens: cli
-            .rebalance_skip_tokens
-            .split(',')
-            .filter(|v| !v.is_empty())
-            .map(|name| mango_client.context.token_by_name(name).token_index)
-            .collect(),
+        skip_tokens: cli.rebalance_skip_tokens.unwrap_or(Vec::new()),
         allow_withdraws: signer_is_owner,
     };
 
@@ -409,6 +263,12 @@ async fn main() -> anyhow::Result<()> {
             .skip_threshold(2)
             .skip_threshold_for_type(LiqErrorType::Liq, 5)
             .skip_duration(Duration::from_secs(120))
+            .build()?,
+        oracle_errors: ErrorTracking::builder()
+            .skip_threshold(1)
+            .skip_duration(Duration::from_secs(
+                cli.skip_oracle_error_in_logs_duration_secs,
+            ))
             .build()?,
     });
 
@@ -523,6 +383,7 @@ async fn main() -> anyhow::Result<()> {
                 };
 
                 liquidation.errors.update();
+                liquidation.oracle_errors.update();
 
                 let liquidated = liquidation
                     .maybe_liquidate_one(account_addresses.iter())
@@ -530,16 +391,13 @@ async fn main() -> anyhow::Result<()> {
 
                 let mut took_tcs = false;
                 if !liquidated && cli.take_tcs == BoolArg::True {
-                    took_tcs = match liquidation
+                    took_tcs = liquidation
                         .maybe_take_token_conditional_swap(account_addresses.iter())
                         .await
-                    {
-                        Ok(v) => v,
-                        Err(err) => {
+                        .unwrap_or_else(|err| {
                             error!("error during maybe_take_token_conditional_swap: {err}");
                             false
-                        }
-                    }
+                        })
                 }
 
                 if liquidated || took_tcs {
@@ -550,14 +408,15 @@ async fn main() -> anyhow::Result<()> {
     });
 
     let token_swap_info_job = tokio::spawn({
-        // TODO: configurable interval
-        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(60));
+        let mut interval = mango_v4_client::delay_interval(Duration::from_secs(
+            cli.token_swap_refresh_interval_secs,
+        ));
         let mut startup_wait = mango_v4_client::delay_interval(Duration::from_secs(1));
         let shared_state = shared_state.clone();
         async move {
             loop {
-                startup_wait.tick().await;
                 if !shared_state.read().unwrap().one_snapshot_done {
+                    startup_wait.tick().await;
                     continue;
                 }
 
@@ -592,6 +451,7 @@ async fn main() -> anyhow::Result<()> {
         ));
     }
 
+    use cli_args::{BoolArg, Cli, CliDotenv};
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
         data_job,
@@ -648,6 +508,7 @@ struct LiquidationState {
     trigger_tcs_config: trigger_tcs::Config,
 
     errors: ErrorTracking<Pubkey, LiqErrorType>,
+    oracle_errors: ErrorTracking<TokenIndex, LiqErrorType>,
 }
 
 impl LiquidationState {
@@ -701,6 +562,25 @@ impl LiquidationState {
         .await;
 
         if let Err(err) = result.as_ref() {
+            if let Some((ti, ti_name)) = err.try_unwrap_oracle_error() {
+                if self
+                    .oracle_errors
+                    .had_too_many_errors(LiqErrorType::Liq, &ti, Instant::now())
+                    .is_none()
+                {
+                    warn!(
+                        "{:?} recording oracle error for token {} {}",
+                        chrono::offset::Utc::now(),
+                        ti_name,
+                        ti
+                    );
+                }
+
+                self.oracle_errors
+                    .record(LiqErrorType::Liq, &ti, err.to_string());
+                return result;
+            }
+
             // Keep track of pubkeys that had errors
             error_tracking.record(LiqErrorType::Liq, pubkey, err.to_string());
 

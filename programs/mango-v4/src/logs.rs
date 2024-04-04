@@ -528,6 +528,22 @@ pub struct PerpLiqBaseOrPositivePnlLogV2 {
 }
 
 #[event]
+pub struct PerpLiqBaseOrPositivePnlLogV3 {
+    pub mango_group: Pubkey,
+    pub perp_market_index: u16,
+    pub liqor: Pubkey,
+    pub liqee: Pubkey,
+    pub base_transfer_liqee: i64,
+    pub quote_transfer_liqee: i128,
+    pub quote_transfer_liqor: i128,
+    pub quote_platform_fee: i128,
+    pub pnl_transfer: i128,
+    pub pnl_settle_limit_transfer_recurring: i64,
+    pub pnl_settle_limit_transfer_oneshot: i64,
+    pub price: i128,
+}
+
+#[event]
 pub struct PerpLiqBankruptcyLog {
     pub mango_group: Pubkey,
     pub liqee: Pubkey,
@@ -778,4 +794,24 @@ pub struct TokenConditionalSwapStartLog {
     pub token_conditional_swap_id: u64,
     pub incentive_token_index: u16,
     pub incentive_amount: u64,
+}
+
+#[event]
+pub struct TokenCollateralFeeLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub asset_usage_fraction: i128,
+    pub fee: i128,
+    pub price: i128,
+}
+
+#[event]
+pub struct ForceWithdrawLog {
+    pub mango_group: Pubkey,
+    pub mango_account: Pubkey,
+    pub token_index: u16,
+    pub quantity: u64,
+    pub price: i128, // I80F48
+    pub to_token_account: Pubkey,
 }

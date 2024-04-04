@@ -17,6 +17,7 @@ mod test_bankrupt_tokens;
 mod test_basic;
 mod test_benchmark;
 mod test_borrow_limits;
+mod test_collateral_fees;
 mod test_delegate;
 mod test_fees_buyback_with_mngo;
 mod test_force_close;

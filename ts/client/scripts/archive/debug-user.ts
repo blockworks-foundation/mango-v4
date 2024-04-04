@@ -1,6 +1,6 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import cloneDeep from 'lodash/cloneDeep';
+import copy from 'fast-copy';
 import { cpuUsage } from 'process';
 import { Group } from '../../src/accounts/group';
 import { HealthCache } from '../../src/accounts/healthCache';
@@ -244,7 +244,7 @@ async function debugUser(
         .getPerpMarketByMarketIndex(pp.marketIndex)
         .priceNativeToUi(lp.toNumber());
 
-      const gClone: Group = cloneDeep(group);
+      const gClone: Group = copy(group);
       gClone.getPerpMarketByMarketIndex(pm.perpMarketIndex)._price = lp;
 
       const simHealth = toUiDecimalsForQuote(

@@ -3367,7 +3367,7 @@ dependencies = [
 
 [[package]]
 name = "mango-v4"
-version = "0.22.0"
+version = "0.23.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -3531,6 +3531,7 @@ dependencies = [
  "once_cell",
  "pyth-sdk-solana",
  "rand 0.7.3",
+ "regex",
  "serde",
  "serde_derive",
  "serde_json",

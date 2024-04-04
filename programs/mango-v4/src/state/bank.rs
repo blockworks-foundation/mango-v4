@@ -162,8 +162,10 @@ pub struct Bank {
     /// That means bankrupt accounts may still have assets of this type deposited.
     pub disable_asset_liquidation: u8,
 
+    pub force_withdraw: u8,
+
     #[derivative(Debug = "ignore")]
-    pub padding: [u8; 5],
+    pub padding: [u8; 4],
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -221,8 +223,16 @@ pub struct Bank {
     /// See also collected_fees_native and fees_withdrawn.
     pub collected_liquidation_fees: I80F48,
 
+    /// Collateral fees that have been collected (in native tokens)
+    ///
+    /// See also collected_fees_native and fees_withdrawn.
+    pub collected_collateral_fees: I80F48,
+
+    /// The daily collateral fees rate for fully utilized collateral.
+    pub collateral_fee_per_day: f32,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1920],
+    pub reserved: [u8; 1900],
 }
 const_assert_eq!(
     size_of::<Bank>(),
@@ -259,8 +269,9 @@ const_assert_eq!(
         + 16 * 3
         + 32
         + 8
-        + 16 * 3
-        + 1920
+        + 16 * 4
+        + 4
+        + 1900
 );
 const_assert_eq!(size_of::<Bank>(), 3064);
 const_assert_eq!(size_of::<Bank>() % 8, 0);
@@ -304,6 +315,7 @@ impl Bank {
             indexed_borrows: I80F48::ZERO,
             collected_fees_native: I80F48::ZERO,
             collected_liquidation_fees: I80F48::ZERO,
+            collected_collateral_fees: I80F48::ZERO,
             fees_withdrawn: 0,
             dust: I80F48::ZERO,
             flash_loan_approved_amount: 0,
@@ -351,7 +363,8 @@ impl Bank {
             reduce_only: existing_bank.reduce_only,
             force_close: existing_bank.force_close,
             disable_asset_liquidation: existing_bank.disable_asset_liquidation,
-            padding: [0; 5],
+            force_withdraw: existing_bank.force_withdraw,
+            padding: [0; 4],
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -368,25 +381,31 @@ impl Bank {
             deposit_limit: existing_bank.deposit_limit,
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
-            reserved: [0; 1920],
+            collateral_fee_per_day: existing_bank.collateral_fee_per_day,
+            reserved: [0; 1900],
         }
     }
 
     pub fn verify(&self) -> Result<()> {
         require_gte!(self.oracle_config.conf_filter, 0.0);
         require_gte!(self.util0, I80F48::ZERO);
+        require_gte!(self.util1, self.util0);
+        require_gte!(I80F48::ONE, self.util1);
         require_gte!(self.rate0, I80F48::ZERO);
-        require_gte!(self.util1, I80F48::ZERO);
         require_gte!(self.rate1, I80F48::ZERO);
         require_gte!(self.max_rate, I80F48::ZERO);
+        require_gte!(self.adjustment_factor, 0.0);
         require_gte!(self.loan_fee_rate, 0.0);
         require_gte!(self.loan_origination_fee_rate, 0.0);
-        require_gte!(self.maint_asset_weight, 0.0);
+        require_gte!(self.stable_price_model.delay_growth_limit, 0.0);
+        require_gte!(self.stable_price_model.stable_growth_limit, 0.0);
         require_gte!(self.init_asset_weight, 0.0);
+        require_gte!(self.maint_asset_weight, self.init_asset_weight);
         require_gte!(self.maint_liab_weight, 0.0);
-        require_gte!(self.init_liab_weight, 0.0);
+        require_gte!(self.init_liab_weight, self.maint_liab_weight);
         require_gte!(self.liquidation_fee, 0.0);
         require_gte!(self.min_vault_to_deposits_ratio, 0.0);
+        require_gte!(1.0, self.min_vault_to_deposits_ratio);
         require_gte!(self.net_borrow_limit_per_window_quote, -1);
         require_gt!(self.borrow_weight_scale_start_quote, 0.0);
         require_gt!(self.deposit_weight_scale_start_quote, 0.0);
@@ -396,6 +415,7 @@ impl Bank {
         require_gte!(self.flash_loan_swap_fee_rate, 0.0);
         require_gte!(self.interest_curve_scaling, 1.0);
         require_gte!(self.interest_target_utilization, 0.0);
+        require_gte!(1.0, self.interest_target_utilization);
         require_gte!(self.maint_weight_shift_duration_inv, 0.0);
         require_gte!(self.maint_weight_shift_asset_target, 0.0);
         require_gte!(self.maint_weight_shift_liab_target, 0.0);
@@ -403,6 +423,12 @@ impl Bank {
         require_gte!(self.platform_liquidation_fee, 0.0);
         if !self.allows_asset_liquidation() {
             require!(self.are_borrows_reduce_only(), MangoError::SomeError);
+            require_eq!(self.maint_asset_weight, I80F48::ZERO);
+        }
+        require_gte!(self.collateral_fee_per_day, 0.0);
+        if self.is_force_withdraw() {
+            require!(self.are_deposits_reduce_only(), MangoError::SomeError);
+            require!(!self.allows_asset_liquidation(), MangoError::SomeError);
             require_eq!(self.maint_asset_weight, I80F48::ZERO);
         }
         Ok(())
@@ -424,6 +450,10 @@ impl Bank {
 
     pub fn is_force_close(&self) -> bool {
         self.force_close == 1
+    }
+
+    pub fn is_force_withdraw(&self) -> bool {
+        self.force_withdraw == 1
     }
 
     pub fn allows_asset_liquidation(&self) -> bool {

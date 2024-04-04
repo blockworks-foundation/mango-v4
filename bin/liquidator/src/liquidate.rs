@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -20,6 +21,12 @@ pub struct Config {
     pub refresh_timeout: Duration,
     pub compute_limit_for_liq_ix: u32,
 
+    pub only_allowed_tokens: HashSet<TokenIndex>,
+    pub forbidden_tokens: HashSet<TokenIndex>,
+
+    pub only_allowed_perp_markets: HashSet<PerpMarketIndex>,
+    pub forbidden_perp_markets: HashSet<PerpMarketIndex>,
+
     /// If we cram multiple ix into a transaction, don't exceed this level
     /// of expected-cu.
     pub max_cu_per_transaction: u32,
@@ -33,8 +40,6 @@ struct LiquidateHelper<'a> {
     health_cache: &'a HealthCache,
     maint_health: I80F48,
     liqor_min_health_ratio: I80F48,
-    allowed_asset_tokens: HashSet<Pubkey>,
-    allowed_liab_tokens: HashSet<Pubkey>,
     config: Config,
 }
 
@@ -87,7 +92,7 @@ impl<'a> LiquidateHelper<'a> {
             let exceeds_cu_limit = new_ixs.cu > self.config.max_cu_per_transaction;
             let exceeds_size_limit = {
                 tx_builder.instructions = new_ixs.clone().to_instructions();
-                !tx_builder.transaction_size()?.is_ok()
+                !tx_builder.transaction_size()?.is_within_limit()
             };
             if exceeds_cu_limit || exceeds_size_limit {
                 break;
@@ -136,6 +141,25 @@ impl<'a> LiquidateHelper<'a> {
         let all_perp_base_positions: anyhow::Result<
             Vec<Option<(PerpMarketIndex, i64, I80F48, I80F48)>>,
         > = stream::iter(self.liqee.active_perp_positions())
+            .filter(|pp| async {
+                if self
+                    .config
+                    .forbidden_perp_markets
+                    .contains(&pp.market_index)
+                {
+                    return false;
+                }
+                if !self.config.only_allowed_perp_markets.is_empty()
+                    && !self
+                        .config
+                        .only_allowed_perp_markets
+                        .contains(&pp.market_index)
+                {
+                    return false;
+                }
+
+                true
+            })
             .then(|pp| async {
                 let base_lots = pp.base_position_lots();
                 if (base_lots == 0 && pp.quote_position_native() <= 0) || pp.has_open_taker_fills()
@@ -353,6 +377,7 @@ impl<'a> LiquidateHelper<'a> {
             .health_cache
             .token_infos
             .iter()
+            .filter(|p| !self.config.forbidden_tokens.contains(&p.token_index))
             .zip(
                 self.health_cache
                     .effective_token_balances(HealthType::LiquidationEnd)
@@ -378,26 +403,9 @@ impl<'a> LiquidateHelper<'a> {
                 is_valid_asset.then_some((ti.token_index, is_preferred, quote_value))
             })
             .collect_vec();
-        // sort such that preferred tokens are at the end, and the one with the larget quote value is
-        // at the very end
-        potential_assets.sort_by_key(|(_, is_preferred, amount)| (*is_preferred, *amount));
-
-        // filter only allowed assets
-        let potential_allowed_assets = potential_assets.iter().filter_map(|(ti, _, _)| {
-            let is_allowed = self
-                .allowed_asset_tokens
-                .contains(&self.client.context.token(*ti).mint);
-            is_allowed.then_some(*ti)
-        });
-
-        let asset_token_index = match potential_allowed_assets.last() {
-            Some(token_index) => token_index,
-            None => anyhow::bail!(
-                "mango account {}, has no allowed asset tokens that are liquidatable: {:?}",
-                self.pubkey,
-                potential_assets,
-            ),
-        };
+        // sort such that preferred tokens are at the start, and the one with the larget quote value is
+        // at 0
+        potential_assets.sort_by_key(|(_, is_preferred, amount)| Reverse((*is_preferred, *amount)));
 
         //
         // find a good liab, same as for assets
@@ -410,28 +418,68 @@ impl<'a> LiquidateHelper<'a> {
                 let tokens = (-ti.balance_spot).min(-effective.spot_and_perp);
                 let is_valid_liab = tokens > 0;
                 let quote_value = tokens * ti.prices.oracle;
-                is_valid_liab.then_some((ti.token_index, quote_value))
+                is_valid_liab.then_some((ti.token_index, false, quote_value))
             })
             .collect_vec();
-        // largest liquidatable liability at the end
-        potential_liabs.sort_by_key(|(_, amount)| *amount);
+        // largest liquidatable liability at the start
+        potential_liabs.sort_by_key(|(_, is_preferred, amount)| Reverse((*is_preferred, *amount)));
 
-        // filter only allowed liabs
-        let potential_allowed_liabs = potential_liabs.iter().filter_map(|(ti, _)| {
-            let is_allowed = self
-                .allowed_liab_tokens
-                .contains(&self.client.context.token(*ti).mint);
-            is_allowed.then_some(*ti)
-        });
+        //
+        // Find a pair
+        //
 
-        let liab_token_index = match potential_allowed_liabs.last() {
-            Some(token_index) => token_index,
-            None => anyhow::bail!(
-                "mango account {}, has no liab tokens that are liquidatable: {:?}",
+        fn find_best_token(
+            lh: &LiquidateHelper,
+            token_list: &Vec<(TokenIndex, bool, I80F48)>,
+        ) -> (Option<TokenIndex>, Option<TokenIndex>) {
+            let mut best_whitelisted = None;
+            let mut best = None;
+
+            let allowed_token_list = token_list
+                .iter()
+                .filter_map(|(ti, _, _)| (!lh.config.forbidden_tokens.contains(ti)).then_some(ti));
+
+            for ti in allowed_token_list {
+                let whitelisted = lh.config.only_allowed_tokens.is_empty()
+                    || lh.config.only_allowed_tokens.contains(ti);
+                if best.is_none() {
+                    best = Some(*ti);
+                }
+
+                if best_whitelisted.is_none() && whitelisted {
+                    best_whitelisted = Some(*ti);
+                    break;
+                }
+            }
+
+            return (best, best_whitelisted);
+        }
+
+        let (best_asset, best_whitelisted_asset) = find_best_token(self, &potential_assets);
+        let (best_liab, best_whitelisted_liab) = find_best_token(self, &potential_liabs);
+
+        let best_pair_opt = [
+            (best_whitelisted_asset, best_liab),
+            (best_asset, best_whitelisted_liab),
+        ]
+        .iter()
+        .filter_map(|(a, l)| (a.is_some() && l.is_some()).then_some((a.unwrap(), l.unwrap())))
+        .next();
+
+        if best_pair_opt.is_none() {
+            anyhow::bail!(
+                "mango account {}, has no allowed asset/liab tokens pair that are liquidatable: assets={:?}; liabs={:?}",
                 self.pubkey,
+                potential_assets,
                 potential_liabs,
-            ),
+            )
         };
+
+        let (asset_token_index, liab_token_index) = best_pair_opt.unwrap();
+
+        //
+        // Compute max transfer size
+        //
 
         let max_liab_transfer = self
             .max_token_liab_transfer(liab_token_index, asset_token_index)
@@ -484,9 +532,7 @@ impl<'a> LiquidateHelper<'a> {
             .iter()
             .find(|(liab_token_index, _liab_price, liab_usdc_equivalent)| {
                 liab_usdc_equivalent.is_negative()
-                    && self
-                        .allowed_liab_tokens
-                        .contains(&self.client.context.token(*liab_token_index).mint)
+                    && !self.config.forbidden_tokens.contains(liab_token_index)
             })
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -643,8 +689,6 @@ pub async fn maybe_liquidate_account(
 
     let maint_health = health_cache.health(HealthType::Maint);
 
-    let all_token_mints = HashSet::from_iter(mango_client.context.tokens.values().map(|c| c.mint));
-
     // try liquidating
     let maybe_txsig = LiquidateHelper {
         client: mango_client,
@@ -654,8 +698,6 @@ pub async fn maybe_liquidate_account(
         health_cache: &health_cache,
         maint_health,
         liqor_min_health_ratio,
-        allowed_asset_tokens: all_token_mints.clone(),
-        allowed_liab_tokens: all_token_mints,
         config: config.clone(),
     }
     .send_liq_tx()

@@ -13,7 +13,7 @@ use solana_sdk::signature::Signature;
 use solana_sdk::signer::Signer;
 use solana_sdk::transaction::VersionedTransaction;
 use tracing::*;
-use {anyhow::Context, fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
+use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
 pub struct Config {
     /// Amount of time to wait before reusing a positive-pnl account

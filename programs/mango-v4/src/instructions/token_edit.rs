@@ -54,6 +54,8 @@ pub fn token_edit(
     zero_util_rate: Option<f32>,
     platform_liquidation_fee: Option<f32>,
     disable_asset_liquidation_opt: Option<bool>,
+    collateral_fee_per_day: Option<f32>,
+    force_withdraw_opt: Option<bool>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -483,7 +485,21 @@ pub fn token_edit(
                 platform_liquidation_fee
             );
             bank.platform_liquidation_fee = I80F48::from_num(platform_liquidation_fee);
-            require_group_admin = true;
+            if platform_liquidation_fee != 0.0 {
+                require_group_admin = true;
+            }
+        }
+
+        if let Some(collateral_fee_per_day) = collateral_fee_per_day {
+            msg!(
+                "Collateral fee per day old {:?}, new {:?}",
+                bank.collateral_fee_per_day,
+                collateral_fee_per_day
+            );
+            bank.collateral_fee_per_day = collateral_fee_per_day;
+            if collateral_fee_per_day != 0.0 {
+                require_group_admin = true;
+            }
         }
 
         if let Some(disable_asset_liquidation) = disable_asset_liquidation_opt {
@@ -493,6 +509,16 @@ pub fn token_edit(
                 disable_asset_liquidation
             );
             bank.disable_asset_liquidation = u8::from(disable_asset_liquidation);
+            require_group_admin = true;
+        }
+
+        if let Some(force_withdraw) = force_withdraw_opt {
+            msg!(
+                "Force withdraw old {:?}, new {:?}",
+                bank.force_withdraw,
+                force_withdraw
+            );
+            bank.force_withdraw = u8::from(force_withdraw);
             require_group_admin = true;
         }
     }

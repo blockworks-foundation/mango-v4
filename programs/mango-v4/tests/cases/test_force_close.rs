@@ -438,3 +438,114 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_force_withdraw_token() -> Result<(), TransportError> {
+    let test_builder = TestContextBuilder::new();
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    //
+    // SETUP: Create a group and an account to fill the vaults
+    //
+
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let token = &tokens[0];
+
+    let deposit_amount = 100;
+
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[0],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: fails when force withdraw isn't enabled
+    //
+    assert!(send_tx(
+        solana,
+        TokenForceWithdrawInstruction {
+            account,
+            bank: token.bank,
+            target: context.users[0].token_accounts[0],
+        },
+    )
+    .await
+    .is_err());
+
+    // set force withdraw to enabled
+    send_tx(
+        solana,
+        TokenEdit {
+            admin,
+            group,
+            mint: token.mint.pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                init_asset_weight_opt: Some(0.0),
+                maint_asset_weight_opt: Some(0.0),
+                reduce_only_opt: Some(1),
+                disable_asset_liquidation_opt: Some(true),
+                force_withdraw_opt: Some(true),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: can't withdraw to foreign address
+    //
+    assert!(send_tx(
+        solana,
+        TokenForceWithdrawInstruction {
+            account,
+            bank: token.bank,
+            target: context.users[1].token_accounts[0], // bad address/owner
+        },
+    )
+    .await
+    .is_err());
+
+    //
+    // TEST: passes and withdraws tokens
+    //
+    let token_account = context.users[0].token_accounts[0];
+    let before_balance = solana.token_account_balance(token_account).await;
+    send_tx(
+        solana,
+        TokenForceWithdrawInstruction {
+            account,
+            bank: token.bank,
+            target: token_account,
+        },
+    )
+    .await
+    .unwrap();
+
+    let after_balance = solana.token_account_balance(token_account).await;
+    assert_eq!(after_balance, before_balance + deposit_amount);
+    assert!(account_position_closed(solana, account, token.bank).await);
+
+    Ok(())
+}

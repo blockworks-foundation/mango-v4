@@ -45,7 +45,7 @@ pub enum TokenConditionalSwapType {
 }
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct TokenConditionalSwap {
     pub id: u64,

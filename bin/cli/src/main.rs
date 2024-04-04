@@ -1,10 +1,14 @@
+use clap::clap_derive::ArgEnum;
 use clap::{Args, Parser, Subcommand};
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::state::{PlaceOrderType, SelfTradeBehavior, Side};
 use mango_v4_client::{
     keypair_from_cli, pubkey_from_cli, Client, MangoClient, TransactionBuilderConfig,
 };
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 mod save_snapshot;
 mod test_oracles;
@@ -88,6 +92,98 @@ struct JupiterSwap {
     rpc: Rpc,
 }
 
+#[derive(ArgEnum, Clone, Debug)]
+#[repr(u8)]
+pub enum CliSide {
+    Bid = 0,
+    Ask = 1,
+}
+
+#[derive(Args, Debug, Clone)]
+struct PerpPlaceOrder {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(long, value_enum)]
+    side: CliSide,
+
+    #[clap(short, long)]
+    price: f64,
+
+    #[clap(long)]
+    quantity: f64,
+
+    #[clap(long)]
+    expiry: u64,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
+#[derive(Args, Debug, Clone)]
+struct Serum3CreateOpenOrders {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
+#[derive(Args, Debug, Clone)]
+struct Serum3CloseOpenOrders {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
+#[derive(Args, Debug, Clone)]
+struct Serum3PlaceOrder {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    market_name: String,
+
+    #[clap(long, value_enum)]
+    side: CliSide,
+
+    #[clap(short, long)]
+    price: f64,
+
+    #[clap(long)]
+    quantity: f64,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum Command {
     CreateAccount(CreateAccount),
@@ -128,6 +224,10 @@ enum Command {
         #[clap(short, long)]
         output: String,
     },
+    PerpPlaceOrder(PerpPlaceOrder),
+    Serum3CloseOpenOrders(Serum3CloseOpenOrders),
+    Serum3CreateOpenOrders(Serum3CreateOpenOrders),
+    Serum3PlaceOrder(Serum3PlaceOrder),
 }
 
 impl Rpc {
@@ -207,15 +307,8 @@ async fn main() -> Result<(), anyhow::Error> {
             let output_mint = pubkey_from_cli(&cmd.output_mint);
             let client = MangoClient::new_for_existing_account(client, account, owner).await?;
             let txsig = client
-                .jupiter_v4()
-                .swap(
-                    input_mint,
-                    output_mint,
-                    cmd.amount,
-                    cmd.slippage_bps,
-                    mango_v4_client::JupiterSwapMode::ExactIn,
-                    false,
-                )
+                .jupiter_v6()
+                .swap(input_mint, output_mint, cmd.amount, cmd.slippage_bps, false)
                 .await?;
             println!("{}", txsig);
         }
@@ -247,6 +340,111 @@ async fn main() -> Result<(), anyhow::Error> {
             let mango_group = pubkey_from_cli(&group);
             let client = rpc.client(None)?;
             save_snapshot::save_snapshot(mango_group, client, output).await?
+        }
+        Command::PerpPlaceOrder(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let market = client
+                .context
+                .perp_markets
+                .iter()
+                .find(|p| p.1.name == cmd.market_name)
+                .unwrap()
+                .1;
+
+            fn native(x: f64, b: u32) -> i64 {
+                (x * (10_i64.pow(b)) as f64) as i64
+            }
+
+            let price_lots = native(cmd.price, 6) * market.base_lot_size
+                / (market.quote_lot_size * 10_i64.pow(market.base_decimals.into()));
+            let max_base_lots =
+                native(cmd.quantity, market.base_decimals.into()) / market.base_lot_size;
+
+            let txsig = client
+                .perp_place_order(
+                    market.perp_market_index,
+                    match cmd.side {
+                        CliSide::Bid => Side::Bid,
+                        CliSide::Ask => Side::Ask,
+                    },
+                    price_lots,
+                    max_base_lots,
+                    i64::max_value(),
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    PlaceOrderType::Limit,
+                    false,
+                    if cmd.expiry > 0 {
+                        SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() + cmd.expiry
+                    } else {
+                        0
+                    },
+                    10,
+                    SelfTradeBehavior::AbortTransaction,
+                )
+                .await?;
+            println!("{}", txsig);
+        }
+        Command::Serum3CreateOpenOrders(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+
+            let txsig = client.serum3_create_open_orders(&cmd.market_name).await?;
+            println!("{}", txsig);
+        }
+        Command::Serum3CloseOpenOrders(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+
+            let txsig = client.serum3_close_open_orders(&cmd.market_name).await?;
+            println!("{}", txsig);
+        }
+        Command::Serum3PlaceOrder(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let market_index = client.context.serum3_market_index(&cmd.market_name);
+            let market = client.context.serum3(market_index);
+            let base_token = client.context.token(market.base_token_index);
+            let quote_token = client.context.token(market.quote_token_index);
+
+            fn native(x: f64, b: u32) -> u64 {
+                (x * (10_i64.pow(b)) as f64) as u64
+            }
+
+            // coin_lot_size = base lot size ?
+            // cf priceNumberToLots
+            let price_lots = native(cmd.price, quote_token.decimals as u32) * market.coin_lot_size
+                / (native(1.0, base_token.decimals as u32) * market.pc_lot_size);
+
+            // cf baseSizeNumberToLots
+            let max_base_lots =
+                native(cmd.quantity, base_token.decimals as u32) / market.coin_lot_size;
+
+            let txsig = client
+                .serum3_place_order(
+                    &cmd.market_name,
+                    match cmd.side {
+                        CliSide::Bid => Serum3Side::Bid,
+                        CliSide::Ask => Serum3Side::Ask,
+                    },
+                    price_lots,
+                    max_base_lots as u64,
+                    ((price_lots * max_base_lots) as f64 * 1.01) as u64,
+                    Serum3SelfTradeBehavior::AbortTransaction,
+                    Serum3OrderType::Limit,
+                    SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                    10,
+                )
+                .await?;
+            println!("{}", txsig);
         }
     };
 

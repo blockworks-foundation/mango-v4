@@ -1078,6 +1078,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             zero_util_rate: 0.0,
             platform_liquidation_fee: self.platform_liquidation_fee,
             disable_asset_liquidation: false,
+            collateral_fee_per_day: 0.0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1326,6 +1327,8 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         zero_util_rate_opt: None,
         platform_liquidation_fee_opt: None,
         disable_asset_liquidation_opt: None,
+        collateral_fee_per_day_opt: None,
+        force_withdraw_opt: None,
     }
 }
 
@@ -1844,6 +1847,7 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
         allowed_fast_listings_per_interval_opt: None,
+        collateral_fee_interval_opt: None,
     }
 }
 
@@ -3106,6 +3110,58 @@ impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
+    }
+}
+
+pub struct TokenForceWithdrawInstruction {
+    pub account: Pubkey,
+    pub bank: Pubkey,
+    pub target: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenForceWithdrawInstruction {
+    type Accounts = mango_v4::accounts::TokenForceWithdraw;
+    type Instruction = mango_v4::instruction::TokenForceWithdraw;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let bank = account_loader.load::<Bank>(&self.bank).await.unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            bank: self.bank,
+            vault: bank.vault,
+            oracle: bank.oracle,
+            owner_ata_token_account: self.target,
+            alternate_owner_token_account: self.target,
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
     }
 }
 
@@ -5036,5 +5092,50 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenChargeCollateralFeesInstruction {
+    pub account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenChargeCollateralFeesInstruction {
+    type Accounts = mango_v4::accounts::TokenChargeCollateralFees;
+    type Instruction = mango_v4::instruction::TokenChargeCollateralFees;
+    async fn to_instruction(
+        &self,
+        account_loader: impl ClientAccountLoader + 'async_trait,
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {};
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            &account_loader,
+            &account,
+            None,
+            true,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
     }
 }

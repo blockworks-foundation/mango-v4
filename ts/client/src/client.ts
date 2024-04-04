@@ -1,16 +1,16 @@
 import {
   AnchorProvider,
   BN,
-  Instruction,
   Program,
   Provider,
   Wallet,
 } from '@coral-xyz/anchor';
-import * as borsh from '@coral-xyz/borsh';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
+  createAccount,
   createCloseAccountInstruction,
   createInitializeAccount3Instruction,
+  unpackAccount,
 } from '@solana/spl-token';
 import {
   AccountInfo,
@@ -26,13 +26,13 @@ import {
   RecentPrioritizationFees,
   SYSVAR_INSTRUCTIONS_PUBKEY,
   SYSVAR_RENT_PUBKEY,
+  Signer,
   SystemProgram,
   TransactionInstruction,
-  TransactionSignature,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
+import copy from 'fast-copy';
 import chunk from 'lodash/chunk';
-import cloneDeep from 'lodash/cloneDeep';
 import groupBy from 'lodash/groupBy';
 import mapValues from 'lodash/mapValues';
 import maxBy from 'lodash/maxBy';
@@ -45,7 +45,6 @@ import {
   Serum3Orders,
   TokenConditionalSwap,
   TokenConditionalSwapDisplayPriceStyle,
-  TokenConditionalSwapDto,
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
@@ -94,7 +93,7 @@ import {
   toNativeSellPerBuyTokenPrice,
 } from './utils';
 import {
-  MangoSignature,
+  LatestBlockhash,
   MangoSignatureStatus,
   SendTransactionOpts,
   sendTransaction,
@@ -115,8 +114,8 @@ export type IdsSource = 'api' | 'static' | 'get-program-accounts';
 
 export type MangoClientOptions = {
   idsSource?: IdsSource;
-  postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
+  postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   prioritizationFee?: number;
   estimateFee?: boolean;
   txConfirmationCommitment?: Commitment;
@@ -125,10 +124,15 @@ export type MangoClientOptions = {
   multipleConnections?: Connection[];
 };
 
+export type TxCallbackOptions = {
+  txid: string;
+  txSignatureBlockHash: LatestBlockhash;
+};
+
 export class MangoClient {
   private idsSource: IdsSource;
-  private postSendTxCallback?: ({ txid }: { txid: string }) => void;
-  postTxConfirmationCallback?: ({ txid }: { txid: string }) => void;
+  private postSendTxCallback?: (callbackOpts: TxCallbackOptions) => void;
+  postTxConfirmationCallback?: (callbackOpts: TxCallbackOptions) => void;
   private prioritizationFee: number;
   private estimateFee: boolean;
   private txConfirmationCommitment: Commitment;
@@ -176,7 +180,7 @@ export class MangoClient {
   public async sendAndConfirmTransaction(
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   /// Transactions
   public async sendAndConfirmTransaction(
@@ -218,13 +222,13 @@ export class MangoClient {
     group: Group,
     ixs: TransactionInstruction[],
     opts?: { confirmInBackground: true } & SendTransactionOpts,
-  ): Promise<MangoSignature>;
+  ): Promise<MangoSignatureStatus>;
 
   public async sendAndConfirmTransactionForGroup(
     group: Group,
     ixs: TransactionInstruction[],
     opts: SendTransactionOpts = {},
-  ): Promise<MangoSignatureStatus | MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     return await this.sendAndConfirmTransaction(ixs, {
       alts: group.addressLookupTablesList,
       ...opts,
@@ -304,6 +308,7 @@ export class MangoClient {
     feesMngoTokenIndex?: TokenIndex,
     feesExpiryInterval?: BN,
     allowedFastListingsPerInterval?: number,
+    collateralFeeInterval?: BN,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
       .groupEdit(
@@ -319,6 +324,7 @@ export class MangoClient {
         feesMngoTokenIndex ?? null,
         feesExpiryInterval ?? null,
         allowedFastListingsPerInterval ?? null,
+        collateralFeeInterval ?? null,
       )
       .accounts({
         group: group.publicKey,
@@ -462,6 +468,7 @@ export class MangoClient {
         params.zeroUtilRate,
         params.platformLiquidationFee,
         params.disableAssetLiquidation,
+        params.collateralFeePerDay,
       )
       .accounts({
         group: group.publicKey,
@@ -550,6 +557,8 @@ export class MangoClient {
         params.zeroUtilRate,
         params.platformLiquidationFee,
         params.disableAssetLiquidation,
+        params.collateralFeePerDay,
+        params.forceWithdraw,
       )
       .accounts({
         group: group.publicKey,
@@ -614,6 +623,94 @@ export class MangoClient {
       .remainingAccounts(parsedHealthAccounts)
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async tokenForceWithdraw(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenIndex: TokenIndex,
+  ): Promise<MangoSignatureStatus> {
+    const bank = group.getFirstBankByTokenIndex(tokenIndex);
+    if (!bank.forceWithdraw) {
+      throw new Error('Bank is not in force-withdraw mode');
+    }
+
+    const ownerAtaTokenAccount = await getAssociatedTokenAddress(
+      bank.mint,
+      mangoAccount.owner,
+      true,
+    );
+    let alternateOwnerTokenAccount = PublicKey.default;
+    const preInstructions: TransactionInstruction[] = [];
+    const postInstructions: TransactionInstruction[] = [];
+
+    const ai = await this.connection.getAccountInfo(ownerAtaTokenAccount);
+
+    // ensure withdraws don't fail with missing ATAs
+    if (ai == null) {
+      preInstructions.push(
+        await createAssociatedTokenAccountIdempotentInstruction(
+          (this.program.provider as AnchorProvider).wallet.publicKey,
+          mangoAccount.owner,
+          bank.mint,
+        ),
+      );
+
+      // wsol case
+      if (bank.mint.equals(NATIVE_MINT)) {
+        postInstructions.push(
+          createCloseAccountInstruction(
+            ownerAtaTokenAccount,
+            mangoAccount.owner,
+            mangoAccount.owner,
+          ),
+        );
+      }
+    } else {
+      const account = await unpackAccount(ownerAtaTokenAccount, ai);
+      // if owner is not same as mango account's owner on the ATA (for whatever reason)
+      // then create another token account
+      if (!account.owner.equals(mangoAccount.owner)) {
+        const kp = Keypair.generate();
+        alternateOwnerTokenAccount = kp.publicKey;
+        await createAccount(
+          this.connection,
+          (this.program.provider as AnchorProvider).wallet as any as Signer,
+          bank.mint,
+          mangoAccount.owner,
+          kp,
+        );
+
+        // wsol case
+        if (bank.mint.equals(NATIVE_MINT)) {
+          postInstructions.push(
+            createCloseAccountInstruction(
+              alternateOwnerTokenAccount,
+              mangoAccount.owner,
+              mangoAccount.owner,
+            ),
+          );
+        }
+      }
+    }
+
+    const ix = await this.program.methods
+      .tokenForceWithdraw()
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        bank: bank.publicKey,
+        vault: bank.vault,
+        oracle: bank.oracle,
+        ownerAtaTokenAccount,
+        alternateOwnerTokenAccount,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [
+      ...preInstructions,
+      ix,
+      ...postInstructions,
+    ]);
   }
 
   public async tokenDeregister(
@@ -1232,7 +1329,7 @@ export class MangoClient {
     // Work on a deep cloned mango account, since we would deactivating positions
     // before deactivation reaches on-chain state in order to simplify building a fresh list
     // of healthRemainingAccounts to each subsequent ix
-    const clonedMangoAccount = cloneDeep(mangoAccount);
+    const clonedMangoAccount = copy(mangoAccount);
     const instructions: TransactionInstruction[] = [];
 
     for (const serum3Account of clonedMangoAccount.serum3Active()) {
@@ -1328,7 +1425,7 @@ export class MangoClient {
     mintPk: PublicKey,
     amount: number,
     reduceOnly = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const decimals = group.getMintDecimals(mintPk);
     const nativeAmount = toNative(amount, decimals);
     return await this.tokenDepositNative(
@@ -1347,11 +1444,16 @@ export class MangoClient {
     nativeAmount: BN,
     reduceOnly = false,
     intoExisting = false,
-  ): Promise<MangoSignature> {
+  ): Promise<MangoSignatureStatus> {
     const bank = group.getFirstBankByMint(mintPk);
 
     const walletPk = this.walletPk;
-    const tokenAccountPk = await getAssociatedTokenAddress(mintPk, walletPk);
+    const tokenAccountPk = await getAssociatedTokenAddress(
+      mintPk,
+      walletPk,
+      // Allow ATA authority to be a PDA
+      true,
+    );
 
     let wrappedSolAccount: PublicKey | undefined;
     let preInstructions: TransactionInstruction[] = [];

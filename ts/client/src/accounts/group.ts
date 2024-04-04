@@ -8,14 +8,19 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 import BN from 'bn.js';
-import cloneDeep from 'lodash/cloneDeep';
 import merge from 'lodash/merge';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID } from '../constants';
 import { Id } from '../ids';
 import { I80F48 } from '../numbers/I80F48';
 import { PriceImpact, computePriceImpactOnJup } from '../risk';
-import { buildFetch, toNative, toNativeI80F48, toUiDecimals } from '../utils';
+import {
+  buildFetch,
+  deepClone,
+  toNative,
+  toNativeI80F48,
+  toUiDecimals,
+} from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
 import {
   OracleProvider,
@@ -50,6 +55,7 @@ export class Group {
       fastListingIntervalStart: BN;
       fastListingsInInterval: number;
       allowedFastListingsPerInterval: number;
+      collateralFeeInterval: BN;
     },
   ): Group {
     return new Group(
@@ -74,6 +80,7 @@ export class Group {
       obj.fastListingIntervalStart,
       obj.fastListingsInInterval,
       obj.allowedFastListingsPerInterval,
+      obj.collateralFeeInterval,
       [], // addressLookupTablesList
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
@@ -113,6 +120,7 @@ export class Group {
     public fastListingIntervalStart: BN,
     public fastListingsInInterval: number,
     public allowedFastListingsPerInterval: number,
+    public collateralFeeInterval: BN,
     public addressLookupTablesList: AddressLookupTableAccount[],
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
@@ -203,7 +211,8 @@ export class Group {
       banks = await client.getBanksForGroup(this);
     }
 
-    const oldbanksMapByTokenIndex = cloneDeep(this.banksMapByTokenIndex);
+    const oldbanksMapByTokenIndex = deepClone(this.banksMapByTokenIndex);
+
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
@@ -360,7 +369,7 @@ export class Group {
     }
 
     // ensure that freshly fetched perp markets have valid price until we fetch oracles again
-    const oldPerpMarketByMarketIndex = cloneDeep(
+    const oldPerpMarketByMarketIndex = deepClone(
       this.perpMarketsMapByMarketIndex,
     );
     for (const perpMarket of perpMarkets) {
@@ -493,6 +502,7 @@ export class Group {
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
+        oracle,
         ai,
         client.program.provider.connection,
       );

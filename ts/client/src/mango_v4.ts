@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.22.0",
+  "version": "0.23.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -276,6 +276,12 @@ export type MangoV4 = {
           "name": "allowedFastListingsPerIntervalOpt",
           "type": {
             "option": "u16"
+          }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -635,6 +641,10 @@ export type MangoV4 = {
         {
           "name": "disableAssetLiquidation",
           "type": "bool"
+        },
+        {
+          "name": "collateralFeePerDay",
+          "type": "f32"
         }
       ]
     },
@@ -1048,6 +1058,18 @@ export type MangoV4 = {
         },
         {
           "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
           }
@@ -3774,6 +3796,63 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -5964,6 +6043,25 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "tokenChargeCollateralFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -7392,11 +7490,15 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -7532,11 +7634,29 @@ export type MangoV4 = {
             }
           },
           {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1900
               ]
             }
           }
@@ -7665,11 +7785,27 @@ export type MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -7792,11 +7928,26 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -9567,11 +9718,15 @@ export type MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -10492,6 +10647,9 @@ export type MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
@@ -10847,6 +11005,9 @@ export type MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }
@@ -12711,6 +12872,71 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "PerpLiqBaseOrPositivePnlLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferRecurring",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferOneshot",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpLiqBankruptcyLog",
       "fields": [
         {
@@ -13696,6 +13922,76 @@ export type MangoV4 = {
         {
           "name": "incentiveAmount",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ForceWithdrawLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "toTokenAccount",
+          "type": "publicKey",
           "index": false
         }
       ]
@@ -14056,7 +14352,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.22.0",
+  "version": "0.23.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14333,6 +14629,12 @@ export const IDL: MangoV4 = {
           "name": "allowedFastListingsPerIntervalOpt",
           "type": {
             "option": "u16"
+          }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -14692,6 +14994,10 @@ export const IDL: MangoV4 = {
         {
           "name": "disableAssetLiquidation",
           "type": "bool"
+        },
+        {
+          "name": "collateralFeePerDay",
+          "type": "f32"
         }
       ]
     },
@@ -15105,6 +15411,18 @@ export const IDL: MangoV4 = {
         },
         {
           "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
           }
@@ -17831,6 +18149,63 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "perpCreateMarket",
       "docs": [
         "",
@@ -20021,6 +20396,25 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "tokenChargeCollateralFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -21449,11 +21843,15 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -21589,11 +21987,29 @@ export const IDL: MangoV4 = {
             }
           },
           {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1920
+                1900
               ]
             }
           }
@@ -21722,11 +22138,27 @@ export const IDL: MangoV4 = {
             "type": "u16"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -21849,11 +22281,26 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -23624,11 +24071,15 @@ export const IDL: MangoV4 = {
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -24549,6 +25000,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
           }
         ]
       }
@@ -24904,6 +25358,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "Serum3PlaceOrderV2"
+          },
+          {
+            "name": "TokenForceWithdraw"
           }
         ]
       }
@@ -26768,6 +27225,71 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "PerpLiqBaseOrPositivePnlLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferRecurring",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferOneshot",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpLiqBankruptcyLog",
       "fields": [
         {
@@ -27753,6 +28275,76 @@ export const IDL: MangoV4 = {
         {
           "name": "incentiveAmount",
           "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ForceWithdrawLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "toTokenAccount",
+          "type": "publicKey",
           "index": false
         }
       ]
