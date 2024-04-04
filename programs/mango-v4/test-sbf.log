@@ -1,0 +1,128 @@
+Warning: cargo-test-bpf is deprecated. Please, use cargo-test-sbf
+cargo-test-bpf child: /Users/dboures/.local/share/solana/install/active_release/bin/cargo-test-sbf --features enable-gpl -- force_withdraw
+Error: Function _ZN14raydium_amm_v39libraries7big_num4U51215overflowing_pow17hf10697e7ec306a69E Stack offset of 4448 exceeded max offset of 4096 by 352 bytes, please minimize large stack variables
+Error: Function _ZN86_$LT$switchboard_v2..aggregator..AggregatorAccountData$u20$as$u20$core..fmt..Debug$GT$3fmt17h1c064e05434af9b1E Stack offset of 4128 exceeded max offset of 4096 by 32 bytes, please minimize large stack variables
+    Finished release [optimized] target(s) in 0.56s
+    Finished test [unoptimized + debuginfo] target(s) in 1.17s
+     Running unittests src/lib.rs (/Users/dboures/lou-dev/mango-v4/target/debug/deps/mango_v4-ac2b844a47fef24c)
+     Running tests/test_all.rs (/Users/dboures/lou-dev/mango-v4/target/debug/deps/test_all-edde87c69f31fe30)
+[2024-03-07T16:20:43.199965000Z INFO  solana_program_test] "mango_v4" SBF program from /Users/dboures/lou-dev/mango-v4/target/deploy/mango_v4.so, modified 1 day, 22 hours, 41 minutes, 42 seconds, 608 ms, 612 µs and 685 ns ago
+[2024-03-07T16:20:43.221867000Z INFO  solana_program_test] "serum_dex" SBF program from tests/fixtures/serum_dex.so, modified 9 months, 1 week, 3 days, 16 hours, 3 minutes, 36 seconds, 532 ms, 23 µs and 619 ns ago
+[2024-03-07T16:20:44.063623000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.067507000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: GroupCreate
+[2024-03-07T16:20:44.071394000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.071831000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.073302000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.073528000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.074328000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+[2024-03-07T16:20:44.075531000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: InitializeAccount3
+[2024-03-07T16:20:44.077671000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4214 of 60522 compute units
+[2024-03-07T16:20:44.077736000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+[2024-03-07T16:20:44.080006000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 27624 of 80000 compute units
+[2024-03-07T16:20:44.080056000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.084750000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.085835000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: StubOracleCreate
+[2024-03-07T16:20:44.086811000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.086859000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.087992000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 11088 of 80000 compute units
+[2024-03-07T16:20:44.088036000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.293061000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.295260000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: StubOracleSet
+[2024-03-07T16:20:44.298469000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 4132 of 80000 compute units
+[2024-03-07T16:20:44.298615000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.308917000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.313831000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenRegister
+[2024-03-07T16:20:44.320560000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.320824000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.323177000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.323258000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.323927000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+[2024-03-07T16:20:44.324941000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: InitializeAccount3
+[2024-03-07T16:20:44.325315000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4214 of 55835 compute units
+[2024-03-07T16:20:44.325404000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+[2024-03-07T16:20:44.327367000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.327513000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.336600000Z DEBUG solana_runtime::message_processor::stable_log] Program data: vQGras+5v4A5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGRmCjSF2OFA3K4LgtsXrLCwK0lFuxV3RkZj1NG2QgerQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADq59JItrekHf84F9MLDHKEMm0jIkYZG1aFDFr+fIdEU
+[2024-03-07T16:20:44.337666000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 49703 of 80000 compute units
+[2024-03-07T16:20:44.337776000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.345090000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.347943000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenAddBank
+[2024-03-07T16:20:44.350433000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.350561000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.352321000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.352373000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.352826000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+[2024-03-07T16:20:44.353461000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: InitializeAccount3
+[2024-03-07T16:20:44.353693000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4214 of 49206 compute units
+[2024-03-07T16:20:44.353761000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+[2024-03-07T16:20:44.356876000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 41169 of 80000 compute units
+[2024-03-07T16:20:44.356941000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.359717000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.360777000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: AccountCreateV2
+[2024-03-07T16:20:44.362141000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 invoke [2]
+[2024-03-07T16:20:44.362299000Z DEBUG solana_runtime::message_processor::stable_log] Program 11111111111111111111111111111111 success
+[2024-03-07T16:20:44.364840000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Initialized account with header version 1
+[2024-03-07T16:20:44.367466000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 18571 of 80000 compute units
+[2024-03-07T16:20:44.367522000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.374996000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.376684000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenDeposit
+[2024-03-07T16:20:44.383527000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+[2024-03-07T16:20:44.384236000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: Transfer
+[2024-03-07T16:20:44.385063000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4645 of 60070 compute units
+[2024-03-07T16:20:44.385113000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+[2024-03-07T16:20:44.385902000Z DEBUG solana_runtime::message_processor::stable_log] Program data: F5qwwQsqqPQ5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlG5nuSBD8U+uBxMzR7uAc0I61dwQDXcyaCbc/JUkQF6XAADIuriNBgAAAAAAAAAAAAAAAAAAAAAAQEIPAAAAAAAAAAAAAAAAAEBCDwAAAAAAAAA=
+[2024-03-07T16:20:44.389044000Z DEBUG solana_runtime::message_processor::stable_log] Program data: jbqo/GyNSF45gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlG5nuSBD8U+uBxMzR7uAc0I61dwQDXcyaCbc/JUkQF6XjQFJVQdQZWn4CQLIESCpavFTHSt9cZ9L1l2X46LZGXEAAGQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAA==
+[2024-03-07T16:20:44.389541000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 35641 of 80000 compute units
+[2024-03-07T16:20:44.389588000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.392536000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.393829000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenForceWithdraw
+[2024-03-07T16:20:44.396990000Z DEBUG solana_runtime::message_processor::stable_log] Program log: AnchorError thrown in programs/mango-v4/src/instructions/token_force_withdraw.rs:17. Error Code: SomeError. Error Number: 6000. Error Message: .
+[2024-03-07T16:20:44.397161000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 16988 of 80000 compute units
+[2024-03-07T16:20:44.397203000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg failed: custom program error: 0x1770
+[2024-03-07T16:20:44.400186000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.401414000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenEdit
+[2024-03-07T16:20:44.406923000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Maint asset weight: old - 0.80000001192093, new - 0.0
+[2024-03-07T16:20:44.407069000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Init asset weight: old - 0.600000023841858, new - 0.0
+[2024-03-07T16:20:44.407582000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Reduce only: old - 0, new - 1
+[2024-03-07T16:20:44.408334000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Asset liquidation disabled old 0, new true
+[2024-03-07T16:20:44.408380000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Force withdraw old 0, new true
+[2024-03-07T16:20:44.408590000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Maint asset weight: old - 0.80000001192093, new - 0.0
+[2024-03-07T16:20:44.408730000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Init asset weight: old - 0.600000023841858, new - 0.0
+[2024-03-07T16:20:44.408777000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Reduce only: old - 0, new - 1
+[2024-03-07T16:20:44.408824000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Asset liquidation disabled old 0, new true
+[2024-03-07T16:20:44.408865000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Force withdraw old 0, new true
+[2024-03-07T16:20:44.409207000Z DEBUG solana_runtime::message_processor::stable_log] Program data: vQGras+5v4A5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGRmCjSF2OFA3K4LgtsXrLCwK0lFuxV3RkZj1NG2QgerQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADq59JItrekHf84F9MLDHKEMm0jIkYZG1aFDFr+fIdEU
+[2024-03-07T16:20:44.409303000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 25936 of 80000 compute units
+[2024-03-07T16:20:44.409350000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+[2024-03-07T16:20:44.411351000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.412523000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenForceWithdraw
+[2024-03-07T16:20:44.414182000Z DEBUG solana_runtime::message_processor::stable_log] Program log: AnchorError caused by account: owner_ata_token_account. Error Code: ConstraintAddress. Error Number: 2012. Error Message: An address constraint was violated.
+[2024-03-07T16:20:44.414201000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Left:
+[2024-03-07T16:20:44.414232000Z DEBUG solana_runtime::message_processor::stable_log] Program log: 7Vrt2x5c6CHpaH3UP9NtLyxbM1fhzeFjk37nLAnCEQdP
+[2024-03-07T16:20:44.414246000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Right:
+[2024-03-07T16:20:44.414266000Z DEBUG solana_runtime::message_processor::stable_log] Program log: 4eAQJVRS1xzkRKCdtEz5rbDdWxsChVQLCT5nCinMygxv
+[2024-03-07T16:20:44.414308000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 16674 of 80000 compute units
+[2024-03-07T16:20:44.414343000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg failed: custom program error: 0x7dc
+[2024-03-07T16:20:44.618968000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg invoke [1]
+[2024-03-07T16:20:44.621129000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: TokenForceWithdraw
+[2024-03-07T16:20:44.624531000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+[2024-03-07T16:20:44.625493000Z DEBUG solana_runtime::message_processor::stable_log] Program log: Instruction: Transfer
+[2024-03-07T16:20:44.625832000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 4645 of 60584 compute units
+[2024-03-07T16:20:44.625905000Z DEBUG solana_runtime::message_processor::stable_log] Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+[2024-03-07T16:20:44.626082000Z DEBUG solana_runtime::message_processor::stable_log] Program data: F5qwwQsqqPQ5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlG5nuSBD8U+uBxMzR7uAc0I61dwQDXcyaCbc/JUkQF6XAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQEIPAAAAAAAAAAAAAAAAAEBCDwAAAAAAAAA=
+[2024-03-07T16:20:44.626689000Z DEBUG solana_runtime::message_processor::stable_log] Program data: kieSL3bBenI5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlG5nuSBD8U+uBxMzR7uAc0I61dwQDXcyaCbc/JUkQF6XAAAAAAAAAAAAAAAAAAAAAAAA
+[2024-03-07T16:20:44.626890000Z DEBUG solana_runtime::message_processor::stable_log] Program data: NYIyFwESC8I5gBu98eub0nUdIA1k5XTLS43EQ+gRS92vVs8/8zanlG5nuSBD8U+uBxMzR7uAc0I61dwQDXcyaCbc/JUkQF6XAABkAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAA2GC5qO0e0p5Iwfwo3trqxqfHbKStgZUZRK7S93tVRBw==
+[2024-03-07T16:20:44.627846000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg consumed 28137 of 80000 compute units
+[2024-03-07T16:20:44.627917000Z DEBUG solana_runtime::message_processor::stable_log] Program 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg success
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 0.00s
+
+
+running 1 test
+test cases::test_force_close::test_force_withdraw_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 69 filtered out; finished in 1.47s
+
+
