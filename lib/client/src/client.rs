@@ -618,6 +618,64 @@ impl MangoClient {
         Ok(ixs)
     }
 
+    /// Creates token withdraw instructions performed by the delegate for the MangoClient's account/owner.
+    /// The `account` state is passed in separately so changes during the tx can be
+    /// accounted for when deriving health accounts.
+    pub async fn token_withdraw_as_delegate_instructions(
+        &self,
+        account: &MangoAccountValue,
+        mint: Pubkey,
+        amount: u64,
+        allow_borrow: bool,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let token = self.context.token_by_mint(&mint)?;
+        let token_index = token.token_index;
+
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(account, vec![token_index], vec![], vec![])
+            .await?;
+
+        let ixs = PreparedInstructions::from_vec(
+            vec![
+                spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                    &self.owner(),        // delegate is payer
+                    &account.fixed.owner, // mango account owner is owner
+                    &mint,
+                    &Token::id(),
+                ),
+                Instruction {
+                    program_id: mango_v4::id(),
+                    accounts: {
+                        let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                            &mango_v4::accounts::TokenWithdraw {
+                                group: self.group(),
+                                account: self.mango_account_address,
+                                owner: self.owner(),
+                                bank: token.first_bank(),
+                                vault: token.first_vault(),
+                                oracle: token.oracle,
+                                token_account: get_associated_token_address(
+                                    &account.fixed.owner,
+                                    &token.mint,
+                                ),
+                                token_program: Token::id(),
+                            },
+                            None,
+                        );
+                        ams.extend(health_check_metas.into_iter());
+                        ams
+                    },
+                    data: anchor_lang::InstructionData::data(&mango_v4::instruction::TokenWithdraw {
+                        amount,
+                        allow_borrow,
+                    }),
+                },
+            ],
+            self.instruction_cu(health_cu),
+        );
+        Ok(ixs)
+    }
+
     pub async fn token_withdraw(
         &self,
         mint: Pubkey,
@@ -625,9 +683,16 @@ impl MangoClient {
         allow_borrow: bool,
     ) -> anyhow::Result<Signature> {
         let account = self.mango_account().await?;
-        let ixs = self
+        let is_delegate = account.fixed.is_delegate(self.owner());
+        let ixs = if is_delegate {
+            self
+            .token_withdraw_as_delegate_instructions(&account, mint, amount, allow_borrow)
+            .await?
+        } else {
+            self
             .token_withdraw_instructions(&account, mint, amount, allow_borrow)
-            .await?;
+            .await?
+        };
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
 
