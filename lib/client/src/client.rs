@@ -685,13 +685,11 @@ impl MangoClient {
         let account = self.mango_account().await?;
         let is_delegate = account.fixed.is_delegate(self.owner());
         let ixs = if is_delegate {
-            self
-            .token_withdraw_as_delegate_instructions(&account, mint, amount, allow_borrow)
-            .await?
+            self.token_withdraw_as_delegate_instructions(&account, mint, amount, allow_borrow)
+                .await?
         } else {
-            self
-            .token_withdraw_instructions(&account, mint, amount, allow_borrow)
-            .await?
+            self.token_withdraw_instructions(&account, mint, amount, allow_borrow)
+                .await?
         };
         self.send_and_confirm_owner_tx(ixs.to_instructions()).await
     }
