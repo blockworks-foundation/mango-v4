@@ -122,6 +122,7 @@ export type MangoClientOptions = {
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
   multipleConnections?: Connection[];
+  useFallbackOracles?: boolean;
 };
 
 export type TxCallbackOptions = {
@@ -139,6 +140,7 @@ export class MangoClient {
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
   multipleConnections: Connection[] = [];
+  private useFallbackOracles?: boolean;
 
   constructor(
     public program: Program<MangoV4>,
@@ -161,6 +163,7 @@ export class MangoClient {
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
     this.multipleConnections = opts?.multipleConnections ?? [];
+    this.useFallbackOracles = opts?.useFallbackOracles || false;
   }
 
   /// Convenience accessors
@@ -5243,6 +5246,12 @@ export class MangoClient {
         )
         .map((serumPosition) => serumPosition.openOrders),
     );
+
+    if (this.useFallbackOracles) {
+      healthRemainingAccounts.push(
+        ...mintInfos.map((mintInfo) => mintInfo.fallbackOracle),
+      );
+    }
 
     return healthRemainingAccounts;
   }
