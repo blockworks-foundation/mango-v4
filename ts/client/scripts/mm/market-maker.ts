@@ -249,6 +249,9 @@ async function fullMarketMaker() {
     MANGO_V4_ID[CLUSTER],
     {
       idsSource: 'api',
+      fallbackOracleConfig: [
+        new PublicKey('Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD'), // USDC pyth oracle
+      ],
     },
   );
 
