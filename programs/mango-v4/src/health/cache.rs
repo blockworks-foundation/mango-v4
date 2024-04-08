@@ -820,6 +820,12 @@ impl HealthCache {
             })
     }
 
+    pub fn has_token_info(&self, token_index: TokenIndex) -> bool {
+        self.token_infos
+            .iter()
+            .any(|t| t.token_index == token_index)
+    }
+
     pub fn perp_info(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpInfo> {
         Ok(&self.perp_infos[self.perp_info_index(perp_market_index)?])
     }
