@@ -2095,6 +2095,12 @@
 <a href="#2095" id="2095">2095</a>
 <a href="#2096" id="2096">2096</a>
 <a href="#2097" id="2097">2097</a>
+<a href="#2098" id="2098">2098</a>
+<a href="#2099" id="2099">2099</a>
+<a href="#2100" id="2100">2100</a>
+<a href="#2101" id="2101">2101</a>
+<a href="#2102" id="2102">2102</a>
+<a href="#2103" id="2103">2103</a>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -2915,6 +2921,12 @@
                     token_index
                 )
             })
+    }
+
+    <span class="kw">pub fn </span>has_token_info(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; bool {
+        <span class="self">self</span>.token_infos
+            .iter()
+            .any(|t| t.token_index == token_index)
     }
 
     <span class="kw">pub fn </span>perp_info(<span class="kw-2">&amp;</span><span class="self">self</span>, perp_market_index: PerpMarketIndex) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>PerpInfo&gt; {
