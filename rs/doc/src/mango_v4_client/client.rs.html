@@ -3261,7 +3261,7 @@
                     }),
                 },
             ],
-            <span class="self">self</span>.instruction_cu(health_cu),
+            <span class="self">self</span>.instruction_cu(health_cu) + <span class="self">self</span>.context.compute_estimates.cu_per_associated_token_account_creation,
         );
         <span class="prelude-val">Ok</span>(ixs)
     }
