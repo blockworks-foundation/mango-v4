@@ -26,6 +26,7 @@ use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenInde
 ///   are passed because health needs to be computed for different baskets in
 ///   one instruction (such as for liquidation instructions).
 pub trait AccountRetriever {
+    /// Returns the token indexes of the available banks. Unordered and may have duplicates.
     fn available_banks(&self) -> Result<Vec<TokenIndex>>;
 
     fn bank_and_oracle(
@@ -67,6 +68,9 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
 }
 
 /// Creates a FixedOrderAccountRetriever where all banks are present
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
@@ -84,6 +88,9 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 
 /// A FixedOrderAccountRetriever with n_banks <= active_token_positions().count(),
 /// depending on which banks were passed.
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
 pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,

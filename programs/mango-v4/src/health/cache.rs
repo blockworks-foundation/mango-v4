@@ -1234,18 +1234,10 @@ pub fn new_health_cache(
 }
 
 /// Generate a special HealthCache for an account and its health accounts
-/// where nonnegative token positions for bad oracles are skipped.
+/// where nonnegative token positions for bad oracles are skipped as well as missing banks.
 ///
 /// This health cache must be used carefully, since it doesn't provide the actual
 /// account health, just a value that is guaranteed to be less than it.
-pub fn new_health_cache_skipping_bad_oracles(
-    account: &MangoAccountRef,
-    retriever: &impl AccountRetriever,
-    now_ts: u64,
-) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, now_ts, true, false)
-}
-
 pub fn new_health_cache_skipping_missing_banks_and_bad_oracles(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
