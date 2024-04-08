@@ -156,7 +156,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     // Health check
     //
     if let Some((mut health_cache, pre_init_health_lower_bound)) = pre_health_opt {
-        if health_cache.token_info_index(token_index).is_ok() {
+        if health_cache.has_token_info(token_index) {
             // This is the normal case: the health cache knows about the token, we can
             // compute the health for the new state by adjusting its balance
             health_cache.adjust_token_balance(&bank, native_position_after - native_position)?;
