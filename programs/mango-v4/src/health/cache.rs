@@ -1230,7 +1230,7 @@ pub fn new_health_cache(
     retriever: &impl AccountRetriever,
     now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, now_ts, false, false)
+    new_health_cache_impl(account, retriever, now_ts, false)
 }
 
 /// Generate a special HealthCache for an account and its health accounts
@@ -1243,24 +1243,24 @@ pub fn new_health_cache_skipping_missing_banks_and_bad_oracles(
     retriever: &impl AccountRetriever,
     now_ts: u64,
 ) -> Result<HealthCache> {
-    new_health_cache_impl(account, retriever, now_ts, true, true)
+    new_health_cache_impl(account, retriever, now_ts, true)
 }
 
+// On `allow_skipping_banks`:
+//   If (a Bank is not provided or its oracle is stale or inconfident) and the health contribution would
+//   not be negative, skip it. This decreases health, but many operations are still allowed as long
+//   as the decreased amount stays positive.
 fn new_health_cache_impl(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
     now_ts: u64,
-    // If an oracle is stale or inconfident and the health contribution would
-    // not be negative, skip it. This decreases health, but maybe overall it's
-    // still positive?
-    skip_bad_oracles: bool,
-    skip_missing_banks: bool,
+    allow_skipping_banks: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
     // As a CU optimization, don't call available_banks() unless necessary
-    let available_banks_opt = if skip_missing_banks {
+    let available_banks_opt = if allow_skipping_banks {
         Some(retriever.available_banks()?)
     } else {
         None
@@ -1268,7 +1268,7 @@ fn new_health_cache_impl(
 
     for (i, position) in account.active_token_positions().enumerate() {
         // Allow skipping of missing banks only if the account has a nonnegative balance
-        if skip_missing_banks {
+        if allow_skipping_banks {
             let bank_is_available = available_banks_opt
                 .as_ref()
                 .unwrap()
@@ -1288,7 +1288,7 @@ fn new_health_cache_impl(
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index);
 
         // Allow skipping of bad-oracle banks if the account has a nonnegative balance
-        if skip_bad_oracles
+        if allow_skipping_banks
             && bank_oracle_result.is_oracle_error()
             && position.indexed_position >= 0
         {
@@ -1337,7 +1337,7 @@ fn new_health_cache_impl(
             (Ok(base), Ok(quote)) => (base, quote),
             _ => {
                 require_msg_typed!(
-                    skip_bad_oracles || skip_missing_banks,
+                    allow_skipping_banks,
                     MangoError::InvalidBank,
                     "serum market {} misses health accounts for bank {} or {}",
                     serum_account.market_index,
@@ -1374,7 +1374,7 @@ fn new_health_cache_impl(
         )?;
 
         // Ensure the settle token is available in the health cache
-        if skip_bad_oracles || skip_missing_banks {
+        if allow_skipping_banks {
             find_token_info_index(&token_infos, perp_market.settle_token_index)?;
         }
 
