@@ -691,7 +691,7 @@ impl MangoClient {
                     }),
                 },
             ],
-            self.instruction_cu(health_cu),
+            self.instruction_cu(health_cu) + self.context.compute_estimates.cu_per_associated_token_account_creation,
         );
         Ok(ixs)
     }
