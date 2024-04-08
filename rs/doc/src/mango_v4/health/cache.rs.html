@@ -2095,14 +2095,6 @@
 <a href="#2095" id="2095">2095</a>
 <a href="#2096" id="2096">2096</a>
 <a href="#2097" id="2097">2097</a>
-<a href="#2098" id="2098">2098</a>
-<a href="#2099" id="2099">2099</a>
-<a href="#2100" id="2100">2100</a>
-<a href="#2101" id="2101">2101</a>
-<a href="#2102" id="2102">2102</a>
-<a href="#2103" id="2103">2103</a>
-<a href="#2104" id="2104">2104</a>
-<a href="#2105" id="2105">2105</a>
 </pre><pre class="rust"><code><span class="doccomment">/*!
  * This module deals with computing different types of health for a mango account.
  *
@@ -3335,45 +3327,37 @@
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
     now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
-    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">false</span>, <span class="bool-val">false</span>)
+    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">false</span>)
 }
 
 <span class="doccomment">/// Generate a special HealthCache for an account and its health accounts
-/// where nonnegative token positions for bad oracles are skipped.
+/// where nonnegative token positions for bad oracles are skipped as well as missing banks.
 ///
 /// This health cache must be used carefully, since it doesn&#39;t provide the actual
 /// account health, just a value that is guaranteed to be less than it.
-</span><span class="kw">pub fn </span>new_health_cache_skipping_bad_oracles(
+</span><span class="kw">pub fn </span>new_health_cache_skipping_missing_banks_and_bad_oracles(
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
     now_ts: u64,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
-    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">true</span>, <span class="bool-val">false</span>)
+    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">true</span>)
 }
 
-<span class="kw">pub fn </span>new_health_cache_skipping_missing_banks_and_bad_oracles(
+<span class="comment">// On `allow_skipping_banks`:
+//   If (a Bank is not provided or its oracle is stale or inconfident) and the health contribution would
+//   not be negative, skip it. This decreases health, but many operations are still allowed as long
+//   as the decreased amount stays positive.
+</span><span class="kw">fn </span>new_health_cache_impl(
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
     retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
     now_ts: u64,
-) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
-    new_health_cache_impl(account, retriever, now_ts, <span class="bool-val">true</span>, <span class="bool-val">true</span>)
-}
-
-<span class="kw">fn </span>new_health_cache_impl(
-    account: <span class="kw-2">&amp;</span>MangoAccountRef,
-    retriever: <span class="kw-2">&amp;</span><span class="kw">impl </span>AccountRetriever,
-    now_ts: u64,
-    <span class="comment">// If an oracle is stale or inconfident and the health contribution would
-    // not be negative, skip it. This decreases health, but maybe overall it&#39;s
-    // still positive?
-    </span>skip_bad_oracles: bool,
-    skip_missing_banks: bool,
+    allow_skipping_banks: bool,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;HealthCache&gt; {
     <span class="comment">// token contribution from token accounts
     </span><span class="kw">let </span><span class="kw-2">mut </span>token_infos = Vec::with_capacity(account.active_token_positions().count());
 
     <span class="comment">// As a CU optimization, don&#39;t call available_banks() unless necessary
-    </span><span class="kw">let </span>available_banks_opt = <span class="kw">if </span>skip_missing_banks {
+    </span><span class="kw">let </span>available_banks_opt = <span class="kw">if </span>allow_skipping_banks {
         <span class="prelude-val">Some</span>(retriever.available_banks()<span class="question-mark">?</span>)
     } <span class="kw">else </span>{
         <span class="prelude-val">None
@@ -3381,7 +3365,7 @@
 
     <span class="kw">for </span>(i, position) <span class="kw">in </span>account.active_token_positions().enumerate() {
         <span class="comment">// Allow skipping of missing banks only if the account has a nonnegative balance
-        </span><span class="kw">if </span>skip_missing_banks {
+        </span><span class="kw">if </span>allow_skipping_banks {
             <span class="kw">let </span>bank_is_available = available_banks_opt
                 .as_ref()
                 .unwrap()
@@ -3401,7 +3385,7 @@
             retriever.bank_and_oracle(<span class="kw-2">&amp;</span>account.fixed.group, i, position.token_index);
 
         <span class="comment">// Allow skipping of bad-oracle banks if the account has a nonnegative balance
-        </span><span class="kw">if </span>skip_bad_oracles
+        </span><span class="kw">if </span>allow_skipping_banks
             &amp;&amp; bank_oracle_result.is_oracle_error()
             &amp;&amp; position.indexed_position &gt;= <span class="number">0
         </span>{
@@ -3450,7 +3434,7 @@
             (<span class="prelude-val">Ok</span>(base), <span class="prelude-val">Ok</span>(quote)) =&gt; (base, quote),
             <span class="kw">_ </span>=&gt; {
                 <span class="macro">require_msg_typed!</span>(
-                    skip_bad_oracles || skip_missing_banks,
+                    allow_skipping_banks,
                     MangoError::InvalidBank,
                     <span class="string">&quot;serum market {} misses health accounts for bank {} or {}&quot;</span>,
                     serum_account.market_index,
@@ -3487,7 +3471,7 @@
         )<span class="question-mark">?</span>;
 
         <span class="comment">// Ensure the settle token is available in the health cache
-        </span><span class="kw">if </span>skip_bad_oracles || skip_missing_banks {
+        </span><span class="kw">if </span>allow_skipping_banks {
             find_token_info_index(<span class="kw-2">&amp;</span>token_infos, perp_market.settle_token_index)<span class="question-mark">?</span>;
         }
 

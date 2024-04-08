@@ -812,6 +812,13 @@
 <a href="#812" id="812">812</a>
 <a href="#813" id="813">813</a>
 <a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>anchor_lang::ZeroCopy;
 
@@ -840,7 +847,8 @@
 ///   are passed because health needs to be computed for different baskets in
 ///   one instruction (such as for liquidation instructions).
 </span><span class="kw">pub trait </span>AccountRetriever {
-    <span class="kw">fn </span>available_banks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;TokenIndex&gt;&gt;;
+    <span class="doccomment">/// Returns the token indexes of the available banks. Unordered and may have duplicates.
+    </span><span class="kw">fn </span>available_banks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;TokenIndex&gt;&gt;;
 
     <span class="kw">fn </span>bank_and_oracle(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -881,6 +889,9 @@
 }
 
 <span class="doccomment">/// Creates a FixedOrderAccountRetriever where all banks are present
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
 </span><span class="kw">pub fn </span>new_fixed_order_account_retriever&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;(
     ais: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[AccountInfo&lt;<span class="lifetime">&#39;info</span>&gt;],
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
@@ -898,6 +909,9 @@
 
 <span class="doccomment">/// A FixedOrderAccountRetriever with n_banks &lt;= active_token_positions().count(),
 /// depending on which banks were passed.
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
 </span><span class="kw">pub fn </span>new_fixed_order_account_retriever_with_optional_banks&lt;<span class="lifetime">&#39;a</span>, <span class="lifetime">&#39;info</span>&gt;(
     ais: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[AccountInfo&lt;<span class="lifetime">&#39;info</span>&gt;],
     account: <span class="kw-2">&amp;</span>MangoAccountRef,
