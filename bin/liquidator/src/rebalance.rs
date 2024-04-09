@@ -675,19 +675,16 @@ impl Rebalancer {
             )
             .await?;
 
-        // TODO FAS Uncomment this after v0.24.0 is released
-        // let seq_check_ixs = self
-        //     .mango_client
-        //     .sequence_check_instruction(&self.mango_account_address, &account)
-        //     .await?;
+        let seq_check_ixs = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, &account)
+            .await?;
 
         let mut ixs = PreparedInstructions::new();
         ixs.append(create_or_replace_ixs);
         ixs.append(cancel_ixs);
         ixs.append(place_order_ixs);
-
-        // TODO FAS Uncomment this after v0.24.0 is released
-        // ixs.append(seq_check_ixs);
+        ixs.append(seq_check_ixs);
 
         let txsig = self
             .mango_client
