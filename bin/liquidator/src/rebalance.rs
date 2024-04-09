@@ -30,6 +30,8 @@ pub struct Config {
     pub enabled: bool,
     /// Maximum slippage allowed in Jupiter
     pub slippage_bps: u64,
+    /// Maximum slippage from oracle price for limit orders
+    pub limit_order_distance_from_oracle_price_bps: u64,
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
@@ -599,14 +601,30 @@ impl Rebalancer {
             Serum3Side::Ask
         };
 
-        let limit_price = (token_price * I80F48::from_num(market.coin_lot_size)).to_num::<u64>()
-            / market.pc_lot_size;
+        let distance_from_oracle_price_bp =
+            I80F48::from_num(self.config.limit_order_distance_from_oracle_price_bps)
+                * match side {
+                    Serum3Side::Bid => 1,
+                    Serum3Side::Ask => -1,
+                };
+        let price_adjustment_factor =
+            (I80F48::from_num(10_000) + distance_from_oracle_price_bp) / I80F48::from_num(10_000);
+
+        let limit_price =
+            (token_price * price_adjustment_factor * I80F48::from_num(market.coin_lot_size))
+                .to_num::<u64>()
+                / market.pc_lot_size;
         let mut max_base_lots =
             (native_amount.abs() / I80F48::from_num(market.coin_lot_size)).to_num::<u64>();
 
         debug!(
+            side = match side {
+                Serum3Side::Bid => "Buy",
+                Serum3Side::Ask => "Sell",
+            },
             token = token.name,
             oracle_price = token_price.to_num::<f64>(),
+            price_adjustment_factor = price_adjustment_factor.to_num::<f64>(),
             coin_lot_size = market.coin_lot_size,
             pc_lot_size = market.pc_lot_size,
             limit_price = limit_price,
@@ -647,7 +665,11 @@ impl Rebalancer {
                 max_base_lots,
                 ((limit_price * max_base_lots * market.pc_lot_size) as f64 * 1.01) as u64,
                 Serum3SelfTradeBehavior::CancelProvide,
-                Serum3OrderType::PostOnly,
+                if self.config.limit_order_distance_from_oracle_price_bps == 0 {
+                    Serum3OrderType::PostOnly
+                } else {
+                    Serum3OrderType::Limit
+                },
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
                 10,
             )
