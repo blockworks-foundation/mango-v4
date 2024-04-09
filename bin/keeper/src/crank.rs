@@ -193,7 +193,7 @@ pub async fn loop_update_index_and_rate(
             .map(|token_index| client.context.token(*token_index).name.to_owned())
             .join(",");
 
-        let mut instructions = vec![];
+        let mut instructions = PreparedInstructions::new();
         for token_index in token_indices_clone.iter() {
             let token = client.context.token(*token_index);
             let banks_for_a_token = token.banks();
@@ -225,7 +225,14 @@ pub async fn loop_update_index_and_rate(
 
             ix.accounts.append(&mut banks);
 
-            let sim_result = match client.simulate(vec![ix.clone()]).await {
+            let pix = PreparedInstructions::from_single(
+                ix,
+                client
+                    .context
+                    .compute_estimates
+                    .cu_token_update_index_and_rates,
+            );
+            let sim_result = match client.simulate(pix.clone().to_instructions()).await {
                 Ok(response) => response.value,
                 Err(e) => {
                     error!(token.name, "simulation request error: {e:?}");
@@ -238,11 +245,12 @@ pub async fn loop_update_index_and_rate(
                 continue;
             }
 
-            instructions.push(ix);
+            instructions.append(pix);
         }
+
         let pre = Instant::now();
         let sig_result = client
-            .send_and_confirm_permissionless_tx(instructions)
+            .send_and_confirm_permissionless_tx(instructions.to_instructions())
             .await;
 
         let duration_ms = pre.elapsed().as_millis();
@@ -358,7 +366,18 @@ pub async fn loop_consume_events(
             }),
         };
 
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_consume_events_base
+                + num_of_events
+                    * client
+                        .context
+                        .compute_estimates
+                        .cu_perp_consume_events_per_event,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
 
         let duration_ms = pre.elapsed().as_millis();
 
@@ -411,7 +430,13 @@ pub async fn loop_update_funding(
             ),
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
         };
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_update_funding,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
 
         let duration_ms = pre.elapsed().as_millis();
 
