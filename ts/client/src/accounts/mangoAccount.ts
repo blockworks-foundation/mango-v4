@@ -57,6 +57,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
       tokenConditionalSwaps: unknown;
+      lastCollateralFeeCharge: BN;
     },
   ): MangoAccount {
     return new MangoAccount(
@@ -76,6 +77,7 @@ export class MangoAccount {
       obj.buybackFeesAccruedPrevious,
       obj.buybackFeesExpiryTimestamp,
       obj.headerVersion,
+      obj.lastCollateralFeeCharge,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
@@ -102,6 +104,7 @@ export class MangoAccount {
     public buybackFeesAccruedPrevious: BN,
     public buybackFeesExpiryTimestamp: BN,
     public headerVersion: number,
+    public lastCollateralFeeCharge: BN,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
