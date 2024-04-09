@@ -52,6 +52,7 @@ pub async fn save_snapshot(
     // Sourcing account and slot data from solana via websockets
     websocket_source::start(
         websocket_source::Config {
+            rpc_http_url: rpc_url.clone(),
             rpc_ws_url: ws_url.clone(),
             serum_programs,
             open_orders_authority: mango_group,
@@ -98,7 +99,7 @@ pub async fn save_snapshot(
 
         match message {
             Message::Account(_) => {}
-            Message::Snapshot(snapshot) => {
+            Message::Snapshot(snapshot, _) => {
                 for slot in snapshot.iter().map(|a| a.slot).unique() {
                     chain_data.update_slot(chain_data::SlotData {
                         slot,

@@ -3,10 +3,11 @@ use fixed::types::I80F48;
 use itertools::Itertools;
 use log::*;
 use mango_feeds_connector::metrics::MetricU64;
+use mango_feeds_connector::AccountWrite;
 use mango_feeds_connector::{
     chain_data::{AccountData, ChainData, ChainDataMetrics, SlotData},
     metrics::{MetricType, Metrics},
-    AccountWrite, SlotUpdate,
+    SlotUpdate,
 };
 use mango_feeds_lib::{
     base_lots_to_ui, base_lots_to_ui_perp, price_lots_to_ui, price_lots_to_ui_perp, MarketConfig,
@@ -305,7 +306,7 @@ pub async fn init(
                             ),
                         },
                     );
-                }
+                },
                 Ok(slot_update) = slot_queue_receiver.recv() => {
                     chain_cache.update_slot(SlotData {
                         slot: slot_update.slot,
@@ -313,7 +314,6 @@ pub async fn init(
                         status: slot_update.status,
                         chain: 0,
                     });
-
                 }
             }
 

@@ -1,15 +1,18 @@
 use jsonrpc_core::futures::StreamExt;
 use jsonrpc_core_client::transports::ws;
 
+use mango_feeds_connector::metrics::Metrics;
 use solana_sdk::pubkey::Pubkey;
 
 use anyhow::Context;
 use async_channel::{RecvError, Sender};
 use mango_feeds_connector::{
-    AccountWrite, EntityFilter, FeedFilterType, FilterConfig, Memcmp, SnapshotSourceConfig,
-    SourceConfig,
+    AccountWrite, EntityFilter, FeedFilterType, FilterConfig, GrpcSourceConfig, Memcmp,
+    SnapshotSourceConfig, SourceConfig,
 };
 use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_stream::StreamMap;
 use tracing::*;
@@ -22,19 +25,22 @@ pub struct Config {
     pub rpc_http_url: String,
     pub serum_programs: Vec<Pubkey>,
     pub open_orders_authority: Pubkey,
+    pub grpc_sources: Vec<GrpcSourceConfig>,
 }
 
 async fn feed_data(
     config: &Config,
     mango_oracles: Vec<Pubkey>,
     sender: async_channel::Sender<Message>,
+    metrics: &Metrics,
+    exit: Arc<AtomicBool>,
 ) -> anyhow::Result<()> {
     let connect = ws::try_connect::<RpcSolPubSubClient>(&config.rpc_ws_url).map_err_anyhow()?;
     let client = connect.await.map_err_anyhow()?;
 
     let source_config = SourceConfig {
-        dedup_queue_size: 0,
-        grpc_sources: vec![],
+        dedup_queue_size: 5000,
+        grpc_sources: config.grpc_sources.clone(),
         snapshot: SnapshotSourceConfig {
             rpc_http_url: config.rpc_http_url.clone(),
         },
@@ -62,11 +68,13 @@ async fn feed_data(
     };
     let (mango_sub_sender, mango_sub_receiver) = async_channel::unbounded();
     let (mango_sub_slot_sender, mango_sub_slot_receiver) = async_channel::unbounded();
-    let mango_sub_job = mango_feeds_connector::websocket_source::process_events(
+    let mango_sub_job = mango_feeds_connector::grpc_plugin_source::process_events(
         source_config.clone(),
         mango_filters,
         mango_sub_sender,
         mango_sub_slot_sender,
+        metrics.clone(),
+        exit.clone(),
     );
     all_jobs.push(tokio::spawn(mango_sub_job));
 
@@ -75,11 +83,13 @@ async fn feed_data(
     };
     let (mango_oracle_sender, mango_oracle_receiver) = async_channel::unbounded();
     let (mango_oracle_slot_sender, mango_oracle_slot_receiver) = async_channel::unbounded();
-    let mango_oracle_job = mango_feeds_connector::websocket_source::process_events(
+    let mango_oracle_job = mango_feeds_connector::grpc_plugin_source::process_events(
         source_config.clone(),
         mango_oracles_filters,
         mango_oracle_sender,
         mango_oracle_slot_sender,
+        metrics.clone(),
+        exit.clone(),
     );
     all_jobs.push(tokio::spawn(mango_oracle_job));
 
@@ -95,11 +105,13 @@ async fn feed_data(
             ),
         };
 
-        let serum3_job = mango_feeds_connector::websocket_source::process_events(
+        let serum3_job = mango_feeds_connector::grpc_plugin_source::process_events(
             source_config.clone(),
             filters,
             serum3_oo_sender,
             serum3_oo_slot_sender,
+            metrics.clone(),
+            exit.clone(),
         );
 
         all_jobs.push(tokio::spawn(serum3_job));
@@ -147,7 +159,7 @@ async fn feed_data(
                 }
             },
             _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                warn!("websocket timeout");
+                warn!("grpc timeout");
                 return Ok(())
             }
         }
@@ -175,15 +187,27 @@ async fn handle_feed_write(sender: &Sender<Message>, account: AccountWrite) {
         .expect("sending must succeed");
 }
 
-pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
+pub fn start(
+    config: Config,
+    mango_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<Message>,
+    metrics: Metrics,
+    exit: Arc<AtomicBool>,
+) {
     tokio::spawn(async move {
-        // if the websocket disconnects, we get no data in a while etc, reconnect and try again
+        // if the grpc disconnects, we get no data in a while etc, reconnect and try again
         loop {
-            info!("connecting to solana websocket streams");
-            let out = feed_data(&config, mango_oracles.clone(), sender.clone());
+            info!("connecting to solana grpc streams");
+            let out = feed_data(
+                &config,
+                mango_oracles.clone(),
+                sender.clone(),
+                &metrics,
+                exit.clone(),
+            );
             let result = out.await;
             if let Err(err) = result {
-                warn!("websocket stream error: {err}");
+                warn!("grpc stream error: {err}");
             }
         }
     });
@@ -198,7 +222,7 @@ pub async fn get_next_create_bank_slot(
         let elapsed = start.elapsed();
         if elapsed > timeout {
             anyhow::bail!(
-                "did not receive a slot from the websocket connection in {}s",
+                "did not receive a slot from the grpc connection in {}s",
                 timeout.as_secs()
             );
         }
@@ -209,7 +233,7 @@ pub async fn get_next_create_bank_slot(
             Err(_) => continue,
             // channel close
             Ok(Err(err)) => {
-                return Err(err).context("while waiting for first slot from websocket connection");
+                return Err(err).context("while waiting for first slot from grpc connection");
             }
             // success
             Ok(Ok(msg)) => msg,

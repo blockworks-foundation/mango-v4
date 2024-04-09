@@ -3,28 +3,36 @@ use crate::processors::data::DataEvent::{AccountUpdate, Other, Snapshot};
 use async_channel::Receiver;
 use chrono::Utc;
 use itertools::Itertools;
-use mango_v4_client::account_update_stream::{Message, SnapshotType};
-use mango_v4_client::snapshot_source::is_mango_account;
-use mango_v4_client::{
-    account_update_stream, chain_data, grpc_source, snapshot_source, websocket_source,
-    MangoGroupContext,
-};
+use mango_v4_client::account_update_stream::Message;
+use mango_v4_client::{account_update_stream, grpc_source, websocket_source, MangoGroupContext};
 use services_mango_lib::fail_or_retry;
 use services_mango_lib::retry_counter::RetryCounter;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
+use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinHandle;
 use tracing::warn;
 
 pub struct DataProcessor {
     pub channel: tokio::sync::broadcast::Sender<DataEvent>,
-    pub jobs: Vec<JoinHandle<()>>,
-    pub chain_data: Arc<RwLock<chain_data::ChainData>>,
+    pub job: JoinHandle<()>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DataEventSource {
+    Websocket,
+    Grpc,
+}
+
+impl Display for DataEventSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -38,32 +46,31 @@ pub enum DataEvent {
 pub struct SnapshotEvent {
     pub received_at: chrono::DateTime<Utc>,
     pub accounts: Vec<Pubkey>,
-    pub is_full: bool,
+    pub source: DataEventSource,
+    pub slot: u64,
 }
 
 #[derive(Clone, Debug)]
 pub struct AccountUpdateEvent {
     pub received_at: chrono::DateTime<Utc>,
     pub account: Pubkey,
+    pub source: DataEventSource,
+    pub slot: u64,
 }
 
 impl DataProcessor {
     pub async fn init(
         configuration: &Configuration,
+        source: DataEventSource,
         exit: Arc<AtomicBool>,
     ) -> anyhow::Result<DataProcessor> {
         let mut retry_counter = RetryCounter::new(2);
-        let mango_group = Pubkey::from_str(&configuration.mango_group)?;
-        let (mango_stream, snapshot_job) = fail_or_retry!(
+        let mango_stream = fail_or_retry!(
             retry_counter,
-            Self::init_mango_source(configuration, exit.clone()).await
+            Self::init_mango_source(configuration, source, exit.clone()).await
         )?;
         let (sender, _) = tokio::sync::broadcast::channel(8192);
         let sender_clone = sender.clone();
-
-        // The representation of current on-chain account data
-        let chain_data = Arc::new(RwLock::new(chain_data::ChainData::new()));
-        let chain_data_clone = chain_data.clone();
 
         let job = tokio::spawn(async move {
             loop {
@@ -74,14 +81,11 @@ impl DataProcessor {
                 tokio::select! {
                     Ok(msg) = mango_stream.recv() => {
                         let received_at = Utc::now();
-
-                        msg.update_chain_data(&mut chain_data_clone.write().unwrap());
-
                         if sender_clone.receiver_count() == 0 {
                             continue;
                         }
 
-                        let event = Self::parse_message(msg, received_at, mango_group);
+                        let event = Self::parse_message(msg, source, received_at);
 
                         if event.is_none() {
                             continue;
@@ -102,8 +106,7 @@ impl DataProcessor {
 
         let result = DataProcessor {
             channel: sender,
-            jobs: vec![job, snapshot_job],
-            chain_data,
+            job,
         };
 
         Ok(result)
@@ -120,30 +123,31 @@ impl DataProcessor {
 
     fn parse_message(
         message: Message,
+        source: DataEventSource,
         received_at: chrono::DateTime<Utc>,
-        mango_group: Pubkey,
     ) -> Option<DataEvent> {
         match message {
             Message::Account(account_write) => {
-                if is_mango_account(&account_write.account, &mango_group).is_some() {
-                    return Some(AccountUpdate(AccountUpdateEvent {
-                        account: account_write.pubkey,
-                        received_at,
-                    }));
-                }
+                return Some(AccountUpdate(AccountUpdateEvent {
+                    account: account_write.pubkey,
+                    received_at,
+                    source,
+                    slot: account_write.slot,
+                }));
             }
-            Message::Snapshot(snapshot, snapshot_type) => {
+            Message::Snapshot(snapshot, _) => {
+                let slot = snapshot[0].slot;
                 let mut result = Vec::new();
                 for update in snapshot.iter() {
-                    if is_mango_account(&update.account, &mango_group).is_some() {
-                        result.push(update.pubkey);
-                    }
+                    result.push(update.pubkey);
+                    assert!(slot == update.slot);
                 }
 
                 return Some(Snapshot(SnapshotEvent {
                     accounts: result,
                     received_at,
-                    is_full: snapshot_type == SnapshotType::Full,
+                    source: source,
+                    slot: slot,
                 }));
             }
             _ => {}
@@ -154,8 +158,9 @@ impl DataProcessor {
 
     async fn init_mango_source(
         configuration: &Configuration,
+        source: DataEventSource,
         exit: Arc<AtomicBool>,
-    ) -> anyhow::Result<(Receiver<Message>, JoinHandle<()>)> {
+    ) -> anyhow::Result<Receiver<Message>> {
         //
         // Client setup
         //
@@ -182,14 +187,14 @@ impl DataProcessor {
         let (account_update_sender, account_update_receiver) =
             async_channel::unbounded::<account_update_stream::Message>();
 
-        if configuration.source_configuration.use_grpc {
+        if source == DataEventSource::Grpc {
             let metrics_config = mango_feeds_connector::MetricsConfig {
-                output_stdout: true,
+                output_stdout: false,
                 output_http: false,
             };
             let metrics = mango_feeds_connector::metrics::start(
                 metrics_config,
-                "service-mango-health".to_string(),
+                "benchmark-data-update".to_string(),
             );
             let sources = configuration.source_configuration.grpc_sources.clone();
 
@@ -201,8 +206,8 @@ impl DataProcessor {
                     open_orders_authority: mango_group,
                     grpc_sources: sources,
                 },
-                mango_oracles.clone(),
-                account_update_sender.clone(),
+                mango_oracles,
+                account_update_sender,
                 metrics,
                 exit,
             );
@@ -214,34 +219,11 @@ impl DataProcessor {
                     serum_programs,
                     open_orders_authority: mango_group,
                 },
-                mango_oracles.clone(),
-                account_update_sender.clone(),
+                mango_oracles,
+                account_update_sender,
             );
         }
 
-        let first_websocket_slot = websocket_source::get_next_create_bank_slot(
-            account_update_receiver.clone(),
-            Duration::from_secs(10),
-        )
-        .await?;
-
-        // Getting solana account snapshots via jsonrpc
-        // FUTURE: of what to fetch a snapshot - should probably take as an input
-        let snapshot_job = snapshot_source::start(
-            snapshot_source::Config {
-                rpc_http_url: configuration.source_configuration.rpc_http_url.clone(),
-                mango_group,
-                get_multiple_accounts_count: 100,
-                parallel_rpc_requests: 10,
-                snapshot_interval: Duration::from_secs(
-                    configuration.source_configuration.snapshot_interval_secs,
-                ),
-                min_slot: first_websocket_slot + 10,
-            },
-            mango_oracles,
-            account_update_sender,
-        );
-
-        Ok((account_update_receiver, snapshot_job))
+        Ok(account_update_receiver)
     }
 }

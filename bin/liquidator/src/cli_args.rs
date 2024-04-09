@@ -236,4 +236,8 @@ pub struct Cli {
     /// max number of liquidation/tcs to do concurrently
     #[clap(long, env, default_value = "5")]
     pub(crate) max_parallel_operations: u64,
+
+    /// use geyser instead of websocket - additional configuration stored as a toml file (hard to represent as a command line)
+    #[clap(long, env)]
+    pub(crate) geyser_config: Option<String>,
 }
