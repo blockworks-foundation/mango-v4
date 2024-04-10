@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/jupiter/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4_client/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/swap/mod.rs`."><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4_client/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -141,7 +141,53 @@
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
-</pre><pre class="rust"><code><span class="kw">pub mod </span>v6;
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+</pre><pre class="rust"><code><span class="kw">pub mod </span>jupiter_v6;
+<span class="kw">pub mod </span>sanctum;
+<span class="kw">pub mod </span>sanctum_state;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>std::str::FromStr;
@@ -153,13 +199,15 @@
 </span><span class="kw">pub enum </span>Version {
     Mock,
     V6,
+    Sanctum,
 }
 
 <span class="attr">#[derive(Clone)]
 #[allow(clippy::large_enum_variant)]
 </span><span class="kw">pub enum </span>RawQuote {
     Mock,
-    V6(v6::QuoteResponse),
+    V6(jupiter_v6::QuoteResponse),
+    Sanctum(sanctum::QuoteResponse),
 }
 
 <span class="attr">#[derive(Clone)]
@@ -173,7 +221,7 @@
 }
 
 <span class="kw">impl </span>Quote {
-    <span class="kw">pub fn </span>try_from_v6(query: v6::QuoteResponse) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
+    <span class="kw">pub fn </span>try_from_v6(query: jupiter_v6::QuoteResponse) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
         <span class="prelude-val">Ok</span>(Quote {
             input_mint: Pubkey::from_str(<span class="kw-2">&amp;</span>query.input_mint)<span class="question-mark">?</span>,
             output_mint: Pubkey::from_str(<span class="kw-2">&amp;</span>query.output_mint)<span class="question-mark">?</span>,
@@ -188,6 +236,25 @@
         })
     }
 
+    <span class="kw">pub fn </span>try_from_sanctum(
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        query: sanctum::QuoteResponse,
+    ) -&gt; anyhow::Result&lt;<span class="self">Self</span>&gt; {
+        <span class="prelude-val">Ok</span>(Quote {
+            input_mint: input_mint,
+            output_mint: output_mint,
+            price_impact_pct: query.fee_pct.parse()<span class="question-mark">?</span>,
+            in_amount: query
+                .in_amount
+                .as_ref()
+                .map(|a| a.parse())
+                .unwrap_or(<span class="prelude-val">Ok</span>(<span class="number">0</span>))<span class="question-mark">?</span>,
+            out_amount: query.out_amount.parse()<span class="question-mark">?</span>,
+            raw: RawQuote::Sanctum(query),
+        })
+    }
+
     <span class="kw">pub fn </span>first_route_label(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="kw">let </span>label_maybe = <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.raw {
             RawQuote::Mock =&gt; <span class="prelude-val">Some</span>(<span class="string">&quot;mock&quot;</span>.into()),
@@ -197,16 +264,17 @@
                 .and_then(|v| v.swap_info.as_ref())
                 .and_then(|v| v.label.as_ref())
                 .cloned(),
+            RawQuote::Sanctum(raw) =&gt; <span class="prelude-val">Some</span>(raw.swap_src.clone()),
         };
         label_maybe.unwrap_or_else(|| <span class="string">&quot;unknown&quot;</span>.into())
     }
 }
 
-<span class="kw">pub struct </span>Jupiter&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">pub struct </span>Swap&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub </span>mango_client: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MangoClient,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Jupiter&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Swap&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">async fn </span>quote_mock(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         input_mint: Pubkey,
@@ -266,6 +334,14 @@
                     )
                     .<span class="kw">await</span><span class="question-mark">?</span>,
             )<span class="question-mark">?</span>,
+            Version::Sanctum =&gt; Quote::try_from_sanctum(
+                input_mint,
+                output_mint,
+                <span class="self">self</span>.mango_client
+                    .sanctum()
+                    .quote(input_mint, output_mint, amount)
+                    .<span class="kw">await</span><span class="question-mark">?</span>,
+            )<span class="question-mark">?</span>,
         })
     }
 
@@ -279,6 +355,18 @@
                 <span class="self">self</span>.mango_client
                     .jupiter_v6()
                     .prepare_swap_transaction(raw)
+                    .<span class="kw">await
+            </span>}
+            RawQuote::Sanctum(raw) =&gt; {
+                <span class="kw">let </span>max_slippage_bps = (quote.price_impact_pct * <span class="number">100.0</span>).ceil() <span class="kw">as </span>u64;
+                <span class="self">self</span>.mango_client
+                    .sanctum()
+                    .prepare_swap_transaction(
+                        quote.input_mint,
+                        quote.output_mint,
+                        max_slippage_bps,
+                        raw,
+                    )
                     .<span class="kw">await
             </span>}
         }

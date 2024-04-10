@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AccountMeta","InstructionResponse","JupiterV6","PlatformFee","QuoteResponse","RoutePlan","SwapInfo","SwapInstructionsResponse","SwapRequest","SwapResponse"]};
