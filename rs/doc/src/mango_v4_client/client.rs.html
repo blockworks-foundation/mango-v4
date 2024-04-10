@@ -2631,6 +2631,21 @@
 <a href="#2631" id="2631">2631</a>
 <a href="#2632" id="2632">2632</a>
 <a href="#2633" id="2633">2633</a>
+<a href="#2634" id="2634">2634</a>
+<a href="#2635" id="2635">2635</a>
+<a href="#2636" id="2636">2636</a>
+<a href="#2637" id="2637">2637</a>
+<a href="#2638" id="2638">2638</a>
+<a href="#2639" id="2639">2639</a>
+<a href="#2640" id="2640">2640</a>
+<a href="#2641" id="2641">2641</a>
+<a href="#2642" id="2642">2642</a>
+<a href="#2643" id="2643">2643</a>
+<a href="#2644" id="2644">2644</a>
+<a href="#2645" id="2645">2645</a>
+<a href="#2646" id="2646">2646</a>
+<a href="#2647" id="2647">2647</a>
+<a href="#2648" id="2648">2648</a>
 </pre><pre class="rust"><code><span class="kw">use </span>anchor_client::ClientError::AnchorError;
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
@@ -2663,11 +2678,11 @@
 <span class="kw">use </span><span class="kw">crate</span>::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 <span class="kw">use </span><span class="kw">crate</span>::context::MangoGroupContext;
 <span class="kw">use </span><span class="kw">crate</span>::gpa::{fetch_anchor_account, fetch_mango_accounts};
-<span class="kw">use </span><span class="kw">crate</span>::health_cache;
 <span class="kw">use </span><span class="kw">crate</span>::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 <span class="kw">use </span><span class="kw">crate</span>::util;
 <span class="kw">use </span><span class="kw">crate</span>::util::PreparedInstructions;
 <span class="kw">use crate</span>::{account_fetcher::<span class="kw-2">*</span>, swap};
+<span class="kw">use crate</span>::{health_cache, Serum3MarketContext, TokenContext};
 <span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
 <span class="kw">use </span>solana_client::nonblocking::rpc_client::RpcClient <span class="kw">as </span>RpcClientAsync;
 <span class="kw">use </span>solana_client::rpc_client::SerializableTransaction;
@@ -3804,6 +3819,17 @@
         <span class="kw">let </span>account = <span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
+        <span class="kw">let </span>ix = <span class="self">self</span>.serum3_settle_funds_instruction(s3, base, quote, open_orders);
+        <span class="self">self</span>.send_and_confirm_owner_tx(ix.to_instructions()).<span class="kw">await
+    </span>}
+
+    <span class="kw">pub fn </span>serum3_settle_funds_instruction(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        s3: <span class="kw-2">&amp;</span>Serum3MarketContext,
+        base: <span class="kw-2">&amp;</span>TokenContext,
+        quote: <span class="kw-2">&amp;</span>TokenContext,
+        open_orders: Pubkey,
+    ) -&gt; PreparedInstructions {
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
@@ -3836,8 +3862,12 @@
                 fees_to_dao: <span class="bool-val">true</span>,
             }),
         };
-        <span class="self">self</span>.send_and_confirm_owner_tx(<span class="macro">vec!</span>[ix]).<span class="kw">await
-    </span>}
+
+        PreparedInstructions::from_single(
+            ix,
+            <span class="self">self</span>.context.compute_estimates.cu_per_mango_instruction,
+        )
+    }
 
     <span class="kw">pub fn </span>serum3_cancel_all_orders_instruction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
