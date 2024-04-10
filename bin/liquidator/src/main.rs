@@ -248,6 +248,11 @@ async fn main() -> anyhow::Result<()> {
     let (rebalance_trigger_sender, rebalance_trigger_receiver) = async_channel::bounded::<()>(1);
     let (tx_tcs_trigger_sender, tx_tcs_trigger_receiver) = async_channel::unbounded::<()>();
     let (tx_liq_trigger_sender, tx_liq_trigger_receiver) = async_channel::unbounded::<()>();
+
+    if cli.rebalance_using_limit_order == BoolArg::True && !signer_is_owner {
+        warn!("Can't withdraw dust to liqor account if delegate and using limit orders for rebalancing");
+    }
+
     let rebalance_config = rebalance::Config {
         enabled: cli.rebalance == BoolArg::True,
         slippage_bps: cli.rebalance_slippage_bps,
@@ -263,8 +268,11 @@ async fn main() -> anyhow::Result<()> {
             .rebalance_alternate_sanctum_route_tokens
             .clone()
             .unwrap_or_default(),
-        allow_withdraws: signer_is_owner,
+        allow_withdraws: cli.rebalance_using_limit_order == BoolArg::False || signer_is_owner,
         use_sanctum: cli.sanctum_enabled == BoolArg::True,
+        use_limit_order: cli.rebalance_using_limit_order == BoolArg::True,
+        limit_order_distance_from_oracle_price_bps: cli
+            .rebalance_limit_order_distance_from_oracle_price_bps,
     };
     rebalance_config.validate(&mango_client.context);
 

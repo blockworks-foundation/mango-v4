@@ -2,21 +2,27 @@ use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::state::{
     Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
-    PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
+    PlaceOrderType, Serum3MarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
-    chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
-    TransactionBuilder, TransactionSize,
+    chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext,
+    PreparedInstructions, Serum3MarketContext, TokenContext, TransactionBuilder, TransactionSize,
 };
 use solana_client::nonblocking::rpc_client::RpcClient;
 
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 
+use fixed::types::extra::U48;
+use fixed::FixedI128;
+use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::serum3_cpi;
+use mango_v4::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
+use solana_sdk::account::ReadableAccount;
 use solana_sdk::signature::Signature;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::*;
 
 #[derive(Clone)]
@@ -24,6 +30,8 @@ pub struct Config {
     pub enabled: bool,
     /// Maximum slippage allowed in Jupiter
     pub slippage_bps: u64,
+    /// Maximum slippage from oracle price for limit orders
+    pub limit_order_distance_from_oracle_price_bps: u64,
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
     /// If this is 1.05, then it'll swap borrow_value * 1.05 quote token into borrow token.
@@ -35,6 +43,7 @@ pub struct Config {
     pub alternate_sanctum_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
     pub use_sanctum: bool,
+    pub use_limit_order: bool,
 }
 
 impl Config {
@@ -440,6 +449,7 @@ impl Rebalancer {
     }
 
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
+        self.close_and_settle_all_openbook_orders().await?;
         let account = self.mango_account()?;
 
         // TODO: configurable?
@@ -466,7 +476,20 @@ impl Rebalancer {
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.
-            let dust_threshold = I80F48::from(2) / token_price;
+            let dust_threshold_res = if self.config.use_limit_order {
+                self.dust_threshold_for_limit_order(token)
+                    .await
+                    .map(|x| I80F48::from(x))
+            } else {
+                Ok(I80F48::from(2) / token_price)
+            };
+
+            let Ok(dust_threshold) = dust_threshold_res
+            else {
+                let e = dust_threshold_res.unwrap_err();
+                error!("Cannot rebalance token {}, probably missing USDC market ? - error: {}", token.name, e);
+                continue;
+            };
 
             // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
             // So re-fetch the current token position amount
@@ -480,57 +503,29 @@ impl Rebalancer {
             };
             let mut amount = fresh_amount()?;
 
-            trace!(token_index, %amount, %dust_threshold, "checking");
-            if amount < 0 {
-                // Buy
-                let buy_amount =
-                    amount.abs().ceil() + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
-                let input_amount =
-                    buy_amount * token_price * I80F48::from_num(self.config.borrow_settle_excess);
-                let (txsig, route) = self
-                    .token_swap_buy(&account, token_mint, input_amount.to_num())
-                    .await?;
-                let in_token = self
-                    .mango_client
-                    .context
-                    .token_by_mint(&route.input_mint)
-                    .unwrap();
-                info!(
-                    %txsig,
-                    "bought {} {} for {} {}",
-                    token.native_to_ui(I80F48::from(route.out_amount)),
-                    token.name,
-                    in_token.native_to_ui(I80F48::from(route.in_amount)),
-                    in_token.name,
-                );
-                if !self.refresh_mango_account_after_tx(txsig).await? {
-                    return Ok(());
-                }
-                amount = fresh_amount()?;
-            }
+            trace!(token_index, token.name, %amount, %dust_threshold, "checking");
 
-            if amount > dust_threshold {
-                // Sell
-                let (txsig, route) = self
-                    .token_swap_sell(&account, token_mint, amount.to_num::<u64>())
+            if self.config.use_limit_order {
+                self.unwind_using_limit_orders(
+                    &account,
+                    token,
+                    token_price,
+                    dust_threshold,
+                    amount,
+                )
+                .await?;
+            } else {
+                amount = self
+                    .unwind_using_swap(
+                        &account,
+                        token,
+                        token_mint,
+                        token_price,
+                        dust_threshold,
+                        fresh_amount,
+                        amount,
+                    )
                     .await?;
-                let out_token = self
-                    .mango_client
-                    .context
-                    .token_by_mint(&route.output_mint)
-                    .unwrap();
-                info!(
-                    %txsig,
-                    "sold {} {} for {} {}",
-                    token.native_to_ui(I80F48::from(route.in_amount)),
-                    token.name,
-                    out_token.native_to_ui(I80F48::from(route.out_amount)),
-                    out_token.name,
-                );
-                if !self.refresh_mango_account_after_tx(txsig).await? {
-                    return Ok(());
-                }
-                amount = fresh_amount()?;
             }
 
             // Any remainder that could not be sold just gets withdrawn to ensure the
@@ -563,6 +558,288 @@ impl Rebalancer {
         }
 
         Ok(())
+    }
+
+    async fn dust_threshold_for_limit_order(&self, token: &TokenContext) -> anyhow::Result<u64> {
+        let (_, market) = self
+            .mango_client
+            .context
+            .serum3_markets
+            .iter()
+            .find(|(_, context)| {
+                context.base_token_index == token.token_index
+                    && context.quote_token_index == QUOTE_TOKEN_INDEX
+            })
+            .ok_or(anyhow::format_err!(
+                "could not find market for token {}",
+                token.name
+            ))?;
+
+        Ok(market.coin_lot_size - 1)
+    }
+
+    async fn unwind_using_limit_orders(
+        &self,
+        account: &Box<MangoAccountValue>,
+        token: &TokenContext,
+        token_price: I80F48,
+        dust_threshold: FixedI128<U48>,
+        native_amount: I80F48,
+    ) -> anyhow::Result<()> {
+        if native_amount >= 0 && native_amount < dust_threshold {
+            return Ok(());
+        }
+
+        let (market_index, market) = self
+            .mango_client
+            .context
+            .serum3_markets
+            .iter()
+            .find(|(_, context)| {
+                context.base_token_index == token.token_index
+                    && context.quote_token_index == QUOTE_TOKEN_INDEX
+            })
+            .ok_or(anyhow::format_err!(
+                "could not find market for token {}",
+                token.name
+            ))?;
+
+        let side = if native_amount < 0 {
+            Serum3Side::Bid
+        } else {
+            Serum3Side::Ask
+        };
+
+        let distance_from_oracle_price_bp =
+            I80F48::from_num(self.config.limit_order_distance_from_oracle_price_bps)
+                * match side {
+                    Serum3Side::Bid => 1,
+                    Serum3Side::Ask => -1,
+                };
+        let price_adjustment_factor =
+            (I80F48::from_num(10_000) + distance_from_oracle_price_bp) / I80F48::from_num(10_000);
+
+        let limit_price =
+            (token_price * price_adjustment_factor * I80F48::from_num(market.coin_lot_size))
+                .to_num::<u64>()
+                / market.pc_lot_size;
+        let mut max_base_lots =
+            (native_amount.abs() / I80F48::from_num(market.coin_lot_size)).to_num::<u64>();
+
+        debug!(
+            side = match side {
+                Serum3Side::Bid => "Buy",
+                Serum3Side::Ask => "Sell",
+            },
+            token = token.name,
+            oracle_price = token_price.to_num::<f64>(),
+            price_adjustment_factor = price_adjustment_factor.to_num::<f64>(),
+            coin_lot_size = market.coin_lot_size,
+            pc_lot_size = market.pc_lot_size,
+            limit_price,
+            native_amount = native_amount.to_num::<f64>(),
+            max_base_lots = max_base_lots,
+            "building order for rebalancing"
+        );
+
+        // Try to buy enough to close the borrow
+        if max_base_lots == 0 && native_amount < 0 {
+            info!(
+                "Buying a whole lot for token {} to cover borrow of {}",
+                token.name, native_amount
+            );
+            max_base_lots = 1;
+        }
+
+        if max_base_lots == 0 {
+            warn!("Could not rebalance token '{}' (native_amount={}) using limit order, below base lot size", token.name, native_amount);
+            return Ok(());
+        }
+
+        let mut account = account.clone();
+        let create_or_replace_account_ixs = self
+            .mango_client
+            .serum3_create_or_replace_account_instruction(&mut account, *market_index, side)
+            .await?;
+        let cancel_ixs =
+            self.mango_client
+                .serum3_cancel_all_orders_instruction(&account, *market_index, 10)?;
+        let place_order_ixs = self
+            .mango_client
+            .serum3_place_order_instruction(
+                &account,
+                *market_index,
+                side,
+                limit_price,
+                max_base_lots,
+                ((limit_price * max_base_lots * market.pc_lot_size) as f64 * 1.01) as u64,
+                Serum3SelfTradeBehavior::CancelProvide,
+                Serum3OrderType::Limit,
+                SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
+                10,
+            )
+            .await?;
+
+        let seq_check_ixs = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, &account)
+            .await?;
+
+        let mut ixs = PreparedInstructions::new();
+        ixs.append(create_or_replace_account_ixs);
+        ixs.append(cancel_ixs);
+        ixs.append(place_order_ixs);
+        ixs.append(seq_check_ixs);
+
+        let txsig = self
+            .mango_client
+            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .await?;
+
+        info!(
+            %txsig,
+            "placed order for {} {} at price = {}",
+            token.native_to_ui(I80F48::from(native_amount)),
+            token.name,
+            limit_price,
+        );
+        if !self.refresh_mango_account_after_tx(txsig).await? {
+            return Ok(());
+        }
+
+        Ok(())
+    }
+
+    async fn close_and_settle_all_openbook_orders(&self) -> anyhow::Result<()> {
+        let account = self.mango_account()?;
+
+        for x in Self::shuffle(account.active_serum3_orders()) {
+            let token = self.mango_client.context.token(x.base_token_index);
+            let quote = self.mango_client.context.token(x.quote_token_index);
+            let market_index = x.market_index;
+            let market = self
+                .mango_client
+                .context
+                .serum3_markets
+                .get(&market_index)
+                .expect("no openbook market found");
+            self.close_and_settle_openbook_orders(&account, token, &market_index, market, quote)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// This will only settle funds when there is no more active orders (avoid doing too many settle tx)
+    async fn close_and_settle_openbook_orders(
+        &self,
+        account: &Box<MangoAccountValue>,
+        token: &TokenContext,
+        market_index: &Serum3MarketIndex,
+        market: &Serum3MarketContext,
+        quote: &TokenContext,
+    ) -> anyhow::Result<()> {
+        let Ok(open_orders) = account.serum3_orders(*market_index).map(|x| x.open_orders)
+        else {
+            return Ok(());
+        };
+
+        let oo_acc = self.account_fetcher.fetch_raw(&open_orders)?;
+        let oo = serum3_cpi::load_open_orders_bytes(oo_acc.data())?;
+        let oo_slim = OpenOrdersSlim::from_oo(oo);
+
+        if oo_slim.native_base_reserved() != 0 || oo_slim.native_quote_reserved() != 0 {
+            return Ok(());
+        }
+
+        let settle_ixs =
+            self.mango_client
+                .serum3_settle_funds_instruction(market, token, quote, open_orders);
+
+        let close_ixs = self
+            .mango_client
+            .serum3_close_open_orders_instruction(*market_index);
+
+        let mut ixs = PreparedInstructions::new();
+        ixs.append(close_ixs);
+        ixs.append(settle_ixs);
+
+        let txsig = self
+            .mango_client
+            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .await?;
+
+        info!(
+            %txsig,
+            "settle spot funds for {}",
+            token.name,
+        );
+        if !self.refresh_mango_account_after_tx(txsig).await? {
+            return Ok(());
+        }
+
+        Ok(())
+    }
+
+    async fn unwind_using_swap(
+        &self,
+        account: &Box<MangoAccountValue>,
+        token: &TokenContext,
+        token_mint: Pubkey,
+        token_price: I80F48,
+        dust_threshold: FixedI128<U48>,
+        fresh_amount: impl Fn() -> anyhow::Result<I80F48>,
+        amount: I80F48,
+    ) -> anyhow::Result<I80F48> {
+        if amount < 0 {
+            // Buy
+            let buy_amount = amount.abs().ceil() + (dust_threshold - I80F48::ONE).max(I80F48::ZERO);
+            let input_amount =
+                buy_amount * token_price * I80F48::from_num(self.config.borrow_settle_excess);
+            let (txsig, route) = self
+                .token_swap_buy(&account, token_mint, input_amount.to_num())
+                .await?;
+            let in_token = self
+                .mango_client
+                .context
+                .token_by_mint(&route.input_mint)
+                .unwrap();
+            info!(
+                %txsig,
+                "bought {} {} for {} {}",
+                token.native_to_ui(I80F48::from(route.out_amount)),
+                token.name,
+                in_token.native_to_ui(I80F48::from(route.in_amount)),
+                in_token.name,
+            );
+            if !self.refresh_mango_account_after_tx(txsig).await? {
+                return Ok(amount);
+            }
+        }
+
+        if amount > dust_threshold {
+            // Sell
+            let (txsig, route) = self
+                .token_swap_sell(&account, token_mint, amount.to_num::<u64>())
+                .await?;
+            let out_token = self
+                .mango_client
+                .context
+                .token_by_mint(&route.output_mint)
+                .unwrap();
+            info!(
+                %txsig,
+                "sold {} {} for {} {}",
+                token.native_to_ui(I80F48::from(route.in_amount)),
+                token.name,
+                out_token.native_to_ui(I80F48::from(route.out_amount)),
+                out_token.name,
+            );
+            if !self.refresh_mango_account_after_tx(txsig).await? {
+                return Ok(amount);
+            }
+        }
+
+        Ok(fresh_amount()?)
     }
 
     #[instrument(
