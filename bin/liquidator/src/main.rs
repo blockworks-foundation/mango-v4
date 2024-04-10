@@ -89,6 +89,8 @@ async fn main() -> anyhow::Result<()> {
         .jupiter_timeout(Duration::from_secs(cli.jupiter_timeout_secs))
         .jupiter_v6_url(cli.jupiter_v6_url.clone())
         .jupiter_token(cli.jupiter_token.clone())
+        .sanctum_url(cli.sanctum_url.clone())
+        .sanctum_timeout(Duration::from_secs(cli.sanctum_timeout_secs))
         .transaction_builder_config(
             TransactionBuilderConfig::builder()
                 .priority_fee_provider(prio_provider)
@@ -257,16 +259,26 @@ async fn main() -> anyhow::Result<()> {
             .rebalance_alternate_jupiter_route_tokens
             .clone()
             .unwrap_or_default(),
+        alternate_sanctum_route_tokens: cli
+            .rebalance_alternate_sanctum_route_tokens
+            .clone()
+            .unwrap_or_default(),
         allow_withdraws: signer_is_owner,
+        use_sanctum: cli.sanctum_enabled == BoolArg::True,
     };
     rebalance_config.validate(&mango_client.context);
 
-    let rebalancer = Arc::new(rebalance::Rebalancer {
+    let mut rebalancer = rebalance::Rebalancer {
         mango_client: mango_client.clone(),
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
-    });
+        sanctum_supported_mints: HashSet::<Pubkey>::new(),
+    };
+
+    let live_rpc_client = mango_client.client.new_rpc_async();
+    rebalancer.init(&live_rpc_client).await;
+    let rebalancer = Arc::new(rebalancer);
 
     let liquidation = Box::new(LiquidationState {
         mango_client: mango_client.clone(),
@@ -407,7 +419,7 @@ async fn main() -> anyhow::Result<()> {
     // But need to take care to abort if the above job aborts beforehand.
     if cli.rebalance == BoolArg::True {
         let rebalance_job =
-            spawn_rebalance_job(&shared_state, rebalance_trigger_receiver, rebalancer);
+            spawn_rebalance_job(shared_state.clone(), rebalance_trigger_receiver, rebalancer);
         optional_jobs.push(rebalance_job);
     }
 
@@ -523,14 +535,13 @@ fn spawn_telemetry_job(cli: &Cli, mango_client: Arc<MangoClient>) -> JoinHandle<
 }
 
 fn spawn_rebalance_job(
-    shared_state: &Arc<RwLock<SharedState>>,
+    shared_state: Arc<RwLock<SharedState>>,
     rebalance_trigger_receiver: async_channel::Receiver<()>,
     rebalancer: Arc<Rebalancer>,
 ) -> JoinHandle<()> {
     let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
 
     tokio::spawn({
-        let shared_state = shared_state.clone();
         async move {
             loop {
                 tokio::select! {

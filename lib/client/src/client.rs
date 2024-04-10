@@ -27,14 +27,14 @@ use mango_v4::state::{
     PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
-use crate::account_fetcher::*;
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::health_cache;
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
+use crate::util;
 use crate::util::PreparedInstructions;
-use crate::{jupiter, util};
+use crate::{account_fetcher::*, swap};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
@@ -104,6 +104,15 @@ pub struct ClientConfig {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
+
+    #[builder(default = "\"https://api.sanctum.so/v1\".into()")]
+    pub sanctum_url: String,
+
+    /// Sanctum Timeout, defaults to 30s
+    ///
+    /// This timeout applies to jupiter requests.
+    #[builder(default = "Duration::from_secs(30)")]
+    pub sanctum_timeout: Duration,
 
     /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
     #[builder(default = "FallbackOracleConfig::Dynamic")]
@@ -2169,17 +2178,71 @@ impl MangoClient {
         ))
     }
 
-    // jupiter
+    // Swap (jupiter, sanctum)
+    pub fn swap(&self) -> swap::Swap {
+        swap::Swap { mango_client: self }
+    }
 
-    pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
-        jupiter::v6::JupiterV6 {
+    pub fn jupiter_v6(&self) -> swap::jupiter_v6::JupiterV6 {
+        swap::jupiter_v6::JupiterV6 {
             mango_client: self,
             timeout_duration: self.client.config.jupiter_timeout,
         }
     }
 
-    pub fn jupiter(&self) -> jupiter::Jupiter {
-        jupiter::Jupiter { mango_client: self }
+    pub fn sanctum(&self) -> swap::sanctum::Sanctum {
+        swap::sanctum::Sanctum {
+            mango_client: self,
+            timeout_duration: self.client.config.sanctum_timeout,
+        }
+    }
+
+    pub(crate) async fn deserialize_instructions_and_alts(
+        &self,
+        message: &solana_sdk::message::VersionedMessage,
+    ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
+        let lookups = message.address_table_lookups().unwrap_or_default();
+        let address_lookup_tables = self
+            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
+            .await?;
+
+        let mut account_keys = message.static_account_keys().to_vec();
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .writable_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .readonly_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+
+        let compiled_ix = message
+            .instructions()
+            .iter()
+            .map(|ci| solana_sdk::instruction::Instruction {
+                program_id: *ci.program_id(&account_keys),
+                accounts: ci
+                    .accounts
+                    .iter()
+                    .map(|&index| AccountMeta {
+                        pubkey: account_keys[index as usize],
+                        is_signer: message.is_signer(index.into()),
+                        is_writable: message.is_maybe_writable(index.into()),
+                    })
+                    .collect(),
+                data: ci.data.clone(),
+            })
+            .collect();
+
+        Ok((compiled_ix, address_lookup_tables))
     }
 
     pub async fn fetch_address_lookup_table(
