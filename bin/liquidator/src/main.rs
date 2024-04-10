@@ -291,6 +291,9 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default(),
         use_sanctum: cli.sanctum_enabled == BoolArg::True,
         allow_withdraws: true,
+        use_limit_order: cli.rebalance_using_limit_order == BoolArg::True,
+        limit_order_distance_from_oracle_price_bps: cli
+            .rebalance_limit_order_distance_from_oracle_price_bps,
     };
     rebalance_config.validate(&mango_client.context);
 
