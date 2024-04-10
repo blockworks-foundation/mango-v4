@@ -31,10 +31,10 @@ use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTr
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
+use crate::util;
 use crate::util::PreparedInstructions;
 use crate::{account_fetcher::*, swap};
 use crate::{health_cache, Serum3MarketContext, TokenContext};
-use crate::util;
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
@@ -1172,7 +1172,7 @@ impl MangoClient {
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = self.serum3_settle_funds_instruction(s3, base, quote, open_orders);
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        self.send_and_confirm_owner_tx(ix.to_instructions()).await
     }
 
     pub fn serum3_settle_funds_instruction(
@@ -1181,7 +1181,7 @@ impl MangoClient {
         base: &TokenContext,
         quote: &TokenContext,
         open_orders: Pubkey,
-    ) -> Instruction {
+    ) -> PreparedInstructions {
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
@@ -1214,7 +1214,11 @@ impl MangoClient {
                 fees_to_dao: true,
             }),
         };
-        ix
+
+        PreparedInstructions::from_single(
+            ix,
+            self.context.compute_estimates.cu_per_mango_instruction,
+        )
     }
 
     pub fn serum3_cancel_all_orders_instruction(

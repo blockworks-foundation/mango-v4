@@ -449,7 +449,7 @@ impl Rebalancer {
     }
 
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
-        self.settle_and_close_all_openbook_orders().await?;
+        self.close_and_settle_all_openbook_orders().await?;
         let account = self.mango_account()?;
 
         // TODO: configurable?
@@ -476,10 +476,19 @@ impl Rebalancer {
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.
-            let dust_threshold = if self.config.use_limit_order {
-                I80F48::from(self.dust_threshold_for_limit_order(token).await?)
+            let dust_threshold_res = if self.config.use_limit_order {
+                self.dust_threshold_for_limit_order(token)
+                    .await
+                    .map(|x| I80F48::from(x))
             } else {
-                I80F48::from(2) / token_price
+                Ok(I80F48::from(2) / token_price)
+            };
+
+            let Ok(dust_threshold) = dust_threshold_res
+            else {
+                let e = dust_threshold_res.unwrap_err();
+                error!("Cannot rebalance token {}, probably missing USDC market ? - error: {}", token.name, e);
+                return Ok(());
             };
 
             // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
@@ -494,7 +503,7 @@ impl Rebalancer {
             };
             let mut amount = fresh_amount()?;
 
-            trace!(token_index, %amount, %dust_threshold, "checking");
+            trace!(token_index, token.name, %amount, %dust_threshold, "checking");
 
             if self.config.use_limit_order {
                 self.unwind_using_limit_orders(
@@ -627,7 +636,7 @@ impl Rebalancer {
             price_adjustment_factor = price_adjustment_factor.to_num::<f64>(),
             coin_lot_size = market.coin_lot_size,
             pc_lot_size = market.pc_lot_size,
-            limit_price = limit_price,
+            limit_price,
             native_amount = native_amount.to_num::<f64>(),
             max_base_lots = max_base_lots,
             "building order for rebalancing"
@@ -648,7 +657,7 @@ impl Rebalancer {
         }
 
         let mut account = account.clone();
-        let create_or_replace_ixs = self
+        let create_or_replace_account_ixs = self
             .mango_client
             .serum3_create_or_replace_account_instruction(&mut account, *market_index, side)
             .await?;
@@ -665,11 +674,7 @@ impl Rebalancer {
                 max_base_lots,
                 ((limit_price * max_base_lots * market.pc_lot_size) as f64 * 1.01) as u64,
                 Serum3SelfTradeBehavior::CancelProvide,
-                if self.config.limit_order_distance_from_oracle_price_bps == 0 {
-                    Serum3OrderType::PostOnly
-                } else {
-                    Serum3OrderType::Limit
-                },
+                Serum3OrderType::Limit,
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64,
                 10,
             )
@@ -681,7 +686,7 @@ impl Rebalancer {
             .await?;
 
         let mut ixs = PreparedInstructions::new();
-        ixs.append(create_or_replace_ixs);
+        ixs.append(create_or_replace_account_ixs);
         ixs.append(cancel_ixs);
         ixs.append(place_order_ixs);
         ixs.append(seq_check_ixs);
@@ -705,7 +710,7 @@ impl Rebalancer {
         Ok(())
     }
 
-    async fn settle_and_close_all_openbook_orders(&self) -> anyhow::Result<()> {
+    async fn close_and_settle_all_openbook_orders(&self) -> anyhow::Result<()> {
         let account = self.mango_account()?;
 
         for x in Self::shuffle(account.active_serum3_orders()) {
@@ -718,13 +723,14 @@ impl Rebalancer {
                 .serum3_markets
                 .get(&market_index)
                 .expect("no openbook market found");
-            self.settle_and_close_openbook_orders(&account, token, &market_index, market, quote)
+            self.close_and_settle_openbook_orders(&account, token, &market_index, market, quote)
                 .await?;
         }
         Ok(())
     }
 
-    async fn settle_and_close_openbook_orders(
+    /// This will only settle funds when there is no more active orders (avoid doing too many settle tx)
+    async fn close_and_settle_openbook_orders(
         &self,
         account: &Box<MangoAccountValue>,
         token: &TokenContext,
@@ -732,16 +738,11 @@ impl Rebalancer {
         market: &Serum3MarketContext,
         quote: &TokenContext,
     ) -> anyhow::Result<()> {
-        let open_orders_opt = account
-            .serum3_orders(*market_index)
-            .map(|x| x.open_orders)
-            .ok();
-
-        if open_orders_opt.is_none() {
+        let Ok(open_orders) = account.serum3_orders(*market_index).map(|x| x.open_orders)
+        else {
             return Ok(());
-        }
+        };
 
-        let open_orders = open_orders_opt.unwrap();
         let oo_acc = self.account_fetcher.fetch_raw(&open_orders)?;
         let oo = serum3_cpi::load_open_orders_bytes(oo_acc.data())?;
         let oo_slim = OpenOrdersSlim::from_oo(oo);
@@ -750,22 +751,17 @@ impl Rebalancer {
             return Ok(());
         }
 
-        let settle_ixs = PreparedInstructions::from_single(
+        let settle_ixs =
             self.mango_client
-                .serum3_settle_funds_instruction(market, token, quote, open_orders),
-            self.mango_client
-                .context
-                .compute_estimates
-                .cu_per_serum3_order_cancel, // TODO FAS
-        );
+                .serum3_settle_funds_instruction(market, token, quote, open_orders);
 
         let close_ixs = self
             .mango_client
             .serum3_close_open_orders_instruction(*market_index);
 
         let mut ixs = PreparedInstructions::new();
-        ixs.append(settle_ixs);
         ixs.append(close_ixs);
+        ixs.append(settle_ixs);
 
         let txsig = self
             .mango_client
