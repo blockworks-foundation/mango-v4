@@ -488,7 +488,7 @@ impl Rebalancer {
             else {
                 let e = dust_threshold_res.unwrap_err();
                 error!("Cannot rebalance token {}, probably missing USDC market ? - error: {}", token.name, e);
-                return Ok(());
+                continue;
             };
 
             // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
