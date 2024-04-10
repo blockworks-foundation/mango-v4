@@ -78,8 +78,11 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
-        .jupiter_v6_url(cli.jupiter_v6_url)
-        .jupiter_token(cli.jupiter_token)
+        .jupiter_timeout(Duration::from_secs(cli.jupiter_timeout_secs))
+        .jupiter_v6_url(cli.jupiter_v6_url.clone())
+        .jupiter_token(cli.jupiter_token.clone())
+        .sanctum_url(cli.sanctum_url.clone())
+        .sanctum_timeout(Duration::from_secs(cli.sanctum_timeout_secs))
         .transaction_builder_config(
             TransactionBuilderConfig::builder()
                 .priority_fee_provider(prio_provider)
@@ -247,6 +250,11 @@ async fn main() -> anyhow::Result<()> {
         alternate_jupiter_route_tokens: cli
             .rebalance_alternate_jupiter_route_tokens
             .unwrap_or_default(),
+        alternate_sanctum_route_tokens: cli
+            .rebalance_alternate_sanctum_route_tokens
+            .clone()
+            .unwrap_or_default(),
+        use_sanctum: cli.sanctum_enabled == BoolArg::True,
         allow_withdraws: true,
     };
     rebalance_config.validate(&mango_client.context);
@@ -256,6 +264,7 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
+        sanctum_supported_mints: HashSet::<Pubkey>::new(),
     });
 
     let mut liquidation = Box::new(LiquidationState {
