@@ -150,6 +150,10 @@ pub async fn fetch_multiple_accounts(
         .collect())
 }
 
+/// Fetch multiple account using one request per chunk of `max_chunk_size` accounts
+/// Can execute in parallel up to `parallel_rpc_requests`
+///
+/// WARNING: some accounts requested may be missing from the result
 pub async fn fetch_multiple_accounts_in_chunks(
     rpc: &RpcClientAsync,
     keys: &[Pubkey],
@@ -166,13 +170,13 @@ pub async fn fetch_multiple_accounts_in_chunks(
         .map(|keys| {
             let account_info_config = config.clone();
             async move {
-                let mut keys = keys.iter().map(|x| **x).collect::<Vec<Pubkey>>();
+                let keys = keys.iter().map(|x| **x).collect::<Vec<Pubkey>>();
                 let req_res = rpc
                     .get_multiple_accounts_with_config(&keys, account_info_config)
                     .await;
 
                 match req_res {
-                    Ok(v) => Ok(keys.drain(..).zip(v.value).collect::<Vec<_>>()),
+                    Ok(v) => Ok(keys.into_iter().zip(v.value).collect::<Vec<_>>()),
                     Err(e) => Err(e),
                 }
             }
