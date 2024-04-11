@@ -47,7 +47,7 @@
 <span class="attr">#[derive(Accounts)]
 </span><span class="kw">pub struct </span>HealthCheck&lt;<span class="lifetime">&#39;info</span>&gt; {
     <span class="attr">#[account(
-    constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::SequenceCheck) @ MangoError::IxIsDisabled,
+    constraint = group.load()<span class="question-mark">?</span>.is_ix_enabled(IxGate::HealthCheck) @ MangoError::IxIsDisabled,
     )]
     </span><span class="kw">pub </span>group: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Group&gt;,
 
