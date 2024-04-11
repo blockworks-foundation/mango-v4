@@ -17,7 +17,7 @@ pub enum HealthCheckKind {
 #[derive(Accounts)]
 pub struct HealthCheck<'info> {
     #[account(
-    constraint = group.load()?.is_ix_enabled(IxGate::SequenceCheck) @ MangoError::IxIsDisabled,
+    constraint = group.load()?.is_ix_enabled(IxGate::HealthCheck) @ MangoError::IxIsDisabled,
     )]
     pub group: AccountLoader<'info, Group>,
 
