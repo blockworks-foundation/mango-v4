@@ -36,7 +36,7 @@ export interface TokenRegisterParams {
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
   oracleConfig: {
-    confFilter: 0.3,
+    confFilter: 0,
     maxStalenessSlots: null,
   },
   groupInsuranceFund: false,
