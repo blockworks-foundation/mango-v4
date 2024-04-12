@@ -2,11 +2,15 @@
 
 use std::sync::Arc;
 
+use bytemuck::cast_ref;
+use itertools::Itertools;
+use openbook_v2::state::{EventHeap, EventType, FillEvent, OpenOrdersAccount, OutEvent};
+use openbook_client::*;
 use solana_sdk::pubkey::Pubkey;
 
 use super::*;
 
-pub struct ListingKeys {
+pub struct OpenbookListingKeys {
     market_key: TestKeypair,
     req_q_key: TestKeypair,
     event_q_key: TestKeypair,
@@ -79,27 +83,45 @@ impl OpenbookV2Cookie {
         }
     }
 
-    // pub async fn consume_spot_events(
-    //     &self,
-    //     spot_market_cookie: &OpenbookMarketCookie,
-    //     open_orders: &[Pubkey],
-    // ) {
-    //     let mut sorted_oos = open_orders.to_vec();
-    //     sorted_oos.sort_by_key(|key| serum_dex::state::ToAlignedBytes::to_aligned_bytes(key));
+    pub async fn load_open_orders(&self, address: Pubkey) -> OpenOrdersAccount {
+        self.solana.get_account::<OpenOrdersAccount>(address).await
+    }
 
-    //     let instructions = [serum_dex::instruction::consume_events(
-    //         &self.program_id,
-    //         sorted_oos.iter().collect(),
-    //         &spot_market_cookie.market,
-    //         &spot_market_cookie.event_q,
-    //         &spot_market_cookie.coin_fee_account,
-    //         &spot_market_cookie.pc_fee_account,
-    //         10,
-    //     )
-    //     .unwrap()];
-    //     self.solana
-    //         .process_transaction(&instructions, None)
-    //         .await
-    //         .unwrap();
-    // }
+    pub async fn consume_spot_events(&self, spot_market_cookie: &OpenbookMarketCookie, limit: u8) {
+        let event_heap = self
+            .solana
+            .get_account::<EventHeap>(spot_market_cookie.event_heap)
+            .await;
+        let to_consume = event_heap
+            .iter()
+            .map(|(event, _slot)| event)
+            .take(limit as usize)
+            .collect_vec();
+        let open_orders_accounts = to_consume
+            .into_iter()
+            .map(
+                |event| match EventType::try_from(event.event_type).unwrap() {
+                    EventType::Fill => {
+                        let fill: &FillEvent = cast_ref(event);
+                        fill.maker
+                    }
+                    EventType::Out => {
+                        let out: &OutEvent = cast_ref(event);
+                        out.owner
+                    }
+                },
+            )
+            .collect_vec();
+
+        openbook_client::send_openbook_tx(
+            self.solana.as_ref(),
+            ConsumeEventsInstruction {
+                consume_events_admin: None,
+                market: spot_market_cookie.market,
+                open_orders_accounts,
+            },
+        )
+        .await
+        .unwrap();
+    }
 }

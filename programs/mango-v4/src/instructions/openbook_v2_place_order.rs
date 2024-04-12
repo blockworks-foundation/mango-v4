@@ -39,7 +39,7 @@ pub fn openbook_v2_place_order(
         OpenbookV2Side::Bid => openbook_market.quote_token_index,
         OpenbookV2Side::Ask => openbook_market.base_token_index,
     };
-
+    msg!("side {:?} payer token {} ", order.side, payer_token_index);
     //
     // Validation
     //
@@ -107,11 +107,15 @@ pub fn openbook_v2_place_order(
     //
     // Before-order tracking
     //
-    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
-    let before_vault = ctx.accounts.payer_vault.amount;
-    let base_lot_size: u64 = openbook_market_external.base_lot_size.try_into().unwrap();
-    let quote_lot_size: u64 = openbook_market_external.quote_lot_size.try_into().unwrap();
+    let base_lot_size: u64;
+    let quote_lot_size: u64;
+    {
+        let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+        base_lot_size = openbook_market_external.base_lot_size.try_into().unwrap();
+        quote_lot_size = openbook_market_external.quote_lot_size.try_into().unwrap();
+    }
 
+    let before_vault = ctx.accounts.payer_vault.amount;
     let before_oo_free_slots;
     let before_had_bids;
     let before_had_asks;
@@ -145,17 +149,21 @@ pub fn openbook_v2_place_order(
     }
 
     // Get price lots before the book gets modified
-    let bids = ctx.accounts.bids.load_mut()?;
-    let asks = ctx.accounts.asks.load_mut()?;
-    let order_book = openbook_v2::state::Orderbook { bids, asks };
-    let price_lots = order.price(now_ts, None, &order_book)?.0;
+    let price_lots;
+    {
+        let bids = ctx.accounts.bids.load_mut()?;
+        let asks = ctx.accounts.asks.load_mut()?;
+        let order_book = openbook_v2::state::Orderbook { bids, asks };
+        price_lots = order.price(now_ts, None, &order_book)?.0;
+    }
 
     //
     // CPI to place order
     //
-    let account_seeds = mango_account_seeds!(account.fixed);
-    cpi_place_order(ctx.accounts, &[account_seeds], &order, limit)?;
+    let group = ctx.accounts.group.load()?;
+    let group_seeds = group_seeds!(group);
 
+    cpi_place_order(ctx.accounts, &[group_seeds], &order, price_lots, limit)?;
     //
     // After-order tracking
     //
@@ -234,31 +242,35 @@ pub fn openbook_v2_place_order(
     // Placing an order cannot increase vault balance
     require_gte!(before_vault, after_vault);
 
-    let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
-    let mut receiver_bank = ctx.accounts.receiver_bank.load_mut()?;
-    let (base_bank, quote_bank) = match order.side {
-        OpenbookV2Side::Bid => (&mut receiver_bank, &mut payer_bank),
-        OpenbookV2Side::Ask => (&mut payer_bank, &mut receiver_bank),
-    };
-    update_bank_potential_tokens(openbook, base_bank, quote_bank, &after_oo);
+    let before_position_native;
+    let vault_difference;
+    {
+        let mut payer_bank = ctx.accounts.payer_bank.load_mut()?;
+        let mut receiver_bank = ctx.accounts.receiver_bank.load_mut()?;
+        let (base_bank, quote_bank) = match order.side {
+            OpenbookV2Side::Bid => (&mut receiver_bank, &mut payer_bank),
+            OpenbookV2Side::Ask => (&mut payer_bank, &mut receiver_bank),
+        };
+        update_bank_potential_tokens(openbook, base_bank, quote_bank, &after_oo);
 
-    // Track position before withdraw happens
-    let before_position_native = account
-        .token_position_mut(payer_bank.token_index)?
-        .0
-        .native(&payer_bank);
+        // Track position before withdraw happens
+        before_position_native = account
+            .token_position_mut(payer_bank.token_index)?
+            .0
+            .native(&payer_bank);
 
-    // Charge the difference in vault balance to the user's account
-    let vault_difference = {
-        apply_vault_difference(
-            ctx.accounts.account.key(),
-            &mut account.borrow_mut(),
-            openbook_market.market_index,
-            &mut payer_bank,
-            after_vault,
-            before_vault,
-        )?
-    };
+        // Charge the difference in vault balance to the user's account
+        vault_difference = {
+            apply_vault_difference(
+                ctx.accounts.account.key(),
+                &mut account.borrow_mut(),
+                SpotMarketIndex::OpenbookV2(openbook_market.market_index),
+                &mut payer_bank,
+                after_vault,
+                before_vault,
+            )?
+        };
+    }
 
     // Deposit limit check: Placing an order can increase deposit limit use on both
     // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
@@ -266,26 +278,27 @@ pub fn openbook_v2_place_order(
     // This is why this must happen after update_bank_potential_tokens() and any withdraws.
     {
         let receiver_bank = ctx.accounts.receiver_bank.load()?;
+        let payer_bank = ctx.accounts.payer_bank.load()?;
         receiver_bank
             .check_deposit_and_oo_limit()
             .with_context(|| std::format!("on {}", receiver_bank.name()))?;
         payer_bank
             .check_deposit_and_oo_limit()
             .with_context(|| std::format!("on {}", payer_bank.name()))?;
-    }
 
-    // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
-    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
-    if withdrawn_from_vault > before_position_native {
-        require_msg_typed!(
-            !payer_bank.are_borrows_reduce_only(),
-            MangoError::TokenInReduceOnlyMode,
-            "the payer tokens cannot be borrowed"
-        );
-        payer_bank.enforce_max_utilization_on_borrow()?;
-        payer_bank.check_net_borrows(payer_bank_oracle)?;
-    } else {
-        payer_bank.enforce_borrows_lte_deposits()?;
+        // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
+        let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
+        if withdrawn_from_vault > before_position_native {
+            require_msg_typed!(
+                !payer_bank.are_borrows_reduce_only(),
+                MangoError::TokenInReduceOnlyMode,
+                "the payer tokens cannot be borrowed"
+            );
+            payer_bank.enforce_max_utilization_on_borrow()?;
+            payer_bank.check_net_borrows(payer_bank_oracle)?;
+        } else {
+            payer_bank.enforce_borrows_lte_deposits()?;
+        }
     }
 
     // Limit order price bands: If the order ends up on the book, ensure
@@ -331,6 +344,7 @@ pub fn openbook_v2_place_order(
 
     // Health cache updates for the changed account state
     let receiver_bank = ctx.accounts.receiver_bank.load()?;
+    let payer_bank = ctx.accounts.payer_bank.load()?;
     // update scaled weights for receiver bank
     health_cache.adjust_token_balance(&receiver_bank, I80F48::ZERO)?;
     vault_difference.adjust_health_cache_token_balance(&mut health_cache, &payer_bank)?;
@@ -428,7 +442,7 @@ pub fn apply_settle_changes(
     let base_difference = apply_vault_difference(
         account_pk,
         account,
-        openbook_market.market_index,
+        SpotMarketIndex::OpenbookV2(openbook_market.market_index),
         base_bank,
         after_base_vault,
         before_base_vault,
@@ -436,7 +450,7 @@ pub fn apply_settle_changes(
     let quote_difference = apply_vault_difference(
         account_pk,
         account,
-        openbook_market.market_index,
+        SpotMarketIndex::OpenbookV2(openbook_market.market_index),
         quote_bank,
         after_quote_vault_adjusted,
         before_quote_vault,
@@ -446,7 +460,6 @@ pub fn apply_settle_changes(
     // for potential_serum_tokens on the banks.
     {
         let openbook_orders = account.openbook_v2_orders_mut(openbook_market.market_index)?;
-
         update_bank_potential_tokens(openbook_orders, base_bank, quote_bank, after_oo);
     }
 
@@ -496,10 +509,11 @@ fn cpi_place_order(
     ctx: &OpenbookV2PlaceOrder,
     seeds: &[&[&[u8]]],
     order: &OpenbookV2Order,
+    price_lots: i64,
     limit: u8,
 ) -> Result<Return<Option<u128>>> {
     let cpi_accounts = openbook_v2::cpi::accounts::PlaceOrder {
-        signer: ctx.account.to_account_info(),
+        signer: ctx.group.to_account_info(),
         open_orders_account: ctx.open_orders.to_account_info(),
         open_orders_admin: None,
         user_token_account: ctx.payer_vault.to_account_info(),
@@ -508,7 +522,7 @@ fn cpi_place_order(
         asks: ctx.asks.to_account_info(),
         event_heap: ctx.event_heap.to_account_info(),
         market_vault: ctx.market_vault.to_account_info(),
-        oracle_a: None, // todo-pan: how do oracle work
+        oracle_a: None, // we don't yet support markets with oracles
         oracle_b: None,
         token_program: ctx.token_program.to_account_info(),
     };
@@ -519,12 +533,36 @@ fn cpi_place_order(
         seeds,
     );
 
-    let price_lots = {
-        let market = ctx.openbook_v2_market_external.load()?;
-        market.native_price_to_lot(I80F48::from(1000)).unwrap()
+    let expiry_timestamp: u64 = if order.time_in_force > 0 {
+        Clock::get()
+        .unwrap()
+        .unix_timestamp
+        .saturating_add(order.time_in_force as i64)
+        .try_into()
+        .unwrap()
+    } else {
+        0
     };
 
-    let expiry_timestamp: u64 = Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+    let order_type = match order.params {
+        openbook_v2::state::OrderParams::Market => OpenbookV2OrderType::Market,
+        openbook_v2::state::OrderParams::ImmediateOrCancel { price_lots } => {
+            OpenbookV2OrderType::ImmediateOrCancel
+        }
+        openbook_v2::state::OrderParams::Fixed {
+            price_lots,
+            order_type,
+        } => match order_type {
+            openbook_v2::state::PostOrderType::Limit => OpenbookV2OrderType::Limit,
+            openbook_v2::state::PostOrderType::PostOnly => OpenbookV2OrderType::PostOnly,
+            openbook_v2::state::PostOrderType::PostOnlySlide => OpenbookV2OrderType::PostOnlySlide,
+        },
+        openbook_v2::state::OrderParams::OraclePegged {
+            price_offset_lots,
+            order_type,
+            peg_limit,
+        } => todo!(),
+    };
 
     let args = openbook_v2::PlaceOrderArgs {
         side: order.side,
@@ -532,10 +570,12 @@ fn cpi_place_order(
         max_base_lots: order.max_base_lots,
         max_quote_lots_including_fees: order.max_quote_lots_including_fees,
         client_order_id: order.client_order_id,
-        order_type: OpenbookV2OrderType::Limit,
+        order_type,
         expiry_timestamp,
         self_trade_behavior: order.self_trade_behavior,
         limit,
     };
+
+    msg!("args {:?}", args);
     openbook_v2::cpi::place_order(cpi_ctx, args)
 }

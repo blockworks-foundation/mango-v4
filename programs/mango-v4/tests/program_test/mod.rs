@@ -11,7 +11,6 @@ use spl_token::{state::*, *};
 
 pub use cookies::*;
 pub use mango_client::*;
-pub use openbook_client::*;
 pub use openbook_setup::*;
 pub use serum::*;
 pub use solana::*;

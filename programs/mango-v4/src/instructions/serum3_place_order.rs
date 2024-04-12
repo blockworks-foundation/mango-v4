@@ -309,7 +309,7 @@ pub fn serum3_place_order(
         apply_vault_difference(
             ctx.accounts.account.key(),
             &mut account.borrow_mut(),
-            serum_market.market_index,
+            SpotMarketIndex::Serum3(serum_market.market_index),
             &mut payer_bank,
             after_vault,
             before_vault,
@@ -500,7 +500,7 @@ impl VaultDifference {
 pub fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
-    serum_market_index: Serum3MarketIndex,
+    spot_market_index: SpotMarketIndex,
     bank: &mut Bank,
     vault_after: u64,
     vault_before: u64,
@@ -525,16 +525,32 @@ pub fn apply_vault_difference(
         .to_num::<u64>();
 
     let indexed_position = position.indexed_position;
-    let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee;
-    if bank.token_index == market.base_token_index {
-        borrows_without_fee = &mut market.base_borrows_without_fee;
-    } else if bank.token_index == market.quote_token_index {
-        borrows_without_fee = &mut market.quote_borrows_without_fee;
-    } else {
-        return Err(error_msg!(
-            "assert failed: apply_vault_difference called with bad token index"
-        ));
+    match spot_market_index {
+        SpotMarketIndex::Serum3(index) => {
+            let market = account.serum3_orders_mut(index).unwrap();
+            if bank.token_index == market.base_token_index {
+                borrows_without_fee = &mut market.base_borrows_without_fee;
+            } else if bank.token_index == market.quote_token_index {
+                borrows_without_fee = &mut market.quote_borrows_without_fee;
+            } else {
+                return Err(error_msg!(
+                    "assert failed: apply_vault_difference called with bad token index"
+                ));
+            };
+        }
+        SpotMarketIndex::OpenbookV2(index) => {
+            let market = account.openbook_v2_orders_mut(index).unwrap();
+            if bank.token_index == market.base_token_index {
+                borrows_without_fee = &mut market.base_borrows_without_fee;
+            } else if bank.token_index == market.quote_token_index {
+                borrows_without_fee = &mut market.quote_borrows_without_fee;
+            } else {
+                return Err(error_msg!(
+                    "assert failed: apply_vault_difference called with bad token index"
+                ));
+            };
+        }
     };
 
     // Only for place: Add to potential borrow amount
@@ -620,7 +636,7 @@ pub fn apply_settle_changes(
     let base_difference = apply_vault_difference(
         account_pk,
         account,
-        serum_market.market_index,
+        SpotMarketIndex::Serum3(serum_market.market_index),
         base_bank,
         after_base_vault,
         before_base_vault,
@@ -628,7 +644,7 @@ pub fn apply_settle_changes(
     let quote_difference = apply_vault_difference(
         account_pk,
         account,
-        serum_market.market_index,
+        SpotMarketIndex::Serum3(serum_market.market_index),
         quote_bank,
         after_quote_vault_adjusted,
         before_quote_vault,
