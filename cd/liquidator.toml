@@ -3,4 +3,7 @@ kill_signal = "SIGTERM"
 kill_timeout = 30
 
 [build]
-  dockerfile = "../bin/liquidator/Dockerfile.liquidator"
+  dockerfile = "../Dockerfile"
+
+[experimental]
+  cmd = ["liquidator"]
