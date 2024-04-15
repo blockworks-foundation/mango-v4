@@ -338,7 +338,8 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             deviation: 100.0,
         },
     )
-    .await;
+    .await
+    .unwrap();
 
     //
     // TEST: force cancel orders fails due to stale oracle
@@ -368,7 +369,8 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             deviation: 0.0,
         },
     )
-    .await;
+    .await
+    .unwrap();
 
     //
     // TEST: force cancel orders with fallback succeeds

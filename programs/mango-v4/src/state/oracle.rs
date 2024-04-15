@@ -295,6 +295,15 @@ impl<'a, T: KeyedAccountReader> OracleAccountInfos<'a, T> {
             sol_opt: None,
         }
     }
+
+    pub fn from_reader_with_fallback(acc_reader: &'a T, fallback_opt: Option<&'a T>) -> Self {
+        OracleAccountInfos {
+            oracle: acc_reader,
+            fallback_opt,
+            usdc_opt: None,
+            sol_opt: None,
+        }
+    }
 }
 
 /// Returns the price of one native base token, in native quote tokens
