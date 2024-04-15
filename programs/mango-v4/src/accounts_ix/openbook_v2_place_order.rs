@@ -6,7 +6,7 @@ use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use openbook_v2::{
     program::OpenbookV2,
-    state::{BookSide, Market, OpenOrdersAccount, PostOrderType, Side, SelfTradeBehavior},
+    state::{BookSide, Market, OpenOrdersAccount, PostOrderType, SelfTradeBehavior, Side},
 };
 
 #[derive(Copy, Clone, TryFromPrimitive, IntoPrimitive, AnchorSerialize, AnchorDeserialize)]

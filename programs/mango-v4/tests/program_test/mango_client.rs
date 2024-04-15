@@ -5278,15 +5278,15 @@ impl ClientInstruction for OpenbookV2CreateOpenOrdersInstruction {
 }
 
 pub struct OpenbookV2PlaceOrderInstruction {
-    pub payer: TestKeypair,
+    pub owner: TestKeypair,
     pub account: Pubkey,
 
     pub openbook_v2_market: Pubkey,
 
     pub side: OpenbookV2Side,
-    pub taker: bool,
-    pub limit_price: f64,
-    pub max_base: i64,
+    pub price_lots: i64,
+    pub max_base_lots: i64,
+    pub max_quote_lots_including_fees: i64,
     pub client_order_id: u64,
     pub order_type: OpenbookV2PlaceOrderType,
     pub self_trade_behavior: OpenbookV2SelfTradeBehavior,
@@ -5311,39 +5311,11 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
             .await
             .unwrap();
 
-        let fee_decimals_multiplier: i64 = 10_i64.pow(6);
-        let fee: f64 = (if self.taker {
-            println!("taker {}", external_market.taker_fee);
-            external_market.taker_fee
-        } else {
-            println!("maker {}", external_market.maker_fee.max(0));
-            external_market.maker_fee.max(0)
-        } as f64
-            / fee_decimals_multiplier as f64)
-            .abs();
-
-        let base_decimals = external_market.base_decimals;
-        let quote_decimals = external_market.quote_decimals;
-        println!(
-            "fee {} limit price {} quote dec {} base dec {}",
-            fee, self.limit_price, quote_decimals, base_decimals
-        );
-        fn to_native(val: f64, dec: u8) -> i64 {
-            (val * (10_i64.pow(dec.into()) as f64))  as i64
-        }
-        println!("native price {} {}", (10_i64.pow(quote_decimals as u32)) as f64, (self.limit_price * (10_i64.pow(quote_decimals as u32)) as f64) as i64);
-        let base_lot_size = external_market.base_lot_size;
-        let quote_lot_size = external_market.quote_lot_size;
-        let native_price = to_native(self.limit_price, quote_decimals);
-        let native_base = self.max_base;
-        let price_lots = (native_price * base_lot_size) / (quote_lot_size * 10_i64.pow(base_decimals.into()));
-        let max_base_lots = native_base / base_lot_size;
-
         let instruction = Self::Instruction {
             side: self.side,
-            price_lots,
-            max_base_lots,
-            max_quote_lots_including_fees: i64::MAX,
+            price_lots: self.price_lots,
+            max_base_lots: self.max_base_lots,
+            max_quote_lots_including_fees: self.max_quote_lots_including_fees,
             client_order_id: self.client_order_id,
             order_type: self.order_type,
             reduce_only: self.reduce_only,
@@ -5351,14 +5323,6 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
             self_trade_behavior: self.self_trade_behavior,
             limit: self.limit,
         };
-
-        println!(
-            "price_lots {} max_base_lots {} max_quote_lots_incl_fees {} cloi {}",
-            instruction.price_lots,
-            instruction.max_base_lots,
-            instruction.max_quote_lots_including_fees,
-            instruction.client_order_id
-        );
 
         let account = account_loader
             .load_mango_account(&self.account)
@@ -5403,7 +5367,7 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
         let accounts = Self::Accounts {
             group: account.fixed.group,
             account: self.account,
-            authority: self.payer.pubkey(),
+            authority: self.owner.pubkey(),
             open_orders: open_orders_account,
             openbook_v2_program: openbook_program_id,
             openbook_v2_market_external: market.openbook_v2_market_external,
@@ -5425,7 +5389,7 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
     }
 
     fn signers(&self) -> Vec<TestKeypair> {
-        vec![self.payer]
+        vec![self.owner]
     }
 }
 

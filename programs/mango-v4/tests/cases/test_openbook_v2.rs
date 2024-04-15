@@ -30,7 +30,13 @@ impl OpenbookV2OrderPlacer {
     async fn find_order_id_for_client_order_id(&self, client_order_id: u64) -> Option<(u128, u64)> {
         println!("finding {}", client_order_id);
         let open_orders = self.openbook.load_open_orders(self.open_orders).await;
-        println!("in {:?}", open_orders.all_orders_in_use().map(|o| o.client_id).collect_vec());
+        println!(
+            "in {:?}",
+            open_orders
+                .all_orders_in_use()
+                .map(|o| o.client_id)
+                .collect_vec()
+        );
         match open_orders.find_order_with_client_order_id(client_order_id) {
             Some(order) => return Some((order.id, client_order_id)),
             None => return None,
@@ -44,19 +50,22 @@ impl OpenbookV2OrderPlacer {
         taker: bool,
     ) -> Result<mango_v4::accounts::OpenbookV2PlaceOrder, TransportError> {
         let client_order_id = self.inc_client_order_id();
-
+        let fees = if taker { 0.0004 } else { 0.0 };
         send_tx(
             &self.solana,
             OpenbookV2PlaceOrderInstruction {
                 side: OpenbookV2Side::Bid,
-                taker,
+                price_lots: (limit_price * 100.0 / 10.0) as i64, // in quote_lot (10) per base lot (100)
+                max_base_lots: max_base / 100,                   // in base lot (100)
+                // 4 bps taker fees added in
+                max_quote_lots_including_fees: (limit_price * (max_base as f64) * (1.0 + fees)
+                    / 10.0)
+                    .ceil() as i64,
                 client_order_id,
                 limit: 10,
                 account: self.account,
-                limit_price,
-                max_base,
                 expiry_timestamp: 0,
-                payer: self.owner,
+                owner: self.owner,
                 openbook_v2_market: self.openbook_market,
                 reduce_only: false,
                 order_type: OpenbookV2PlaceOrderType::Limit,
@@ -89,14 +98,15 @@ impl OpenbookV2OrderPlacer {
             &self.solana,
             OpenbookV2PlaceOrderInstruction {
                 side: OpenbookV2Side::Ask,
-                taker,
+                price_lots: (limit_price * 100.0 / 10.0) as i64, // in quote_lot (10) per base lot (100)
+                max_base_lots: max_base / 100,                   // in base lot (100)
+                max_quote_lots_including_fees: (limit_price * (max_base as f64) / 10.0).ceil()
+                    as i64,
                 client_order_id,
                 limit: 10,
                 account: self.account,
-                limit_price,
-                max_base,
                 expiry_timestamp: 0,
-                payer: self.owner,
+                owner: self.owner,
                 openbook_v2_market: self.openbook_market,
                 reduce_only: false,
                 order_type: OpenbookV2PlaceOrderType::Limit,
@@ -672,7 +682,7 @@ async fn test_openbook_settle_to_dao() -> Result<(), TransportError> {
     let base2_end = account_position(solana, account2, base_bank).await;
 
     let lof = loan_origination_fee(amount - deposit_amount);
-   // assert_eq!(base_start - amount - 100000 - lof, base_end);
+    // assert_eq!(base_start - amount - 100000 - lof, base_end);
     assert_eq!(base2_start + amount, base2_end);
     assert_eq!(quote_start + amount - openbook_taker_fee(amount), quote_end);
     assert_eq!(
@@ -1266,14 +1276,14 @@ async fn test_openbook_compute() -> Result<(), TransportError> {
             solana,
             OpenbookV2PlaceOrderInstruction {
                 side: OpenbookV2Side::Ask,
-                taker: true,
+                price_lots: (1.0 * 100.0 / 10.0) as i64, // in quote_lot (10) per base lot (100)
+                max_base_lots: 500 / 100,                // in base lot (100)
+                max_quote_lots_including_fees: (1.0 * (500 as f64) / 10.0).ceil() as i64,
                 client_order_id: 0,
                 limit,
                 account: order_placer2.account,
-                limit_price: 1.0,
-                max_base: 500,
                 expiry_timestamp: u64::MAX,
-                payer: order_placer2.owner,
+                owner: order_placer2.owner,
                 openbook_v2_market: order_placer2.openbook_market,
                 reduce_only: false,
                 order_type: OpenbookV2PlaceOrderType::Limit,
@@ -1465,14 +1475,16 @@ async fn test_fallback_oracle_openbook() -> Result<(), TransportError> {
     let client_order_id = order_placer.inc_client_order_id();
     let place_ix = OpenbookV2PlaceOrderInstruction {
         side: OpenbookV2Side::Bid,
-        taker: false,
+        price_lots: (limit_price * 100.0 / 10.0) as i64, // in quote_lot (10) per base lot (100)
+        max_base_lots: max_base / 100,                   // in base lot (100)
+        // 4 bps taker fees added in
+        max_quote_lots_including_fees: (limit_price * (max_base as f64) * (1.0) / 10.0).ceil()
+            as i64,
         client_order_id,
         limit: 10,
         account: order_placer.account,
-        limit_price,
-        max_base,
         expiry_timestamp: u64::MAX,
-        payer: order_placer.owner,
+        owner: order_placer.owner,
         openbook_v2_market: order_placer.openbook_market,
         reduce_only: false,
         order_type: OpenbookV2PlaceOrderType::Limit,

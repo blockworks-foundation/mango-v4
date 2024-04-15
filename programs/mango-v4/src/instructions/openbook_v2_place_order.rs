@@ -535,11 +535,11 @@ fn cpi_place_order(
 
     let expiry_timestamp: u64 = if order.time_in_force > 0 {
         Clock::get()
-        .unwrap()
-        .unix_timestamp
-        .saturating_add(order.time_in_force as i64)
-        .try_into()
-        .unwrap()
+            .unwrap()
+            .unix_timestamp
+            .saturating_add(order.time_in_force as i64)
+            .try_into()
+            .unwrap()
     } else {
         0
     };

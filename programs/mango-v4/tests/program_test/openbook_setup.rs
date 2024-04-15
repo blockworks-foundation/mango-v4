@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use bytemuck::cast_ref;
 use itertools::Itertools;
-use openbook_v2::state::{EventHeap, EventType, FillEvent, OpenOrdersAccount, OutEvent};
 use openbook_client::*;
+use openbook_v2::state::{EventHeap, EventType, FillEvent, OpenOrdersAccount, OutEvent};
 use solana_sdk::pubkey::Pubkey;
 
 use super::*;
@@ -46,7 +46,6 @@ impl OpenbookV2Cookie {
         payer: TestKeypair,
     ) -> OpenbookMarketCookie {
         let collect_fee_admin = TestKeypair::new();
-        let close_market_admin = TestKeypair::new();
         let market = TestKeypair::new();
 
         let res = openbook_client::send_openbook_tx(
@@ -54,7 +53,7 @@ impl OpenbookV2Cookie {
             CreateMarketInstruction {
                 collect_fee_admin: collect_fee_admin.pubkey(),
                 open_orders_admin: None,
-                close_market_admin: Some(close_market_admin.pubkey()),
+                close_market_admin: None,
                 payer: payer,
                 market,
                 quote_lot_size: 10,
