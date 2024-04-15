@@ -40,6 +40,7 @@ pub fn perp_edit_market(
     name_opt: Option<String>,
     force_close_opt: Option<bool>,
     platform_liquidation_fee_opt: Option<f32>,
+    set_fallback_oracle: bool,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -61,6 +62,18 @@ pub fn perp_edit_market(
     if let Some(oracle) = oracle_opt {
         msg!("Oracle: old - {:?}, new - {:?}", perp_market.oracle, oracle);
         perp_market.oracle = oracle;
+        require_group_admin = true;
+    }
+    if set_fallback_oracle {
+        msg!(
+            "Fallback oracle old {:?}, new {:?}",
+            perp_market.fallback_oracle,
+            ctx.accounts.fallback_oracle.key()
+        );
+        check_is_valid_fallback_oracle(&AccountInfoRef::borrow(
+            ctx.accounts.fallback_oracle.as_ref(),
+        )?)?;
+        perp_market.fallback_oracle = ctx.accounts.fallback_oracle.key();
         require_group_admin = true;
     }
     if reset_stable_price {
