@@ -3477,7 +3477,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         name_opt: None,
         force_close_opt: None,
         platform_liquidation_fee_opt: None,
-        set_fallback_oracle: false
+        set_fallback_oracle: false,
     }
 }
 
@@ -3509,7 +3509,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            fallback_oracle: Pubkey::default()
+            fallback_oracle: Pubkey::default(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3550,7 +3550,7 @@ impl ClientInstruction for PerpAddFallbackOracle {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            fallback_oracle: self.fallback_oracle
+            fallback_oracle: self.fallback_oracle,
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3591,7 +3591,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            fallback_oracle: Pubkey::default()
+            fallback_oracle: Pubkey::default(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3634,7 +3634,7 @@ impl ClientInstruction for PerpMakeReduceOnly {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            fallback_oracle: Pubkey::default()
+            fallback_oracle: Pubkey::default(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3677,7 +3677,7 @@ impl ClientInstruction for PerpChangeWeights {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
-            fallback_oracle: Pubkey::default()
+            fallback_oracle: Pubkey::default(),
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);

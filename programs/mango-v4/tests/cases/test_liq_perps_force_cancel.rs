@@ -268,7 +268,7 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
         StubOracleCreate {
             oracle: fallback_oracle_kp,
             group,
-            mint: mints[0].pubkey,
+            mint: base_token.mint.pubkey,
             admin,
             payer,
         },
@@ -283,7 +283,23 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             admin,
             perp_market,
             fallback_oracle,
-        }
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: base_token.mint.pubkey,
+            fallback_oracle,
+            options: mango_v4::instruction::TokenEdit {
+                set_fallback_oracle: true,
+                ..token_edit_instruction_default()
+            },
+        },
     )
     .await
     .unwrap();
@@ -321,7 +337,8 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             last_update_slot: 0,
             deviation: 100.0,
         },
-    ).await;
+    )
+    .await;
 
     //
     // TEST: force cancel orders fails due to stale oracle
@@ -342,7 +359,7 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
     send_tx(
         solana,
         StubOracleSetTestInstruction {
-            oracle: base_token.oracle,
+            oracle: fallback_oracle,
             group,
             mint: base_token.mint.pubkey,
             admin,
@@ -350,7 +367,8 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             last_update_slot: 0,
             deviation: 0.0,
         },
-    ).await;
+    )
+    .await;
 
     //
     // TEST: force cancel orders with fallback succeeds
@@ -366,13 +384,13 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             account,
             perp_market,
         },
-        vec![fallback_oracle_meta.clone()]
+        vec![fallback_oracle_meta.clone()],
     )
     .await
     .unwrap();
 
-    // can withdraw again
-    send_tx(
+    // Withdraw also fails due to stale oracle
+    assert!(send_tx(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -382,6 +400,22 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
             token_account: payer_mint_accounts[1],
             bank_index: 0,
         },
+    )
+    .await
+    .is_err());
+
+    // can withdraw with fallback
+    send_tx_with_extra_accounts(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1,
+            allow_borrow: false,
+            account,
+            owner,
+            token_account: payer_mint_accounts[1],
+            bank_index: 0,
+        },
+        vec![fallback_oracle_meta.clone()],
     )
     .await
     .unwrap();

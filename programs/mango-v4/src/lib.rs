@@ -982,7 +982,7 @@ pub mod mango_v4 {
             name_opt,
             force_close_opt,
             platform_liquidation_fee_opt,
-            set_fallback_oracle
+            set_fallback_oracle,
         )?;
         Ok(())
     }

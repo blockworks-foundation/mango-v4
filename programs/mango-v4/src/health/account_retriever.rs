@@ -187,9 +187,11 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
         Ok(market)
     }
 
-    fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
-        let oracle = &self.ais[account_index];
-        let oracle_acc_infos = OracleAccountInfos::from_reader(oracle);
+    fn oracle_price_perp(
+        &self,
+        oracle_acc_infos: &OracleAccountInfos<T>,
+        perp_market: &PerpMarket,
+    ) -> Result<I80F48> {
         perp_market.oracle_price(&oracle_acc_infos, self.staleness_slot)
     }
 
@@ -266,7 +268,9 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
             })?;
 
         let oracle_index = perp_index + self.n_perps;
-        let oracle_price = self.oracle_price_perp(oracle_index, perp_market).with_context(|| {
+        let oracle_acc_infos =
+            &self.create_oracle_infos(oracle_index, &perp_market.fallback_oracle);
+        let oracle_price = self.oracle_price_perp(oracle_acc_infos, perp_market).with_context(|| {
             format!(
                 "getting oracle for perp market with health account index {} and perp market index {}, passed account {}",
                 oracle_index,

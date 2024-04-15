@@ -296,42 +296,42 @@ impl PerpMarket {
         let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
         let primary_ok =
             primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
-            if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
-                let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
-                require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
-                let fallback_state =
-                    oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.base_decimals)?;
-                let fallback_ok = fallback_state
-                    .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
-                fallback_ok.with_context(|| {
-                    format!(
-                        "{} {}",
-                        oracle_log_context(
-                            self.name(),
-                            &primary_state,
-                            &self.oracle_config,
-                            staleness_slot
-                        ),
-                        oracle_log_context(
-                            self.name(),
-                            &fallback_state,
-                            &self.oracle_config,
-                            staleness_slot
-                        )
-                    )
-                })?;
-                Ok(fallback_state)
-            } else {
-                primary_ok.with_context(|| {
+        if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
+            let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            let fallback_state =
+                oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.base_decimals)?;
+            let fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            fallback_ok.with_context(|| {
+                format!(
+                    "{} {}",
                     oracle_log_context(
                         self.name(),
                         &primary_state,
                         &self.oracle_config,
-                        staleness_slot,
+                        staleness_slot
+                    ),
+                    oracle_log_context(
+                        self.name(),
+                        &fallback_state,
+                        &self.oracle_config,
+                        staleness_slot
                     )
-                })?;
-                Ok(primary_state)
-            }
+                )
+            })?;
+            Ok(fallback_state)
+        } else {
+            primary_ok.with_context(|| {
+                oracle_log_context(
+                    self.name(),
+                    &primary_state,
+                    &self.oracle_config,
+                    staleness_slot,
+                )
+            })?;
+            Ok(primary_state)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {
