@@ -3477,6 +3477,7 @@ fn perp_edit_instruction_default() -> mango_v4::instruction::PerpEditMarket {
         name_opt: None,
         force_close_opt: None,
         platform_liquidation_fee_opt: None,
+        set_fallback_oracle: false
     }
 }
 
@@ -3508,6 +3509,48 @@ impl ClientInstruction for PerpResetStablePriceModel {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
+            fallback_oracle: Pubkey::default()
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct PerpAddFallbackOracle {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub perp_market: Pubkey,
+    pub fallback_oracle: Pubkey,
+}
+
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for PerpAddFallbackOracle {
+    type Accounts = mango_v4::accounts::PerpEditMarket;
+    type Instruction = mango_v4::instruction::PerpEditMarket;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
+
+        let instruction = Self::Instruction {
+            set_fallback_oracle: true,
+            ..perp_edit_instruction_default()
+        };
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            perp_market: self.perp_market,
+            oracle: perp_market.oracle,
+            fallback_oracle: self.fallback_oracle
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3548,6 +3591,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
+            fallback_oracle: Pubkey::default()
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3590,6 +3634,7 @@ impl ClientInstruction for PerpMakeReduceOnly {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
+            fallback_oracle: Pubkey::default()
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3632,6 +3677,7 @@ impl ClientInstruction for PerpChangeWeights {
             admin: self.admin.pubkey(),
             perp_market: self.perp_market,
             oracle: perp_market.oracle,
+            fallback_oracle: Pubkey::default()
         };
 
         let instruction = make_instruction(program_id, &accounts, &instruction);
@@ -3713,6 +3759,7 @@ impl ClientInstruction for PerpDeactivatePositionInstruction {
     }
 }
 
+#[derive(Clone)]
 pub struct PerpPlaceOrderInstruction {
     pub account: Pubkey,
     pub perp_market: Pubkey,
