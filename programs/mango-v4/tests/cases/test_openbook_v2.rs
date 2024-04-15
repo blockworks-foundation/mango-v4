@@ -116,8 +116,12 @@ impl OpenbookV2OrderPlacer {
         .await
     }
 
-    async fn ask(&mut self, limit_price: f64, max_base: i64) -> Option<(u128, u64)> {
+    async fn ask_taker(&mut self, limit_price: f64, max_base: i64) {
         self.try_ask(limit_price, max_base, true).await.unwrap();
+    }
+
+    async fn ask_maker(&mut self, limit_price: f64, max_base: i64) -> Option<(u128, u64)> {
+        self.try_ask(limit_price, max_base, false).await.unwrap();
         self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
             .await
     }
@@ -453,7 +457,7 @@ async fn test_openbook_loan_origination_fees() -> Result<(), TransportError> {
     //
     {
         let (bid_order_id, _) = order_placer.bid_maker(1.0, 200000).await.unwrap();
-        let (ask_order_id, _) = order_placer.ask(2.0, 200000).await.unwrap();
+        let (ask_order_id, _) = order_placer.ask_maker(2.0, 200000).await.unwrap();
 
         let o = order_placer.mango_openbook_orders().await;
         assert_eq!(o.base_borrows_without_fee, 19999); // rounded
@@ -468,7 +472,7 @@ async fn test_openbook_loan_origination_fees() -> Result<(), TransportError> {
 
         // placing new, slightly larger orders increases the borrow_without_fee amount only by a small amount
         let (bid_order_id, _) = order_placer.bid_maker(1.0, 210000).await.unwrap();
-        let (ask_order_id, _) = order_placer.ask(2.0, 300000).await.unwrap();
+        let (ask_order_id, _) = order_placer.ask_maker(2.0, 300000).await.unwrap();
 
         let o = order_placer.mango_openbook_orders().await;
         assert_eq!(o.base_borrows_without_fee, 119998); // rounded
@@ -522,7 +526,7 @@ async fn test_openbook_loan_origination_fees() -> Result<(), TransportError> {
         order_placer2.bid_maker(1.0, bid_amount).await.unwrap();
 
         // account takes
-        order_placer.ask(1.0, ask_amount).await.unwrap();
+        order_placer.ask_taker(1.0, ask_amount).await;
         order_placer.settle(false).await;
 
         let o = order_placer.mango_openbook_orders().await;
@@ -619,7 +623,7 @@ async fn test_openbook_settle_to_dao() -> Result<(), TransportError> {
     //
     // SETUP: Create a group, accounts, market etc
     //
-    let deposit_amount = 500000;
+    let deposit_amount = 160000;
     let CommonSetup {
         group_with_tokens,
         openbook_market_cookie,
@@ -665,8 +669,8 @@ async fn test_openbook_settle_to_dao() -> Result<(), TransportError> {
     let base2_start = account_position(solana, account2, base_bank).await;
 
     // account2 has an order on the book, account takes
-    order_placer2.bid_maker(2.0, amount).await.unwrap();
-    order_placer.ask(2.0, amount + 100000).await.unwrap();
+    order_placer2.bid_maker(1.0, amount).await.unwrap();
+    order_placer.ask_taker(1.0, amount).await;
 
     context
         .openbook
@@ -682,11 +686,11 @@ async fn test_openbook_settle_to_dao() -> Result<(), TransportError> {
     let base2_end = account_position(solana, account2, base_bank).await;
 
     let lof = loan_origination_fee(amount - deposit_amount);
-    // assert_eq!(base_start - amount - 100000 - lof, base_end);
+    assert_eq!(base_start - amount - lof, base_end);
     assert_eq!(base2_start + amount, base2_end);
     assert_eq!(quote_start + amount - openbook_taker_fee(amount), quote_end);
     assert_eq!(
-        quote2_start - amount + openbook_maker_rebate(amount) - lof - 1,
+        quote2_start - amount + openbook_maker_rebate(amount) - lof,
         quote2_end
     );
 
@@ -756,7 +760,7 @@ async fn test_openbook_settle_to_account() -> Result<(), TransportError> {
 
     // account2 has an order on the book, account takes
     order_placer2.bid_maker(1.0, amount).await.unwrap();
-    order_placer.ask(1.0, amount).await.unwrap();
+    order_placer.ask_taker(1.0, amount).await;
 
     context
         .openbook
@@ -779,7 +783,7 @@ async fn test_openbook_settle_to_account() -> Result<(), TransportError> {
         quote_end
     );
     assert_eq!(
-        quote2_start - amount + openbook_maker_rebate(amount) - lof - 1,
+        quote2_start - amount + openbook_maker_rebate(amount) - lof,
         quote2_end
     );
 
@@ -892,7 +896,7 @@ async fn test_openbook_reduce_only_deposits1() -> Result<(), TransportError> {
     assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
 
     // also fails as a taker order
-    order_placer2.ask(1.0, 500).await.unwrap();
+    order_placer2.ask_taker(1.0, 500).await;
     let err = order_placer.try_bid(1.0, 100, true).await;
     assert_mango_error(&err, MangoError::TokenInReduceOnlyMode.into(), "".into());
 
@@ -957,7 +961,7 @@ async fn test_openbook_reduce_only_deposits2() -> Result<(), TransportError> {
     order_placer.try_bid(1.0, 100, false).await.unwrap();
 
     // taking some is fine too
-    order_placer2.ask(1.0, 800).await.unwrap();
+    order_placer2.ask_taker(1.0, 800).await;
     order_placer.try_bid(1.0, 100, true).await.unwrap();
 
     // the limit for orders is reduced now, 100 received, 100 on the book
@@ -1076,7 +1080,7 @@ async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
     assert_eq!(srm.highest_placed_ask, 0.0);
     assert_eq!(srm.lowest_placed_ask, 0.0);
 
-    order_placer.ask(20.0, 100).await.unwrap();
+    order_placer.ask_maker(20.0, 100).await.unwrap();
 
     let srm = order_placer.mango_openbook_orders().await;
     assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
@@ -1084,7 +1088,7 @@ async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
     assert_eq!(srm.highest_placed_ask, 20.0);
     assert_eq!(srm.lowest_placed_ask, 20.0);
 
-    order_placer.ask(19.0, 100).await.unwrap();
+    order_placer.ask_maker(19.0, 100).await.unwrap();
 
     let srm = order_placer.mango_openbook_orders().await;
     assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
@@ -1092,7 +1096,7 @@ async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
     assert_eq!(srm.highest_placed_ask, 20.0);
     assert_eq!(srm.lowest_placed_ask, 19.0);
 
-    order_placer.ask(21.0, 100).await.unwrap();
+    order_placer.ask_maker(21.0, 100).await.unwrap();
 
     let srm = order_placer.mango_openbook_orders().await;
     assert_eq!(srm.highest_placed_bid_inv, 1.0 / 11.0);
@@ -1131,7 +1135,7 @@ async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
     //
     // TEST: can reset even when there's still an order on the other side
     //
-    let (oid, _) = order_placer.ask(10.0, 100).await.unwrap();
+    let (oid, _) = order_placer.ask_maker(10.0, 100).await.unwrap();
 
     let srm = order_placer.mango_openbook_orders().await;
     assert_eq!(srm.highest_placed_bid_inv, 1.0);
@@ -1144,7 +1148,7 @@ async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
         .openbook
         .consume_spot_events(&openbook_market_cookie, 16)
         .await;
-    order_placer.ask(9.0, 100).await.unwrap();
+    order_placer.ask_maker(9.0, 100).await.unwrap();
 
     let srm = order_placer.mango_openbook_orders().await;
     assert_eq!(srm.highest_placed_bid_inv, 1.0);
@@ -1198,7 +1202,7 @@ async fn test_openbook_track_reserved_deposits() -> Result<(), TransportError> {
     order_placer.bid_maker(0.8, 2000).await.unwrap();
     assert_eq!(get_vals(solana).await, (2000, 2000, 1600, 1600));
 
-    order_placer.ask(1.2, 2000).await.unwrap();
+    order_placer.ask_maker(1.2, 2000).await.unwrap();
     assert_eq!(
         get_vals(solana).await,
         (2 * 2000, 2 * 2000, 1600 + 2400, 1600 + 2400)
@@ -1221,7 +1225,7 @@ async fn test_openbook_track_reserved_deposits() -> Result<(), TransportError> {
     order_placer2.settle(false).await;
     assert_eq!(get_vals(solana).await, (4000, 4000, 4000, 4000));
 
-    order_placer2.ask(0.8, 1000).await.unwrap();
+    order_placer2.ask_taker(0.8, 1000).await;
     context
         .openbook
         .consume_spot_events(&openbook_market_cookie, 16)
@@ -1575,7 +1579,7 @@ async fn test_openbook_bands() -> Result<(), TransportError> {
     //
 
     order_placer.bid_maker(1.0, 100).await.unwrap();
-    order_placer.ask(200.0, 100).await.unwrap();
+    order_placer.ask_maker(200.0, 100).await.unwrap();
     order_placer.cancel_all().await;
 
     //
@@ -1679,7 +1683,7 @@ async fn test_openbook_deposit_limits() -> Result<(), TransportError> {
     // TEST: even when placing all base tokens into an ask, they still count
     //
 
-    order_placer.ask(2.0, 5000).await.unwrap();
+    order_placer.ask_maker(2.0, 5000).await.unwrap();
     assert_eq!(remaining_base().await, 3000);
 
     //
@@ -1758,7 +1762,7 @@ async fn test_openbook_deposit_limits() -> Result<(), TransportError> {
     // TEST: if we ask to get more quote, the limit reduces
     //
 
-    order_placer.ask(5.0, 200).await.unwrap();
+    order_placer.ask_maker(5.0, 200).await.unwrap();
     assert_eq!(remaining_quote().await, 2000);
 
     //
