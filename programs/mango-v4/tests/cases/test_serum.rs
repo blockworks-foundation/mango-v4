@@ -559,7 +559,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         order_placer.settle().await;
 
         let o = order_placer.mango_serum_orders().await;
-        // parts of the order ended up on the book an may cause loan origination fees later
+        // parts of the order ended up on the book and may cause loan origination fees later
         assert_eq!(
             o.base_borrows_without_fee,
             (ask_amount - fill_amount) as u64
