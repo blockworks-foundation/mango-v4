@@ -272,33 +272,40 @@ pub fn openbook_v2_place_order(
         };
     }
 
-    // Deposit limit check: Placing an order can increase deposit limit use on both
-    // the payer and receiver bank. Imagine placing a bid for 500 base @ 0.5: it would
-    // use up 1000 quote and 500 base because either could be deposit on cancel/fill.
-    // This is why this must happen after update_bank_potential_tokens() and any withdraws.
+    // Deposit limit check, receiver side:
+    // Placing an order can always increase the receiver bank deposits on fill.
     {
         let receiver_bank = ctx.accounts.receiver_bank.load()?;
-        let payer_bank = ctx.accounts.payer_bank.load()?;
         receiver_bank
             .check_deposit_and_oo_limit()
             .with_context(|| std::format!("on {}", receiver_bank.name()))?;
+    }
+
+    // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
+    let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
+    let payer_bank = ctx.accounts.payer_bank.load()?;
+    if withdrawn_from_vault > before_position_native {
+        require_msg_typed!(
+            !payer_bank.are_borrows_reduce_only(),
+            MangoError::TokenInReduceOnlyMode,
+            "the payer tokens cannot be borrowed"
+        );
+        payer_bank.enforce_max_utilization_on_borrow()?;
+        payer_bank.check_net_borrows(payer_bank_oracle)?;
+
+        // Deposit limit check, payer side:
+        // The payer bank deposits could increase when cancelling the order later:
+        // Imagine the account borrowing payer tokens to place the order, repaying the borrows
+        // and then cancelling the order to create a deposit.
+        //
+        // However, if the account only decreases its deposits to place an order it can't
+        // worsen the situation and should always go through, even if payer deposit limits are
+        // already exceeded.
         payer_bank
             .check_deposit_and_oo_limit()
             .with_context(|| std::format!("on {}", payer_bank.name()))?;
-
-        // Payer bank safety checks like reduce-only, net borrows, vault-to-deposits ratio
-        let withdrawn_from_vault = I80F48::from(before_vault - after_vault);
-        if withdrawn_from_vault > before_position_native {
-            require_msg_typed!(
-                !payer_bank.are_borrows_reduce_only(),
-                MangoError::TokenInReduceOnlyMode,
-                "the payer tokens cannot be borrowed"
-            );
-            payer_bank.enforce_max_utilization_on_borrow()?;
-            payer_bank.check_net_borrows(payer_bank_oracle)?;
-        } else {
-            payer_bank.enforce_borrows_lte_deposits()?;
-        }
+    } else {
+        payer_bank.enforce_borrows_lte_deposits()?;
     }
 
     // Limit order price bands: If the order ends up on the book, ensure

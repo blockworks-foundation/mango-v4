@@ -35,7 +35,7 @@ mod test_openbook_v2;
 // mod test_perp_settle_fees;
 // mod test_position_lifetime;
 // mod test_reduce_only;
-// mod test_serum;
+mod test_serum;
 // mod test_stale_oracles;
 // mod test_token_conditional_swap;
 // mod test_token_update_index_and_rate;

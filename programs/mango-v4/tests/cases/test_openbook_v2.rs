@@ -1816,7 +1816,7 @@ async fn test_openbook_deposit_limits() -> Result<(), TransportError> {
         5000
     );
     // borrowing might lead to a deposit increase later
-    let r = order_placer.try_bid(1.0, 5001, false).await;
+    let r = order_placer.try_bid(1.0, 5100, false).await;
     assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
     // but just selling deposits is fine
     order_placer.try_bid(1.0, 4999, false).await.unwrap();
