@@ -47,11 +47,15 @@ pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>) 
         MangoError::SomeError
     );
 
+    let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
+
     // add oo to mango account
     let open_orders_account = account.create_openbook_v2_orders(openbook_market.market_index)?;
     open_orders_account.open_orders = ctx.accounts.open_orders_account.key();
     open_orders_account.base_token_index = openbook_market.base_token_index;
     open_orders_account.quote_token_index = openbook_market.quote_token_index;
+    open_orders_account.base_lot_size = openbook_market_external.base_lot_size;
+    open_orders_account.quote_lot_size = openbook_market_external.quote_lot_size;
 
     // Make it so that the token_account_map for the base and quote currency
     // stay permanently blocked. Otherwise users may end up in situations where

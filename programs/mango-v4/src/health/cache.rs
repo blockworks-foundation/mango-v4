@@ -303,8 +303,10 @@ impl SpotInfo {
         quote_info_index: usize,
     ) -> Self {
         // track the reserved amounts
-        let reserved_base = I80F48::from(open_orders.potential_base_tokens);
-        let reserved_quote = I80F48::from(open_orders.potential_quote_tokens);
+        let reserved_base =
+            I80F48::from(open_orders_account.position.asks_base_lots * open_orders.base_lot_size);
+        let reserved_quote =
+            I80F48::from(open_orders_account.position.bids_quote_lots * open_orders.quote_lot_size);
 
         let reserved_base_as_quote_lowest_ask =
             reserved_base * I80F48::from_num(open_orders.lowest_placed_ask);

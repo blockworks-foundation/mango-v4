@@ -254,12 +254,19 @@ pub struct OpenbookV2Orders {
     pub lowest_placed_bid_inv: f64,
     pub highest_placed_ask: f64,
 
+    /// Stores the market's lot sizes
+    ///
+    /// Needed because the obv2 open orders account tells us about reserved amounts in lots and
+    /// we want to be able to compute health without also loading the obv2 market.
+    pub quote_lot_size: i64,
+    pub base_lot_size: i64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 176],
+    pub reserved: [u8; 160],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 8 + 8 + 176
+    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 8 + 8 + 8 * 2 + 160
 );
 const_assert_eq!(size_of::<OpenbookV2Orders>(), 280);
 const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
@@ -290,7 +297,9 @@ impl Default for OpenbookV2Orders {
             lowest_placed_ask: 0.0,
             potential_base_tokens: 0,
             potential_quote_tokens: 0,
-            reserved: [0; 176],
+            quote_lot_size: 0,
+            base_lot_size: 0,
+            reserved: [0; 160],
         }
     }
 }
