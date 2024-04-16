@@ -70,8 +70,16 @@ pub fn perp_liq_base_or_positive_pnl(
 
     // Get oracle price for market. Price is validated inside
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+    let fallback_opt = if perp_market.fallback_oracle != Pubkey::default() {
+        ctx.remaining_accounts
+            .iter()
+            .find(|a| a.key == &perp_market.fallback_oracle)
+            .map(|k| AccountInfoRef::borrow(k).unwrap())
+    } else {
+        None
+    };
     let oracle_price = perp_market.oracle_price(
-        &OracleAccountInfos::from_reader(oracle_ref),
+        &OracleAccountInfos::from_reader_with_fallback(oracle_ref, fallback_opt.as_ref()),
         None, // checked in health
     )?;
 

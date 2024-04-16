@@ -456,7 +456,7 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
 /// Copy of the above test with an added fallback oracle + staleness instructions
 async fn test_liq_perps_bankruptcy_stale_oracle() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(400_000); // PerpLiqNegativePnlOrBankruptcy takes a lot of CU
+    test_builder.test().set_compute_max_units(200_000); // PerpLiqNegativePnlOrBankruptcy takes a lot of CU
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -836,7 +836,6 @@ async fn test_liq_perps_bankruptcy_stale_oracle() -> Result<(), TransportError> 
             is_writable: false,
             is_signer: false,
         };
-
         assert!(send_tx_with_extra_accounts(
             solana,
             PerpLiqNegativePnlOrBankruptcyInstruction {

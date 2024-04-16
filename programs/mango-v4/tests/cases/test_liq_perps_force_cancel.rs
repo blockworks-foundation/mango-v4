@@ -407,7 +407,7 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
     .is_err());
 
     // can withdraw with fallback
-    send_tx_with_extra_accounts(
+    assert!(send_tx_with_extra_accounts(
         solana,
         TokenWithdrawInstruction {
             amount: 1,
@@ -420,7 +420,9 @@ async fn test_liq_perps_force_cancel_stale_oracle() -> Result<(), TransportError
         vec![fallback_oracle_meta.clone()],
     )
     .await
-    .unwrap();
+    .unwrap()
+    .result
+    .is_ok());
 
     Ok(())
 }

@@ -508,7 +508,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let sol_oracle_index = ais[fallback_oracles_start..]
             .iter()
             .position(|o| o.key == &pyth_mainnet_sol_oracle::ID);
-        
+
         Ok(Self {
             banks_and_oracles: ScannedBanksAndOracles {
                 banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
