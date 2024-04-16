@@ -67,12 +67,16 @@ pub fn openbook_v2_place_order(
     let group_key = ctx.accounts.group.key();
     let mut account = ctx.accounts.account.load_full_mut()?;
     let (now_ts, now_slot) = clock_now();
-    let retriever =
-        new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        ctx.remaining_accounts,
+        &account.borrow(),
+        now_slot,
+    )?;
 
     let (_, _, payer_active_index) = account.ensure_token_position(payer_token_index)?;
     let (_, _, receiver_active_index) = account.ensure_token_position(receiver_token_index)?;
 
+    // This verifies that the required banks are available and that their oracles are valid
     let (payer_bank, payer_bank_oracle) =
         retriever.bank_and_oracle(&group_key, payer_active_index, payer_token_index)?;
     let (receiver_bank, receiver_bank_oracle) =
@@ -93,8 +97,12 @@ pub fn openbook_v2_place_order(
     //
     // Pre-health computation
     //
-    let mut health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
-        .context("pre-withdraw init health")?;
+    let mut health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )
+    .context("pre init health")?;
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some(pre_init_health)
@@ -367,8 +375,12 @@ pub fn openbook_v2_place_order(
     // Check the receiver's reduce only flag.
     //
     // Note that all orders on the book executing can still cause a net deposit. That's because
-    // the total openbook_v2 potential amount assumes all reserved amounts convert at the current
+    // the total spot potential amount assumes all reserved amounts convert at the current
     // oracle price.
+    //
+    // This also requires that all spot oos that touch the receiver_token are avaliable in the
+    // health cache. We make this a general requirement to avoid surprises.
+    health_cache.check_has_all_spot_infos_for_token(&account.borrow(), receiver_token_index)?;
     if receiver_bank.are_deposits_reduce_only() {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =

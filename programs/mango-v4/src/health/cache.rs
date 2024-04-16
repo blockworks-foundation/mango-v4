@@ -1296,6 +1296,34 @@ impl HealthCache {
             .sum();
         Ok(total_reserved)
     }
+
+    /// Verifies that the health cache has information on all account's active spot markets that
+    /// touch the token_index
+    pub fn check_has_all_spot_infos_for_token(
+        &self,
+        account: &MangoAccountRef,
+        token_index: TokenIndex,
+    ) -> Result<()> {
+        for serum3 in account.active_serum3_orders() {
+            if serum3.base_token_index == token_index || serum3.quote_token_index == token_index {
+                require_msg!(
+                    self.spot_infos.iter().any(|s| s.spot_market_index == SpotMarketIndex::Serum3(serum3.market_index)),
+                    "health cache is missing spot info for serum3 market {} involving receiver token {}; passed banks and oracles?",
+                    serum3.market_index, token_index
+                );
+            }
+        }
+        for oov2 in account.active_openbook_v2_orders() {
+            if oov2.base_token_index == token_index || oov2.quote_token_index == token_index {
+                require_msg!(
+                    self.spot_infos.iter().any(|s| s.spot_market_index == SpotMarketIndex::OpenbookV2(oov2.market_index)),
+                    "health cache is missing spot info for oov2 market {} involving receiver token {}; passed banks and oracles?",
+                    oov2.market_index, token_index
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result<usize> {
@@ -1455,12 +1483,26 @@ fn new_health_cache_impl(
     for (i, open_orders_account) in account.active_openbook_v2_orders().enumerate() {
         let oo = retriever.openbook_oo(i, &open_orders_account.open_orders)?;
 
-        // TODO: openbook v2 accounts should be skippable similar to serum3 ones!
         // find the TokenInfos for the market's base and quote tokens
-        let base_info_index =
-            find_token_info_index(&token_infos, open_orders_account.base_token_index)?;
-        let quote_info_index =
-            find_token_info_index(&token_infos, open_orders_account.quote_token_index)?;
+        // and potentially skip the whole openbook v2 contribution if they are not available
+        let info_index_results = (
+            find_token_info_index(&token_infos, open_orders_account.base_token_index),
+            find_token_info_index(&token_infos, open_orders_account.quote_token_index),
+        );
+        let (base_info_index, quote_info_index) = match info_index_results {
+            (Ok(base), Ok(quote)) => (base, quote),
+            _ => {
+                require_msg_typed!(
+                    allow_skipping_banks,
+                    MangoError::InvalidBank,
+                    "openbook-v2 market {} misses health accounts for bank {} or {}",
+                    open_orders_account.market_index,
+                    open_orders_account.base_token_index,
+                    open_orders_account.quote_token_index,
+                );
+                continue;
+            }
+        };
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.position.base_free_native);

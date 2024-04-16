@@ -425,22 +425,12 @@ pub fn serum3_place_order(
     // Check the receiver's reduce only flag.
     //
     // Note that all orders on the book executing can still cause a net deposit. That's because
-    // the total serum3 potential amount assumes all reserved amounts convert at the current
+    // the total spot potential amount assumes all reserved amounts convert at the current
     // oracle price.
     //
-    // This also requires that all serum3 oos that touch the receiver_token are avaliable in the
+    // This also requires that all spot oos that touch the receiver_token are avaliable in the
     // health cache. We make this a general requirement to avoid surprises.
-    for serum3 in account.active_serum3_orders() {
-        if serum3.base_token_index == receiver_token_index
-            || serum3.quote_token_index == receiver_token_index
-        {
-            require_msg!(
-                health_cache.spot_infos.iter().any(|s| s.spot_market_index == SpotMarketIndex::Serum3(serum3.market_index)),
-                "health cache is missing spot info for serum3 market {} involving receiver token {}; passed banks and oracles?",
-                serum3.market_index, receiver_token_index
-            );
-        }
-    }
+    health_cache.check_has_all_spot_infos_for_token(&account.borrow(), receiver_token_index)?;
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =
