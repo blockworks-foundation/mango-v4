@@ -7,8 +7,8 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::accounts_ix::{
-    InterestRateParams, OpenbookV2PlaceOrderType, OpenbookV2SelfTradeBehavior, OpenbookV2Side,
-    Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+    HealthCheckKind, InterestRateParams, OpenbookV2PlaceOrderType, OpenbookV2SelfTradeBehavior,
+    OpenbookV2Side, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
@@ -36,7 +36,7 @@ pub trait ClientAccountLoader {
 }
 
 #[async_trait::async_trait(?Send)]
-impl ClientAccountLoader for &SolanaCookie {
+impl ClientAccountLoader for SolanaCookie {
     async fn load_bytes(&self, pubkey: &Pubkey) -> Option<Vec<u8>> {
         self.get_account_data(*pubkey).await
     }
@@ -187,7 +187,7 @@ pub trait ClientInstruction {
 
     async fn to_instruction(
         &self,
-        loader: impl ClientAccountLoader + 'async_trait,
+        loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction);
     fn signers(&self) -> Vec<TestKeypair>;
 }
@@ -555,7 +555,7 @@ impl ClientInstruction for FlashLoanBeginInstruction {
     type Instruction = mango_v4::instruction::FlashLoanBegin;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -629,7 +629,7 @@ impl ClientInstruction for FlashLoanSwapBeginInstruction {
     type Instruction = mango_v4::instruction::FlashLoanSwapBegin;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -721,7 +721,7 @@ impl ClientInstruction for FlashLoanEndInstruction {
     type Instruction = mango_v4::instruction::FlashLoanEndV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -738,14 +738,9 @@ impl ClientInstruction for FlashLoanEndInstruction {
             account.ensure_token_position(bank.token_index).unwrap();
         }
 
-        let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
-            &account,
-            None,
-            true,
-            None,
-        )
-        .await;
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
 
         let accounts = Self::Accounts {
             account: self.account,
@@ -800,7 +795,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
     type Instruction = mango_v4::instruction::TokenWithdraw;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -826,7 +821,7 @@ impl ClientInstruction for TokenWithdrawInstruction {
         let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             Some(mint_info.banks[self.bank_index]),
             false,
@@ -872,7 +867,7 @@ impl ClientInstruction for TokenDepositInstruction {
     type Instruction = mango_v4::instruction::TokenDeposit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -898,7 +893,7 @@ impl ClientInstruction for TokenDepositInstruction {
         let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             Some(mint_info.banks[self.bank_index]),
             false,
@@ -943,7 +938,7 @@ impl ClientInstruction for TokenDepositIntoExistingInstruction {
     type Instruction = mango_v4::instruction::TokenDepositIntoExisting;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -969,7 +964,7 @@ impl ClientInstruction for TokenDepositIntoExistingInstruction {
         let mint_info: MintInfo = account_loader.load(&mint_info).await.unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             Some(mint_info.banks[self.bank_index]),
             false,
@@ -1033,7 +1028,7 @@ impl ClientInstruction for TokenRegisterInstruction {
     type Instruction = mango_v4::instruction::TokenRegister;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1081,6 +1076,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             zero_util_rate: 0.0,
             platform_liquidation_fee: self.platform_liquidation_fee,
             disable_asset_liquidation: false,
+            collateral_fee_per_day: 0.0,
         };
 
         let bank = Pubkey::find_program_address(
@@ -1152,7 +1148,7 @@ impl ClientInstruction for TokenAddBankInstruction {
     type Instruction = mango_v4::instruction::TokenAddBank;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1241,7 +1237,7 @@ impl ClientInstruction for TokenDeregisterInstruction {
 
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -1329,6 +1325,8 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         zero_util_rate_opt: None,
         platform_liquidation_fee_opt: None,
         disable_asset_liquidation_opt: None,
+        collateral_fee_per_day_opt: None,
+        force_withdraw_opt: None,
     }
 }
 
@@ -1345,7 +1343,7 @@ impl ClientInstruction for TokenEdit {
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -1401,7 +1399,7 @@ impl ClientInstruction for TokenEditWeights {
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -1460,7 +1458,7 @@ impl ClientInstruction for TokenResetStablePriceModel {
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -1520,7 +1518,7 @@ impl ClientInstruction for TokenResetNetBorrows {
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -1581,7 +1579,7 @@ impl ClientInstruction for TokenMakeReduceOnly {
     type Instruction = mango_v4::instruction::TokenEdit;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -1640,7 +1638,7 @@ impl ClientInstruction for StubOracleSetInstruction {
 
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1678,7 +1676,7 @@ impl ClientInstruction for StubOracleSetTestInstruction {
 
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1716,7 +1714,7 @@ impl ClientInstruction for StubOracleCreate {
 
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1755,7 +1753,7 @@ impl ClientInstruction for StubOracleCloseInstruction {
 
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -1788,7 +1786,7 @@ impl ClientInstruction for GroupCreateInstruction {
     type Instruction = mango_v4::instruction::GroupCreate;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1847,6 +1845,7 @@ pub fn group_edit_instruction_default() -> mango_v4::instruction::GroupEdit {
         mngo_token_index_opt: None,
         buyback_fees_expiry_interval_opt: None,
         allowed_fast_listings_per_interval_opt: None,
+        collateral_fee_interval_opt: None,
     }
 }
 
@@ -1863,7 +1862,7 @@ impl ClientInstruction for GroupEditFeeParameters {
     type Instruction = mango_v4::instruction::GroupEdit;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1899,7 +1898,7 @@ impl ClientInstruction for GroupEdit {
     type Instruction = mango_v4::instruction::GroupEdit;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = &self.options;
@@ -1929,7 +1928,7 @@ impl ClientInstruction for IxGateSetInstruction {
     type Instruction = mango_v4::instruction::IxGateSet;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -1961,7 +1960,7 @@ impl ClientInstruction for GroupCloseInstruction {
     type Instruction = mango_v4::instruction::GroupClose;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2023,7 +2022,7 @@ impl ClientInstruction for AccountCreateInstruction {
     type Instruction = mango_v4::instruction::AccountCreateV3;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2083,7 +2082,7 @@ impl ClientInstruction for AccountExpandInstruction {
     type Instruction = mango_v4::instruction::AccountExpandV2;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2133,7 +2132,7 @@ impl ClientInstruction for AccountSizeMigrationInstruction {
     type Instruction = mango_v4::instruction::AccountSizeMigration;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2172,7 +2171,7 @@ impl ClientInstruction for AccountEditInstruction {
     type Instruction = mango_v4::instruction::AccountEdit;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = mango_v4::instruction::AccountEdit {
@@ -2220,7 +2219,7 @@ impl ClientInstruction for AccountCloseInstruction {
     type Instruction = mango_v4::instruction::AccountClose;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { force_close: false };
@@ -2254,7 +2253,7 @@ impl ClientInstruction for AccountBuybackFeesWithMngo {
     type Instruction = mango_v4::instruction::AccountBuybackFeesWithMngo;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2310,7 +2309,7 @@ impl ClientInstruction for Serum3RegisterMarketInstruction {
     type Instruction = mango_v4::instruction::Serum3RegisterMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2382,7 +2381,7 @@ impl ClientInstruction for Serum3EditMarketInstruction {
     type Instruction = mango_v4::instruction::Serum3EditMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -2413,7 +2412,7 @@ impl ClientInstruction for Serum3DeregisterMarketInstruction {
     type Instruction = mango_v4::instruction::Serum3DeregisterMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2469,7 +2468,7 @@ impl ClientInstruction for Serum3CreateOpenOrdersInstruction {
     type Instruction = mango_v4::instruction::Serum3CreateOpenOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2520,7 +2519,7 @@ impl ClientInstruction for Serum3CloseOpenOrdersInstruction {
     type Instruction = mango_v4::instruction::Serum3CloseOpenOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -2578,7 +2577,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
     type Instruction = mango_v4::instruction::Serum3PlaceOrderV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2602,10 +2601,10 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
             .unwrap()
             .open_orders;
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.quote_token_index)
                 .await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.base_token_index)
                 .await;
 
         let market_external_bytes = account_loader
@@ -2630,7 +2629,7 @@ impl ClientInstruction for Serum3PlaceOrderInstruction {
         .unwrap();
 
         let mut health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -2696,7 +2695,7 @@ impl ClientInstruction for Serum3CancelOrderInstruction {
     type Instruction = mango_v4::instruction::Serum3CancelOrder;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2762,7 +2761,7 @@ impl ClientInstruction for Serum3CancelOrderByClientOrderIdInstruction {
     type Instruction = mango_v4::instruction::Serum3CancelOrderByClientOrderId;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2825,7 +2824,7 @@ impl ClientInstruction for Serum3CancelAllOrdersInstruction {
     type Instruction = mango_v4::instruction::Serum3CancelAllOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: self.limit };
@@ -2887,7 +2886,7 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
     type Instruction = mango_v4::instruction::Serum3SettleFundsV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -2904,10 +2903,10 @@ impl ClientInstruction for Serum3SettleFundsV2Instruction {
             .unwrap()
             .open_orders;
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.quote_token_index)
                 .await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.base_token_index)
                 .await;
 
         let market_external_bytes = account_loader
@@ -2971,7 +2970,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
     type Instruction = mango_v4::instruction::Serum3LiqForceCancelOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: self.limit };
@@ -2986,10 +2985,10 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
             .unwrap()
             .open_orders;
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.quote_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.quote_token_index)
                 .await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, serum_market.base_token_index)
+            get_mint_info_by_token_index(account_loader, &account, serum_market.base_token_index)
                 .await;
 
         let market_external_bytes = account_loader
@@ -3013,7 +3012,7 @@ impl ClientInstruction for Serum3LiqForceCancelOrdersInstruction {
         .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -3069,7 +3068,7 @@ impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
     type Instruction = mango_v4::instruction::TokenForceCloseBorrowsWithToken;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3087,7 +3086,7 @@ impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             self.asset_token_index,
@@ -3115,6 +3114,58 @@ impl ClientInstruction for TokenForceCloseBorrowsWithTokenInstruction {
     }
 }
 
+pub struct TokenForceWithdrawInstruction {
+    pub account: Pubkey,
+    pub bank: Pubkey,
+    pub target: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenForceWithdrawInstruction {
+    type Accounts = mango_v4::accounts::TokenForceWithdraw;
+    type Instruction = mango_v4::instruction::TokenForceWithdraw;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let bank = account_loader.load::<Bank>(&self.bank).await.unwrap();
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            bank: self.bank,
+            vault: bank.vault,
+            oracle: bank.oracle,
+            owner_ata_token_account: self.target,
+            alternate_owner_token_account: self.target,
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
 pub struct TokenLiqWithTokenInstruction {
     pub liqee: Pubkey,
     pub liqor: Pubkey,
@@ -3132,7 +3183,7 @@ impl ClientInstruction for TokenLiqWithTokenInstruction {
     type Instruction = mango_v4::instruction::TokenLiqWithToken;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3150,7 +3201,7 @@ impl ClientInstruction for TokenLiqWithTokenInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             self.asset_token_index,
@@ -3192,7 +3243,7 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
     type Instruction = mango_v4::instruction::TokenLiqBankruptcy;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3209,7 +3260,7 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             QUOTE_TOKEN_INDEX,
@@ -3331,7 +3382,7 @@ impl ClientInstruction for PerpCreateMarketInstruction {
     type Instruction = mango_v4::instruction::PerpCreateMarket;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3447,7 +3498,7 @@ impl ClientInstruction for PerpResetStablePriceModel {
     type Instruction = mango_v4::instruction::PerpEditMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -3487,7 +3538,7 @@ impl ClientInstruction for PerpSetSettleLimitWindow {
     type Instruction = mango_v4::instruction::PerpEditMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -3528,7 +3579,7 @@ impl ClientInstruction for PerpMakeReduceOnly {
     type Instruction = mango_v4::instruction::PerpEditMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -3570,7 +3621,7 @@ impl ClientInstruction for PerpChangeWeights {
     type Instruction = mango_v4::instruction::PerpEditMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -3609,7 +3660,7 @@ impl ClientInstruction for PerpCloseMarketInstruction {
     type Instruction = mango_v4::instruction::PerpCloseMarket;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -3646,7 +3697,7 @@ impl ClientInstruction for PerpDeactivatePositionInstruction {
     type Instruction = mango_v4::instruction::PerpDeactivatePosition;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
@@ -3704,7 +3755,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
     type Instruction = mango_v4::instruction::PerpPlaceOrderV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3726,7 +3777,7 @@ impl ClientInstruction for PerpPlaceOrderInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -3772,7 +3823,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
     type Instruction = mango_v4::instruction::PerpPlaceOrderPeggedV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3796,7 +3847,7 @@ impl ClientInstruction for PerpPlaceOrderPeggedInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -3837,7 +3888,7 @@ impl ClientInstruction for PerpCancelOrderInstruction {
     type Instruction = mango_v4::instruction::PerpCancelOrder;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3874,7 +3925,7 @@ impl ClientInstruction for PerpCancelOrderByClientOrderIdInstruction {
     type Instruction = mango_v4::instruction::PerpCancelOrderByClientOrderId;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -3911,7 +3962,7 @@ impl ClientInstruction for PerpCancelAllOrdersInstruction {
     type Instruction = mango_v4::instruction::PerpCancelAllOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: self.limit };
@@ -3944,7 +3995,7 @@ impl ClientInstruction for PerpConsumeEventsInstruction {
     type Instruction = mango_v4::instruction::PerpConsumeEvents;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 10 };
@@ -3983,7 +4034,7 @@ impl ClientInstruction for PerpUpdateFundingInstruction {
     type Instruction = mango_v4::instruction::PerpUpdateFunding;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4018,7 +4069,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
     type Instruction = mango_v4::instruction::PerpSettlePnl;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4033,7 +4084,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account_a,
             &account_b,
             TokenIndex::MAX,
@@ -4043,7 +4094,7 @@ impl ClientInstruction for PerpSettlePnlInstruction {
         )
         .await;
         let settle_mint_info = get_mint_info_by_token_index(
-            &account_loader,
+            account_loader,
             &account_a,
             perp_market.settle_token_index,
         )
@@ -4083,7 +4134,7 @@ impl ClientInstruction for PerpForceClosePositionInstruction {
     type Instruction = mango_v4::instruction::PerpForceClosePosition;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4119,7 +4170,7 @@ impl ClientInstruction for PerpSettleFeesInstruction {
     type Instruction = mango_v4::instruction::PerpSettleFees;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4132,7 +4183,7 @@ impl ClientInstruction for PerpSettleFeesInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -4140,7 +4191,7 @@ impl ClientInstruction for PerpSettleFeesInstruction {
         )
         .await;
         let settle_mint_info =
-            get_mint_info_by_token_index(&account_loader, &account, perp_market.settle_token_index)
+            get_mint_info_by_token_index(account_loader, &account, perp_market.settle_token_index)
                 .await;
 
         let accounts = Self::Accounts {
@@ -4172,7 +4223,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
     type Instruction = mango_v4::instruction::PerpLiqForceCancelOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { limit: 10 };
@@ -4183,7 +4234,7 @@ impl ClientInstruction for PerpLiqForceCancelOrdersInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -4223,7 +4274,7 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
     type Instruction = mango_v4::instruction::PerpLiqBaseOrPositivePnl;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4242,7 +4293,7 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             TokenIndex::MAX,
@@ -4253,7 +4304,7 @@ impl ClientInstruction for PerpLiqBaseOrPositivePnlInstruction {
         .await;
 
         let settle_mint_info =
-            get_mint_info_by_token_index(&account_loader, &liqee, perp_market.settle_token_index)
+            get_mint_info_by_token_index(account_loader, &liqee, perp_market.settle_token_index)
                 .await;
 
         let accounts = Self::Accounts {
@@ -4291,7 +4342,7 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
     type Instruction = mango_v4::instruction::PerpLiqNegativePnlOrBankruptcyV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4309,7 +4360,7 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             .await
             .unwrap();
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             TokenIndex::MAX,
@@ -4321,10 +4372,10 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
 
         let group = account_loader.load::<Group>(&group_key).await.unwrap();
         let settle_mint_info =
-            get_mint_info_by_token_index(&account_loader, &liqee, perp_market.settle_token_index)
+            get_mint_info_by_token_index(account_loader, &liqee, perp_market.settle_token_index)
                 .await;
         let insurance_mint_info =
-            get_mint_info_by_token_index(&account_loader, &liqee, QUOTE_TOKEN_INDEX).await;
+            get_mint_info_by_token_index(account_loader, &liqee, QUOTE_TOKEN_INDEX).await;
 
         let accounts = Self::Accounts {
             group: group_key,
@@ -4360,7 +4411,7 @@ impl ClientInstruction for BenchmarkInstruction {
     type Instruction = mango_v4::instruction::Benchmark;
     async fn to_instruction(
         &self,
-        _loader: impl ClientAccountLoader + 'async_trait,
+        _loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4385,7 +4436,7 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
     type Instruction = mango_v4::instruction::TokenUpdateIndexAndRate;
     async fn to_instruction(
         &self,
-        loader: impl ClientAccountLoader + 'async_trait,
+        loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4428,7 +4479,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
     type Instruction = mango_v4::instruction::ComputeAccountData;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4439,7 +4490,7 @@ impl ClientInstruction for ComputeAccountDataInstruction {
             .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -4472,7 +4523,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
     type Instruction = mango_v4::instruction::HealthRegionBegin;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4483,7 +4534,7 @@ impl ClientInstruction for HealthRegionBeginInstruction {
             .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             None,
             false,
@@ -4518,7 +4569,7 @@ impl ClientInstruction for HealthRegionEndInstruction {
     type Instruction = mango_v4::instruction::HealthRegionEnd;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -4529,7 +4580,7 @@ impl ClientInstruction for HealthRegionEndInstruction {
             .unwrap();
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &account,
             self.affected_bank,
             false,
@@ -4564,7 +4615,7 @@ impl ClientInstruction for AltSetInstruction {
     type Instruction = mango_v4::instruction::AltSet;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction { index: self.index };
@@ -4598,7 +4649,7 @@ impl ClientInstruction for AltExtendInstruction {
     type Instruction = mango_v4::instruction::AltExtend;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4642,7 +4693,7 @@ impl ClientInstruction for TokenConditionalSwapCreateInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapCreateV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4723,7 +4774,7 @@ impl ClientInstruction for TokenConditionalSwapCreateLinearAuctionInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapCreateLinearAuction;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4803,7 +4854,7 @@ impl ClientInstruction for TokenConditionalSwapCreatePremiumAuctionInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapCreatePremiumAuction;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4876,7 +4927,7 @@ impl ClientInstruction for TokenConditionalSwapCancelInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapCancel;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -4891,9 +4942,9 @@ impl ClientInstruction for TokenConditionalSwapCancelInstruction {
         let tcs = account.token_conditional_swap_by_id(self.id).unwrap().1;
 
         let buy_mint_info =
-            get_mint_info_by_token_index(&account_loader, &account, tcs.buy_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, tcs.buy_token_index).await;
         let sell_mint_info =
-            get_mint_info_by_token_index(&account_loader, &account, tcs.sell_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, tcs.sell_token_index).await;
 
         let accounts = Self::Accounts {
             group: account.fixed.group,
@@ -4929,7 +4980,7 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapTriggerV2;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -4957,7 +5008,7 @@ impl ClientInstruction for TokenConditionalSwapTriggerInstruction {
         };
 
         let health_check_metas = derive_liquidation_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             &liqor,
             tcs.buy_token_index,
@@ -4997,7 +5048,7 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
     type Instruction = mango_v4::instruction::TokenConditionalSwapStart;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -5012,7 +5063,7 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
             .clone();
 
         let sell_mint_info =
-            get_mint_info_by_token_index(&account_loader, &liqee, tcs.sell_token_index).await;
+            get_mint_info_by_token_index(account_loader, &liqee, tcs.sell_token_index).await;
 
         let instruction = Self::Instruction {
             token_conditional_swap_index: self.index,
@@ -5020,7 +5071,7 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
         };
 
         let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
+            account_loader,
             &liqee,
             Some(sell_mint_info.first_bank()),
             true,
@@ -5064,7 +5115,7 @@ impl ClientInstruction for OpenbookV2RegisterMarketInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2RegisterMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {
@@ -5137,7 +5188,7 @@ impl ClientInstruction for OpenbookV2EditMarketInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2EditMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
 
@@ -5171,7 +5222,7 @@ impl ClientInstruction for OpenbookV2DeregisterMarketInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2DeregisterMarket;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
@@ -5232,7 +5283,7 @@ impl ClientInstruction for OpenbookV2CreateOpenOrdersInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2CreateOpenOrders;
     async fn to_instruction(
         &self,
-        _account_loader: impl ClientAccountLoader + 'async_trait,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5300,7 +5351,7 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2PlaceOrder;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5330,9 +5381,9 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
             .unwrap();
 
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.quote_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.base_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
 
         let (payer_bank, payer_vault, receiver_bank, market_vault) = match self.side {
             OpenbookV2Side::Ask => (
@@ -5349,14 +5400,9 @@ impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
             ),
         };
 
-        let health_check_metas = derive_health_check_remaining_account_metas(
-            &account_loader,
-            &account,
-            None,
-            true,
-            None,
-        )
-        .await;
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
 
         let open_orders_account = account
             .all_openbook_v2_orders()
@@ -5409,7 +5455,7 @@ impl ClientInstruction for OpenbookV2CancelOrderInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2CancelOrder;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5471,7 +5517,7 @@ impl ClientInstruction for OpenbookV2CancelAllOrdersInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2CancelAllOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5532,7 +5578,7 @@ impl ClientInstruction for OpenbookV2SettleFundsInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2SettleFunds;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5550,9 +5596,9 @@ impl ClientInstruction for OpenbookV2SettleFundsInstruction {
             .await
             .unwrap();
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.quote_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.base_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
 
         let open_orders_account = account
             .all_openbook_v2_orders()
@@ -5604,7 +5650,7 @@ impl ClientInstruction for OpenbookV2CloseOpenOrdersInstruction {
     type Instruction = mango_v4::instruction::OpenbookV2CloseOpenOrders;
     async fn to_instruction(
         &self,
-        account_loader: impl ClientAccountLoader + 'async_trait,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let openbook_program_id = openbook_v2::id();
@@ -5617,9 +5663,9 @@ impl ClientInstruction for OpenbookV2CloseOpenOrdersInstruction {
         let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
 
         let quote_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.quote_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
         let base_info =
-            get_mint_info_by_token_index(&account_loader, &account, market.base_token_index).await;
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
 
         let open_orders_indexer = Pubkey::find_program_address(
             &[b"OpenOrdersIndexer".as_ref(), self.account.as_ref()],
@@ -5673,5 +5719,173 @@ impl ClientInstruction for OpenbookV2CloseOpenOrdersInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenChargeCollateralFeesInstruction {
+    pub account: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenChargeCollateralFeesInstruction {
+    type Accounts = mango_v4::accounts::TokenChargeCollateralFees;
+    type Instruction = mango_v4::instruction::TokenChargeCollateralFees;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {};
+
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
+#[derive(Clone)]
+pub struct HealthAccountSkipping<T: ClientInstruction> {
+    pub inner: T,
+    pub skip_banks: Vec<Pubkey>,
+}
+#[async_trait::async_trait(?Send)]
+impl<T: ClientInstruction> ClientInstruction for HealthAccountSkipping<T> {
+    type Accounts = T::Accounts;
+    type Instruction = T::Instruction;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let (accounts, mut instruction) = self.inner.to_instruction(account_loader).await;
+
+        let ams = &mut instruction.accounts;
+        for bank_pk in &self.skip_banks {
+            let bank_pos =
+                ams.len() - 1 - ams.iter().rev().position(|m| m.pubkey == *bank_pk).unwrap();
+            ams.remove(bank_pos);
+
+            let bank = account_loader.load::<Bank>(&bank_pk).await.unwrap();
+            let oracle_pk = bank.oracle;
+
+            let oracle_pos = bank_pos
+                + ams[bank_pos..]
+                    .iter()
+                    .position(|m| m.pubkey == oracle_pk)
+                    .unwrap();
+            ams.remove(oracle_pos);
+        }
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        self.inner.signers()
+    }
+}
+
+#[derive(Default)]
+pub struct SequenceCheckInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub expected_sequence_number: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for SequenceCheckInstruction {
+    type Accounts = mango_v4::accounts::SequenceCheck;
+    type Instruction = mango_v4::instruction::SequenceCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            expected_sequence_number: self.expected_sequence_number,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct HealthCheckInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub min_health_value: f64,
+    pub check_kind: HealthCheckKind,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for HealthCheckInstruction {
+    type Accounts = mango_v4::accounts::HealthCheck;
+    type Instruction = mango_v4::instruction::HealthCheck;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            min_health_value: self.min_health_value,
+            check_kind: self.check_kind,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+        };
+
+        let health_check_metas = derive_health_check_remaining_account_metas(
+            account_loader,
+            &account,
+            None,
+            false,
+            None,
+        )
+        .await;
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
     }
 }

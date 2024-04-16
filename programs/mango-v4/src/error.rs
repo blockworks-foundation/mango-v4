@@ -145,6 +145,12 @@ pub enum MangoError {
     MissingFeedForCLMMOracle,
     #[msg("the asset does not allow liquidation")]
     TokenAssetLiquidationDisabled,
+    #[msg("for borrows the bank must be in the health account list")]
+    BorrowsRequireHealthAccountBank,
+    #[msg("invalid sequence number")]
+    InvalidSequenceNumber,
+    #[msg("invalid health")]
+    InvalidHealth,
     #[msg("no free openbook v2 open orders index")]
     NoFreeOpenbookV2OpenOrdersIndex,
     #[msg("openbook v2 open orders exist already")]

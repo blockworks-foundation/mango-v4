@@ -9,6 +9,7 @@ use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{emit_perp_balances, emit_stack, PerpSettleFeesLog, TokenBalanceLog};
+use crate::util::clock_now;
 
 pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) -> Result<()> {
     // max_settle_amount must greater than zero
@@ -123,8 +124,9 @@ pub fn perp_settle_fees(ctx: Context<PerpSettleFees>, max_settle_amount: u64) ->
     drop(perp_market);
 
     // Verify that the result of settling did not violate the health of the account that lost money
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
+    let retriever =
+        new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
     let health = compute_health(&account.borrow(), HealthType::Init, &retriever, now_ts)?;
     require!(health >= 0, MangoError::HealthMustBePositive);
 

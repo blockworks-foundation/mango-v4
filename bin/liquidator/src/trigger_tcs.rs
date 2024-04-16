@@ -1,8 +1,10 @@
+use std::collections::HashSet;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     pin::Pin,
     sync::{Arc, RwLock},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use futures_core::Future;
@@ -11,9 +13,10 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
+use mango_v4_client::{chain_data, swap, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
+use mango_v4::accounts_ix::HealthCheckKind::MaintRatio;
 use solana_sdk::signature::Signature;
 use tracing::*;
 use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
@@ -54,9 +57,9 @@ pub enum Mode {
 
 #[derive(Clone)]
 pub struct Config {
+    pub refresh_timeout: Duration,
     pub min_health_ratio: f64,
     pub max_trigger_quote_amount: u64,
-    pub refresh_timeout: Duration,
     pub compute_limit_for_trigger: u32,
     pub collateral_token_index: TokenIndex,
 
@@ -70,9 +73,12 @@ pub struct Config {
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
 
-    pub jupiter_version: jupiter::Version,
+    pub jupiter_version: swap::Version,
     pub jupiter_slippage_bps: u64,
     pub mode: Mode,
+
+    pub only_allowed_tokens: HashSet<TokenIndex>,
+    pub forbidden_tokens: HashSet<TokenIndex>,
 }
 
 pub enum JupiterQuoteCacheResult<T> {
@@ -118,9 +124,9 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
+        version: swap::Version,
         max_in_per_out_price: f64,
-    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, jupiter::Quote)>> {
+    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, swap::Quote)>> {
         let cache_entry = self.cache_entry(input_mint, output_mint);
 
         let held_lock = {
@@ -178,10 +184,10 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
-    ) -> anyhow::Result<(f64, jupiter::Quote)> {
+        version: swap::Version,
+    ) -> anyhow::Result<(f64, swap::Quote)> {
         let quote = client
-            .jupiter()
+            .swap()
             .quote(
                 input_mint,
                 output_mint,
@@ -202,8 +208,8 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
-    ) -> anyhow::Result<(f64, jupiter::Quote)> {
+        version: swap::Version,
+    ) -> anyhow::Result<(f64, swap::Quote)> {
         match self
             .quote(
                 client,
@@ -249,11 +255,10 @@ impl JupiterQuoteCache {
         collateral_amount: u64,
         sell_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
+        version: swap::Version,
         max_sell_per_buy_price: f64,
-    ) -> anyhow::Result<
-        JupiterQuoteCacheResult<(f64, Option<jupiter::Quote>, Option<jupiter::Quote>)>,
-    > {
+    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, Option<swap::Quote>, Option<swap::Quote>)>>
+    {
         // First check if we have cached prices for both legs and
         // if those break the specified limit
         let cached_collateral_to_buy = self.cached_price(collateral_mint, buy_mint).await;
@@ -332,7 +337,7 @@ struct PreparedExecution {
     max_sell_token_to_liqor: u64,
     min_buy_token: u64,
     min_taker_price: f32,
-    jupiter_quote: Option<jupiter::Quote>,
+    jupiter_quote: Option<swap::Quote>,
 }
 
 struct PreparationResult {
@@ -401,10 +406,42 @@ impl Context {
         Ok(taker_price >= base_price * cost_over_oracle * (1.0 + self.config.profit_fraction))
     }
 
+    // excluded by config
+    fn tcs_pair_is_allowed(
+        &self,
+        buy_token_index: TokenIndex,
+        sell_token_index: TokenIndex,
+    ) -> bool {
+        if self.config.forbidden_tokens.contains(&buy_token_index) {
+            return false;
+        }
+
+        if self.config.forbidden_tokens.contains(&sell_token_index) {
+            return false;
+        }
+
+        if self.config.only_allowed_tokens.is_empty() {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&buy_token_index) {
+            return true;
+        }
+
+        if self.config.only_allowed_tokens.contains(&sell_token_index) {
+            return true;
+        }
+
+        return false;
+    }
+
     // Either expired or triggerable with ok-looking price.
     fn tcs_is_interesting(&self, tcs: &TokenConditionalSwap) -> anyhow::Result<bool> {
         if tcs.is_expired(self.now_ts) {
             return Ok(true);
+        }
+        if !self.tcs_pair_is_allowed(tcs.buy_token_index, tcs.buy_token_index) {
+            return Ok(false);
         }
 
         let (_, buy_token_price, _) = self.token_bank_price_mint(tcs.buy_token_index)?;
@@ -965,7 +1002,7 @@ impl Context {
     pub async fn execute_tcs(
         &self,
         tcs: &mut [(Pubkey, u64, u64)],
-        error_tracking: &mut ErrorTracking<Pubkey, LiqErrorType>,
+        error_tracking: Arc<RwLock<ErrorTracking<Pubkey, LiqErrorType>>>,
     ) -> anyhow::Result<(Vec<Signature>, Vec<Pubkey>)> {
         use rand::distributions::{Distribution, WeightedError, WeightedIndex};
 
@@ -1014,7 +1051,7 @@ impl Context {
                     }
                     Err(e) => {
                         trace!(%result.pubkey, "preparation error {:?}", e);
-                        error_tracking.record(
+                        error_tracking.write().unwrap().record(
                             LiqErrorType::TcsExecution,
                             &result.pubkey,
                             e.to_string(),
@@ -1058,7 +1095,7 @@ impl Context {
             };
 
             // start the new one
-            if let Some(job) = self.prepare_job(&pubkey, tcs_id, volume, error_tracking) {
+            if let Some(job) = self.prepare_job(&pubkey, tcs_id, volume, error_tracking.clone()) {
                 pending_volume += volume;
                 pending.push(job);
             }
@@ -1095,7 +1132,11 @@ impl Context {
                 Ok(v) => Some((pubkey, v)),
                 Err(err) => {
                     trace!(%pubkey, "execution error {:?}", err);
-                    error_tracking.record(LiqErrorType::TcsExecution, &pubkey, err.to_string());
+                    error_tracking.write().unwrap().record(
+                        LiqErrorType::TcsExecution,
+                        &pubkey,
+                        err.to_string(),
+                    );
                     None
                 }
             });
@@ -1110,12 +1151,14 @@ impl Context {
         pubkey: &Pubkey,
         tcs_id: u64,
         volume: u64,
-        error_tracking: &ErrorTracking<Pubkey, LiqErrorType>,
+        error_tracking: Arc<RwLock<ErrorTracking<Pubkey, LiqErrorType>>>,
     ) -> Option<Pin<Box<dyn Future<Output = PreparationResult> + Send>>> {
         // Skip a pubkey if there've been too many errors recently
-        if let Some(error_entry) =
-            error_tracking.had_too_many_errors(LiqErrorType::TcsExecution, pubkey, Instant::now())
-        {
+        if let Some(error_entry) = error_tracking.read().unwrap().had_too_many_errors(
+            LiqErrorType::TcsExecution,
+            pubkey,
+            Instant::now(),
+        ) {
             trace!(
                 "skip checking for tcs on account {pubkey}, had {} errors recently",
                 error_entry.count
@@ -1156,7 +1199,7 @@ impl Context {
         // Jupiter quote is provided only for triggers, not close-expired
         let mut tx_builder = if let Some(jupiter_quote) = pending.jupiter_quote {
             self.mango_client
-                .jupiter()
+                .swap()
                 .prepare_swap_transaction(&jupiter_quote)
                 .await?
         } else {
@@ -1189,6 +1232,27 @@ impl Context {
         tx_builder
             .instructions
             .append(&mut trigger_ixs.instructions);
+
+        let (_, tcs) = liqee.token_conditional_swap_by_id(pending.tcs_id)?;
+        let affected_tokens = allowed_tokens
+            .iter()
+            .chain(&[tcs.buy_token_index, tcs.sell_token_index])
+            .copied()
+            .collect_vec();
+        let liqor = &self.mango_client.mango_account().await?;
+        tx_builder.instructions.append(
+            &mut self
+                .mango_client
+                .health_check_instruction(
+                    liqor,
+                    self.config.min_health_ratio,
+                    affected_tokens,
+                    vec![],
+                    MaintRatio,
+                )
+                .await?
+                .instructions,
+        );
 
         let txsig = tx_builder
             .send_and_confirm(&self.mango_client.client)

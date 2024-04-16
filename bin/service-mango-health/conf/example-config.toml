@@ -1,0 +1,28 @@
+rpc_ws_url = "wss://mango.rpcpool.com/<TOKEN>"
+rpc_http_url = "http://mango.rpcpool.com/<TOKEN>"
+mango_group = "78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX"
+snapshot_interval_secs = 900
+
+# [postgres]
+# connection_string = "$PG_CONNECTION_STRING"
+# allow_invalid_certs = true
+# max_retry_count = 2
+
+# # [postgres.tls]
+# # ca_cert_path = "$PG_CA_CERT"
+# # client_key_path = "$PG_CLIENT_KEY"
+
+[computing_configuration]
+recompute_interval_ms = 100
+
+[logging_configuration]
+log_health_to_stdout = true
+#log_health_for_accounts = ["xxx"]
+
+[persistence_configuration]
+enabled = true
+history_time_to_live_secs = 2678400 # 31 days
+persist_max_periodicity_secs = 60
+snapshot_queue_length = 30 # 30 * persist_max_periodicity_secs secs of backup in queue
+max_failure_duration_secs = 3600
+max_retry_count = 3

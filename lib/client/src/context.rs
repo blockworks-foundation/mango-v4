@@ -7,9 +7,9 @@ use anchor_lang::__private::bytemuck;
 use mango_v4::{
     accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
     state::{
-        determine_oracle_type, load_whirlpool_state, oracle_state_unchecked, Group,
-        MangoAccountValue, OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType,
-        PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+        determine_oracle_type, load_orca_pool_state, load_raydium_pool_state,
+        oracle_state_unchecked, Group, MangoAccountValue, OracleAccountInfos, OracleConfig,
+        OracleConfigParams, OracleType, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
     },
 };
 
@@ -120,6 +120,10 @@ pub struct ComputeEstimates {
     pub cu_per_perp_order_match: u32,
     pub cu_per_perp_order_cancel: u32,
     pub cu_per_oracle_fallback: u32,
+    pub cu_per_charge_collateral_fees: u32,
+    pub cu_per_charge_collateral_fees_token: u32,
+    pub cu_for_sequence_check: u32,
+    pub cu_per_associated_token_account_creation: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -139,6 +143,13 @@ impl Default for ComputeEstimates {
             cu_per_perp_order_cancel: 7_000,
             // measured around 2k, see test_health_compute_tokens_fallback_oracles
             cu_per_oracle_fallback: 2000,
+            // the base cost is mostly the division
+            cu_per_charge_collateral_fees: 20_000,
+            // per-chargable-token cost
+            cu_per_charge_collateral_fees_token: 15_000,
+            // measured around 8k, see test_basics
+            cu_for_sequence_check: 10_000,
+            cu_per_associated_token_account_creation: 21_000,
         }
     }
 }
@@ -705,8 +716,12 @@ async fn fetch_raw_account(rpc: &RpcClientAsync, address: Pubkey) -> Result<Acco
 fn get_fallback_quote_key(acc_info: &impl KeyedAccountReader) -> Pubkey {
     let maybe_key = match determine_oracle_type(acc_info).ok() {
         Some(oracle_type) => match oracle_type {
-            OracleType::OrcaCLMM => match load_whirlpool_state(acc_info).ok() {
+            OracleType::OrcaCLMM => match load_orca_pool_state(acc_info).ok() {
                 Some(whirlpool) => whirlpool.get_quote_oracle().ok(),
+                None => None,
+            },
+            OracleType::RaydiumCLMM => match load_raydium_pool_state(acc_info).ok() {
+                Some(pool) => pool.get_quote_oracle().ok(),
                 None => None,
             },
             _ => None,

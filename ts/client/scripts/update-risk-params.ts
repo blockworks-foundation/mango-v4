@@ -1,4 +1,5 @@
 import {
+  LISTING_PRESETS,
   MidPriceImpact,
   getMidPriceImpacts,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
@@ -9,6 +10,8 @@ import {
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
 } from '@solana/spl-governance';
+import { Builder } from '../src/builder';
+
 import {
   AccountMeta,
   Connection,
@@ -21,13 +24,18 @@ import fs from 'fs';
 import { Bank } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { MangoAccount } from '../src/accounts/mangoAccount';
-import { Builder } from '../src/builder';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { getEquityForMangoAccounts } from '../src/risk';
+import {
+  LiqorPriceImpact,
+  buildGroupGrid,
+  findLargestAssetBatchUi,
+  getEquityForMangoAccounts,
+} from '../src/risk';
 import {
   buildFetch,
+  toNative,
   toNativeI80F48ForQuote,
   toUiDecimalsForQuote,
 } from '../src/utils';
@@ -111,9 +119,10 @@ async function getTotalLiqorEquity(
 function getPriceImpactForBank(
   midPriceImpacts: MidPriceImpact[],
   bank: Bank,
+  priceImpactPercent = 1,
 ): MidPriceImpact {
   const tokenToPriceImpact = midPriceImpacts
-    .filter((x) => x.avg_price_impact_percent < 1)
+    .filter((x) => x.avg_price_impact_percent < priceImpactPercent)
     .reduce((acc: { [key: string]: MidPriceImpact }, val: MidPriceImpact) => {
       if (
         !acc[val.symbol] ||
@@ -135,19 +144,129 @@ async function updateTokenParams(): Promise<void> {
 
   const instructions: TransactionInstruction[] = [];
 
-  const mangoAccounts = await client.getAllMangoAccounts(group, true);
+  const allMangoAccounts = await client.getAllMangoAccounts(group, true);
+
+  const stepSize = 1;
+
   const ttlLiqorEquityUi = await getTotalLiqorEquity(
     client,
     group,
-    mangoAccounts,
+    allMangoAccounts,
   );
 
   const midPriceImpacts = getMidPriceImpacts(group.pis);
 
+  const pisForLiqor: LiqorPriceImpact[][] = [];
+  // eslint-disable-next-line no-constant-condition
+  if (false) {
+    const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
+      group,
+      allMangoAccounts,
+      stepSize,
+    );
+  }
+
+  // eslint-disable-next-line no-constant-condition
+  if (false) {
+    // Deposit limits header
+    console.log(
+      `${'name'.padStart(20)} ${'maxLiqBatchUi'.padStart(
+        15,
+      )} ${'maxLiqBatchUi'.padStart(15)} ${'sellImpact'.padStart(
+        12,
+      )}$ ${'pi %'.padStart(12)}% ${'aNDUi'.padStart(
+        20,
+      )}${'aNDQuoteUi'.padStart(20)} ${'uiDeposits'.padStart(
+        12,
+      )} ${'uiDeposits'.padStart(12)} ${'depositLimitsUi'.padStart(12)}`,
+    );
+  }
+
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
+    .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
+      const builder = Builder(NullTokenEditParams);
+      let change = false;
+
       try {
+        const tier = Object.values(LISTING_PRESETS).find((x) =>
+          x.initLiabWeight.toFixed(1) === '1.8'
+            ? x.initLiabWeight.toFixed(1) ===
+                bank?.initLiabWeight.toNumber().toFixed(1) &&
+              x.reduceOnly === bank.reduceOnly
+            : x.initLiabWeight.toFixed(1) ===
+              bank?.initLiabWeight.toNumber().toFixed(1),
+        );
+
+        // eslint-disable-next-line no-constant-condition
+        if (true) {
+          if (
+            bank.uiBorrows() == 0 &&
+            bank.reduceOnly == 2 &&
+            bank.initAssetWeight.toNumber() == 0 &&
+            bank.maintAssetWeight.toNumber() == 0
+          ) {
+            builder.disableAssetLiquidation(true);
+            builder.oracleConfig({
+              confFilter: 1000,
+              maxStalenessSlots: -1,
+            });
+            change = true;
+          }
+        }
+
+        // // eslint-disable-next-line no-constant-condition
+        // if (true) {
+        //   if (bank.uiBorrows() == 0 && bank.reduceOnly == 1) {
+        //     builder.disableAssetLiquidation(true);
+        //     builder.forceWithdraw(true);
+        //     change = true;
+        //   }
+        // }
+
+        // // eslint-disable-next-line no-constant-condition
+        // if (true) {
+        //   if (!tier) {
+        //     console.log(`${bank.name}, no tier found`);
+        //   } else if (tier.preset_name != 'C') {
+        //     if (tier.preset_name.includes('A')) {
+        //       builder.liquidationFee(bank.liquidationFee.toNumber() * 0.2);
+        //       builder.platformLiquidationFee(
+        //         bank.liquidationFee.toNumber() * 0.8,
+        //       );
+        //     } else if (tier.preset_name.includes('B')) {
+        //       builder.liquidationFee(bank.liquidationFee.toNumber() * 0.4);
+        //       builder.platformLiquidationFee(
+        //         bank.liquidationFee.toNumber() * 0.6,
+        //       );
+        //     }
+        //     change = true;
+        //   }
+        // }
+
+        // eslint-disable-next-line no-constant-condition
+        // if (true) {
+        //   if (!tier) {
+        //     console.log(`${bank.name}, no tier found`);
+        //   } else {
+        //     console.log(
+        //       `${bank.name.padStart(10)}, ${bank.loanFeeRate
+        //         .mul(I80F48.fromNumber(100))
+        //         .toFixed(2)}, ${bank.loanOriginationFeeRate
+        //         .mul(I80F48.fromNumber(100))
+        //         .toFixed(2)}, ${tier?.preset_name.padStart(5)}, ${(
+        //         tier.loanFeeRate * 100
+        //       ).toFixed(2)}, ${(tier!.loanOriginationFeeRate * 100).toFixed(2)}`,
+        //     );
+
+        //     builder.loanFeeRate(tier!.loanFeeRate);
+        //     builder.loanOriginationFeeRate(tier!.loanOriginationFeeRate);
+        //     builder.flashLoanSwapFeeRate(tier!.loanOriginationFeeRate);
+        //     change = true;
+        //   }
+        // }
+
         // formulas are sourced from here
         // https://www.notion.so/mango-markets/Mango-v4-Risk-parameter-recommendations-d309cdf5faac4aeea7560356e68532ab
 
@@ -157,10 +276,9 @@ async function updateTokenParams(): Promise<void> {
         //   4 * priceImpact.target_amount,
         // );
 
-        const builder = Builder(NullTokenEditParams);
-
-        // if (true) {
-        if (!bank.areBorrowsReduceOnly()) {
+        // eslint-disable-next-line no-constant-condition
+        if (false) {
+          // Net borrow limits
           const netBorrowLimitPerWindowQuote = Math.max(
             10_000,
             Math.min(bank.uiDeposits() * bank.uiPrice, 300_000) / 3 +
@@ -169,10 +287,11 @@ async function updateTokenParams(): Promise<void> {
           builder.netBorrowLimitPerWindowQuote(
             toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
           );
+          change = true;
           if (
             netBorrowLimitPerWindowQuote !=
             toUiDecimalsForQuote(bank.netBorrowLimitPerWindowQuote)
-          )
+          ) {
             console.log(
               `${
                 bank.name
@@ -180,9 +299,77 @@ async function updateTokenParams(): Promise<void> {
                 bank.netBorrowLimitPerWindowQuote,
               ).toLocaleString()}`,
             );
+          }
+        }
+
+        // Deposit limits
+        // eslint-disable-next-line no-constant-condition
+        if (false) {
+          if (bank.maintAssetWeight.toNumber() > 0) {
+            {
+              // Find asset's largest batch in $ we would need to liquidate, batches are extreme points of a range of price drop,
+              // range is constrained by leverage provided
+              // i.e. how much volatility we expect
+              const r = findLargestAssetBatchUi(
+                pisForLiqor,
+                bank.name,
+                Math.round(bank.maintAssetWeight.toNumber() * 100),
+                100 - Math.round(bank.maintAssetWeight.toNumber() * 100),
+                stepSize,
+              );
+
+              const maxLiqBatchQuoteUi = r[0];
+              const maxLiqBatchUi = r[1];
+
+              const sellImpact = getPriceImpactForBank(
+                midPriceImpacts,
+                bank,
+                (bank.liquidationFee.toNumber() * 100) / 2,
+              );
+
+              // Deposit limit = sell impact - largest batch
+              const allowedNewDepositsQuoteUi =
+                sellImpact.target_amount - maxLiqBatchQuoteUi;
+              const allowedNewDepositsUi =
+                sellImpact.target_amount / bank.uiPrice -
+                maxLiqBatchQuoteUi / bank.uiPrice;
+
+              const depositLimitUi = bank.uiDeposits() + allowedNewDepositsUi;
+
+              // LOG
+              // console.log(
+              //   `${bank.name.padStart(20)} ${maxLiqBatchUi
+              //     .toLocaleString()
+              //     .padStart(15)} ${maxLiqBatchQuoteUi
+              //     .toLocaleString()
+              //     .padStart(15)}$ ${sellImpact.target_amount
+              //     .toLocaleString()
+              //     .padStart(12)}$ ${sellImpact.avg_price_impact_percent
+              //     .toLocaleString()
+              //     .padStart(12)}% ${allowedNewDepositsUi
+              //     .toLocaleString()
+              //     .padStart(20)}${allowedNewDepositsQuoteUi
+              //     .toLocaleString()
+              //     .padStart(20)}$ ${bank
+              //     .uiDeposits()
+              //     .toLocaleString()
+              //     .padStart(12)} ${(bank.uiDeposits() * bank.uiPrice)
+              //     .toLocaleString()
+              //     .padStart(12)}$ ${depositLimitUi
+              //     .toLocaleString()
+              //     .padStart(12)}`,
+              // );
+
+              builder.depositLimit(toNative(depositLimitUi, bank.mintDecimals));
+              change = true;
+            }
+          }
         }
 
         const params = builder.build();
+        console.log(
+          `${bank.name}, ${params.disableAssetLiquidation} ${params.oracleConfig?.maxStalenessSlots} ${params.oracleConfig?.confFilter}`,
+        );
 
         const ix = await client.program.methods
           .tokenEdit(
@@ -228,6 +415,9 @@ async function updateTokenParams(): Promise<void> {
             params.depositLimit,
             params.zeroUtilRate,
             params.platformLiquidationFee,
+            params.disableAssetLiquidation,
+            params.collateralFeePerDay,
+            params.forceWithdraw,
           )
           .accounts({
             group: group.publicKey,
@@ -235,6 +425,7 @@ async function updateTokenParams(): Promise<void> {
             admin: group.admin,
             mintInfo: group.mintInfosMapByTokenIndex.get(bank.tokenIndex)
               ?.publicKey,
+            fallbackOracle: PublicKey.default,
           })
           .remainingAccounts([
             {
@@ -253,7 +444,9 @@ async function updateTokenParams(): Promise<void> {
           throw simulated.value.logs;
         }
 
-        instructions.push(ix);
+        if (change) {
+          instructions.push(ix);
+        }
       } catch (error) {
         console.log(`....Skipping ${bank.name}, ${error}`);
       }
@@ -277,13 +470,17 @@ async function updateTokenParams(): Promise<void> {
 
   const walletSigner = wallet as never;
 
+  console.log(DRY_RUN);
+
   if (!DRY_RUN) {
     const proposalAddress = await createProposal(
       client.connection,
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk parameters for tokens',
+      PROPOSAL_TITLE
+        ? PROPOSAL_TITLE
+        : 'Disable asset liquidation for C tier tokens in mango-v4, part 2',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,

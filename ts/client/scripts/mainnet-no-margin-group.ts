@@ -143,6 +143,7 @@ async function registerTokens(): Promise<void> {
     group,
     usdcMainnetMint,
     usdcMainnetOracle,
+    PublicKey.default,
     0,
     'USDC',
     defaultTokenParams,

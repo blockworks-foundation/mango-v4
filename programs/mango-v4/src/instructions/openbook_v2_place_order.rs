@@ -6,6 +6,7 @@ use crate::instructions::{apply_vault_difference, OODifference};
 use crate::logs::OpenbookV2OpenOrdersBalanceLog;
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
+use crate::util::clock_now;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 use openbook_v2::cpi::Return;
@@ -65,7 +66,9 @@ pub fn openbook_v2_place_order(
     // Validate bank and vault #3
     let group_key = ctx.accounts.group.key();
     let mut account = ctx.accounts.account.load_full_mut()?;
-    let retriever = new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
+    let (now_ts, now_slot) = clock_now();
+    let retriever =
+        new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
 
     let (_, _, payer_active_index) = account.ensure_token_position(payer_token_index)?;
     let (_, _, receiver_active_index) = account.ensure_token_position(receiver_token_index)?;
@@ -90,7 +93,6 @@ pub fn openbook_v2_place_order(
     //
     // Pre-health computation
     //
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
     let mut health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
         .context("pre-withdraw init health")?;
     let pre_health_opt = if !account.fixed.is_in_health_region() {

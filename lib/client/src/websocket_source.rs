@@ -11,11 +11,11 @@ use solana_rpc::rpc_pubsub::RpcSolPubSubClient;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
 
 use anyhow::Context;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio_stream::StreamMap;
 use tracing::*;
 
-use crate::account_update_stream::{AccountUpdate, Message};
+use crate::account_update_stream::{AccountUpdate, ChainSlotUpdate, Message};
 use crate::AnyhowWrap;
 
 pub struct Config {
@@ -143,7 +143,10 @@ async fn feed_data(
             },
             message = slot_sub.next() => {
                 if let Some(data) = message {
-                    sender.send(Message::Slot(data.map_err_anyhow()?)).await.expect("sending must succeed");
+                    sender.send(Message::Slot(ChainSlotUpdate{
+                        slot_update: data.map_err_anyhow()?,
+                        reception_time: Instant::now()
+                    })).await.expect("sending must succeed");
                 } else {
                     warn!("slot update stream closed");
                     return Ok(());
@@ -200,7 +203,7 @@ pub async fn get_next_create_bank_slot(
         match msg {
             Message::Slot(slot_update) => {
                 if let solana_client::rpc_response::SlotUpdate::CreatedBank { slot, .. } =
-                    *slot_update
+                    *slot_update.slot_update
                 {
                     return Ok(slot);
                 }

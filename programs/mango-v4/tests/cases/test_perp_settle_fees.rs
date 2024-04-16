@@ -166,52 +166,40 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -100_020.0,
         0.01
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         100_000.0,
         0.01
-    ));
+    );
 
     // Cannot settle position that does not exist
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market: perp_market_2,
             max_settle_amount: u64::MAX,
         },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::PerpPositionDoesNotExist.into(),
-        "Cannot settle a position that does not exist".to_string(),
+        MangoError::PerpPositionDoesNotExist
     );
 
     // max_settle_amount must be greater than zero
-    let result = send_tx(
+    send_tx_expect_error!(
         solana,
         PerpSettleFeesInstruction {
             account: account_1,
             perp_market: perp_market,
             max_settle_amount: 0,
         },
-    )
-    .await;
-
-    assert_mango_error(
-        &result,
-        MangoError::MaxSettleAmountMustBeGreaterThanZero.into(),
-        "max_settle_amount must be greater than zero".to_string(),
+        MangoError::MaxSettleAmountMustBeGreaterThanZero
     );
 
     // TODO: Test funding settlement
@@ -247,20 +235,20 @@ async fn test_perp_settle_fees() -> Result<(), TransportError> {
     // No change
     {
         let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             mango_account_0.perps[0]
                 .unsettled_pnl(&perp_market, I80F48::from(1200))
                 .unwrap(),
             19980.0, // 1*100*(1200-1000) - (20 in fees)
             0.01
-        ));
-        assert!(assert_equal(
+        );
+        assert_eq_fixed_f64!(
             mango_account_1.perps[0]
                 .unsettled_pnl(&perp_market, I80F48::from(1200))
                 .unwrap(),
             -20000.0,
             0.01
-        ));
+        );
     }
 
     // TODO: Difficult to test health due to fees being so small. Need alternative

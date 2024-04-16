@@ -28,6 +28,9 @@ use crate::state::{Bank, MangoAccountRef, PerpMarket, PerpMarketIndex, TokenInde
 ///   are passed because health needs to be computed for different baskets in
 ///   one instruction (such as for liquidation instructions).
 pub trait AccountRetriever {
+    /// Returns the token indexes of the available banks. Unordered and may have duplicates.
+    fn available_banks(&self) -> Result<Vec<TokenIndex>>;
+
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
@@ -52,11 +55,12 @@ pub trait AccountRetriever {
 
 /// Assumes the account infos needed for the health computation follow a strict order.
 ///
-/// 1. n_banks Bank account, in the order of account.token_iter_active()
+/// 1. n_banks Bank account, in the order of account.active_token_positions() although it's
+///    allowed for some of the banks (and their oracles in 2.) to be skipped
 /// 2. n_banks oracle accounts, one for each bank in the same order
-/// 3. PerpMarket accounts, in the order of account.perps.iter_active_accounts()
+/// 3. PerpMarket accounts, in the order of account.perps.active_perp_positions()
 /// 4. PerpMarket oracle accounts, in the order of the perp market accounts
-/// 5. serum3 OpenOrders accounts, in the order of account.serum3.iter_active()
+/// 5. serum3 OpenOrders accounts, in the order of account.active_serum3_orders()
 /// 6. fallback oracle accounts, order and existence of accounts is not guaranteed
 pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub ais: Vec<T>,
@@ -71,22 +75,69 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub sol_oracle_index: Option<usize>,
 }
 
+/// Creates a FixedOrderAccountRetriever where all banks are present
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
+    now_slot: u64,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_token_len = account.active_token_positions().count();
+
+    // Load the banks early to verify them
+    for ai in &ais[0..active_token_len] {
+        ai.load::<Bank>()?;
+    }
+
+    new_fixed_order_account_retriever_inner(ais, account, now_slot, active_token_len)
+}
+
+/// A FixedOrderAccountRetriever with n_banks <= active_token_positions().count(),
+/// depending on which banks were passed.
+///
+/// Note that this does not eagerly validate that the right accounts were passed. That
+/// validation happens only when banks, perps etc are requested.
+pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccountRef,
+    now_slot: u64,
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
+    // Scan for the number of banks provided
+    let mut n_banks = 0;
+    for ai in ais {
+        if let Some((_, bank_result)) = can_load_as::<Bank>((0, ai)) {
+            bank_result?;
+            n_banks += 1;
+        } else {
+            break;
+        }
+    }
+
+    let active_token_len = account.active_token_positions().count();
+    require_gte!(active_token_len, n_banks);
+
+    new_fixed_order_account_retriever_inner(ais, account, now_slot, n_banks)
+}
+
+pub fn new_fixed_order_account_retriever_inner<'a, 'info>(
+    ais: &'a [AccountInfo<'info>],
+    account: &MangoAccountRef,
+    now_slot: u64,
+    n_banks: usize,
+) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_serum3_len = account.active_serum3_orders().count();
     let active_openbook_v2_len = account.active_openbook_v2_orders().count();
     let active_perp_len = account.active_perp_positions().count();
-    let expected_ais = active_token_len * 2 // banks + oracles
+    let expected_ais = n_banks * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
         + active_serum3_len // open_orders
         + active_openbook_v2_len; // open_orders
     require_msg_typed!(ais.len() >= expected_ais, MangoError::InvalidHealthAccountCount,
-        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos {} obv2 oos)",
+        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos, {} obv2 oos)",
         ais.len(), expected_ais,
-        active_token_len, active_token_len, active_perp_len, active_perp_len, active_serum3_len, active_openbook_v2_len
+        n_banks, n_banks, active_perp_len, active_perp_len, active_serum3_len, active_openbook_v2_len
     );
     let usdc_oracle_index = ais[..]
         .iter()
@@ -97,12 +148,12 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 
     Ok(FixedOrderAccountRetriever {
         ais: AccountInfoRef::borrow_slice(ais)?,
-        n_banks: active_token_len,
+        n_banks,
         n_perps: active_perp_len,
-        begin_perp: active_token_len * 2,
-        begin_serum3: active_token_len * 2 + active_perp_len * 2,
-        begin_openbook_v2: active_token_len * 2 + active_perp_len * 2 + active_serum3_len,
-        staleness_slot: Some(Clock::get()?.slot),
+        begin_perp: n_banks * 2,
+        begin_serum3: n_banks * 2 + active_perp_len * 2,
+        begin_openbook_v2: n_banks * 2 + active_perp_len * 2 + active_serum3_len,
+        staleness_slot: Some(now_slot),
         begin_fallback_oracles: expected_ais,
         usdc_oracle_index,
         sol_oracle_index,
@@ -110,11 +161,28 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 }
 
 impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
-    fn bank(&self, group: &Pubkey, account_index: usize, token_index: TokenIndex) -> Result<&Bank> {
-        let bank = self.ais[account_index].load::<Bank>()?;
-        require_keys_eq!(bank.group, *group);
-        require_eq!(bank.token_index, token_index);
-        Ok(bank)
+    fn bank(
+        &self,
+        group: &Pubkey,
+        active_token_position_index: usize,
+        token_index: TokenIndex,
+    ) -> Result<(usize, &Bank)> {
+        // Maybe not all banks were passed: The desired bank must be at or
+        // to the left of account_index and left of n_banks.
+        let end_index = (active_token_position_index + 1).min(self.n_banks);
+        for i in (0..end_index).rev() {
+            let ai = &self.ais[i];
+            let bank = ai.load_fully_unchecked::<Bank>()?;
+            if bank.token_index == token_index {
+                require_keys_eq!(bank.group, *group);
+                return Ok((i, bank));
+            }
+        }
+        Err(error_msg_typed!(
+            MangoError::InvalidHealthAccountCount,
+            "bank for token index {} not found",
+            token_index
+        ))
     }
 
     fn perp_market(
@@ -157,25 +225,25 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
 }
 
 impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>> {
+        let mut result = Vec::with_capacity(self.n_banks);
+        for bank_ai in &self.ais[0..self.n_banks] {
+            let bank = bank_ai.load_fully_unchecked::<Bank>()?;
+            result.push(bank.token_index);
+        }
+        Ok(result)
+    }
+
     fn bank_and_oracle(
         &self,
         group: &Pubkey,
         active_token_position_index: usize,
         token_index: TokenIndex,
     ) -> Result<(&Bank, I80F48)> {
-        let bank_account_index = active_token_position_index;
-        let bank = self
-            .bank(group, bank_account_index, token_index)
-            .with_context(|| {
-                format!(
-                    "loading bank with health account index {}, token index {}, passed account {}",
-                    bank_account_index,
-                    token_index,
-                    self.ais[bank_account_index].key(),
-                )
-            })?;
+        let (bank_account_index, bank) =
+            self.bank(group, active_token_position_index, token_index)?;
 
-        let oracle_index = self.n_banks + active_token_position_index;
+        let oracle_index = self.n_banks + bank_account_index;
         let oracle_acc_infos = &self.create_oracle_infos(oracle_index, &bank.fallback_oracle);
         let oracle_price_result = bank.oracle_price(oracle_acc_infos, self.staleness_slot);
         let oracle_price = oracle_price_result.with_context(|| {
@@ -557,6 +625,10 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 }
 
 impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
+    fn available_banks(&self) -> Result<Vec<TokenIndex>> {
+        Ok(self.banks_and_oracles.index_map.keys().copied().collect())
+    }
+
     fn bank_and_oracle(
         &self,
         _group: &Pubkey,
@@ -586,6 +658,8 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
 
 #[cfg(test)]
 mod tests {
+    use crate::state::{MangoAccount, MangoAccountValue};
+
     use super::super::test::*;
     use super::*;
     use openbook_v2::state::OpenOrdersAccount;
@@ -723,5 +797,99 @@ mod tests {
         assert!(retriever
             .perp_market_and_oracle_price(&group, 1, 5)
             .is_err());
+    }
+
+    #[test]
+    fn test_fixed_account_retriever_with_skips() {
+        let group = Pubkey::new_unique();
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 10, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 20, 2.0, 0.2, 0.1);
+        let (mut bank3, mut oracle3) = mock_bank_and_oracle(group, 30, 3.0, 0.2, 0.1);
+
+        let mut perp1 = mock_perp_market(group, oracle2.pubkey, 2.0, 9, (0.2, 0.1), (0.05, 0.02));
+        let mut oracle2_clone = oracle2.clone();
+
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        account.ensure_token_position(10).unwrap();
+        account.ensure_token_position(20).unwrap();
+        account.ensure_token_position(30).unwrap();
+        account.ensure_perp_position(9, 10).unwrap();
+
+        // pass all
+        {
+            let ais = vec![
+                bank1.as_account_info(),
+                bank2.as_account_info(),
+                bank3.as_account_info(),
+                oracle1.as_account_info(),
+                oracle2.as_account_info(),
+                oracle3.as_account_info(),
+                perp1.as_account_info(),
+                oracle2_clone.as_account_info(),
+            ];
+            let retriever =
+                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
+                    .unwrap();
+            assert_eq!(retriever.available_banks(), Ok(vec![10, 20, 30]));
+
+            let (i, bank) = retriever.bank(&group, 0, 10).unwrap();
+            assert_eq!(i, 0);
+            assert_eq!(bank.token_index, 10);
+
+            let (i, bank) = retriever.bank(&group, 1, 20).unwrap();
+            assert_eq!(i, 1);
+            assert_eq!(bank.token_index, 20);
+
+            let (i, bank) = retriever.bank(&group, 2, 30).unwrap();
+            assert_eq!(i, 2);
+            assert_eq!(bank.token_index, 30);
+
+            assert!(retriever.perp_market(&group, 6, 9).is_ok());
+        }
+
+        // skip bank2
+        {
+            let ais = vec![
+                bank1.as_account_info(),
+                bank3.as_account_info(),
+                oracle1.as_account_info(),
+                oracle3.as_account_info(),
+                perp1.as_account_info(),
+                oracle2_clone.as_account_info(),
+            ];
+            let retriever =
+                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
+                    .unwrap();
+            assert_eq!(retriever.available_banks(), Ok(vec![10, 30]));
+
+            let (i, bank) = retriever.bank(&group, 0, 10).unwrap();
+            assert_eq!(i, 0);
+            assert_eq!(bank.token_index, 10);
+
+            let (i, bank) = retriever.bank(&group, 2, 30).unwrap();
+            assert_eq!(i, 1);
+            assert_eq!(bank.token_index, 30);
+
+            assert!(retriever.bank(&group, 1, 20).is_err());
+
+            assert!(retriever.perp_market(&group, 4, 9).is_ok());
+        }
+
+        // skip all
+        {
+            let ais = vec![perp1.as_account_info(), oracle2_clone.as_account_info()];
+            let retriever =
+                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
+                    .unwrap();
+            assert_eq!(retriever.available_banks(), Ok(vec![]));
+
+            assert!(retriever.bank(&group, 0, 10).is_err());
+            assert!(retriever.bank(&group, 1, 20).is_err());
+            assert!(retriever.bank(&group, 2, 30).is_err());
+
+            assert!(retriever.perp_market(&group, 0, 9).is_ok());
+        }
     }
 }

@@ -31,6 +31,7 @@ export interface TokenRegisterParams {
   zeroUtilRate: number;
   platformLiquidationFee: number;
   disableAssetLiquidation: boolean;
+  collateralFeePerDay: number;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -48,7 +49,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
     adjustmentFactor: 0.004,
   },
   loanFeeRate: 0.0005,
-  loanOriginationFeeRate: 0.005,
+  loanOriginationFeeRate: 0.0075,
   maintAssetWeight: 0,
   initAssetWeight: 0,
   maintLiabWeight: 1.4,
@@ -72,6 +73,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   zeroUtilRate: 0.0,
   platformLiquidationFee: 0.0,
   disableAssetLiquidation: false,
+  collateralFeePerDay: 0.0,
 };
 
 export interface TokenEditParams {
@@ -114,6 +116,8 @@ export interface TokenEditParams {
   zeroUtilRate: number | null;
   platformLiquidationFee: number | null;
   disableAssetLiquidation: boolean | null;
+  collateralFeePerDay: number | null;
+  forceWithdraw: boolean | null;
 }
 
 export const NullTokenEditParams: TokenEditParams = {
@@ -156,6 +160,8 @@ export const NullTokenEditParams: TokenEditParams = {
   zeroUtilRate: null,
   platformLiquidationFee: null,
   disableAssetLiquidation: null,
+  collateralFeePerDay: null,
+  forceWithdraw: null,
 };
 
 export interface PerpEditParams {
@@ -303,6 +309,10 @@ export interface IxGateParams {
   TokenConditionalSwapCreatePremiumAuction: boolean;
   TokenConditionalSwapCreateLinearAuction: boolean;
   Serum3PlaceOrderV2: boolean;
+  TokenForceWithdraw: boolean;
+  SequenceCheck: boolean;
+  HealthCheck: boolean;
+  OpenbookV2CancelAllOrders: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -382,6 +392,10 @@ export const TrueIxGateParams: IxGateParams = {
   TokenConditionalSwapCreatePremiumAuction: true,
   TokenConditionalSwapCreateLinearAuction: true,
   Serum3PlaceOrderV2: true,
+  TokenForceWithdraw: true,
+  SequenceCheck: true,
+  HealthCheck: true,
+  OpenbookV2CancelAllOrders: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -471,6 +485,10 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenConditionalSwapCreatePremiumAuction', 69);
   toggleIx(ixGate, p, 'TokenConditionalSwapCreateLinearAuction', 70);
   toggleIx(ixGate, p, 'Serum3PlaceOrderV2', 71);
+  toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
+  toggleIx(ixGate, p, 'SequenceCheck', 73);
+  toggleIx(ixGate, p, 'HealthCheck', 74);
+  toggleIx(ixGate, p, 'OpenbookV2CancelAllOrders', 75);
 
   return ixGate;
 }

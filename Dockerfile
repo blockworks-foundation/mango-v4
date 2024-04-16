@@ -1,9 +1,7 @@
 # syntax = docker/dockerfile:1.2
 # Base image containing all binaries, deployed to ghcr.io/blockworks-foundation/mango-v4:latest
-FROM rust:1.70.0-bullseye as base
-RUN cargo install cargo-chef --locked
-RUN rustup component add rustfmt
-RUN apt-get update && apt-get -y install clang cmake
+FROM lukemathwalker/cargo-chef:latest-rust-1.69-slim-bullseye as base
+RUN apt-get update && apt-get -y install clang cmake perl libfindbin-libs-perl
 WORKDIR /app
 
 FROM base as plan
@@ -27,6 +25,7 @@ COPY --from=build /app/target/release/service-mango-* /usr/local/bin/
 COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
 COPY --from=build /app/bin/service-mango-fills/conf/template-config.toml ./fills-config.toml
 COPY --from=build /app/bin/service-mango-orderbook/conf/template-config.toml ./orderbook-config.toml
+COPY --from=build /app/bin/service-mango-health/conf/template-config.toml ./health-config.toml
 
 COPY --from=build /app/bin/service-mango-pnl/conf/template-config.toml ./pnl-config.toml
 COPY --from=build /app/bin/service-mango-fills/conf//template-config.toml ./fills-config.toml

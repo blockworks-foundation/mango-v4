@@ -7,23 +7,24 @@
   - 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg is the address of the Mango v4 Program
   - FP4PxqHTVzeG2c6eZd7974F9WvKUSdBeduUK3rjYyvBw is the address of the Mango v4 Program Governance
 
-- Check out the latest version of the `dev` branch
+- Assuming there's a release branch (like release/program-v0.22.0)
+  with a completed audit and an updated changelog.
 
-- Update the changelog
-
-  git log program-v0.11.0..HEAD -- programs/mango-v4/
+- Check out the release branch
 
 - Make sure the version is bumped in programs/mango-v4/Cargo.toml
 
-- Update the idl ./update-local-idl.sh
+- Update the idl ./update-local-idl.sh and verify that there's no difference
 
-- Run the tests to double check
+- Run the tests to double check there are no failures
 
-- Tag and push
+- Tag (`git tag program-v0.xy.z HEAD`) and push it (`git push <tag>`)
 
 - Do a verifiable build
 
-  anchor build --verifiable --solana-version 1.14.13 -- --features enable-gpl
+  Set GITHUB_SHA and GITHUB_REF_NAME to the release sha1 and tag name.
+
+  anchor build --verifiable --docker-image backpackapp/build:v0.28.0 --solana-version 1.16.14 --env GITHUB_SHA --env GITHUB_REF_NAME -- --features enable-gpl
 
   (or wait for github to finish and create the release)
 

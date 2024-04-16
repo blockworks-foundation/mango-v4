@@ -2,9 +2,10 @@ use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
-use crate::health::{new_fixed_order_account_retriever, new_health_cache, AccountRetriever};
+use crate::health::*;
 use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
 use crate::state::*;
+use crate::util::clock_now;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::sysvar::instructions as tx_instructions;
@@ -368,8 +369,9 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     // all vaults must have had matching banks
     for (i, has_bank) in vaults_with_banks.iter().enumerate() {
-        require_msg!(
+        require_msg_typed!(
             has_bank,
+            MangoError::InvalidBank,
             "missing bank for vault index {}, address {}",
             i,
             vaults[i].key
@@ -378,21 +380,35 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
     match flash_loan_type {
         FlashLoanType::Unknown => {}
-        FlashLoanType::Swap => {
+        FlashLoanType::Swap | FlashLoanType::SwapWithoutFee => {
             require_msg!(
                 changes.len() == 2,
-                "when flash_loan_type is Swap there must be exactly 2 token vault changes"
+                "when flash_loan_type is Swap or SwapWithoutFee there must be exactly 2 token vault changes"
             )
         }
     }
 
     // Check health before balance adjustments
-    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
-    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+    // The vault-to-bank matching above ensures that the banks for the affected tokens are available.
+    let (now_ts, now_slot) = clock_now();
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        health_ais,
+        &account.borrow(),
+        now_slot,
+    )?;
+    let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )?;
+
     let pre_init_health = account.check_health_pre(&health_cache)?;
 
     // Prices for logging and net borrow checks
+    //
+    // This also verifies that all affected banks/oracles are available in health_cache:
+    // That is essential to avoid issues around withdrawing tokens when init health is negative
+    // (similar issue to token_withdraw)
     let mut oracle_prices = vec![];
     for change in &changes {
         let (_, oracle_price) = retriever.bank_and_oracle(
@@ -400,6 +416,8 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             change.bank_index,
             change.token_index,
         )?;
+        // Sanity check
+        health_cache.token_info_index(change.token_index)?;
 
         oracle_prices.push(oracle_price);
     }
@@ -502,8 +520,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     });
 
     // Check health after account position changes
-    let retriever = new_fixed_order_account_retriever(health_ais, &account.borrow())?;
-    let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)?;
+    let retriever = new_fixed_order_account_retriever_with_optional_banks(
+        health_ais,
+        &account.borrow(),
+        now_slot,
+    )?;
+    let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+        &account.borrow(),
+        &retriever,
+        now_ts,
+    )?;
     account.check_health_post(&health_cache, pre_init_health)?;
 
     // Deactivate inactive token accounts after health check

@@ -73,19 +73,25 @@ async function addSpotMarket() {
   const marketPk = new PublicKey(
     [...group.openbookV2ExternalMarketsMap.keys()][0],
   );
-  console.log('tokenDeposit', await client.tokenDeposit(group, account, quoteMint, 1000));
-  console.log('placeOrder', await client.openbookV2PlaceOrder(
-    group,
-    account,
-    marketPk,
-    OpenbookV2Side.bid,
-    1,
-    1,
-    Serum3SelfTradeBehavior.decrementTake,
-    Serum3OrderType.limit,
-    420,
-    32,
-  ));
+  console.log(
+    'tokenDeposit',
+    await client.tokenDeposit(group, account, quoteMint, 1000),
+  );
+  console.log(
+    'placeOrder',
+    await client.openbookV2PlaceOrder(
+      group,
+      account,
+      marketPk,
+      OpenbookV2Side.bid,
+      1,
+      1,
+      Serum3SelfTradeBehavior.decrementTake,
+      Serum3OrderType.limit,
+      420,
+      32,
+    ),
+  );
 
   process.exit();
 }

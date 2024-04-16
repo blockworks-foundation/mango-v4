@@ -707,11 +707,11 @@ async fn test_openbook_settle_to_dao() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         quote_fees_end - quote_fees_start,
         (lof + openbook_referrer_fee(amount)) as f64,
         0.1
-    ));
+    );
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(
@@ -800,11 +800,7 @@ async fn test_openbook_settle_to_account() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
-        quote_fees_end - quote_fees_start,
-        lof as f64,
-        0.1
-    ));
+    assert_eq_fixed_f64!(quote_fees_end - quote_fees_start, lof as f64, 0.1);
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(account_data.buyback_fees_accrued_current, 0);

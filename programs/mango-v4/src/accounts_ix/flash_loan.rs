@@ -92,6 +92,12 @@ pub struct FlashLoanEnd<'info> {
 #[derive(PartialEq, Copy, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
 #[repr(u8)]
 pub enum FlashLoanType {
+    /// An arbitrary flash loan
     Unknown,
+    /// A flash loan used for a swap where one token is exchanged for another.
+    ///
+    /// Deposits in this type get charged the flash_loan_swap_fee_rate
     Swap,
+    /// Like Swap, but without the flash_loan_swap_fee_rate
+    SwapWithoutFee,
 }

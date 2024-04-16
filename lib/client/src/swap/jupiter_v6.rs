@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::time::Duration;
 
 use anchor_lang::prelude::Pubkey;
 use serde::{Deserialize, Serialize};
@@ -72,13 +73,7 @@ pub struct SwapRequest {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SwapResponse {
-    pub swap_transaction: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct SwapInstructionsResponse {
+pub struct JupiterSwapInstructionsResponse {
     pub token_ledger_instruction: Option<InstructionResponse>,
     pub compute_budget_instructions: Option<Vec<InstructionResponse>>,
     pub setup_instructions: Option<Vec<InstructionResponse>>,
@@ -139,6 +134,7 @@ impl TryFrom<&AccountMeta> for solana_sdk::instruction::AccountMeta {
 
 pub struct JupiterV6<'a> {
     pub mango_client: &'a MangoClient,
+    pub timeout_duration: Duration,
 }
 
 impl<'a> JupiterV6<'a> {
@@ -204,6 +200,7 @@ impl<'a> JupiterV6<'a> {
             .http_client
             .get(format!("{}/quote", config.jupiter_v6_url))
             .query(&query_args)
+            .timeout(self.timeout_duration)
             .send()
             .await
             .context("quote request to jupiter")?;
@@ -290,11 +287,12 @@ impl<'a> JupiterV6<'a> {
                 destination_token_account: None, // default to user ata
                 quote_response: quote.clone(),
             })
+            .timeout(self.timeout_duration)
             .send()
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: SwapInstructionsResponse = util::http_error_handling(swap_response)
+        let swap: JupiterSwapInstructionsResponse = util::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 

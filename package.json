@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.21.8",
+  "version": "0.23.1",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -63,7 +63,8 @@
     "trailingComma": "all"
   },
   "dependencies": {
-    "@blockworks-foundation/mango-v4-settings": "^0.2.16",
+    "@blockworks-foundation/mango-v4-settings": "0.14.15",
+    "@blockworks-foundation/mangolana": "0.0.14",
     "@coral-xyz/anchor": "^0.29.0",
     "@openbook-dex/openbook-v2": "^0.1.2",
     "@project-serum/serum": "0.13.65",
@@ -76,13 +77,15 @@
     "bs58": "^5.0.0",
     "cross-fetch": "^3.1.5",
     "dotenv": "^16.0.3",
+    "fast-copy": "^3.0.1",
     "lodash": "^4.17.21",
     "node-kraken-api": "^2.2.2"
   },
   "resolutions": {
     "@coral-xyz/anchor": "^0.29.0",
     "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
-    "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11"
+    "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
+    "**/@blockworks-foundation/mangolana/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11"
   },
   "license": "MIT"
 }

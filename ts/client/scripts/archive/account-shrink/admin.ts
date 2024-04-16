@@ -73,6 +73,7 @@ async function main(): Promise<void> {
       group,
       usdcDevnetMint,
       usdcDevnetOracle.publicKey,
+      PublicKey.default,
       0, // tokenIndex
       'USDC',
       {
@@ -101,6 +102,7 @@ async function main(): Promise<void> {
       group,
       solDevnetMint,
       solDevnetOracle,
+      PublicKey.default,
       4, // tokenIndex
       'SOL',
       {
@@ -130,6 +132,7 @@ async function main(): Promise<void> {
       group,
       usdtDevnetMint,
       usdcDevnetOracle.publicKey,
+      PublicKey.default,
       5, // tokenIndex
       'USDT',
       {
@@ -212,6 +215,7 @@ async function main(): Promise<void> {
         1.0,
         2 * 60 * 60,
         0.025,
+        0,
       );
       await group.reloadAll(client);
       const perpMarket = group.getPerpMarketByMarketIndex(

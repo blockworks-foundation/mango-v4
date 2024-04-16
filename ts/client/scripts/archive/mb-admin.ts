@@ -206,6 +206,7 @@ async function registerTokens() {
     group,
     usdcMainnetMint,
     usdcMainnetOracle.publicKey,
+    PublicKey.default,
     0,
     'USDC',
     {
@@ -226,6 +227,7 @@ async function registerTokens() {
     group,
     usdtMainnetMint,
     usdtMainnetOracle,
+    PublicKey.default,
     1,
     'USDT',
     {
@@ -246,6 +248,7 @@ async function registerTokens() {
     group,
     daiMainnetMint,
     daiMainnetOracle,
+    PublicKey.default,
     2,
     'DAI',
     {
@@ -266,6 +269,7 @@ async function registerTokens() {
     group,
     ethMainnetMint,
     ethMainnetOracle,
+    PublicKey.default,
     3,
     'ETH',
     {
@@ -286,6 +290,7 @@ async function registerTokens() {
     group,
     solMainnetMint,
     solMainnetOracle,
+    PublicKey.default,
     4,
     'SOL',
     {
@@ -306,6 +311,7 @@ async function registerTokens() {
     group,
     msolMainnetMint,
     msolMainnetOracle,
+    PublicKey.default,
     5,
     'MSOL',
     {
@@ -450,6 +456,7 @@ async function registerPerpMarkets() {
     1.0,
     2 * 60 * 60,
     0.025,
+    0,
   );
 
   await client.perpCreateMarket(
@@ -482,6 +489,7 @@ async function registerPerpMarkets() {
     1.0,
     2 * 60 * 60,
     0.2, // 20% positive pnl liquidation fee?
+    0,
   );
 }
 

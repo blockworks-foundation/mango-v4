@@ -12,7 +12,7 @@ use crate::state::*;
 pub const FREE_ORDER_SLOT: PerpMarketIndex = PerpMarketIndex::MAX;
 
 #[zero_copy]
-#[derive(AnchorDeserialize, AnchorSerialize, Derivative)]
+#[derive(AnchorDeserialize, AnchorSerialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct TokenPosition {
     // TODO: Why did we have deposits and borrows as two different values
@@ -110,7 +110,7 @@ impl TokenPosition {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct Serum3Orders {
     pub open_orders: Pubkey,
@@ -203,7 +203,7 @@ impl Default for Serum3Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct OpenbookV2Orders {
     pub open_orders: Pubkey,
@@ -305,7 +305,7 @@ impl Default for OpenbookV2Orders {
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
@@ -672,7 +672,7 @@ impl PerpPosition {
             .unwrap();
         let upnl_abs = upnl.abs().ceil().to_num::<i64>();
         self.recurring_settle_pnl_allowance =
-            self.recurring_settle_pnl_allowance.max(0).min(upnl_abs);
+            self.recurring_settle_pnl_allowance.min(upnl_abs).max(0);
 
         self.recurring_settle_pnl_allowance - before
     }
@@ -769,12 +769,21 @@ impl PerpPosition {
         }
 
         let base_native = self.base_position_native(market);
-        let position_value = (market.stable_price() * base_native).abs().to_num::<f64>();
-        let unrealized = (market.settle_pnl_limit_factor as f64 * position_value).clamp_to_i64();
+        let position_value = market.stable_price() * base_native;
+
+        let position_value_abs = position_value.abs().to_num::<f64>();
+        let unrealized =
+            (market.settle_pnl_limit_factor as f64 * position_value_abs).clamp_to_i64();
+
+        let upnl_abs = (self.quote_position_native() + position_value)
+            .abs()
+            .ceil()
+            .to_num::<i64>();
 
         let mut max_pnl = unrealized
-            // abs() because of potential migration
-            + self.recurring_settle_pnl_allowance.abs();
+            // .abs() because of potential migration
+            // .min() to do the same as apply_recurring_settle_pnl_allowance_constraint
+            + self.recurring_settle_pnl_allowance.abs().min(upnl_abs);
         let mut min_pnl = -max_pnl;
 
         let oneshot = self.oneshot_settle_pnl_allowance;
@@ -879,15 +888,21 @@ impl PerpPosition {
         self.oneshot_settle_pnl_allowance += change;
     }
 
-    /// Adds to the quote position and adds a recurring ("realized trade") settle limit
-    pub fn record_liquidation_pnl_takeover(&mut self, change: I80F48, recurring_limit: I80F48) {
+    /// Takes over a quote position along with recurring and oneshot settle limit allowance
+    pub fn record_liquidation_pnl_takeover(
+        &mut self,
+        change: I80F48,
+        recurring_limit: i64,
+        oneshot_limit: i64,
+    ) {
         self.change_quote_position(change);
-        self.recurring_settle_pnl_allowance += recurring_limit.abs().ceil().to_num::<i64>();
+        self.recurring_settle_pnl_allowance += recurring_limit;
+        self.oneshot_settle_pnl_allowance += I80F48::from(oneshot_limit);
     }
 }
 
 #[zero_copy]
-#[derive(AnchorSerialize, AnchorDeserialize, Derivative)]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct PerpOpenOrder {
     pub side_and_tree: u8, // SideAndOrderTree -- enums aren't POD
@@ -1503,6 +1518,14 @@ mod tests {
 
         pos.settle_pnl_limit_settled_in_current_window_native = 0;
         market.stable_price_model.stable_price = 1.0;
-        assert_eq!(pos.available_settle_limit(&market), (-31, 36));
+        // because the upnl is 0 the recurring allowance doesn't count
+        assert_eq!(
+            pos.unsettled_pnl(&market, I80F48::from_num(1.0)).unwrap(),
+            I80F48::ZERO
+        );
+        assert_eq!(pos.available_settle_limit(&market), (-20, 25));
+
+        pos.quote_position_native += I80F48::from(7);
+        assert_eq!(pos.available_settle_limit(&market), (-27, 32));
     }
 }

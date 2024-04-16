@@ -15,7 +15,8 @@ use futures::{stream, StreamExt};
 use solana_rpc::rpc::rpc_accounts::AccountsDataClient;
 use solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tokio::task::JoinHandle;
 use tokio::time;
 use tracing::*;
 
@@ -55,6 +56,7 @@ impl AccountSnapshot {
                     .account
                     .decode()
                     .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
+                reception_time: Instant::now(),
             });
         }
         Ok(())
@@ -74,6 +76,7 @@ impl AccountSnapshot {
                     account: ui_account
                         .decode()
                         .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
+                    reception_time: Instant::now(),
                 });
             }
         }
@@ -221,11 +224,15 @@ async fn feed_snapshots(
     Ok(())
 }
 
-pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::Sender<Message>) {
+pub fn start(
+    config: Config,
+    mango_oracles: Vec<Pubkey>,
+    sender: async_channel::Sender<Message>,
+) -> JoinHandle<()> {
     let mut poll_wait_first_snapshot = crate::delay_interval(time::Duration::from_secs(2));
     let mut interval_between_snapshots = crate::delay_interval(config.snapshot_interval);
 
-    tokio::spawn(async move {
+    let snapshot_job = tokio::spawn(async move {
         let rpc_client = http::connect_with_options::<MinimalClient>(&config.rpc_http_url, true)
             .await
             .expect("always Ok");
@@ -258,4 +265,6 @@ pub fn start(config: Config, mango_oracles: Vec<Pubkey>, sender: async_channel::
             };
         }
     });
+
+    snapshot_job
 }

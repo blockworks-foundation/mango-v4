@@ -8,7 +8,7 @@ import {
 import { toNativeI80F48 } from '../../src/utils';
 const { MB_CLUSTER_URL } = process.env;
 
-async function decodePrice(conn, ai): Promise<void> {
+async function decodePrice(conn, ai, pk): Promise<void> {
   let uiPrice, price, lastUpdatedSlot, type;
   if (isPythOracle(ai!)) {
     const priceData = parsePriceData(ai!.data);
@@ -17,7 +17,7 @@ async function decodePrice(conn, ai): Promise<void> {
     lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
     type = 'pyth';
   } else if (isSwitchboardOracle(ai!)) {
-    const priceData = await parseSwitchboardOracle(ai!, conn);
+    const priceData = await parseSwitchboardOracle(pk, ai!, conn);
     uiPrice = priceData.price;
     price = toNativeI80F48(uiPrice, 6 - 5);
     lastUpdatedSlot = priceData.lastUpdatedSlot;
@@ -31,16 +31,17 @@ async function decodePrice(conn, ai): Promise<void> {
 
 async function main(): Promise<void> {
   try {
+    const oraclePk1 = new PublicKey(
+      '4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE',
+    );
     const conn = new Connection(MB_CLUSTER_URL!);
-    let ai = await conn.getAccountInfo(
-      new PublicKey('4SZ1qb4MtSUrZcoeaeQ3BDzVCyqxw3VwSFpPiMTmn4GE'),
+    let ai = await conn.getAccountInfo(oraclePk1);
+    decodePrice(conn, ai, oraclePk1);
+    const oraclePk2 = new PublicKey(
+      '8ihFLu5FimgTQ1Unh4dVyEHUGodJ5gJQCrQf4KUVB9bN',
     );
-    decodePrice(conn, ai);
-
-    ai = await conn.getAccountInfo(
-      new PublicKey('8ihFLu5FimgTQ1Unh4dVyEHUGodJ5gJQCrQf4KUVB9bN'),
-    );
-    decodePrice(conn, ai);
+    ai = await conn.getAccountInfo(oraclePk2);
+    decodePrice(conn, ai, oraclePk2);
   } catch (error) {
     console.log(error);
   }

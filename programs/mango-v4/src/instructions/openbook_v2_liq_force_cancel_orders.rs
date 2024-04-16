@@ -10,6 +10,7 @@ use crate::logs::OpenbookV2OpenOrdersBalanceLog;
 use crate::serum3_cpi::OpenOrdersAmounts;
 use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
+use crate::util::clock_now;
 
 pub fn openbook_v2_liq_force_cancel_orders(
     ctx: Context<OpenbookV2LiqForceCancelOrders>,
@@ -52,14 +53,15 @@ pub fn openbook_v2_liq_force_cancel_orders(
         );
     }
 
+    let (now_ts, now_slot) = clock_now();
+
     //
     // Early return if if liquidation is not allowed or if market is not in force close
     //
     let mut health_cache = {
         let mut account = ctx.accounts.account.load_full_mut()?;
         let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
         let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
             .context("create health cache")?;
 

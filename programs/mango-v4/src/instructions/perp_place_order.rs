@@ -3,8 +3,9 @@ use anchor_lang::prelude::*;
 use crate::accounts_ix::*;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
-use crate::health::{new_fixed_order_account_retriever, new_health_cache};
+use crate::health::*;
 use crate::state::*;
+use crate::util::clock_now;
 
 // TODO
 #[allow(clippy::too_many_arguments)]
@@ -16,7 +17,7 @@ pub fn perp_place_order(
     require_gte!(order.max_base_lots, 0);
     require_gte!(order.max_quote_lots, 0);
 
-    let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
+    let (now_ts, now_slot) = clock_now();
     let oracle_price;
 
     // Update funding if possible.
@@ -66,10 +67,21 @@ pub fn perp_place_order(
     // Pre-health computation, _after_ perp position is created
     //
     let pre_health_opt = if !account.fixed.is_in_health_region() {
-        let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow())?;
-        let health_cache = new_health_cache(&account.borrow(), &retriever, now_ts)
-            .context("pre-withdraw init health")?;
+        let retriever = new_fixed_order_account_retriever_with_optional_banks(
+            ctx.remaining_accounts,
+            &account.borrow(),
+            now_slot,
+        )?;
+        let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
+            &account.borrow(),
+            &retriever,
+            now_ts,
+        )
+        .context("pre init health")?;
+
+        // The settle token banks/oracles must be passed and be valid
+        health_cache.token_info_index(settle_token_index)?;
+
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some((health_cache, pre_init_health))
     } else {

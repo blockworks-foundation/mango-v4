@@ -421,24 +421,16 @@ async fn test_liq_tokens_with_token() -> Result<(), TransportError> {
     // The liqee pays for the 20 collateral at a price of 1.02*1.02. The liqor gets 1.01*1.01,
     // so the platform fee is
     let platform_fee = 20.0 * (1.0 - 1.01 * 1.01 / (1.02 * 1.02));
-    assert!(assert_equal_f64_f64(
+    assert_eq_f64!(
         account_position_f64(solana, vault_account, collateral_token2.bank).await,
         100000.0 + 20.0 - platform_fee,
         0.001,
-    ));
+    );
 
     // Verify platform liq fee tracking
     let colbank = solana.get_account::<Bank>(collateral_token2.bank).await;
-    assert!(assert_equal_fixed_f64(
-        colbank.collected_fees_native,
-        platform_fee,
-        0.001
-    ));
-    assert!(assert_equal_fixed_f64(
-        colbank.collected_liquidation_fees,
-        platform_fee,
-        0.001
-    ));
+    assert_eq_fixed_f64!(colbank.collected_fees_native, platform_fee, 0.001);
+    assert_eq_fixed_f64!(colbank.collected_liquidation_fees, platform_fee, 0.001);
 
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());

@@ -86,7 +86,7 @@ impl MangoAccountPdaSeeds {
 // When not reading via idl, MangoAccount binary data is backwards compatible: when ignoring trailing bytes,
 // a v2 account can be read as a v1 account and a v3 account can be read as v1 or v2 etc.
 #[account]
-#[derive(Derivative)]
+#[derive(Derivative, PartialEq)]
 #[derivative(Debug)]
 pub struct MangoAccount {
     // fixed
@@ -123,8 +123,7 @@ pub struct MangoAccount {
 
     pub bump: u8,
 
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
 
     // (Display only)
     // Cumulative (deposits - withdraws)
@@ -151,8 +150,14 @@ pub struct MangoAccount {
     /// Next id to use when adding a token condition swap
     pub next_token_conditional_swap_id: u64,
 
+    pub temporary_delegate: Pubkey,
+    pub temporary_delegate_expiry: u64,
+
+    /// Time at which the last collateral fee was charged
+    pub last_collateral_fee_charge: u64,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 200],
+    pub reserved: [u8; 152],
 
     // dynamic
     pub header_version: u8,
@@ -197,7 +202,7 @@ impl MangoAccount {
             in_health_region: 0,
             account_num: 0,
             bump: 0,
-            padding: Default::default(),
+            sequence_number: 0,
             net_deposits: 0,
             perp_spot_transfers: 0,
             health_region_begin_init_health: 0,
@@ -206,7 +211,10 @@ impl MangoAccount {
             buyback_fees_accrued_previous: 0,
             buyback_fees_expiry_timestamp: 0,
             next_token_conditional_swap_id: 0,
-            reserved: [0; 200],
+            temporary_delegate: Pubkey::default(),
+            temporary_delegate_expiry: 0,
+            last_collateral_fee_charge: 0,
+            reserved: [0; 152],
             header_version: DEFAULT_MANGO_ACCOUNT_VERSION,
             padding3: Default::default(),
             padding4: Default::default(),
@@ -343,7 +351,7 @@ pub struct MangoAccountFixed {
     being_liquidated: u8,
     in_health_region: u8,
     pub bump: u8,
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
     pub net_deposits: i64,
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
@@ -354,11 +362,12 @@ pub struct MangoAccountFixed {
     pub next_token_conditional_swap_id: u64,
     pub temporary_delegate: Pubkey,
     pub temporary_delegate_expiry: u64,
-    pub reserved: [u8; 160],
+    pub last_collateral_fee_charge: u64,
+    pub reserved: [u8; 152],
 }
 const_assert_eq!(
     size_of::<MangoAccountFixed>(),
-    32 * 4 + 8 + 8 * 8 + 32 + 8 + 160
+    32 * 4 + 8 + 8 * 8 + 32 + 8 + 8 + 152
 );
 const_assert_eq!(size_of::<MangoAccountFixed>(), 400);
 const_assert_eq!(size_of::<MangoAccountFixed>() % 8, 0);
@@ -803,6 +812,12 @@ impl<
 
     fn dynamic(&self) -> &[u8] {
         self.dynamic.deref_or_borrow()
+    }
+
+    #[allow(dead_code)]
+    fn dynamic_reserved_bytes(&self) -> &[u8] {
+        let reserved_offset = self.header().reserved_bytes_offset();
+        &self.dynamic()[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
     }
 
     /// Returns
@@ -1607,6 +1622,13 @@ impl<
         Ok(())
     }
 
+    /// A stricter version of check_health_post_checks() that requires >=0 health, it not getting
+    /// worse is not sufficient
+    pub fn check_health_post_checks_strict(&mut self, post_init_health: I80F48) -> Result<()> {
+        require!(post_init_health >= 0, MangoError::HealthMustBePositive);
+        Ok(())
+    }
+
     pub fn check_liquidatable(&mut self, health_cache: &HealthCache) -> Result<CheckLiquidatable> {
         // Once maint_health falls below 0, we want to start liquidating,
         // we want to allow liquidation to continue until init_health is positive,
@@ -2089,6 +2111,7 @@ impl<'a, 'info: 'a> MangoAccountLoader<'a> for &'a AccountLoader<'info, MangoAcc
 mod tests {
     use bytemuck::Zeroable;
     use itertools::Itertools;
+    use std::path::PathBuf;
 
     use crate::state::PostOrderType;
 
@@ -2688,12 +2711,7 @@ mod tests {
             );
         }
 
-        let reserved_offset = account.header.reserved_bytes_offset();
-        assert!(
-            account.dynamic[reserved_offset..reserved_offset + DYNAMIC_RESERVED_BYTES]
-                .iter()
-                .all(|&v| v == 0)
-        );
+        assert!(account.dynamic_reserved_bytes().iter().all(|&v| v == 0));
 
         Ok(())
     }
@@ -3182,6 +3200,96 @@ mod tests {
         let to_be_closed_account_opt = account.find_first_active_unused_perp_position();
 
         assert_eq!(to_be_closed_account_opt.unwrap().market_index, 3)
+    }
+
+    // Attempts reading old mango account data with borsh and with zerocopy
+    #[test]
+    fn test_mango_account_backwards_compatibility() -> Result<()> {
+        use solana_program_test::{find_file, read_file};
+
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        // Grab live accounts with
+        // solana account CZGf1qbYPaSoabuA1EmdN8W5UHvH5CeXcNZ7RTx65aVQ --output-file programs/mango-v4/resources/test/mangoaccount-v0.21.3.bin
+        let fixtures = vec!["mangoaccount-v0.21.3", "mangoaccount-v0.23.0"];
+
+        for fixture in fixtures {
+            let filename = format!("resources/test/{}.bin", fixture);
+            let account_bytes = read_file(find_file(&filename).unwrap());
+
+            // Read with borsh
+            let mut account_bytes_slice: &[u8] = &account_bytes;
+            let borsh_account = MangoAccount::try_deserialize(&mut account_bytes_slice)?;
+
+            // Read with zerocopy
+            let zerocopy_reader = MangoAccountValue::from_bytes(&account_bytes[8..])?;
+            let fixed = &zerocopy_reader.fixed;
+            let zerocopy_account = MangoAccount {
+                group: fixed.group,
+                owner: fixed.owner,
+                name: fixed.name,
+                delegate: fixed.delegate,
+                account_num: fixed.account_num,
+                being_liquidated: fixed.being_liquidated,
+                in_health_region: fixed.in_health_region,
+                bump: fixed.bump,
+                sequence_number: 0,
+                net_deposits: fixed.net_deposits,
+                perp_spot_transfers: fixed.perp_spot_transfers,
+                health_region_begin_init_health: fixed.health_region_begin_init_health,
+                frozen_until: fixed.frozen_until,
+                buyback_fees_accrued_current: fixed.buyback_fees_accrued_current,
+                buyback_fees_accrued_previous: fixed.buyback_fees_accrued_previous,
+                buyback_fees_expiry_timestamp: fixed.buyback_fees_expiry_timestamp,
+                next_token_conditional_swap_id: fixed.next_token_conditional_swap_id,
+                temporary_delegate: fixed.temporary_delegate,
+                temporary_delegate_expiry: fixed.temporary_delegate_expiry,
+                last_collateral_fee_charge: fixed.last_collateral_fee_charge,
+                reserved: [0u8; 152],
+
+                header_version: *zerocopy_reader.header_version(),
+                padding3: Default::default(),
+
+                padding4: Default::default(),
+                tokens: zerocopy_reader.all_token_positions().cloned().collect_vec(),
+
+                padding5: Default::default(),
+                serum3: zerocopy_reader.all_serum3_orders().cloned().collect_vec(),
+
+                padding6: Default::default(),
+                perps: zerocopy_reader.all_perp_positions().cloned().collect_vec(),
+
+                padding7: Default::default(),
+                perp_open_orders: zerocopy_reader.all_perp_orders().cloned().collect_vec(),
+
+                padding8: Default::default(),
+                token_conditional_swaps: zerocopy_reader
+                    .all_token_conditional_swaps()
+                    .cloned()
+                    .collect_vec(),
+
+                padding9: Default::default(),
+                openbook_v2: zerocopy_reader
+                    .all_openbook_v2_orders()
+                    .cloned()
+                    .collect_vec(),
+
+                reserved_dynamic: zerocopy_reader.dynamic_reserved_bytes().try_into().unwrap(),
+            };
+
+            // Both methods agree?
+            assert_eq!(borsh_account, zerocopy_account);
+
+            // Serializing and deserializing produces the same data?
+            let mut borsh_bytes = Vec::new();
+            borsh_account.try_serialize(&mut borsh_bytes)?;
+            let mut slice: &[u8] = &borsh_bytes;
+            let roundtrip_account = MangoAccount::try_deserialize(&mut slice)?;
+            assert_eq!(borsh_account, roundtrip_account);
+        }
+
+        Ok(())
     }
 }
 

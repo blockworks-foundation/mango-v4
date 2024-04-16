@@ -1,5 +1,5 @@
 {
-  "version": "0.22.0",
+  "version": "0.24.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -276,6 +276,12 @@
           "name": "allowedFastListingsPerIntervalOpt",
           "type": {
             "option": "u16"
+          }
+        },
+        {
+          "name": "collateralFeeIntervalOpt",
+          "type": {
+            "option": "u64"
           }
         }
       ]
@@ -635,6 +641,10 @@
         {
           "name": "disableAssetLiquidation",
           "type": "bool"
+        },
+        {
+          "name": "collateralFeePerDay",
+          "type": "f32"
         }
       ]
     },
@@ -1048,6 +1058,18 @@
         },
         {
           "name": "disableAssetLiquidationOpt",
+          "type": {
+            "option": "bool"
+          }
+        },
+        {
+          "name": "collateralFeePerDayOpt",
+          "type": {
+            "option": "f32"
+          }
+        },
+        {
+          "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
           }
@@ -1883,6 +1905,66 @@
         {
           "name": "maxBuybackUsd",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthValue",
+          "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
         }
       ]
     },
@@ -3920,6 +4002,63 @@
           }
         }
       ]
+    },
+    {
+      "name": "tokenForceWithdraw",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "bank",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "vault",
+            "oracle"
+          ]
+        },
+        {
+          "name": "vault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "ownerAtaTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "alternateOwnerTokenAccount",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "Only for the unusual case where the owner_ata account is not owned by account.owner"
+          ]
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
     },
     {
       "name": "perpCreateMarket",
@@ -6112,6 +6251,25 @@
       ]
     },
     {
+      "name": "tokenChargeCollateralFees",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "altSet",
       "accounts": [
         {
@@ -7464,11 +7622,15 @@
             "type": "u8"
           },
           {
+            "name": "forceWithdraw",
+            "type": "u8"
+          },
+          {
             "name": "padding",
             "type": {
               "array": [
                 "u8",
-                5
+                4
               ]
             }
           },
@@ -7604,6 +7766,33 @@
             }
           },
           {
+            "name": "collectedCollateralFees",
+            "docs": [
+              "Collateral fees that have been collected (in native tokens)",
+              "",
+              "See also collected_fees_native and fees_withdrawn."
+            ],
+            "type": {
+              "defined": "I80F48"
+            }
+          },
+          {
+            "name": "collateralFeePerDay",
+            "docs": [
+              "The daily collateral fees rate for fully utilized collateral."
+            ],
+            "type": "f32"
+          },
+          {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
             "name": "potentialOpenbookTokens",
             "docs": [
               "Largest amount of tokens that might be added the the bank based on",
@@ -7616,7 +7805,7 @@
             "type": {
               "array": [
                 "u8",
-                1912
+                1888
               ]
             }
           }
@@ -7745,11 +7934,27 @@
             "type": "u16"
           },
           {
+            "name": "padding2",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          },
+          {
+            "name": "collateralFeeInterval",
+            "docs": [
+              "Intervals in which collateral fee is applied"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1812
+                1800
               ]
             }
           }
@@ -7815,13 +8020,8 @@
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -7872,11 +8072,26 @@
             "type": "u64"
           },
           {
+            "name": "temporaryDelegate",
+            "type": "publicKey"
+          },
+          {
+            "name": "temporaryDelegateExpiry",
+            "type": "u64"
+          },
+          {
+            "name": "lastCollateralFeeCharge",
+            "docs": [
+              "Time at which the last collateral fee was charged"
+            ],
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                200
+                152
               ]
             }
           },
@@ -9378,11 +9593,25 @@
             "type": "f64"
           },
           {
+            "name": "quoteLotSize",
+            "docs": [
+              "Stores the market's lot sizes",
+              "",
+              "Needed because the obv2 open orders account tells us about reserved amounts in lots and",
+              "we want to be able to compute health without also loading the obv2 market."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "baseLotSize",
+            "type": "i64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                176
+                160
               ]
             }
           }
@@ -9730,13 +9959,8 @@
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -9779,11 +10003,15 @@
             "type": "u64"
           },
           {
+            "name": "lastCollateralFeeCharge",
+            "type": "u64"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                152
               ]
             }
           }
@@ -10704,6 +10932,35 @@
           },
           {
             "name": "Swap"
+          },
+          {
+            "name": "SwapWithoutFee"
+          }
+        ]
+      }
+    },
+    {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
           }
         ]
       }
@@ -11161,6 +11418,15 @@
             "name": "Serum3PlaceOrderV2"
           },
           {
+            "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
+          },
+          {
             "name": "OpenbookV2CancelAllOrders"
           }
         ]
@@ -11202,6 +11468,9 @@
           },
           {
             "name": "OrcaCLMM"
+          },
+          {
+            "name": "RaydiumCLMM"
           }
         ]
       }
@@ -13121,6 +13390,71 @@
       ]
     },
     {
+      "name": "PerpLiqBaseOrPositivePnlLogV3",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "perpMarketIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "liqor",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "liqee",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "baseTransferLiqee",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quoteTransferLiqor",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "quotePlatformFee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlTransfer",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferRecurring",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "pnlSettleLimitTransferOneshot",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "PerpLiqBankruptcyLog",
       "fields": [
         {
@@ -14109,6 +14443,76 @@
           "index": false
         }
       ]
+    },
+    {
+      "name": "TokenCollateralFeeLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "assetUsageFraction",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "fee",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ForceWithdrawLog",
+      "fields": [
+        {
+          "name": "mangoGroup",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "mangoAccount",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "tokenIndex",
+          "type": "u16",
+          "index": false
+        },
+        {
+          "name": "quantity",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "i128",
+          "index": false
+        },
+        {
+          "name": "toTokenAccount",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
     }
   ],
   "errors": [
@@ -14464,11 +14868,26 @@
     },
     {
       "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
+    },
+    {
+      "code": 6073,
       "name": "NoFreeOpenbookV2OpenOrdersIndex",
       "msg": "no free openbook v2 open orders index"
     },
     {
-      "code": 6071,
+      "code": 6074,
       "name": "OpenbookV2OpenOrdersExistAlready",
       "msg": "openbook v2 open orders exist already"
     }

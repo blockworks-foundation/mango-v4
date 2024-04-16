@@ -202,7 +202,7 @@ async function main(): Promise<void> {
 
   const genericBanks = ['MNGO', 'MSOL'];
   let nextTokenIndex = 3;
-  for (let name of genericBanks) {
+  for (const name of genericBanks) {
     console.log(`Registering ${name}...`);
     const mint = new PublicKey(MAINNET_MINTS.get(name)!);
     const oracle = oracles.get(name);
@@ -239,7 +239,7 @@ async function main(): Promise<void> {
   }
 
   let nextSerumMarketIndex = 0;
-  for (let [name, mint] of MAINNET_MINTS) {
+  for (const [name, mint] of MAINNET_MINTS) {
     if (name == 'USDC') {
       continue;
     }
@@ -330,12 +330,12 @@ async function createAndPopulateAlt(
       });
       let sig = await client.sendAndConfirmTransaction([createIx[0]]);
       console.log(
-        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig.signature}`,
       );
 
       console.log(`ALT: set at index 0 for group...`);
       sig = await client.altSet(group, createIx[1], 0);
-      console.log(`...https://explorer.solana.com/tx/${sig}`);
+      console.log(`...https://explorer.solana.com/tx/${sig.signature}`);
 
       group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
     } catch (error) {
@@ -366,7 +366,7 @@ async function createAndPopulateAlt(
       addresses,
     });
     const sig = await client.sendAndConfirmTransaction([extendIx]);
-    console.log(`https://explorer.solana.com/tx/${sig}`);
+    console.log(`https://explorer.solana.com/tx/${sig.signature}`);
   }
 
   // Extend using mango v4 relevant pub keys
