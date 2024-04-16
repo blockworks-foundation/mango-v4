@@ -1592,6 +1592,7 @@ mod tests {
         deposit_weight_scale_start_quote: u64,
         borrow_weight_scale_start_quote: u64,
         potential_serum_tokens: u64,
+        potential_openbook_tokens: u64,
     }
 
     #[derive(Default)]
@@ -1601,6 +1602,8 @@ mod tests {
         token3: i64,
         oo_1_2: (u64, u64),
         oo_1_3: (u64, u64),
+        oov2_1_2: (u64, u64),
+        oov2_1_3: (u64, u64),
         perp1: (i64, i64, i64, i64),
         expected_health: f64,
         bank_settings: [BankSettings; 3],
@@ -1648,6 +1651,7 @@ mod tests {
             bank.indexed_deposits = I80F48::from(settings.deposits) / bank.deposit_index;
             bank.indexed_borrows = I80F48::from(settings.borrows) / bank.borrow_index;
             bank.potential_serum_tokens = settings.potential_serum_tokens;
+            bank.potential_openbook_tokens = settings.potential_openbook_tokens;
             if settings.deposit_weight_scale_start_quote > 0 {
                 bank.deposit_weight_scale_start_quote =
                     settings.deposit_weight_scale_start_quote as f64;
@@ -1673,6 +1677,26 @@ mod tests {
         serum3account2.quote_token_index = 0;
         oo2.data().native_pc_total = testcase.oo_1_3.0;
         oo2.data().native_coin_total = testcase.oo_1_3.1;
+
+        let mut oov2_1 = TestAccount::<OpenOrdersAccount>::new_zeroed();
+        let openbookv2account = account.create_openbook_v2_orders(2).unwrap();
+        openbookv2account.open_orders = oov2_1.pubkey;
+        openbookv2account.base_token_index = 4;
+        openbookv2account.quote_token_index = 0;
+        openbookv2account.base_lot_size = 1;
+        openbookv2account.quote_lot_size = 1;
+        oov2_1.data().position.bids_quote_lots = testcase.oov2_1_2.0 as i64;
+        oov2_1.data().position.asks_base_lots = testcase.oov2_1_2.1 as i64;
+
+        let mut oov2_2 = TestAccount::<OpenOrdersAccount>::new_zeroed();
+        let openbookv2account2 = account.create_openbook_v2_orders(3).unwrap();
+        openbookv2account2.open_orders = oov2_2.pubkey;
+        openbookv2account2.base_token_index = 5;
+        openbookv2account2.quote_token_index = 0;
+        openbookv2account2.base_lot_size = 1;
+        openbookv2account2.quote_lot_size = 1;
+        oov2_2.data().position.bids_quote_lots = testcase.oov2_1_3.0 as i64;
+        oov2_2.data().position.asks_base_lots = testcase.oov2_1_3.1 as i64;
 
         let mut perp1 = mock_perp_market(group, oracle2.pubkey, 5.0, 9, (0.2, 0.1), (0.05, 0.02));
         let perpaccount = account.ensure_perp_position(9, 0).unwrap().0;
@@ -1700,6 +1724,8 @@ mod tests {
             oracle2_ai,
             oo1.as_account_info(),
             oo2.as_account_info(),
+            oov2_1.as_account_info(),
+            oov2_2.as_account_info(),
         ];
 
         let retriever = ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
@@ -1983,6 +2009,181 @@ mod tests {
                         deposits: 600,
                         deposit_weight_scale_start_quote: 500 * 10,
                         potential_serum_tokens: 100,
+                        ..BankSettings::default()
+                    },
+                ],
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 * (100.0 / 200.0) + 100.0 * 10.0 * 0.5 * (500.0 / 700.0)
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5 * (100.0 / 200.0)
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5 * (500.0 / 700.0),
+                ..Default::default()
+            },
+            TestHealth1Case { // 18, like 0 with obv2
+                token1: 100,
+                token2: -10,
+                oov2_1_2: (20, 15),
+                expected_health:
+                    // for token1
+                    0.8 * (100.0
+                    // including open orders (scenario: bids execute)
+                    + (20.0 + 15.0 * base_price))
+                    // for token2
+                    - 10.0 * base_price * 1.5,
+                ..Default::default()
+            },
+            TestHealth1Case { // 19, like 1 with obv2
+                token1: -100,
+                token2: 10,
+                oov2_1_2: (20, 15),
+                expected_health:
+                    // for token1
+                    1.2 * (-100.0)
+                    // for token2, including open orders (scenario: asks execute)
+                    + (10.0 * base_price + (20.0 + 15.0 * base_price)) * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case { // 20, reserved oo funds, like 6 with obv2
+                token1: -100,
+                token2: -10,
+                token3: -10,
+                oov2_1_2: (1, 1),
+                oov2_1_3: (1, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5 - 10.0 * 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 5.0) * 1.2
+                    // oo_1_3 (-> token1)
+                    + (1.0 + 10.0) * 1.2,
+                ..Default::default()
+            },
+            TestHealth1Case { // 21, reserved oo funds cross the zero balance level, like 7 with obv2
+                token1: -14,
+                token2: -10,
+                token3: -10,
+                oov2_1_2: (1, 1),
+                oov2_1_3: (1, 1),
+                expected_health:
+                    // tokens
+                    -14.0 * 1.2 - 10.0 * 5.0 * 1.5 - 10.0 * 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + 3.0 * 1.2 + 3.0 * 0.8
+                    // oo_1_3 (-> token1)
+                    + 8.0 * 1.2 + 3.0 * 0.8,
+                ..Default::default()
+            },
+            TestHealth1Case { // 22, reserved oo funds in a non-quote currency, like 8 with obv2
+                token1: -100,
+                token2: -100,
+                token3: -1,
+                oov2_1_2: (0, 0),
+                oov2_1_3: (10, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 100.0 * 5.0 * 1.5 - 10.0 * 1.5
+                    // oo_1_3 (-> token3)
+                    + 10.0 * 1.5 + 10.0 * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case { // 23, like 8 but oo_1_2 flips the oo_1_3 target, like 9 with obv2
+                token1: -100,
+                token2: -100,
+                token3: -1,
+                oov2_1_2: (100, 0),
+                oov2_1_3: (10, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 100.0 * 5.0 * 1.5 - 10.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + 80.0 * 1.2 + 20.0 * 0.8
+                    // oo_1_3 (-> token1)
+                    + 20.0 * 0.8,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 24, reserved oo funds with max bid/min ask, like 14 with obv2
+                token1: -100,
+                token2: -10,
+                token3: 0,
+                oov2_1_2: (1, 1),
+                oov2_1_3: (11, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 3.0) * 1.2
+                    // oo_1_3 (-> token3)
+                    + (11.0 / 12.0 + 1.0) * 10.0 * 0.5,
+                extra: Some(|account: &mut MangoAccountValue| {
+                    let s2 = account.openbook_v2_orders_mut(2).unwrap();
+                    s2.lowest_placed_ask = 3.0;
+                    let s3 = account.openbook_v2_orders_mut(3).unwrap();
+                    s3.highest_placed_bid_inv = 1.0 / 12.0;
+                }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 25, reserved oo funds with max bid/min ask not crossing oracle, like 15 with obv2
+                token1: -100,
+                token2: -10,
+                token3: 0,
+                oov2_1_2: (1, 1),
+                oov2_1_3: (11, 1),
+                expected_health:
+                    // tokens
+                    -100.0 * 1.2 - 10.0 * 5.0 * 1.5
+                    // oo_1_2 (-> token1)
+                    + (1.0 + 5.0) * 1.2
+                    // oo_1_3 (-> token3)
+                    + (11.0 / 10.0 + 1.0) * 10.0 * 0.5,
+                extra: Some(|account: &mut MangoAccountValue| {
+                    let s2 = account.openbook_v2_orders_mut(2).unwrap();
+                    s2.lowest_placed_ask = 6.0;
+                    let s3 = account.openbook_v2_orders_mut(3).unwrap();
+                    s3.highest_placed_bid_inv = 1.0 / 9.0;
+                }),
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 26, base case for 27, like 16 with obv2
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oov2_1_2: (0, 100),
+                oov2_1_3: (0, 100),
+                expected_health:
+                    // tokens
+                    100.0 * 0.8 + 100.0 * 5.0 * 0.5 + 100.0 * 10.0 * 0.5
+                    // oo_1_2 (-> token2)
+                    + 100.0 * 5.0 * 0.5
+                    // oo_1_3 (-> token1)
+                    + 100.0 * 10.0 * 0.5,
+                ..Default::default()
+            },
+            TestHealth1Case {
+                // 27, potential_openbook_tokens counts for deposit weight scaling, like 17 with obv2
+                token1: 100,
+                token2: 100,
+                token3: 100,
+                oov2_1_2: (0, 100),
+                oov2_1_3: (0, 100),
+                bank_settings: [
+                    BankSettings {
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 100,
+                        deposit_weight_scale_start_quote: 100 * 5,
+                        potential_openbook_tokens: 100,
+                        ..BankSettings::default()
+                    },
+                    BankSettings {
+                        deposits: 600,
+                        deposit_weight_scale_start_quote: 500 * 10,
+                        potential_openbook_tokens: 100,
                         ..BankSettings::default()
                     },
                 ],
