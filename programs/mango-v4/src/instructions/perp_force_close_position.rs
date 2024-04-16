@@ -35,8 +35,18 @@ pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result
         .max(0);
     let now_slot = Clock::get()?.slot;
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-    let oracle_price =
-        perp_market.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
+    let fallback_opt = if perp_market.fallback_oracle != Pubkey::default() {
+        ctx.remaining_accounts
+            .iter()
+            .find(|a| a.key == &perp_market.fallback_oracle)
+            .map(|k| AccountInfoRef::borrow(k).unwrap())
+    } else {
+        None
+    };
+    let oracle_price = perp_market.oracle_price(
+        &OracleAccountInfos::from_reader_with_fallback(oracle_ref, fallback_opt.as_ref()),
+        Some(now_slot),
+    )?;
     let quote_transfer = I80F48::from(base_transfer * perp_market.base_lot_size) * oracle_price;
 
     account_a_perp_position.record_trade(&mut perp_market, -base_transfer, quote_transfer);
