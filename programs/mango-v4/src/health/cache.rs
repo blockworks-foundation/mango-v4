@@ -1540,6 +1540,8 @@ mod tests {
         openbookv2account.potential_quote_tokens = 20;
         openbookv2account.potential_base_tokens = 15;
         openbookv2account.market_index = 2;
+        openbookv2account.base_lot_size = 1;
+        openbookv2account.quote_lot_size = 1;
         oo2.data().position.quote_free_native = 1;
         oo2.data().position.base_free_native = 3;
         oo2.data().position.referrer_rebates_available = 2;

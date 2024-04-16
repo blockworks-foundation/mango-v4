@@ -82,10 +82,8 @@ impl OpenbookV2OrderPlacer {
             .await
     }
 
-    async fn bid_taker(&mut self, limit_price: f64, max_base: i64) -> Option<(u128, u64)> {
+    async fn bid_taker(&mut self, limit_price: f64, max_base: i64) {
         self.try_bid(limit_price, max_base, true).await.unwrap();
-        self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
-            .await
     }
 
     async fn try_ask(
@@ -1224,7 +1222,7 @@ async fn test_openbook_track_reserved_deposits() -> Result<(), TransportError> {
     // because order_placer2 puts funds into the openbook oo
     //
 
-    order_placer2.bid_taker(1.2, 1000).await.unwrap();
+    order_placer2.bid_taker(1.2, 1000).await;
     context
         .openbook
         .consume_spot_events(&openbook_market_cookie, 16)
