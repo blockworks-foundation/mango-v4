@@ -34,23 +34,55 @@ pub fn perp_liq_negative_pnl_or_bankruptcy(
         perp_market_index = perp_market.perp_market_index;
         settle_token_index = perp_market.settle_token_index;
         let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-        perp_oracle_price = perp_market
-            .oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
+        let fallback_opt = if perp_market.fallback_oracle != Pubkey::default() {
+            ctx.remaining_accounts
+                .iter()
+                .find(|a| a.key == &perp_market.fallback_oracle)
+                .map(|k| AccountInfoRef::borrow(k).unwrap())
+        } else {
+            None
+        };
+        perp_oracle_price = perp_market.oracle_price(
+            &OracleAccountInfos::from_reader_with_fallback(oracle_ref, fallback_opt.as_ref()),
+            Some(now_slot),
+        )?;
 
         let settle_bank = ctx.accounts.settle_bank.load()?;
         let settle_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.settle_oracle.as_ref())?;
+        let settle_fallback_opt = if settle_bank.fallback_oracle != Pubkey::default() {
+            ctx.remaining_accounts
+                .iter()
+                .find(|a| a.key == &settle_bank.fallback_oracle)
+                .map(|k| AccountInfoRef::borrow(k).unwrap())
+        } else {
+            None
+        };
         settle_token_oracle_price = settle_bank.oracle_price(
-            &OracleAccountInfos::from_reader(settle_oracle_ref),
+            &OracleAccountInfos::from_reader_with_fallback(
+                settle_oracle_ref,
+                settle_fallback_opt.as_ref(),
+            ),
             Some(now_slot),
         )?;
         drop(settle_bank); // could be the same as insurance_bank
 
         let insurance_bank = ctx.accounts.insurance_bank.load()?;
         let insurance_oracle_ref = &AccountInfoRef::borrow(ctx.accounts.insurance_oracle.as_ref())?;
+        let insurance_fallback_opt = if insurance_bank.fallback_oracle != Pubkey::default() {
+            ctx.remaining_accounts
+                .iter()
+                .find(|a| a.key == &insurance_bank.fallback_oracle)
+                .map(|k| AccountInfoRef::borrow(k).unwrap())
+        } else {
+            None
+        };
         // We're not getting the insurance token price from the HealthCache because
         // the liqee isn't guaranteed to have an insurance fund token position.
         insurance_token_oracle_price = insurance_bank.oracle_price(
-            &OracleAccountInfos::from_reader(insurance_oracle_ref),
+            &OracleAccountInfos::from_reader_with_fallback(
+                insurance_oracle_ref,
+                insurance_fallback_opt.as_ref(),
+            ),
             Some(now_slot),
         )?;
     }

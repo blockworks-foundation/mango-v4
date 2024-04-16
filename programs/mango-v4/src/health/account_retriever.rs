@@ -508,7 +508,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         let sol_oracle_index = ais[fallback_oracles_start..]
             .iter()
             .position(|o| o.key == &pyth_mainnet_sol_oracle::ID);
-
+        
         Ok(Self {
             banks_and_oracles: ScannedBanksAndOracles {
                 banks: AccountInfoRefMut::borrow_slice(&ais[..n_banks])?,
@@ -556,7 +556,17 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
         // The account was already loaded successfully during construction
         let perp_market = self.perp_markets[index].load_fully_unchecked::<PerpMarket>()?;
         let oracle_acc = &self.perp_oracles[index];
-        let oracle_acc_infos = OracleAccountInfos::from_reader(oracle_acc);
+
+        let fallback_opt = if &perp_market.fallback_oracle == &Pubkey::default() {
+            None
+        } else {
+            self.banks_and_oracles
+                .fallback_oracles
+                .iter()
+                .find(|ai| ai.key == &perp_market.fallback_oracle)
+        };
+        let oracle_acc_infos =
+            OracleAccountInfos::from_reader_with_fallback(oracle_acc, fallback_opt);
         let price =
             perp_market.oracle_price(&oracle_acc_infos, self.banks_and_oracles.staleness_slot)?;
         Ok((perp_market, price))
