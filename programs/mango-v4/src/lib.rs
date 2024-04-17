@@ -39,7 +39,7 @@ use state::{
     TokenIndex, TCS_START_INCENTIVE,
 };
 
-declare_id!("DPYRy9sn4SfMzqu5FXVoRiuLnseTr7ZYq2rNSJDLV8uN");
+declare_id!("4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg");
 
 #[program]
 pub mod mango_v4 {
