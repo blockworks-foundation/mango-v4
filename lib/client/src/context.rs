@@ -115,6 +115,7 @@ pub struct ComputeEstimates {
     pub health_cu_per_token: u32,
     pub health_cu_per_perp: u32,
     pub health_cu_per_serum: u32,
+    pub health_cu_per_obv2: u32,
     pub cu_per_serum3_order_match: u32,
     pub cu_per_serum3_order_cancel: u32,
     pub cu_per_perp_order_match: u32,
@@ -133,6 +134,7 @@ impl Default for ComputeEstimates {
             health_cu_per_token: 5000,
             health_cu_per_perp: 8000,
             health_cu_per_serum: 6000,
+            health_cu_per_obv2: 6000,
             // measured around 1.5k, see test_serum_compute
             cu_per_serum3_order_match: 3_000,
             // measured around 11k, see test_serum_compute
@@ -160,15 +162,18 @@ impl ComputeEstimates {
         tokens: usize,
         perps: usize,
         serums: usize,
+        obv2s: usize,
         fallbacks: usize,
     ) -> u32 {
         let tokens: u32 = tokens.try_into().unwrap();
         let perps: u32 = perps.try_into().unwrap();
         let serums: u32 = serums.try_into().unwrap();
+        let obv2s: u32 = obv2s.try_into().unwrap();
         let fallbacks: u32 = fallbacks.try_into().unwrap();
         tokens * self.health_cu_per_token
             + perps * self.health_cu_per_perp
             + serums * self.health_cu_per_serum
+            + obv2s * self.health_cu_per_obv2
             + fallbacks * self.cu_per_oracle_fallback
     }
 
@@ -177,6 +182,7 @@ impl ComputeEstimates {
             account.active_token_positions().count(),
             account.active_perp_positions().count(),
             account.active_serum3_orders().count(),
+            account.active_openbook_v2_orders().count(),
             num_fallbacks,
         )
     }
@@ -439,6 +445,7 @@ impl MangoGroupContext {
         }
 
         let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
+        let obv2_oos = account.active_openbook_v2_orders().map(|o| o.open_orders);
         let perp_markets = account
             .active_perp_positions()
             .map(|&pa| self.perp_market_address(pa.market_index));
@@ -471,6 +478,7 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(obv2_oos.map(to_account_meta))
             .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
@@ -515,6 +523,10 @@ impl MangoGroupContext {
             .active_serum3_orders()
             .chain(account1.active_serum3_orders())
             .map(|&s| s.open_orders);
+        let obv2_oos = account2
+            .active_openbook_v2_orders()
+            .chain(account1.active_openbook_v2_orders())
+            .map(|&s| s.open_orders);
         let perp_market_indexes = account2
             .active_perp_positions()
             .chain(account1.active_perp_positions())
@@ -553,6 +565,7 @@ impl MangoGroupContext {
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(obv2_oos.map(to_account_meta))
             .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
@@ -574,11 +587,13 @@ impl MangoGroupContext {
             account1_token_count,
             account1.active_perp_positions().count(),
             account1.active_serum3_orders().count(),
+            account1.active_openbook_v2_orders().count(),
             fallbacks_len,
         ) + self.compute_estimates.health_for_counts(
             account2_token_count,
             account2.active_perp_positions().count(),
             account2.active_serum3_orders().count(),
+            account2.active_openbook_v2_orders().count(),
             fallbacks_len,
         );
 
