@@ -52,7 +52,7 @@ switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
 
-openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", rev = "270b2d2d473862bd4e3aa213feb970af81f4b3e2", features = ["no-entrypoint", "cpi", "enable-gpl"] }
+openbook-v2 = { workspace = true, features = ["no-entrypoint", "cpi", "enable-gpl"] }
 
 
 [dev-dependencies]

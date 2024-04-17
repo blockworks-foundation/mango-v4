@@ -3621,6 +3621,7 @@ dependencies = [
  "jsonrpc-core-client",
  "mango-feeds-connector",
  "mango-v4",
+ "openbook-v2",
  "pyth-sdk-solana",
  "reqwest",
  "serde",
