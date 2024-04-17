@@ -91,7 +91,11 @@ pub struct OpenbookV2PlaceOrder<'info> {
     #[account(mut)]
     pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
-    #[account(has_one = group, has_one = openbook_v2_market_external, has_one = openbook_v2_program)]
+    #[account(
+        has_one = group,
+        has_one = openbook_v2_market_external,
+        has_one = openbook_v2_program,
+    )]
     pub openbook_v2_market: AccountLoader<'info, OpenbookV2Market>,
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,

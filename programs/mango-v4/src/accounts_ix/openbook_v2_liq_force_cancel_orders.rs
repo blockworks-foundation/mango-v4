@@ -39,6 +39,8 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
         has_one = bids,
         has_one = asks,
         has_one = event_heap,
+        has_one = market_base_vault,
+        has_one = market_quote_vault,
     )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 

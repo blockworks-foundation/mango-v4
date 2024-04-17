@@ -13,9 +13,6 @@ pub struct OpenbookV2DeregisterMarket<'info> {
     )]
     pub group: AccountLoader<'info, Group>,
 
-    #[account(
-        constraint = group.load()?.admin == admin.key(),
-    )]
     pub admin: Signer<'info>,
 
     #[account(

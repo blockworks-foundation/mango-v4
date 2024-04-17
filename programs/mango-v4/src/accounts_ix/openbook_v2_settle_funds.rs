@@ -36,19 +36,17 @@ pub struct OpenbookV2SettleFunds<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        has_one = market_base_vault,
+        has_one = market_quote_vault,
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    #[account(
-        mut,
-        constraint = market_base_vault.mint == base_vault.mint,
-    )]
+    #[account(mut)]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
 
-    #[account(
-        mut,
-        constraint = market_quote_vault.mint == quote_vault.mint,
-    )]
+    #[account(mut)]
     pub market_quote_vault: Box<Account<'info, TokenAccount>>,
 
     /// needed for the automatic settle_funds call
