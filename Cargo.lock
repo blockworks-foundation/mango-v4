@@ -3700,6 +3700,7 @@ dependencies = [
  "mango-v4",
  "mango-v4-client",
  "once_cell",
+ "openbook-v2",
  "pyth-sdk-solana",
  "rand 0.7.3",
  "regex",

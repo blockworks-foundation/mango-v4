@@ -4,7 +4,10 @@ use std::time::Duration;
 
 use itertools::Itertools;
 use mango_v4::health::{HealthCache, HealthType};
-use mango_v4::state::{MangoAccountValue, PerpMarketIndex, Side, TokenIndex, QUOTE_TOKEN_INDEX};
+use mango_v4::state::{
+    MangoAccountValue, OpenbookV2Orders, PerpMarketIndex, Serum3Orders, Side, TokenIndex,
+    QUOTE_TOKEN_INDEX,
+};
 use mango_v4_client::{chain_data, MangoClient, PreparedInstructions};
 use solana_sdk::signature::Signature;
 
@@ -45,7 +48,12 @@ struct LiquidateHelper<'a> {
 }
 
 impl<'a> LiquidateHelper<'a> {
-    async fn serum3_close_orders(&self) -> anyhow::Result<Option<Signature>> {
+    async fn spot_close_orders(&self) -> anyhow::Result<Option<Signature>> {
+        enum SpotMarket {
+            Serum(Serum3Orders),
+            OpenbookV2(OpenbookV2Orders),
+        }
+
         // look for any open serum orders or settleable balances
         let serum_oos: anyhow::Result<Vec<_>> = self
             .liqee
@@ -56,39 +64,72 @@ impl<'a> LiquidateHelper<'a> {
                 Ok((*orders, *open_orders))
             })
             .try_collect();
-        let mut serum_force_cancels = serum_oos?
-            .into_iter()
-            .filter_map(|(orders, open_orders)| {
-                let can_force_cancel = open_orders.native_coin_total > 0
-                    || open_orders.native_pc_total > 0
-                    || open_orders.referrer_rebates_accrued > 0;
-                if can_force_cancel {
-                    Some(orders)
-                } else {
-                    None
-                }
+        let serum_force_cancels = serum_oos?.into_iter().filter_map(|(orders, open_orders)| {
+            let can_force_cancel = open_orders.native_coin_total > 0
+                || open_orders.native_pc_total > 0
+                || open_orders.referrer_rebates_accrued > 0;
+            if can_force_cancel {
+                Some(SpotMarket::Serum(orders))
+            } else {
+                None
+            }
+        });
+
+        let obv2_oos: anyhow::Result<Vec<_>> = self
+            .liqee
+            .active_openbook_v2_orders()
+            .map(|orders| {
+                let open_orders = self
+                    .account_fetcher
+                    .fetch::<openbook_v2::state::OpenOrdersAccount>(&orders.open_orders)?;
+                Ok((*orders, open_orders))
             })
+            .try_collect();
+        let obv2_force_cancels = obv2_oos?.into_iter().filter_map(|(orders, open_orders)| {
+            let can_force_cancel = !open_orders.position.is_empty(open_orders.version);
+            if can_force_cancel {
+                Some(SpotMarket::OpenbookV2(orders))
+            } else {
+                None
+            }
+        });
+
+        let mut force_cancels = serum_force_cancels
+            .chain(obv2_force_cancels)
             .collect::<Vec<_>>();
-        if serum_force_cancels.is_empty() {
+        if force_cancels.is_empty() {
             return Ok(None);
         }
-        serum_force_cancels.shuffle(&mut rand::thread_rng());
+        force_cancels.shuffle(&mut rand::thread_rng());
 
         let mut ixs = PreparedInstructions::new();
-        let mut cancelled_markets = vec![];
+        let mut cancelled_serum3 = vec![];
+        let mut cancelled_openbook_v2 = vec![];
         let mut tx_builder = self.client.transaction_builder().await?;
 
-        for force_cancel in serum_force_cancels {
+        for force_cancel in force_cancels {
             let mut new_ixs = ixs.clone();
-            new_ixs.append(
-                self.client
-                    .serum3_liq_force_cancel_orders_instruction(
-                        (self.pubkey, self.liqee),
-                        force_cancel.market_index,
-                        &force_cancel.open_orders,
-                    )
-                    .await?,
-            );
+            let cancel_ix = match &force_cancel {
+                SpotMarket::Serum(orders) => {
+                    self.client
+                        .serum3_liq_force_cancel_orders_instruction(
+                            (self.pubkey, self.liqee),
+                            orders.market_index,
+                            &orders.open_orders,
+                        )
+                        .await?
+                }
+                SpotMarket::OpenbookV2(orders) => {
+                    self.client
+                        .openbook_v2_liq_force_cancel_orders_instruction(
+                            (self.pubkey, self.liqee),
+                            orders.market_index,
+                            &orders.open_orders,
+                        )
+                        .await?
+                }
+            };
+            new_ixs.append(cancel_ix);
 
             let exceeds_cu_limit = new_ixs.cu > self.config.max_cu_per_transaction;
             let exceeds_size_limit = {
@@ -100,16 +141,20 @@ impl<'a> LiquidateHelper<'a> {
             }
 
             ixs = new_ixs;
-            cancelled_markets.push(force_cancel.market_index);
+            match force_cancel {
+                SpotMarket::Serum(orders) => cancelled_serum3.push(orders.market_index),
+                SpotMarket::OpenbookV2(orders) => cancelled_openbook_v2.push(orders.market_index),
+            }
         }
 
         tx_builder.instructions = ixs.to_instructions();
 
         let txsig = tx_builder.send_and_confirm(&self.client.client).await?;
         info!(
-            market_indexes = ?cancelled_markets,
+            market_indexes_serum3 = ?cancelled_serum3,
+            market_indexes_openbook_v2 = ?cancelled_openbook_v2,
             %txsig,
-            "Force cancelled serum orders",
+            "Force cancelled spot orders",
         );
         Ok(Some(txsig))
     }
@@ -619,7 +664,7 @@ impl<'a> LiquidateHelper<'a> {
         if let Some(txsig) = self.perp_close_orders().await? {
             return Ok(Some(txsig));
         }
-        if let Some(txsig) = self.serum3_close_orders().await? {
+        if let Some(txsig) = self.spot_close_orders().await? {
             return Ok(Some(txsig));
         }
 

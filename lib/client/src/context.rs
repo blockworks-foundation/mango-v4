@@ -5,11 +5,12 @@ use anchor_client::ClientError;
 use anchor_lang::__private::bytemuck;
 
 use mango_v4::{
-    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
+    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData, LoadZeroCopy},
     state::{
         determine_oracle_type, load_orca_pool_state, load_raydium_pool_state,
-        oracle_state_unchecked, Group, MangoAccountValue, OracleAccountInfos, OracleConfig,
-        OracleConfigParams, OracleType, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+        oracle_state_unchecked, Group, MangoAccountValue, OpenbookV2MarketIndex,
+        OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType, PerpMarketIndex,
+        Serum3MarketIndex, TokenIndex, MAX_BANKS,
     },
 };
 
@@ -94,6 +95,24 @@ pub struct Serum3MarketContext {
 }
 
 #[derive(Clone, PartialEq, Eq)]
+pub struct OpenbookV2MarketContext {
+    pub address: Pubkey,
+    pub name: String,
+    pub openbook_v2_program: Pubkey,
+    pub market_external: Pubkey,
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
+    pub bids: Pubkey,
+    pub asks: Pubkey,
+    pub event_heap: Pubkey,
+    pub market_base_vault: Pubkey,
+    pub market_quote_vault: Pubkey,
+    pub market_authority: Pubkey,
+    pub quote_lot_size: u64,
+    pub base_lot_size: u64,
+}
+
+#[derive(Clone, PartialEq, Eq)]
 pub struct PerpMarketContext {
     pub group: Pubkey,
     pub perp_market_index: PerpMarketIndex,
@@ -118,6 +137,7 @@ pub struct ComputeEstimates {
     pub health_cu_per_obv2: u32,
     pub cu_per_serum3_order_match: u32,
     pub cu_per_serum3_order_cancel: u32,
+    pub cu_per_openbook_v2_order_cancel: u32,
     pub cu_per_perp_order_match: u32,
     pub cu_per_perp_order_cancel: u32,
     pub cu_per_oracle_fallback: u32,
@@ -139,6 +159,7 @@ impl Default for ComputeEstimates {
             cu_per_serum3_order_match: 3_000,
             // measured around 11k, see test_serum_compute
             cu_per_serum3_order_cancel: 20_000,
+            cu_per_openbook_v2_order_cancel: 30_000,
             // measured around 3.5k, see test_perp_compute
             cu_per_perp_order_match: 7_000,
             // measured around 3.5k, see test_perp_compute
@@ -197,6 +218,9 @@ pub struct MangoGroupContext {
     pub serum3_markets: HashMap<Serum3MarketIndex, Serum3MarketContext>,
     pub serum3_market_indexes_by_name: HashMap<String, Serum3MarketIndex>,
 
+    pub openbook_v2_markets: HashMap<OpenbookV2MarketIndex, OpenbookV2MarketContext>,
+    pub openbook_v2_market_indexes_by_name: HashMap<String, OpenbookV2MarketIndex>,
+
     pub perp_markets: HashMap<PerpMarketIndex, PerpMarketContext>,
     pub perp_market_indexes_by_name: HashMap<String, PerpMarketIndex>,
 
@@ -232,6 +256,10 @@ impl MangoGroupContext {
 
     pub fn serum3_quote_token(&self, market_index: Serum3MarketIndex) -> &TokenContext {
         self.token(self.serum3(market_index).quote_token_index)
+    }
+
+    pub fn openbook_v2(&self, market_index: OpenbookV2MarketIndex) -> &OpenbookV2MarketContext {
+        self.openbook_v2_markets.get(&market_index).unwrap()
     }
 
     pub fn token(&self, token_index: TokenIndex) -> &TokenContext {
@@ -350,6 +378,41 @@ impl MangoGroupContext {
             })
             .collect::<HashMap<_, _>>();
 
+        // openbook v2 markets
+        let openbook_v2_market_tuples = fetch_openbook_v2_markets(rpc, program, group).await?;
+        let openbook_v2_markets_external = stream::iter(openbook_v2_market_tuples.iter())
+            .then(|(_, s)| fetch_raw_account(rpc, s.openbook_v2_market_external))
+            .try_collect::<Vec<_>>()
+            .await?;
+        let openbook_v2_markets = openbook_v2_market_tuples
+            .iter()
+            .zip(openbook_v2_markets_external.iter())
+            .map(|((pk, s), market_external_account)| {
+                let market_external = market_external_account
+                    .load::<openbook_v2::state::Market>()
+                    .unwrap();
+                (
+                    s.market_index,
+                    OpenbookV2MarketContext {
+                        address: *pk,
+                        base_token_index: s.base_token_index,
+                        quote_token_index: s.quote_token_index,
+                        name: s.name().to_string(),
+                        openbook_v2_program: s.openbook_v2_program,
+                        market_external: s.openbook_v2_market_external,
+                        bids: market_external.bids,
+                        asks: market_external.asks,
+                        event_heap: market_external.event_heap,
+                        market_base_vault: market_external.market_base_vault,
+                        market_quote_vault: market_external.market_quote_vault,
+                        market_authority: market_external.market_authority,
+                        quote_lot_size: market_external.quote_lot_size.try_into().unwrap(),
+                        base_lot_size: market_external.base_lot_size.try_into().unwrap(),
+                    },
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
         // perp markets
         let perp_market_tuples = fetch_perp_markets(rpc, program, group).await?;
         let perp_markets = perp_market_tuples
@@ -385,6 +448,10 @@ impl MangoGroupContext {
             .iter()
             .map(|(i, s)| (s.name.clone(), *i))
             .collect::<HashMap<_, _>>();
+        let openbook_v2_market_indexes_by_name = openbook_v2_markets
+            .iter()
+            .map(|(i, s)| (s.name.clone(), *i))
+            .collect::<HashMap<_, _>>();
         let perp_market_indexes_by_name = perp_markets
             .iter()
             .map(|(i, p)| (p.name.clone(), *i))
@@ -404,6 +471,8 @@ impl MangoGroupContext {
             token_indexes_by_name,
             serum3_markets,
             serum3_market_indexes_by_name,
+            openbook_v2_markets,
+            openbook_v2_market_indexes_by_name,
             perp_markets,
             perp_market_indexes_by_name,
             address_lookup_tables,
