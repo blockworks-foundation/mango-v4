@@ -365,37 +365,42 @@ pub async fn load_supported_token_mints(
         }
     }
 
+    // taken from https://github.com/igneous-labs/sanctum-lst-list/blob/master/sanctum-lst-list.toml
+    let hardcoded_lst_mints = [
+        "pathdXw4He1Xk3eX84pDdDZnGKEme3GivBamGCVPZ5a", //  pathSOL
+        "jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v", // JupSOL
+        "BgYgFYq4A9a2o5S1QbWkmYVFBh7LBQL8YvugdhieFg38", // juicingJupSOL
+        "pWrSoLAhue6jUxUkbWgmEy5rD9VJzkFmvfTDV5KgNuu", // pwrSOL
+        "suPer8CPwxoJPQ7zksGMwFvjBQhjAHwUMmPV4FVatBw", // superSOL
+        "jucy5XJ76pHVvtPZb5TKRcGQExkwit2P5s4vY8UzmpC", // jucySOL
+        "BonK1YhkXEGLZzwtcvRTip3gAL9nCeQD7ppZBLXhtTs", // bonkSOL
+        "Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ", // dSOL
+        "Comp4ssDzXcLeu2MnLuGNNFC4cmLPMng8qWHPvzAMU1h", // compassSOL
+        "picobAEvs6w7QEknPce34wAE4gknZA9v5tTonnmHYdX", // picoSOL
+        "GRJQtWwdJmp5LLpy8JWjPgn5FnLyqSJGNhn5ZnCTFUwM", // clockSOL
+        "HUBsveNpjo5pWqNkH57QzxjQASdTVXcSK7bVKTSZtcSX", // hubSOL
+        "strng7mqqc1MBJJV6vMzYbEqnwVGvKKGKedeCvtktWA", // strongSOL
+        "LnTRntk2kTfWEY6cVB8K9649pgJbt6dJLS1Ns1GZCWg", // lanternSOL
+        "st8QujHLPsX3d6HG9uQg9kJ91jFxUgruwsb1hyYXSNd", // stakeSOL
+        "pumpkinsEq8xENVZE6QgTS93EN4r9iKvNxNALS1ooyp", // pumpkinSOL
+        "CgnTSoL3DgY9SFHxcLj6CgCgKKoTBr6tp4CPAEWy25DE", // cgntSOL
+        "LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X", // laineSOL
+        "vSoLxydx6akxyMD9XEcPvGYNGq6Nn66oqVb3UkGkei7", // vSOL
+        "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1", // bSOL
+        "GEJpt3Wjmr628FqXxTgxMce1pLntcPV4uFi8ksxMyPQh", // daoSOL
+        "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", // JitoSOL
+        "7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn", // JSOL
+        "LSTxxxnJzKDFSLr4dUkPcmCf5VyryEqzPLz5j4bpxFp", // LST
+        "Zippybh3S5xYYam2nvL6hVJKz1got6ShgV4DyD1XQYF", // zippySOL
+        "edge86g9cVz87xcpKpy3J77vbp4wYd9idEV562CCntt", // edgeSOL
+        "So11111111111111111111111111111111111111112", // SOL
+        "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm", // INF
+        "7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj", // stSOL
+        "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", // mSOL
+    ];
+
     // Hardcoded for now
-    lst_mints.insert(
-        Pubkey::from_str("CgntPoLka5pD5fesJYhGmUCF8KU1QS1ZmZiuAuMZr2az").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("7ge2xKsZXmqPxa3YmXxXmzCp9Hc2ezrTxh6PECaxCwrL").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("GUAMR8ciiaijraJeLDEDrFVaueLm9YzWWY9R7CBPL9rA").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("Jito4APyf642JPZPx3hGc6WWJ8zPKtRbRs4P815Awbb").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("CtMyWsrUtAwXWiGr9WjHT5fC3p3fgV8cyGpLTo2LJzG1").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("2qyEeSAWKfU18AFthrF7JA8z8ZCi1yt76Tqs917vwQTV").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("DqhH94PjkZsjAqEze2BEkWhFQJ6EyU6MdtMphMgnXqeK").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("F8h46pYkaqPJNP2MRkUUUtRkf8efCkpoqehn9g1bTTm7").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("5oc4nmbNTda9fx8Tw57ShLD132aqDK65vuHH4RU1K4LZ").expect("invalid lst mint"),
-    );
-    lst_mints.insert(
-        Pubkey::from_str("stk9ApL5HeVAwPLr3TLhDXdZS8ptVu7zp6ov8HFDuMi").expect("invalid lst mint"),
-    );
+    lst_mints.extend(hardcoded_lst_mints.map(|x| Pubkey::from_str(x).expect("invalid mint")));
 
     Ok(lst_mints)
 }
