@@ -40,7 +40,7 @@ pub fn openbook_v2_place_order(
         OpenbookV2Side::Bid => openbook_market.quote_token_index,
         OpenbookV2Side::Ask => openbook_market.base_token_index,
     };
-    msg!("side {:?} payer token {} ", order.side, payer_token_index);
+
     //
     // Validation
     //
@@ -103,6 +103,11 @@ pub fn openbook_v2_place_order(
         now_ts,
     )
     .context("pre init health")?;
+
+    // The payer and receiver token banks/oracles must be passed and be valid
+    health_cache.token_info_index(payer_token_index)?;
+    health_cache.token_info_index(receiver_token_index)?;
+
     let pre_health_opt = if !account.fixed.is_in_health_region() {
         let pre_init_health = account.check_health_pre(&health_cache)?;
         Some(pre_init_health)
