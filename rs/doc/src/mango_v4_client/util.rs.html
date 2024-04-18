@@ -144,6 +144,16 @@
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
 <a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
 </pre><pre class="rust"><code><span class="kw">use </span>solana_sdk::compute_budget::ComputeBudgetInstruction;
 <span class="kw">use </span>solana_sdk::instruction::Instruction;
 
@@ -166,16 +176,26 @@
 <span class="doccomment">/// Push to an async_channel::Sender and ignore if the channel is full
 </span><span class="kw">pub trait </span>AsyncChannelSendUnlessFull&lt;T&gt; {
     <span class="doccomment">/// Send a message if the channel isn&#39;t full
-    </span><span class="kw">fn </span>send_unless_full(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), async_channel::SendError&lt;T&gt;&gt;;
+    </span><span class="kw">fn </span>send_unless_full(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; anyhow::Result&lt;()&gt;;
 }
 
 <span class="kw">impl</span>&lt;T&gt; AsyncChannelSendUnlessFull&lt;T&gt; <span class="kw">for </span>async_channel::Sender&lt;T&gt; {
-    <span class="kw">fn </span>send_unless_full(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), async_channel::SendError&lt;T&gt;&gt; {
+    <span class="kw">fn </span>send_unless_full(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; anyhow::Result&lt;()&gt; {
         <span class="kw">use </span>async_channel::<span class="kw-2">*</span>;
         <span class="kw">match </span><span class="self">self</span>.try_send(msg) {
             <span class="prelude-val">Ok</span>(()) =&gt; <span class="prelude-val">Ok</span>(()),
-            <span class="prelude-val">Err</span>(TrySendError::Closed(msg)) =&gt; <span class="prelude-val">Err</span>(async_channel::SendError(msg)),
+            <span class="prelude-val">Err</span>(TrySendError::Closed(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow::format_err!</span>(<span class="string">&quot;channel is closed&quot;</span>)),
             <span class="prelude-val">Err</span>(TrySendError::Full(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Ok</span>(()),
+        }
+    }
+}
+<span class="kw">impl</span>&lt;T&gt; AsyncChannelSendUnlessFull&lt;T&gt; <span class="kw">for </span>tokio::sync::mpsc::Sender&lt;T&gt; {
+    <span class="kw">fn </span>send_unless_full(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; anyhow::Result&lt;()&gt; {
+        <span class="kw">use </span>tokio::sync::mpsc::<span class="kw-2">*</span>;
+        <span class="kw">match </span><span class="self">self</span>.try_send(msg) {
+            <span class="prelude-val">Ok</span>(()) =&gt; <span class="prelude-val">Ok</span>(()),
+            <span class="prelude-val">Err</span>(error::TrySendError::Closed(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Err</span>(<span class="macro">anyhow::format_err!</span>(<span class="string">&quot;channel is closed&quot;</span>)),
+            <span class="prelude-val">Err</span>(error::TrySendError::Full(<span class="kw">_</span>)) =&gt; <span class="prelude-val">Ok</span>(()),
         }
     }
 }

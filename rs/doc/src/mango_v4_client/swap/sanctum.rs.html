@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/jupiter/v6.rs`."><title>v6.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4_client/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/swap/sanctum.rs`."><title>sanctum.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4_client/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -404,174 +404,71 @@
 <a href="#404" id="404">404</a>
 <a href="#405" id="405">405</a>
 <a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a>
-<a href="#408" id="408">408</a>
-<a href="#409" id="409">409</a>
-<a href="#410" id="410">410</a>
-<a href="#411" id="411">411</a>
-<a href="#412" id="412">412</a>
-<a href="#413" id="413">413</a>
-<a href="#414" id="414">414</a>
-<a href="#415" id="415">415</a>
-<a href="#416" id="416">416</a>
-<a href="#417" id="417">417</a>
-<a href="#418" id="418">418</a>
-<a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
-<a href="#421" id="421">421</a>
-<a href="#422" id="422">422</a>
-</pre><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
+</pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashSet;
+<span class="kw">use </span>std::str::FromStr;
 
-<span class="kw">use </span>anchor_lang::prelude::Pubkey;
-<span class="kw">use </span>serde::{Deserialize, Serialize};
-
-<span class="kw">use </span>anchor_lang::Id;
+<span class="kw">use </span>anchor_lang::{system_program, Id};
 <span class="kw">use </span>anchor_spl::token::Token;
-
-<span class="kw">use </span><span class="kw">crate</span>::MangoClient;
-<span class="kw">use crate</span>::{util, TransactionBuilder};
-
 <span class="kw">use </span>anyhow::Context;
-<span class="kw">use </span>solana_sdk::{instruction::Instruction, signature::Signature};
+<span class="kw">use </span>bincode::Options;
+<span class="kw">use </span>mango_v4::accounts_zerocopy::AccountReader;
+<span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>solana_address_lookup_table_program::state::AddressLookupTable;
+<span class="kw">use </span>solana_client::nonblocking::rpc_client::RpcClient;
+<span class="kw">use </span>solana_sdk::account::Account;
+<span class="kw">use </span>solana_sdk::{instruction::Instruction, pubkey::Pubkey, signature::Signature};
+<span class="kw">use </span>std::time::Duration;
+
+<span class="kw">use </span><span class="kw">crate</span>::gpa::fetch_multiple_accounts_in_chunks;
+<span class="kw">use </span><span class="kw">crate</span>::swap::sanctum_state;
+<span class="kw">use crate</span>::{util, MangoClient, TransactionBuilder};
+<span class="kw">use </span>borsh::BorshDeserialize;
 
 <span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
 </span><span class="kw">pub struct </span>QuoteResponse {
-    <span class="kw">pub </span>input_mint: String,
     <span class="kw">pub </span>in_amount: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>output_mint: String,
-    <span class="kw">pub </span>out_amount: String,
-    <span class="kw">pub </span>other_amount_threshold: String,
-    <span class="kw">pub </span>swap_mode: String,
-    <span class="kw">pub </span>slippage_bps: i32,
-    <span class="kw">pub </span>platform_fee: <span class="prelude-ty">Option</span>&lt;PlatformFee&gt;,
-    <span class="kw">pub </span>price_impact_pct: String,
-    <span class="kw">pub </span>route_plan: Vec&lt;RoutePlan&gt;,
-    <span class="kw">pub </span>context_slot: u64,
-    <span class="kw">pub </span>time_taken: f64,
-}
-
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>PlatformFee {
-    <span class="kw">pub </span>amount: String,
-    <span class="kw">pub </span>fee_bps: i32,
-}
-
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>RoutePlan {
-    <span class="kw">pub </span>percent: i32,
-    <span class="kw">pub </span>swap_info: <span class="prelude-ty">Option</span>&lt;SwapInfo&gt;,
-}
-
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>SwapInfo {
-    <span class="kw">pub </span>amm_key: String,
-    <span class="kw">pub </span>label: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>input_mint: String,
-    <span class="kw">pub </span>output_mint: String,
-    <span class="kw">pub </span>in_amount: String,
     <span class="kw">pub </span>out_amount: String,
     <span class="kw">pub </span>fee_amount: String,
     <span class="kw">pub </span>fee_mint: String,
+    <span class="kw">pub </span>fee_pct: String,
+    <span class="kw">pub </span>swap_src: String,
 }
 
 <span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
 </span><span class="kw">pub struct </span>SwapRequest {
-    <span class="kw">pub </span>user_public_key: String,
-    <span class="kw">pub </span>wrap_and_unwrap_sol: bool,
-    <span class="kw">pub </span>use_shared_accounts: bool,
-    <span class="kw">pub </span>fee_account: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>compute_unit_price_micro_lamports: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-    <span class="kw">pub </span>as_legacy_transaction: bool,
-    <span class="kw">pub </span>use_token_ledger: bool,
-    <span class="kw">pub </span>destination_token_account: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>quote_response: QuoteResponse,
+    <span class="kw">pub </span>amount: String,
+    <span class="kw">pub </span>quoted_amount: String,
+    <span class="kw">pub </span>input: String,
+    <span class="kw">pub </span>mode: String,
+    <span class="kw">pub </span>output_lst_mint: String,
+    <span class="kw">pub </span>signer: String,
+    <span class="kw">pub </span>swap_src: String,
 }
 
 <span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>SwapResponse {
-    <span class="kw">pub </span>swap_transaction: String,
+</span><span class="kw">pub struct </span>SanctumSwapResponse {
+    <span class="kw">pub </span>tx: String,
 }
 
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>SwapInstructionsResponse {
-    <span class="kw">pub </span>token_ledger_instruction: <span class="prelude-ty">Option</span>&lt;InstructionResponse&gt;,
-    <span class="kw">pub </span>compute_budget_instructions: <span class="prelude-ty">Option</span>&lt;Vec&lt;InstructionResponse&gt;&gt;,
-    <span class="kw">pub </span>setup_instructions: <span class="prelude-ty">Option</span>&lt;Vec&lt;InstructionResponse&gt;&gt;,
-    <span class="kw">pub </span>swap_instruction: InstructionResponse,
-    <span class="kw">pub </span>cleanup_instructions: <span class="prelude-ty">Option</span>&lt;Vec&lt;InstructionResponse&gt;&gt;,
-    <span class="kw">pub </span>address_lookup_table_addresses: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
-}
-
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>InstructionResponse {
-    <span class="kw">pub </span>program_id: String,
-    <span class="kw">pub </span>data: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>accounts: <span class="prelude-ty">Option</span>&lt;Vec&lt;AccountMeta&gt;&gt;,
-}
-
-<span class="attr">#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = <span class="string">&quot;camelCase&quot;</span>)]
-</span><span class="kw">pub struct </span>AccountMeta {
-    <span class="kw">pub </span>pubkey: String,
-    <span class="kw">pub </span>is_signer: <span class="prelude-ty">Option</span>&lt;bool&gt;,
-    <span class="kw">pub </span>is_writable: <span class="prelude-ty">Option</span>&lt;bool&gt;,
-}
-
-<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>InstructionResponse&gt; <span class="kw">for </span>solana_sdk::instruction::Instruction {
-    <span class="kw">type </span>Error = anyhow::Error;
-    <span class="kw">fn </span>try_from(m: <span class="kw-2">&amp;</span>InstructionResponse) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
-        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
-            program_id: Pubkey::from_str(<span class="kw-2">&amp;</span>m.program_id)<span class="question-mark">?</span>,
-            data: m
-                .data
-                .as_ref()
-                .map(|d| base64::decode(d))
-                .unwrap_or(<span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]))<span class="question-mark">?</span>,
-            accounts: m
-                .accounts
-                .as_ref()
-                .map(|accs| {
-                    accs.iter()
-                        .map(|a| a.try_into())
-                        .collect::&lt;anyhow::Result&lt;Vec&lt;solana_sdk::instruction::AccountMeta&gt;&gt;&gt;()
-                })
-                .unwrap_or(<span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]))<span class="question-mark">?</span>,
-        })
-    }
-}
-
-<span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>AccountMeta&gt; <span class="kw">for </span>solana_sdk::instruction::AccountMeta {
-    <span class="kw">type </span>Error = anyhow::Error;
-    <span class="kw">fn </span>try_from(m: <span class="kw-2">&amp;</span>AccountMeta) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
-        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
-            pubkey: Pubkey::from_str(<span class="kw-2">&amp;</span>m.pubkey)<span class="question-mark">?</span>,
-            is_signer: m.is_signer.unwrap_or(<span class="bool-val">false</span>),
-            is_writable: m.is_writable.unwrap_or(<span class="bool-val">false</span>),
-        })
-    }
-}
-
-<span class="kw">pub struct </span>JupiterV6&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">pub struct </span>Sanctum&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub </span>mango_client: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MangoClient,
+    <span class="kw">pub </span>timeout_duration: Duration,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; JupiterV6&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Sanctum&lt;<span class="lifetime">&#39;a</span>&gt; {
     <span class="kw">pub async fn </span>quote(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        slippage_bps: u64,
-        only_direct_routes: bool,
     ) -&gt; anyhow::Result&lt;QuoteResponse&gt; {
+        <span class="kw">if </span>input_mint == output_mint {
+            <span class="macro">anyhow::bail!</span>(<span class="string">&quot;Need two distinct mint to swap&quot;</span>);
+        }
+
         <span class="kw">let </span><span class="kw-2">mut </span>account = <span class="self">self</span>.mango_client.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>input_token_index = <span class="self">self
             </span>.mango_client
@@ -586,64 +483,39 @@
         account.ensure_token_position(input_token_index)<span class="question-mark">?</span>;
         account.ensure_token_position(output_token_index)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>health_account_num =
-            <span class="comment">// bank and oracle
-            </span><span class="number">2 </span>* account.active_token_positions().count()
-            <span class="comment">// perp market and oracle
-            </span>+ <span class="number">2 </span>* account.active_perp_positions().count()
-            <span class="comment">// open orders account
-            </span>+ account.active_serum3_orders().count();
-        <span class="comment">// The mango instructions need the health account plus
-        // mango program and group and account and instruction introspection.
-        // Other accounts are shared between jupiter and mango:
-        // token accounts, mints, token program, ata program, owner
-        </span><span class="kw">let </span>extra_accounts = <span class="number">4</span>;
-        <span class="comment">// To produce more of a margin for error (also for the tx bytes size)
-        </span><span class="kw">let </span>buffer_accounts = <span class="number">6</span>;
-        <span class="kw">let </span>flash_loan_account_num = health_account_num + extra_accounts + buffer_accounts;
-
-        <span class="kw">let </span><span class="kw-2">mut </span>query_args = <span class="macro">vec!</span>[
-            (<span class="string">&quot;inputMint&quot;</span>, input_mint.to_string()),
-            (<span class="string">&quot;outputMint&quot;</span>, output_mint.to_string()),
+        <span class="kw">let </span>query_args = <span class="macro">vec!</span>[
+            (<span class="string">&quot;input&quot;</span>, input_mint.to_string()),
+            (<span class="string">&quot;outputLstMint&quot;</span>, output_mint.to_string()),
             (<span class="string">&quot;amount&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, amount)),
-            (<span class="string">&quot;slippageBps&quot;</span>, <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, slippage_bps)),
-            (<span class="string">&quot;onlyDirectRoutes&quot;</span>, only_direct_routes.to_string()),
-            (
-                <span class="string">&quot;maxAccounts&quot;</span>,
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;{}&quot;</span>,
-                    <span class="kw">crate</span>::MAX_ACCOUNTS_PER_TRANSACTION - flash_loan_account_num
-                ),
-            ),
         ];
         <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
-        <span class="kw">if </span>!config.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
-        }
 
         <span class="kw">let </span>response = <span class="self">self
             </span>.mango_client
             .http_client
-            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/quote&quot;</span>, config.jupiter_v6_url))
+            .get(<span class="macro">format!</span>(<span class="string">&quot;{}/swap/quote&quot;</span>, config.sanctum_url))
             .query(<span class="kw-2">&amp;</span>query_args)
+            .timeout(<span class="self">self</span>.timeout_duration)
             .send()
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+            </span>.context(<span class="string">&quot;quote request to sanctum&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>quote: QuoteResponse =
             util::http_error_handling(response).<span class="kw">await</span>.with_context(|| {
-                <span class="macro">format!</span>(<span class="string">&quot;error requesting jupiter route between {input_mint} and {output_mint}&quot;</span>)
+                <span class="macro">format!</span>(<span class="string">&quot;error requesting sanctum route between {input_mint} and {output_mint} (using url: {})&quot;</span>, config.sanctum_url)
             })<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(quote)
     }
 
-    <span class="doccomment">/// Find the instructions and account lookup tables for a jupiter swap through mango
+    <span class="doccomment">/// Find the instructions and account lookup tables for a sanctum swap through mango
     </span><span class="kw">pub async fn </span>prepare_swap_transaction(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        max_slippage_bps: u64,
         quote: <span class="kw-2">&amp;</span>QuoteResponse,
     ) -&gt; anyhow::Result&lt;TransactionBuilder&gt; {
-        <span class="kw">let </span>input_mint = Pubkey::from_str(<span class="kw-2">&amp;</span>quote.input_mint)<span class="question-mark">?</span>;
-        <span class="kw">let </span>output_mint = Pubkey::from_str(<span class="kw-2">&amp;</span>quote.output_mint)<span class="question-mark">?</span>;
+        <span class="macro">tracing::info!</span>(<span class="string">&quot;swapping using sanctum&quot;</span>);
 
         <span class="kw">let </span>source_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>input_mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>target_token = <span class="self">self</span>.mango_client.context.token_by_mint(<span class="kw-2">&amp;</span>output_mint)<span class="question-mark">?</span>;
@@ -690,46 +562,92 @@
             .<span class="kw">await
             </span>.context(<span class="string">&quot;building health accounts&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>query_args = <span class="macro">vec!</span>[];
         <span class="kw">let </span>config = <span class="self">self</span>.mango_client.client.config();
-        <span class="kw">if </span>!config.jupiter_token.is_empty() {
-            query_args.push((<span class="string">&quot;token&quot;</span>, config.jupiter_token.clone()));
-        }
+
+        <span class="kw">let </span>in_amount = quote
+            .in_amount
+            .clone()
+            .expect(<span class="string">&quot;sanctum require a in amount&quot;</span>);
+        <span class="kw">let </span>quote_amount_u64 = quote.out_amount.parse::&lt;u64&gt;()<span class="question-mark">?</span>;
+        <span class="kw">let </span>out_amount = ((quote_amount_u64 <span class="kw">as </span>f64) * (<span class="number">1.0 </span>- (max_slippage_bps <span class="kw">as </span>f64) / <span class="number">10_000.0</span>))
+            .ceil() <span class="kw">as </span>u64;
 
         <span class="kw">let </span>swap_response = <span class="self">self
             </span>.mango_client
             .http_client
-            .post(<span class="macro">format!</span>(<span class="string">&quot;{}/swap-instructions&quot;</span>, config.jupiter_v6_url))
-            .query(<span class="kw-2">&amp;</span>query_args)
+            .post(<span class="macro">format!</span>(<span class="string">&quot;{}/swap&quot;</span>, config.sanctum_url))
             .json(<span class="kw-2">&amp;</span>SwapRequest {
-                user_public_key: owner.to_string(),
-                wrap_and_unwrap_sol: <span class="bool-val">false</span>,
-                use_shared_accounts: <span class="bool-val">true</span>,
-                fee_account: <span class="prelude-val">None</span>,
-                compute_unit_price_micro_lamports: <span class="prelude-val">None</span>, <span class="comment">// we already prioritize
-                </span>as_legacy_transaction: <span class="bool-val">false</span>,
-                use_token_ledger: <span class="bool-val">false</span>,
-                destination_token_account: <span class="prelude-val">None</span>, <span class="comment">// default to user ata
-                </span>quote_response: quote.clone(),
+                amount: in_amount.clone(),
+                quoted_amount: out_amount.to_string(),
+                input: input_mint.to_string(),
+                mode: <span class="string">&quot;ExactIn&quot;</span>.to_string(),
+                output_lst_mint: output_mint.to_string(),
+                signer: owner.to_string(),
+                swap_src: quote.swap_src.clone(),
             })
+            .timeout(<span class="self">self</span>.timeout_duration)
             .send()
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;swap transaction request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+            </span>.context(<span class="string">&quot;swap transaction request to sanctum&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span>swap: SwapInstructionsResponse = util::http_error_handling(swap_response)
+        <span class="kw">let </span>swap_r: SanctumSwapResponse = util::http_error_handling(swap_response)
             .<span class="kw">await
-            </span>.context(<span class="string">&quot;error requesting jupiter swap&quot;</span>)<span class="question-mark">?</span>;
+            </span>.context(<span class="string">&quot;error requesting sanctum swap&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>tx = bincode::options()
+            .with_fixint_encoding()
+            .reject_trailing_bytes()
+            .deserialize::&lt;solana_sdk::transaction::VersionedTransaction&gt;(
+                <span class="kw-2">&amp;</span>base64::decode(<span class="kw-2">&amp;</span>swap_r.tx).context(<span class="string">&quot;base64 decoding sanctum transaction&quot;</span>)<span class="question-mark">?</span>,
+            )
+            .context(<span class="string">&quot;parsing sanctum transaction&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>(sanctum_ixs_orig, sanctum_alts) = <span class="self">self
+            </span>.mango_client
+            .deserialize_instructions_and_alts(<span class="kw-2">&amp;</span>tx.message)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let </span>system_program = system_program::ID;
+        <span class="kw">let </span>ata_program = anchor_spl::associated_token::ID;
+        <span class="kw">let </span>token_program = anchor_spl::token::ID;
+        <span class="kw">let </span>compute_budget_program: Pubkey = solana_sdk::compute_budget::ID;
+        <span class="comment">// these setup instructions should be placed outside of flashloan begin-end
+        </span><span class="kw">let </span>is_setup_ix = |k: Pubkey| -&gt; bool {
+            k == ata_program || k == token_program || k == compute_budget_program
+        };
+        <span class="kw">let </span>sync_native_pack =
+            anchor_spl::token::spl_token::instruction::TokenInstruction::SyncNative.pack();
+
+        <span class="comment">// Remove auto wrapping of SOL-&gt;wSOL
+        </span><span class="kw">let </span>sanctum_ixs: Vec&lt;Instruction&gt; = sanctum_ixs_orig
+            .clone()
+            .into_iter()
+            .filter(|ix| {
+                !(ix.program_id == system_program)
+                    &amp;&amp; !(ix.program_id == token_program &amp;&amp; ix.data == sync_native_pack)
+            })
+            .collect();
+
+        <span class="kw">let </span>sanctum_action_ix_begin = sanctum_ixs
+            .iter()
+            .position(|ix| !is_setup_ix(ix.program_id))
+            .ok_or_else(|| {
+                <span class="macro">anyhow::anyhow!</span>(<span class="string">&quot;sanctum swap response only had setup-like instructions&quot;</span>)
+            })<span class="question-mark">?</span>;
+        <span class="kw">let </span>sanctum_action_ix_end = sanctum_ixs.len()
+            - sanctum_ixs
+                .iter()
+                .rev()
+                .position(|ix| !is_setup_ix(ix.program_id))
+                .unwrap();
 
         <span class="kw">let </span><span class="kw-2">mut </span>instructions: Vec&lt;Instruction&gt; = Vec::new();
 
-        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>swap.compute_budget_instructions.unwrap_or_default() {
-            instructions.push(ix.try_into()<span class="question-mark">?</span>);
-        }
-        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>swap.setup_instructions.unwrap_or_default() {
-            instructions.push(ix.try_into()<span class="question-mark">?</span>);
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>sanctum_ixs[..sanctum_action_ix_begin] {
+            instructions.push(ix.clone());
         }
 
-        <span class="comment">// Ensure the source token account is created (jupiter takes care of the output account)
+        <span class="comment">// Ensure the source token account is created (sanctum takes care of the output account)
         </span>instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                 <span class="kw-2">&amp;</span>owner,
@@ -761,7 +679,11 @@
                 loan_amounts,
             }),
         });
-        instructions.push((<span class="kw-2">&amp;</span>swap.swap_instruction).try_into()<span class="question-mark">?</span>);
+
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>sanctum_ixs[sanctum_action_ix_begin..sanctum_action_ix_end] {
+            instructions.push(ix.clone());
+        }
+
         instructions.push(Instruction {
             program_id: mango_v4::id(),
             accounts: {
@@ -784,24 +706,13 @@
                 flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Swap,
             }),
         });
-        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>swap.cleanup_instructions.unwrap_or_default() {
-            instructions.push(ix.try_into()<span class="question-mark">?</span>);
+
+        <span class="kw">for </span>ix <span class="kw">in </span><span class="kw-2">&amp;</span>sanctum_ixs[sanctum_action_ix_end..] {
+            instructions.push(ix.clone());
         }
 
         <span class="kw">let </span><span class="kw-2">mut </span>address_lookup_tables = <span class="self">self</span>.mango_client.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>jup_alt_addresses = swap
-            .address_lookup_table_addresses
-            .map(|list| {
-                list.iter()
-                    .map(|s| Pubkey::from_str(s))
-                    .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
-            })
-            .unwrap_or(<span class="prelude-val">Ok</span>(<span class="macro">vec!</span>[]))<span class="question-mark">?</span>;
-        <span class="kw">let </span>jup_alts = <span class="self">self
-            </span>.mango_client
-            .fetch_address_lookup_tables(jup_alt_addresses.iter())
-            .<span class="kw">await</span><span class="question-mark">?</span>;
-        address_lookup_tables.extend(jup_alts.into_iter());
+        address_lookup_tables.extend(sanctum_alts.into_iter());
 
         <span class="kw">let </span>payer = owner; <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
 
@@ -823,24 +734,81 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         input_mint: Pubkey,
         output_mint: Pubkey,
+        max_slippage_bps: u64,
         amount: u64,
-        slippage_bps: u64,
-        only_direct_routes: bool,
     ) -&gt; anyhow::Result&lt;Signature&gt; {
-        <span class="kw">let </span>route = <span class="self">self
-            </span>.quote(
-                input_mint,
-                output_mint,
-                amount,
-                slippage_bps,
-                only_direct_routes,
-            )
-            .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>route = <span class="self">self</span>.quote(input_mint, output_mint, amount).<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>tx_builder = <span class="self">self</span>.prepare_swap_transaction(<span class="kw-2">&amp;</span>route).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>tx_builder = <span class="self">self
+            </span>.prepare_swap_transaction(input_mint, output_mint, max_slippage_bps, <span class="kw-2">&amp;</span>route)
+            .<span class="kw">await</span><span class="question-mark">?</span>;
 
         tx_builder.send_and_confirm(<span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.client).<span class="kw">await
     </span>}
+}
+
+<span class="kw">pub async fn </span>load_supported_token_mints(
+    live_rpc_client: <span class="kw-2">&amp;</span>RpcClient,
+) -&gt; anyhow::Result&lt;HashSet&lt;Pubkey&gt;&gt; {
+    <span class="kw">let </span>address = Pubkey::from_str(<span class="string">&quot;EhWxBHdmQ3yDmPzhJbKtGMM9oaZD42emt71kSieghy5&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>lookup_table_data = live_rpc_client.get_account(<span class="kw-2">&amp;</span>address).<span class="kw">await</span><span class="question-mark">?</span>;
+    <span class="kw">let </span>lookup_table = AddressLookupTable::deserialize(<span class="kw-2">&amp;</span>lookup_table_data.data())<span class="question-mark">?</span>;
+    <span class="kw">let </span>accounts: Vec&lt;Account&gt; =
+        fetch_multiple_accounts_in_chunks(live_rpc_client, <span class="kw-2">&amp;</span>lookup_table.addresses, <span class="number">100</span>, <span class="number">1</span>)
+            .<span class="kw">await</span><span class="question-mark">?
+            </span>.into_iter()
+            .map(|x| x.<span class="number">1</span>)
+            .collect();
+
+    <span class="kw">let </span><span class="kw-2">mut </span>lst_mints = HashSet::new();
+    <span class="kw">for </span>account <span class="kw">in </span>accounts {
+        <span class="kw">let </span>account = Account::from(account);
+        <span class="kw">let </span><span class="kw-2">mut </span>account_data = account.data();
+        <span class="kw">let </span>t = sanctum_state::StakePool::deserialize(<span class="kw-2">&amp;mut </span>account_data);
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(d) = t {
+            lst_mints.insert(d.pool_mint);
+        }
+    }
+
+    <span class="comment">// taken from https://github.com/igneous-labs/sanctum-lst-list/blob/master/sanctum-lst-list.toml
+    </span><span class="kw">let </span>hardcoded_lst_mints = [
+        <span class="string">&quot;pathdXw4He1Xk3eX84pDdDZnGKEme3GivBamGCVPZ5a&quot;</span>, <span class="comment">//  pathSOL
+        </span><span class="string">&quot;jupSoLaHXQiZZTSfEWMTRRgpnyFm8f6sZdosWBjx93v&quot;</span>, <span class="comment">// JupSOL
+        </span><span class="string">&quot;BgYgFYq4A9a2o5S1QbWkmYVFBh7LBQL8YvugdhieFg38&quot;</span>, <span class="comment">// juicingJupSOL
+        </span><span class="string">&quot;pWrSoLAhue6jUxUkbWgmEy5rD9VJzkFmvfTDV5KgNuu&quot;</span>, <span class="comment">// pwrSOL
+        </span><span class="string">&quot;suPer8CPwxoJPQ7zksGMwFvjBQhjAHwUMmPV4FVatBw&quot;</span>, <span class="comment">// superSOL
+        </span><span class="string">&quot;jucy5XJ76pHVvtPZb5TKRcGQExkwit2P5s4vY8UzmpC&quot;</span>, <span class="comment">// jucySOL
+        </span><span class="string">&quot;BonK1YhkXEGLZzwtcvRTip3gAL9nCeQD7ppZBLXhtTs&quot;</span>, <span class="comment">// bonkSOL
+        </span><span class="string">&quot;Dso1bDeDjCQxTrWHqUUi63oBvV7Mdm6WaobLbQ7gnPQ&quot;</span>, <span class="comment">// dSOL
+        </span><span class="string">&quot;Comp4ssDzXcLeu2MnLuGNNFC4cmLPMng8qWHPvzAMU1h&quot;</span>, <span class="comment">// compassSOL
+        </span><span class="string">&quot;picobAEvs6w7QEknPce34wAE4gknZA9v5tTonnmHYdX&quot;</span>, <span class="comment">// picoSOL
+        </span><span class="string">&quot;GRJQtWwdJmp5LLpy8JWjPgn5FnLyqSJGNhn5ZnCTFUwM&quot;</span>, <span class="comment">// clockSOL
+        </span><span class="string">&quot;HUBsveNpjo5pWqNkH57QzxjQASdTVXcSK7bVKTSZtcSX&quot;</span>, <span class="comment">// hubSOL
+        </span><span class="string">&quot;strng7mqqc1MBJJV6vMzYbEqnwVGvKKGKedeCvtktWA&quot;</span>, <span class="comment">// strongSOL
+        </span><span class="string">&quot;LnTRntk2kTfWEY6cVB8K9649pgJbt6dJLS1Ns1GZCWg&quot;</span>, <span class="comment">// lanternSOL
+        </span><span class="string">&quot;st8QujHLPsX3d6HG9uQg9kJ91jFxUgruwsb1hyYXSNd&quot;</span>, <span class="comment">// stakeSOL
+        </span><span class="string">&quot;pumpkinsEq8xENVZE6QgTS93EN4r9iKvNxNALS1ooyp&quot;</span>, <span class="comment">// pumpkinSOL
+        </span><span class="string">&quot;CgnTSoL3DgY9SFHxcLj6CgCgKKoTBr6tp4CPAEWy25DE&quot;</span>, <span class="comment">// cgntSOL
+        </span><span class="string">&quot;LAinEtNLgpmCP9Rvsf5Hn8W6EhNiKLZQti1xfWMLy6X&quot;</span>, <span class="comment">// laineSOL
+        </span><span class="string">&quot;vSoLxydx6akxyMD9XEcPvGYNGq6Nn66oqVb3UkGkei7&quot;</span>, <span class="comment">// vSOL
+        </span><span class="string">&quot;bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1&quot;</span>, <span class="comment">// bSOL
+        </span><span class="string">&quot;GEJpt3Wjmr628FqXxTgxMce1pLntcPV4uFi8ksxMyPQh&quot;</span>, <span class="comment">// daoSOL
+        </span><span class="string">&quot;J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn&quot;</span>, <span class="comment">// JitoSOL
+        </span><span class="string">&quot;7Q2afV64in6N6SeZsAAB81TJzwDoD6zpqmHkzi9Dcavn&quot;</span>, <span class="comment">// JSOL
+        </span><span class="string">&quot;LSTxxxnJzKDFSLr4dUkPcmCf5VyryEqzPLz5j4bpxFp&quot;</span>, <span class="comment">// LST
+        </span><span class="string">&quot;Zippybh3S5xYYam2nvL6hVJKz1got6ShgV4DyD1XQYF&quot;</span>, <span class="comment">// zippySOL
+        </span><span class="string">&quot;edge86g9cVz87xcpKpy3J77vbp4wYd9idEV562CCntt&quot;</span>, <span class="comment">// edgeSOL
+        </span><span class="string">&quot;So11111111111111111111111111111111111111112&quot;</span>, <span class="comment">// SOL
+        </span><span class="string">&quot;5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm&quot;</span>, <span class="comment">// INF
+        </span><span class="string">&quot;7dHbWXmci3dT8UFYWYZweBLXgycu7Y3iL6trKn1Y7ARj&quot;</span>, <span class="comment">// stSOL
+        </span><span class="string">&quot;mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So&quot;</span>, <span class="comment">// mSOL
+    </span>];
+
+    <span class="comment">// Hardcoded for now
+    </span>lst_mints.extend(hardcoded_lst_mints.map(|x| Pubkey::from_str(x).expect(<span class="string">&quot;invalid mint&quot;</span>)));
+
+    <span class="prelude-val">Ok</span>(lst_mints)
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>
