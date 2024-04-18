@@ -1036,6 +1036,73 @@ async fn test_openbook_place_reducing_when_liquidatable() -> Result<(), Transpor
 }
 
 #[tokio::test]
+async fn test_openbook_liq_force_close() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 1000;
+    let CommonSetup {
+        group_with_tokens,
+        base_token,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+
+    // Place orders that can later be cancelled
+    order_placer.try_bid(0.8, 200, false).await.unwrap();
+    order_placer.try_ask(1.2, 200, false).await.unwrap();
+
+    // Give account some base token borrows (-500)
+    send_tx(
+        solana,
+        TokenWithdrawInstruction {
+            amount: 1500,
+            allow_borrow: true,
+            account: order_placer.account,
+            owner: order_placer.owner,
+            token_account: context.users[0].token_accounts[1],
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    // Change the base price to make the account liquidatable
+    set_bank_stub_oracle_price(
+        solana,
+        group_with_tokens.group,
+        &base_token,
+        group_with_tokens.admin,
+        10.0,
+    )
+    .await;
+
+    let before_init_health = account_init_health(solana, order_placer.account).await;
+    assert!(before_init_health < 0.0);
+
+    send_tx(
+        solana,
+        OpenbookV2LiqForceCancelInstruction {
+            account: order_placer.account,
+            payer: context.users[1].key,
+            openbook_v2_market: order_placer.openbook_market,
+        },
+    )
+    .await
+    .unwrap();
+
+    let after_init_health = account_init_health(solana, order_placer.account).await;
+    println!("{before_init_health} {after_init_health}");
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_openbook_track_bid_ask() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
     test_builder.test().set_compute_max_units(150_000);

@@ -5722,6 +5722,81 @@ impl ClientInstruction for OpenbookV2CloseOpenOrdersInstruction {
     }
 }
 
+pub struct OpenbookV2LiqForceCancelInstruction {
+    pub account: Pubkey,
+    pub payer: TestKeypair,
+
+    pub openbook_v2_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2LiqForceCancelInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2LiqForceCancelOrders;
+    type Instruction = mango_v4::instruction::OpenbookV2LiqForceCancelOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction { limit: 10 };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let quote_info =
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
+        let base_info =
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
+
+        let open_orders = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            payer: self.payer.pubkey(),
+            open_orders,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+            event_heap: external_market.event_heap,
+            market_base_vault: external_market.market_base_vault,
+            market_quote_vault: external_market.market_quote_vault,
+            market_vault_signer: external_market.market_authority,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
+            system_program: System::id(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
+    }
+}
+
 #[derive(Clone)]
 pub struct TokenChargeCollateralFeesInstruction {
     pub account: Pubkey,
