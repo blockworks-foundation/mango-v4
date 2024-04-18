@@ -359,7 +359,7 @@ function typeSize(idl: Idl, ty: IdlType): number {
       return 32;
     default:
       if ('vec' in ty) {
-        return 1;
+        return 4;
       }
       if ('option' in ty) {
         return 1 + typeSize(idl, ty.option);
