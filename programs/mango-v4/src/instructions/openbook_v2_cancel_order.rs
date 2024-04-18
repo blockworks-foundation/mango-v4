@@ -20,7 +20,7 @@ pub fn openbook_v2_cancel_order(
     // Check instruction gate
     let group = ctx.accounts.group.load()?;
     require!(
-        group.is_ix_enabled(IxGate::OpenbookV2CancelAllOrders),
+        group.is_ix_enabled(IxGate::OpenbookV2CancelOrder),
         MangoError::IxIsDisabled
     );
 
