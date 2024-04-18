@@ -1713,7 +1713,7 @@ async fn test_perp_skip_bank() -> Result<(), TransportError> {
     Ok(())
 }
 
-async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
+pub async fn assert_no_perp_orders(solana: &SolanaCookie, account_0: Pubkey) {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
 
     for oo in mango_account_0.perp_open_orders.iter() {

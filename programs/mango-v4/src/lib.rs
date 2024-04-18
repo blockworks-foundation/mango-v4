@@ -946,6 +946,7 @@ pub mod mango_v4 {
         name_opt: Option<String>,
         force_close_opt: Option<bool>,
         platform_liquidation_fee_opt: Option<f32>,
+        set_fallback_oracle: bool,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_edit_market(
@@ -981,6 +982,7 @@ pub mod mango_v4 {
             name_opt,
             force_close_opt,
             platform_liquidation_fee_opt,
+            set_fallback_oracle,
         )?;
         Ok(())
     }

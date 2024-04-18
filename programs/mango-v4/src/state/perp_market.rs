@@ -8,7 +8,7 @@ use oracle::oracle_log_context;
 use static_assertions::const_assert_eq;
 
 use crate::accounts_zerocopy::KeyedAccountReader;
-use crate::error::{Contextable, MangoError};
+use crate::error::{Contextable, IsAnchorErrorWithCode, MangoError};
 use crate::logs::{emit_stack, PerpUpdateFundingLogV2};
 use crate::state::orderbook::Side;
 use crate::state::{oracle, TokenIndex};
@@ -198,8 +198,12 @@ pub struct PerpMarket {
     /// liquidation fees that happened. So never decreases (different to fees_accrued).
     pub accrued_liquidation_fees: I80F48,
 
+    /// Oracle that may be used if the main oracle is stale or not confident enough.
+    /// If this is Pubkey::default(), no fallback is available.
+    pub fallback_oracle: Pubkey,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 1848],
+    pub reserved: [u8; 1816],
 }
 
 const_assert_eq!(
@@ -237,7 +241,8 @@ const_assert_eq!(
         + 3 * 16
         + 8
         + 2 * 16
-        + 1848
+        + 32
+        + 1816
 );
 const_assert_eq!(size_of::<PerpMarket>(), 2808);
 const_assert_eq!(size_of::<PerpMarket>() % 8, 0);
@@ -288,13 +293,45 @@ impl PerpMarket {
         staleness_slot: Option<u64>,
     ) -> Result<OracleState> {
         require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
-        let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
-        state
-            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
-            .with_context(|| {
-                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
+        let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
+        let primary_ok =
+            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+        if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
+            let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
+            require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
+            let fallback_state =
+                oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.base_decimals)?;
+            let fallback_ok = fallback_state
+                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            fallback_ok.with_context(|| {
+                format!(
+                    "{} {}",
+                    oracle_log_context(
+                        self.name(),
+                        &primary_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    ),
+                    oracle_log_context(
+                        self.name(),
+                        &fallback_state,
+                        &self.oracle_config,
+                        staleness_slot
+                    )
+                )
             })?;
-        Ok(state)
+            Ok(fallback_state)
+        } else {
+            primary_ok.with_context(|| {
+                oracle_log_context(
+                    self.name(),
+                    &primary_state,
+                    &self.oracle_config,
+                    staleness_slot,
+                )
+            })?;
+            Ok(primary_state)
+        }
     }
 
     pub fn stable_price(&self) -> I80F48 {
@@ -500,6 +537,7 @@ impl PerpMarket {
                 max_staleness_slots: -1,
                 reserved: [0; 72],
             },
+            fallback_oracle: Pubkey::default(),
             stable_price_model: StablePriceModel::default(),
             quote_lot_size: 1,
             base_lot_size: 1,
@@ -537,7 +575,7 @@ impl PerpMarket {
             fees_withdrawn: 0,
             platform_liquidation_fee: I80F48::ZERO,
             accrued_liquidation_fees: I80F48::ZERO,
-            reserved: [0; 1848],
+            reserved: [0; 1816],
         }
     }
 }

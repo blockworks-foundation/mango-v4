@@ -31,9 +31,18 @@ pub fn perp_place_order(
             asks: ctx.accounts.asks.load_mut()?,
         };
 
+        let fallback_opt = if perp_market.fallback_oracle != Pubkey::default() {
+            ctx.remaining_accounts
+                .iter()
+                .find(|a| a.key == &perp_market.fallback_oracle)
+                .map(|k| AccountInfoRef::borrow(k).unwrap())
+        } else {
+            None
+        };
+
         let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
         let oracle_state = perp_market.oracle_state(
-            &OracleAccountInfos::from_reader(oracle_ref),
+            &OracleAccountInfos::from_reader_with_fallback(oracle_ref, fallback_opt.as_ref()),
             None, // staleness checked in health
         )?;
         oracle_price = oracle_state.price;

@@ -1,6 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use super::*;
+use crate::cases::test_perp::assert_no_perp_orders;
 use anchor_lang::prelude::AccountMeta;
 use solana_sdk::account::AccountSharedData;
 
@@ -740,6 +741,210 @@ async fn test_raydium_fallback_oracle() -> Result<(), TransportError> {
     .unwrap()
     .result
     .unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_fallback_place_perp() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // bad oracles log a lot
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 1000;
+    let account_0 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let account_1 = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+    let settler =
+        create_funded_account(&solana, group, owner, 251, &context.users[1], &[], 0, 0).await;
+    let settler_owner = owner.clone();
+
+    //
+    // TEST: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket {
+        perp_market, bids, ..
+    } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: -0.0001,
+            taker_fee: 0.0002,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[0]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // SETUP: Fallback oracle
+    //
+    let fallback_oracle_kp = TestKeypair::new();
+    let fallback_oracle = fallback_oracle_kp.pubkey();
+    send_tx(
+        solana,
+        StubOracleCreate {
+            oracle: fallback_oracle_kp,
+            group,
+            mint: tokens[0].mint.pubkey,
+            admin,
+            payer,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        PerpAddFallbackOracle {
+            group,
+            admin,
+            perp_market,
+            fallback_oracle,
+        },
+    )
+    .await
+    .unwrap();
+
+    let price_lots = {
+        let perp_market = solana.get_account::<PerpMarket>(perp_market).await;
+        perp_market.native_price_to_lot(I80F48::ONE)
+    };
+
+    //
+    // SETUP: Change the oracle to be invalid
+    //
+    send_tx(
+        solana,
+        StubOracleSetTestInstruction {
+            oracle: tokens[0].oracle,
+            group,
+            mint: tokens[0].mint.pubkey,
+            admin,
+            price: 1.0,
+            last_update_slot: 0,
+            deviation: 100.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: place order fails due to stale oracle
+    //
+
+    let place_ix = PerpPlaceOrderInstruction {
+        account: account_0,
+        perp_market,
+        owner,
+        side: Side::Bid,
+        price_lots,
+        max_base_lots: 1,
+        ..PerpPlaceOrderInstruction::default()
+    };
+    assert!(send_tx(solana, place_ix.clone()).await.is_err());
+
+    //
+    // SETUP: Ensure fallback oracle matches default
+    //
+    send_tx(
+        solana,
+        StubOracleSetTestInstruction {
+            oracle: tokens[0].oracle,
+            group,
+            mint: tokens[0].mint.pubkey,
+            admin,
+            price: 1.0,
+            last_update_slot: 0,
+            deviation: 0.0,
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: place order succeeds with fallback oracle
+    //
+    let fallback_oracle_meta = AccountMeta {
+        pubkey: fallback_oracle,
+        is_writable: false,
+        is_signer: false,
+    };
+    send_tx_with_extra_accounts(solana, place_ix, vec![fallback_oracle_meta.clone()])
+        .await
+        .unwrap();
+
+    let bids_data = solana.get_account_boxed::<BookSide>(bids).await;
+    assert_eq!(bids_data.roots[0].leaf_count, 1);
+    let order_id_to_cancel = solana
+        .get_account::<MangoAccount>(account_0)
+        .await
+        .perp_open_orders[0]
+        .id;
+
+    send_tx(
+        solana,
+        PerpCancelOrderInstruction {
+            account: account_0,
+            perp_market,
+            owner,
+            order_id: order_id_to_cancel,
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_no_perp_orders(solana, account_0).await;
 
     Ok(())
 }
