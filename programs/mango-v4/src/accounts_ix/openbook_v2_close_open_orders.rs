@@ -53,7 +53,7 @@ pub struct OpenbookV2CloseOpenOrders<'info> {
     #[account(mut, has_one = group)]
     pub base_bank: AccountLoader<'info, Bank>,
 
-    // token_index and payer_bank.vault == payer_vault is validated inline at #3
+    // token_index is validated inline at #3
     #[account(mut, has_one = group)]
     pub quote_bank: AccountLoader<'info, Bank>,
 
