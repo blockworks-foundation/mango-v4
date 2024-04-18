@@ -48,26 +48,11 @@ pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) ->
     //
     // close OO
     //
-    let group_key;
-    let owner_key;
-    let account_num;
-    let bump;
     {
-        // this is so dumb how do i not do this
         let account = ctx.accounts.account.load()?;
-        group_key = account.group;
-        owner_key = account.owner;
-        account_num = account.account_num;
-        bump = account.bump;
+        let seeds = mango_account_seeds!(account);
+        cpi_close_open_orders(ctx.accounts, &[seeds])?;
     }
-    let seeds = &[
-        b"MangoAccount".as_ref(),
-        group_key.as_ref(),
-        owner_key.as_ref(),
-        &account_num.to_le_bytes(),
-        &[bump],
-    ];
-    cpi_close_open_orders(ctx.accounts, &[seeds])?;
 
     // Reduce the in_use_count on the token positions - they no longer need to be forced open.
     // Also dust the position since we have banks now
