@@ -261,13 +261,6 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
-<a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
 </pre><pre class="rust"><code><span class="kw">use </span>jsonrpc_core_client::transports::http;
 
 <span class="kw">use </span>mango_v4::accounts_zerocopy::<span class="kw-2">*</span>;
@@ -286,7 +279,6 @@
 <span class="kw">use </span>solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 <span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::time::{Duration, Instant};
-<span class="kw">use </span>tokio::task::JoinHandle;
 <span class="kw">use </span>tokio::time;
 <span class="kw">use </span>tracing::<span class="kw-2">*</span>;
 
@@ -494,15 +486,11 @@
     <span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">pub fn </span>start(
-    config: Config,
-    mango_oracles: Vec&lt;Pubkey&gt;,
-    sender: async_channel::Sender&lt;Message&gt;,
-) -&gt; JoinHandle&lt;()&gt; {
+<span class="kw">pub fn </span>start(config: Config, mango_oracles: Vec&lt;Pubkey&gt;, sender: async_channel::Sender&lt;Message&gt;) {
     <span class="kw">let </span><span class="kw-2">mut </span>poll_wait_first_snapshot = <span class="kw">crate</span>::delay_interval(time::Duration::from_secs(<span class="number">2</span>));
     <span class="kw">let </span><span class="kw-2">mut </span>interval_between_snapshots = <span class="kw">crate</span>::delay_interval(config.snapshot_interval);
 
-    <span class="kw">let </span>snapshot_job = tokio::spawn(<span class="kw">async move </span>{
+    tokio::spawn(<span class="kw">async move </span>{
         <span class="kw">let </span>rpc_client = http::connect_with_options::&lt;MinimalClient&gt;(<span class="kw-2">&amp;</span>config.rpc_http_url, <span class="bool-val">true</span>)
             .<span class="kw">await
             </span>.expect(<span class="string">&quot;always Ok&quot;</span>);
@@ -535,8 +523,6 @@
             };
         }
     });
-
-    snapshot_job
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>

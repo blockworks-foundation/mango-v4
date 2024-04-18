@@ -726,11 +726,6 @@
 <a href="#726" id="726">726</a>
 <a href="#727" id="727">727</a>
 <a href="#728" id="728">728</a>
-<a href="#729" id="729">729</a>
-<a href="#730" id="730">730</a>
-<a href="#731" id="731">731</a>
-<a href="#732" id="732">732</a>
-<a href="#733" id="733">733</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
@@ -855,8 +850,6 @@
     <span class="kw">pub </span>cu_per_oracle_fallback: u32,
     <span class="kw">pub </span>cu_per_charge_collateral_fees: u32,
     <span class="kw">pub </span>cu_per_charge_collateral_fees_token: u32,
-    <span class="kw">pub </span>cu_for_sequence_check: u32,
-    <span class="kw">pub </span>cu_per_associated_token_account_creation: u32,
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>ComputeEstimates {
@@ -880,9 +873,6 @@
             </span>cu_per_charge_collateral_fees: <span class="number">20_000</span>,
             <span class="comment">// per-chargable-token cost
             </span>cu_per_charge_collateral_fees_token: <span class="number">15_000</span>,
-            <span class="comment">// measured around 8k, see test_basics
-            </span>cu_for_sequence_check: <span class="number">10_000</span>,
-            cu_per_associated_token_account_creation: <span class="number">21_000</span>,
         }
     }
 }

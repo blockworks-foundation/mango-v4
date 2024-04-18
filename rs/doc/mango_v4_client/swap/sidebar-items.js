@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["RawQuote","Version"],"mod":["jupiter_v6","sanctum","sanctum_state"],"struct":["Quote","Swap"]};
