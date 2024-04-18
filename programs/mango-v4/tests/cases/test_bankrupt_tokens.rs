@@ -240,8 +240,8 @@ async fn test_bankrupt_tokens_socialize_loss() -> Result<(), TransportError> {
     // both bank's borrows were completely wiped: no one else borrowed
     let borrow1_bank0: Bank = solana.get_account(borrow_token1.bank).await;
     let borrow1_bank1: Bank = solana.get_account(borrow_token1.bank).await;
-    assert_eq!(borrow1_bank0.native_borrows(), 0);
-    assert_eq!(borrow1_bank1.native_borrows(), 0);
+    assert_eq!(borrow1_bank0.borrows(), 0);
+    assert_eq!(borrow1_bank1.borrows(), 0);
 
     send_tx(
         solana,

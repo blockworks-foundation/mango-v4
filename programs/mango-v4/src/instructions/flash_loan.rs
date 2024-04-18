@@ -3,7 +3,8 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::group_seeds;
 use crate::health::*;
-use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3, TokenBalanceLog};
+use crate::logs::emit_token_balance_log;
+use crate::logs::{emit_stack, FlashLoanLogV3, FlashLoanTokenDetailV3};
 use crate::state::*;
 use crate::util::clock_now;
 
@@ -257,6 +258,7 @@ struct TokenVaultChange {
     bank_index: usize,
     raw_token_index: usize,
     amount: I80F48,
+    after_vault_balance: u64,
 }
 
 pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
@@ -359,11 +361,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
 
         max_swap_fee_rate = max_swap_fee_rate.max(bank.flash_loan_swap_fee_rate);
 
+        let vault = Account::<TokenAccount>::try_from(vault_ai)?;
+
         changes.push(TokenVaultChange {
             token_index: bank.token_index,
             bank_index: i,
             raw_token_index,
             amount: change,
+            after_vault_balance: vault.amount,
         });
     }
 
@@ -487,6 +492,16 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             bank.check_deposit_and_oo_limit()?;
         }
 
+        if change.amount < 0 {
+            // Verify that the no-lending amount on the vault remains. If the acting account
+            // itself had a no-lending position, the unlendable_deposits has already been reduced.
+            require_gte!(
+                change.after_vault_balance,
+                bank.unlendable_deposits,
+                MangoError::InsufficentBankVaultFunds
+            );
+        }
+
         bank.flash_loan_approved_amount = 0;
         bank.flash_loan_token_account_initial = u64::MAX;
 
@@ -502,14 +517,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
             approved_amount: approved_amount_u64,
         });
 
-        emit_stack(TokenBalanceLog {
-            mango_group: group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index: bank.token_index as u16,
-            indexed_position: position.indexed_position.to_bits(),
-            deposit_index: bank.deposit_index.to_bits(),
-            borrow_index: bank.borrow_index.to_bits(),
-        });
+        emit_token_balance_log(ctx.accounts.account.key(), &bank, position);
     }
 
     emit_stack(FlashLoanLogV3 {

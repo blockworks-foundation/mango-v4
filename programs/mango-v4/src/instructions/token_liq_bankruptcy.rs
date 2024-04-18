@@ -5,12 +5,12 @@ use fixed::types::I80F48;
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 
 use crate::accounts_ix::*;
 use crate::logs::{
-    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, TokenLiqBankruptcyLog,
-    WithdrawLoanLog,
+    emit_stack, LoanOriginationFeeInstruction, TokenLiqBankruptcyLog, WithdrawLoanLog,
 };
 
 pub fn token_liq_bankruptcy(
@@ -128,24 +128,13 @@ pub fn token_liq_bankruptcy(
             require_keys_eq!(quote_bank.vault, ctx.accounts.quote_vault.key());
             require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
 
-            let quote_deposit_index = quote_bank.deposit_index;
-            let quote_borrow_index = quote_bank.borrow_index;
-
             // credit the liqor
             let (liqor_quote, liqor_quote_raw_token_index, _) =
                 liqor.ensure_token_position(INSURANCE_TOKEN_INDEX)?;
             let liqor_quote_active =
                 quote_bank.deposit(liqor_quote, insurance_transfer_i80f48, now_ts)?;
 
-            // liqor quote
-            emit_stack(TokenBalanceLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.liqor.key(),
-                token_index: INSURANCE_TOKEN_INDEX,
-                indexed_position: liqor_quote.indexed_position.to_bits(),
-                deposit_index: quote_deposit_index.to_bits(),
-                borrow_index: quote_borrow_index.to_bits(),
-            });
+            emit_token_balance_log(ctx.accounts.liqor.key(), quote_bank, liqor_quote);
 
             // transfer liab from liqee to liqor
             let (liqor_liab, liqor_liab_raw_token_index, _) =
@@ -153,15 +142,7 @@ pub fn token_liq_bankruptcy(
             let liqor_liab_withdraw_result =
                 liab_bank.withdraw_with_fee(liqor_liab, liab_transfer, now_ts)?;
 
-            // liqor liab
-            emit_stack(TokenBalanceLog {
-                mango_group: ctx.accounts.group.key(),
-                mango_account: ctx.accounts.liqor.key(),
-                token_index: liab_token_index,
-                indexed_position: liqor_liab.indexed_position.to_bits(),
-                deposit_index: liab_deposit_index.to_bits(),
-                borrow_index: liab_borrow_index.to_bits(),
-            });
+            emit_token_balance_log(ctx.accounts.liqor.key(), liab_bank, liqor_liab);
 
             // Check liqor's health
             if !liqor.fixed.is_in_health_region() {
@@ -239,7 +220,7 @@ pub fn token_liq_bankruptcy(
             bank.deposit_index = new_deposit_index;
 
             // credit liqee on each bank where we can offset borrows
-            let amount_for_bank = amount_to_credit.min(bank.native_borrows());
+            let amount_for_bank = amount_to_credit.min(bank.borrows());
             if amount_for_bank.is_positive() {
                 // enable dusting, because each deposit() is allowed to round up. thus multiple deposit
                 // could bring the total position slightly above zero otherwise
@@ -256,17 +237,9 @@ pub fn token_liq_bankruptcy(
         require_eq!(liqee_liab.indexed_position, I80F48::ZERO);
     }
 
-    // liqee liab
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.liqee.key(),
-        token_index: liab_token_index,
-        indexed_position: liqee_liab.indexed_position.to_bits(),
-        deposit_index: liab_deposit_index.to_bits(),
-        borrow_index: liab_borrow_index.to_bits(),
-    });
-
     let liab_bank = bank_ais[0].load::<Bank>()?;
+    emit_token_balance_log(ctx.accounts.liqee.key(), &liab_bank, liqee_liab);
+
     let end_liab_native = liqee_liab.native(&liab_bank);
     liqee_health_cache.adjust_token_balance(&liab_bank, end_liab_native - initial_liab_native)?;
 

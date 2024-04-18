@@ -1,7 +1,8 @@
 use crate::accounts_ix::*;
 use crate::error::*;
 use crate::health::*;
-use crate::logs::{emit_stack, TokenBalanceLog, TokenForceCloseBorrowsWithTokenLogV2};
+use crate::logs::emit_token_balance_log;
+use crate::logs::{emit_stack, TokenForceCloseBorrowsWithTokenLogV2};
 use crate::state::*;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
@@ -112,18 +113,18 @@ pub fn token_force_close_borrows_with_token(
         // Apply the balance changes to the liqor and liqee accounts
         let liqee_liab_active =
             liab_bank.deposit_with_dusting(liqee_liab_position, liab_transfer, now_ts)?;
-        let liqee_liab_indexed_position = liqee_liab_position.indexed_position;
+        emit_token_balance_log(liqee_key, liab_bank, liqee_liab_position);
 
         let liqor_liab_withdraw_result =
             liab_bank.withdraw_with_fee(liqor_liab_position, liab_transfer, now_ts)?;
-        let liqor_liab_indexed_position = liqor_liab_position.indexed_position;
+        emit_token_balance_log(liqor_key, liab_bank, liqor_liab_position);
         let liqee_liab_native_after = liqee_liab_position.native(liab_bank);
 
         let (liqor_asset_position, liqor_asset_raw_index, _) =
             liqor.ensure_token_position(asset_token_index)?;
         let liqor_asset_active =
             asset_bank.deposit(liqor_asset_position, asset_transfer_to_liqor, now_ts)?;
-        let liqor_asset_indexed_position = liqor_asset_position.indexed_position;
+        emit_token_balance_log(liqor_key, asset_bank, liqor_asset_position);
 
         let liqee_asset_position = liqee.token_position_mut_by_raw_index(liqee_asset_raw_index);
         let liqee_asset_active = asset_bank.withdraw_without_fee_with_dusting(
@@ -131,7 +132,7 @@ pub fn token_force_close_borrows_with_token(
             asset_transfer_from_liqee,
             now_ts,
         )?;
-        let liqee_asset_indexed_position = liqee_asset_position.indexed_position;
+        emit_token_balance_log(liqee_key, asset_bank, liqee_asset_position);
         let liqee_assets_native_after = liqee_asset_position.native(asset_bank);
 
         msg!(
@@ -139,43 +140,6 @@ pub fn token_force_close_borrows_with_token(
             liab_transfer,
             asset_transfer_from_liqee,
         );
-
-        // liqee asset
-        emit_stack(TokenBalanceLog {
-            mango_group: liqee.fixed.group,
-            mango_account: liqee_key,
-            token_index: asset_token_index,
-            indexed_position: liqee_asset_indexed_position.to_bits(),
-            deposit_index: asset_bank.deposit_index.to_bits(),
-            borrow_index: asset_bank.borrow_index.to_bits(),
-        });
-        // liqee liab
-        emit_stack(TokenBalanceLog {
-            mango_group: liqee.fixed.group,
-            mango_account: liqee_key,
-            token_index: liab_token_index,
-            indexed_position: liqee_liab_indexed_position.to_bits(),
-            deposit_index: liab_bank.deposit_index.to_bits(),
-            borrow_index: liab_bank.borrow_index.to_bits(),
-        });
-        // liqor asset
-        emit_stack(TokenBalanceLog {
-            mango_group: liqee.fixed.group,
-            mango_account: liqor_key,
-            token_index: asset_token_index,
-            indexed_position: liqor_asset_indexed_position.to_bits(),
-            deposit_index: asset_bank.deposit_index.to_bits(),
-            borrow_index: asset_bank.borrow_index.to_bits(),
-        });
-        // liqor liab
-        emit_stack(TokenBalanceLog {
-            mango_group: liqee.fixed.group,
-            mango_account: liqor_key,
-            token_index: liab_token_index,
-            indexed_position: liqor_liab_indexed_position.to_bits(),
-            deposit_index: liab_bank.deposit_index.to_bits(),
-            borrow_index: liab_bank.borrow_index.to_bits(),
-        });
 
         emit_stack(TokenForceCloseBorrowsWithTokenLogV2 {
             mango_group: liqee.fixed.group,

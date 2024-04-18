@@ -1,12 +1,13 @@
 use crate::accounts_zerocopy::*;
 use crate::health::*;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 use crate::util::clock_now;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, TokenBalanceLog, TokenCollateralFeeLog};
+use crate::logs::{emit_stack, TokenCollateralFeeLog};
 
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
     let group = ctx.accounts.group.load()?;
@@ -116,14 +117,7 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             price: token_info.prices.oracle.to_bits(),
         });
 
-        emit_stack(TokenBalanceLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
-            token_index: bank.token_index,
-            indexed_position: token_position.indexed_position.to_bits(),
-            deposit_index: bank.deposit_index.to_bits(),
-            borrow_index: bank.borrow_index.to_bits(),
-        })
+        emit_token_balance_log(ctx.accounts.account.key(), &bank, token_position);
     }
 
     Ok(())

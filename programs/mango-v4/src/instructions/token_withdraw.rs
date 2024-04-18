@@ -1,6 +1,7 @@
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 use crate::util::clock_now;
 use anchor_lang::prelude::*;
@@ -9,9 +10,7 @@ use anchor_spl::token;
 use fixed::types::I80F48;
 
 use crate::accounts_ix::*;
-use crate::logs::{
-    emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
-};
+use crate::logs::{emit_stack, LoanOriginationFeeInstruction, WithdrawLoanLog, WithdrawLog};
 
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
@@ -82,6 +81,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         amount_i80f48,
         Clock::get()?.unix_timestamp.try_into().unwrap(),
     )?;
+    emit_token_balance_log(ctx.accounts.account.key(), &bank, position);
     let native_position_after = position.native(&bank);
 
     // Avoid getting in trouble because of the mutable bank account borrow later
@@ -89,11 +89,12 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
     let bank = ctx.accounts.bank.load()?;
 
     // Provide a readable error message in case the vault doesn't have enough tokens
-    if ctx.accounts.vault.amount < amount {
+    // Note that unlendable_deposits has already been reduced above.
+    if ctx.accounts.vault.amount < bank.unlendable_deposits + amount {
         return err!(MangoError::InsufficentBankVaultFunds).with_context(|| {
             format!(
-                "bank vault does not have enough tokens, need {} but have {}",
-                amount, ctx.accounts.vault.amount
+                "bank vault does not have enough tokens, need {} but have {} ({} unlendable)",
+                amount, ctx.accounts.vault.amount, bank.unlendable_deposits
             )
         });
     }
@@ -104,15 +105,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
         amount,
     )?;
-
-    emit_stack(TokenBalanceLog {
-        mango_group: ctx.accounts.group.key(),
-        mango_account: ctx.accounts.account.key(),
-        token_index,
-        indexed_position: position.indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
 
     // Update the net deposits - adjust by price so different tokens are on the same basis (in USD terms)
     let amount_usd = (amount_i80f48 * unsafe_oracle_state.price).to_num::<i64>();

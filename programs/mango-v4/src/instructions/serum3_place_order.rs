@@ -2,10 +2,11 @@ use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
+use crate::logs::emit_token_balance_log;
 use crate::state::*;
 
 use crate::accounts_ix::*;
-use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2, TokenBalanceLog};
+use crate::logs::{emit_stack, Serum3OpenOrdersBalanceLogV2};
 use crate::serum3_cpi::{
     load_market_state, load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim,
 };
@@ -331,6 +332,14 @@ pub fn serum3_place_order(
         )?
     };
 
+    // Verify that the no-lending amount on the vault remains. If the acting account
+    // itself had a no-lending position, the unlendable_deposits has already been reduced.
+    require_gte!(
+        after_vault,
+        payer_bank.unlendable_deposits,
+        MangoError::InsufficentBankVaultFunds
+    );
+
     // Deposit limit check, receiver side:
     // Placing an order can always increase the receiver bank deposits on fill.
     {
@@ -530,6 +539,7 @@ fn apply_vault_difference(
     } else {
         bank.withdraw_without_fee(position, -needed_change, now_ts)?;
     }
+    emit_token_balance_log(account_pk, bank, position);
     let native_after = position.native(bank);
     let native_change = native_after - native_before;
     // amount of tokens transfered to serum3 reserved that were borrowed
@@ -539,7 +549,6 @@ fn apply_vault_difference(
         .abs()
         .to_num::<u64>();
 
-    let indexed_position = position.indexed_position;
     let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee;
     if bank.token_index == market.base_token_index {
@@ -559,15 +568,6 @@ fn apply_vault_difference(
     if needed_change > 0 {
         *borrows_without_fee = (*borrows_without_fee).saturating_sub(needed_change.to_num::<u64>());
     }
-
-    emit_stack(TokenBalanceLog {
-        mango_group: bank.group,
-        mango_account: account_pk,
-        token_index: bank.token_index,
-        indexed_position: indexed_position.to_bits(),
-        deposit_index: bank.deposit_index.to_bits(),
-        borrow_index: bank.borrow_index.to_bits(),
-    });
 
     Ok(VaultDifference {
         token_index: bank.token_index,

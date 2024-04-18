@@ -151,6 +151,7 @@ export class Bank implements BankForHealth {
       collectedLiquidationFees: I80F48Dto;
       collectedCollateralFees: I80F48Dto;
       collateralFeePerDay: number;
+      unlendableDeposits: BN;
     },
   ): Bank {
     return new Bank(
@@ -219,6 +220,7 @@ export class Bank implements BankForHealth {
       obj.collectedCollateralFees,
       obj.collateralFeePerDay,
       obj.forceWithdraw == 1,
+      obj.unlendableDeposits,
     );
   }
 
@@ -288,6 +290,7 @@ export class Bank implements BankForHealth {
     collectedCollateralFees: I80F48Dto,
     public collateralFeePerDay: number,
     public forceWithdraw: boolean,
+    public unlendableDeposts: BN,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.oracleConfig = {
@@ -514,8 +517,16 @@ export class Bank implements BankForHealth {
     return this._oracleProvider;
   }
 
-  nativeDeposits(): I80F48 {
+  nativeLendableDeposits(): I80F48 {
     return this.indexedDeposits.mul(this.depositIndex);
+  }
+
+  nativeUnlendableDeposits(): I80F48 {
+    return I80F48.fromU64(this.unlendableDeposts);
+  }
+
+  nativeDeposits(): I80F48 {
+    return this.nativeUnlendableDeposits().add(this.nativeLendableDeposits());
   }
 
   nativeBorrows(): I80F48 {
@@ -536,14 +547,14 @@ export class Bank implements BankForHealth {
    */
   getBorrowRateWithoutUpkeepRate(): I80F48 {
     const totalBorrows = this.nativeBorrows();
-    const totalDeposits = this.nativeDeposits();
+    const lendableDeposits = this.nativeLendableDeposits();
 
-    if (totalDeposits.isZero() || totalBorrows.isZero()) {
+    if (lendableDeposits.isZero() || totalBorrows.isZero()) {
       return ZERO_I80F48();
     }
 
     const utilization = totalBorrows
-      .div(totalDeposits)
+      .div(lendableDeposits)
       .max(ZERO_I80F48())
       .min(ONE_I80F48());
     const scaling = I80F48.fromNumber(
@@ -588,15 +599,15 @@ export class Bank implements BankForHealth {
   getDepositRate(): I80F48 {
     const borrowRate = this.getBorrowRate();
     const totalBorrows = this.nativeBorrows();
-    const totalDeposits = this.nativeDeposits();
+    const lendableDeposits = this.nativeLendableDeposits();
 
-    if (totalDeposits.isZero() && totalBorrows.isZero()) {
+    if (lendableDeposits.isZero() && totalBorrows.isZero()) {
       return ZERO_I80F48();
-    } else if (totalDeposits.isZero()) {
+    } else if (lendableDeposits.isZero()) {
       return this.maxRate;
     }
 
-    const utilization = totalBorrows.div(totalDeposits);
+    const utilization = totalBorrows.div(lendableDeposits);
     return utilization.mul(borrowRate);
   }
 
@@ -622,26 +633,56 @@ export class Bank implements BankForHealth {
     return toUiDecimals(this.getNetBorrowLimitPerWindow(), this.mintDecimals);
   }
 
-  getMaxWithdraw(vaultBalance: BN, userDeposits = ZERO_I80F48()): I80F48 {
+  /**
+   * The maximum someone with `userDeposits` could withdraw from the bank
+   * if they had infinite health.
+   */
+  getMaxWithdraw(
+    vaultBalance: BN,
+    userDeposits = ZERO_I80F48(),
+    userPositionWithLending: boolean,
+  ): I80F48 {
     userDeposits = userDeposits.max(ZERO_I80F48());
+    let vaultBalanceI80F48 = I80F48.fromU64(vaultBalance);
 
-    // any borrow must respect the minVaultToDepositsRatio
-    const minVaultBalanceRequired = this.nativeDeposits().mul(
-      I80F48.fromNumber(this.minVaultToDepositsRatio),
-    );
-    const maxBorrowFromVault = I80F48.fromI64(vaultBalance)
-      .sub(minVaultBalanceRequired)
+    // It may not be possible to fully withdraw userDeposits - check for that and return early
+    let availableWithdraws;
+    if (userPositionWithLending) {
+      availableWithdraws = this.nativeLendableDeposits()
+        .sub(this.nativeBorrows())
+        .min(vaultBalanceI80F48);
+    } else {
+      availableWithdraws = vaultBalanceI80F48;
+    }
+    if (availableWithdraws.lte(userDeposits)) {
+      return availableWithdraws.max(ZERO_I80F48());
+    }
+    if (!userPositionWithLending) {
+      return userDeposits;
+    }
+
+    // Now we know all userDeposits are withdrawn. How much can be borrowed?
+
+    const maxBorrowByVault = vaultBalanceI80F48
+      .sub(userDeposits)
       .max(ZERO_I80F48());
-    // User deposits can exceed maxWithdrawFromVault
-    let maxBorrow = maxBorrowFromVault.sub(userDeposits).max(ZERO_I80F48());
-    // any borrow must respect the limit left in window
-    maxBorrow = maxBorrow.min(this.getBorrowLimitLeftInWindow());
-    // borrows would be applied a fee
-    maxBorrow = maxBorrow.div(ONE_I80F48().add(this.loanOriginationFeeRate));
 
-    // user deposits can always be withdrawn
-    // even if vaults can be depleted
-    return maxBorrow.add(userDeposits).min(I80F48.fromI64(vaultBalance));
+    const maxUtilization = I80F48.fromNumber(1 - this.minVaultToDepositsRatio);
+    const maxBorrowByUtilization = this.nativeLendableDeposits()
+      .sub(userDeposits)
+      .mul(maxUtilization)
+      .sub(this.nativeBorrows())
+      .max(ZERO_I80F48());
+
+    const maxBorrow = maxBorrowByVault
+      .min(maxBorrowByUtilization)
+      .min(this.getBorrowLimitLeftInWindow());
+
+    const maxBorrowAsk = maxBorrow.div(
+      ONE_I80F48().add(this.loanOriginationFeeRate),
+    );
+
+    return maxBorrowAsk.add(userDeposits);
   }
 
   getTimeToNextBorrowLimitWindowStartsTs(): number {

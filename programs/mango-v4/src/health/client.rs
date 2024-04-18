@@ -24,6 +24,7 @@ impl HealthCache {
     /// Errors:
     /// - If there are no existing token positions for the source or target index.
     /// - If the withdraw fails due to the net borrow limit.
+    /// - If the withdraw fails due to borrows on a position with no lending
     fn cache_after_swap(
         &self,
         account: &MangoAccountValue,
@@ -196,7 +197,7 @@ impl HealthCache {
         }
 
         let cache_after_swap = |amount: I80F48| -> Result<Option<HealthCache>> {
-            ignore_net_borrow_limit_errors(self.cache_after_swap(
+            ignore_limit_errors(self.cache_after_swap(
                 account,
                 source_bank,
                 source_oracle_price,
@@ -456,7 +457,7 @@ impl HealthCache {
             Ok(resulting_cache)
         };
         let fn_value_after_borrow = |amount: I80F48| -> Result<I80F48> {
-            Ok(ignore_net_borrow_limit_errors(cache_after_borrow(amount))?
+            Ok(ignore_limit_errors(cache_after_borrow(amount))?
                 .as_ref()
                 .map(target_fn)
                 .unwrap_or(I80F48::MIN))
@@ -628,10 +629,16 @@ fn find_maximum(
     }
 }
 
-fn ignore_net_borrow_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Option<HealthCache>> {
+fn ignore_limit_errors(maybe_cache: Result<HealthCache>) -> Result<Option<HealthCache>> {
     // Special case net borrow errors: We want to be able to find a good
     // swap amount even if the max swap is limited by the net borrow limit.
     if maybe_cache.is_anchor_error_with_code(MangoError::BankNetBorrowsLimitReached.error_code()) {
+        return Ok(None);
+    }
+    // Same for withdrawing from no-lending positions
+    if maybe_cache
+        .is_anchor_error_with_code(MangoError::UnlendableTokenPositionCannotBeNegative.error_code())
+    {
         return Ok(None);
     }
     maybe_cache.map(|c| Some(c))
@@ -1729,5 +1736,58 @@ mod tests {
         };
 
         assert!(leverage_eq(&health_cache, 2.0));
+    }
+
+    #[test]
+    fn test_max_no_lending() {
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+        let tp0 = account.ensure_token_position(0).unwrap().0;
+        tp0.disable_lending = 1;
+        tp0.unlendable_deposits = 100;
+        account.ensure_token_position(1).unwrap();
+
+        let group = Pubkey::new_unique();
+        let (mut bank0, _) = mock_bank_and_oracle(group, 0, 1.0, 0.0, 0.0);
+        let (mut bank1, _) = mock_bank_and_oracle(group, 1, 2.0, 0.2, 0.2);
+        let bank0_data = bank0.data();
+        bank0_data.unlendable_deposits = 1000; // assume other accounts also deposited
+        let bank1_data = bank1.data();
+
+        let health_cache = HealthCache {
+            token_infos: vec![
+                TokenInfo {
+                    token_index: 0,
+                    balance_spot: I80F48::from(100),
+                    ..default_token_info(0.0, 1.0)
+                },
+                TokenInfo {
+                    token_index: 1,
+                    balance_spot: I80F48::from(100),
+                    ..default_token_info(0.2, 2.0)
+                },
+            ],
+            serum3_infos: vec![],
+            perp_infos: vec![],
+            being_liquidated: false,
+        };
+
+        let max_swap = health_cache
+            .max_swap_source_for_health_ratio_with_limits(
+                &account,
+                bank0_data,
+                I80F48::from_num(1.0),
+                bank1_data,
+                I80F48::from_num(0.5),
+                I80F48::from_num(1.0),
+            )
+            .unwrap();
+        assert_eq!(max_swap, 100);
+
+        let max_borrow = health_cache
+            .max_borrow_for_health_ratio(&account, bank0_data, I80F48::from_num(1.0))
+            .unwrap();
+        assert!(max_borrow < 100);
+        assert!(max_borrow > 99);
     }
 }

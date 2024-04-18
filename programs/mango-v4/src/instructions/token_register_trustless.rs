@@ -111,7 +111,9 @@ pub fn token_register_trustless(
         collected_liquidation_fees: I80F48::ZERO,
         collected_collateral_fees: I80F48::ZERO,
         collateral_fee_per_day: 0.0, // TODO
-        reserved: [0; 1900],
+        padding2: Default::default(),
+        unlendable_deposits: 0,
+        reserved: [0; 1888],
     };
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
     if let Ok(oracle_price) = bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), None)

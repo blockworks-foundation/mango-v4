@@ -777,6 +777,86 @@ impl ClientInstruction for FlashLoanEndInstruction {
 }
 
 #[derive(Clone)]
+pub struct TokenCreatePositionInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub bank: Pubkey,
+    pub allow_lending: bool,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenCreatePositionInstruction {
+    type Accounts = mango_v4::accounts::TokenCreateOrClosePosition;
+    type Instruction = mango_v4::instruction::TokenCreatePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            allow_lending: self.allow_lending,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank: self.bank,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenClosePositionInstruction {
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub bank: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenClosePositionInstruction {
+    type Accounts = mango_v4::accounts::TokenCreateOrClosePosition;
+    type Instruction = mango_v4::instruction::TokenClosePosition;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        // load accounts, find PDAs, find remainingAccounts
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            owner: self.owner.pubkey(),
+            bank: self.bank,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+#[derive(Clone)]
 pub struct TokenWithdrawInstruction {
     pub amount: u64,
     pub allow_borrow: bool,

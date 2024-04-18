@@ -1011,11 +1011,13 @@ impl<
                     indexed_position: I80F48::ZERO,
                     token_index,
                     in_use_count: 0,
+                    disable_lending: 0,
                     cumulative_deposit_interest: 0.0,
                     cumulative_borrow_interest: 0.0,
                     previous_index: I80F48::ZERO,
+                    unlendable_deposits: 0,
                     padding: Default::default(),
-                    reserved: [0; 128],
+                    reserved: [0; 120],
                 };
             }
             Ok((v, raw_index, bank_index))
@@ -1160,6 +1162,13 @@ impl<
                 perp_position.market_index = perp_market_index;
 
                 let settle_token_position = self.ensure_token_position(settle_token_index)?.0;
+                // no-lending positions can't have negative balances and can't work with perps:
+                // settlement must be able to move the position arbitrarily
+                require_msg_typed!(
+                    settle_token_position.allow_lending(),
+                    MangoError::PerpSettleTokenPositionMustSupportBorrows,
+                    "the account's settle token position (index {settle_token_index}) is a no-lending position, unsuitable for perps"
+                );
                 settle_token_position.increment_in_use();
             }
         }
@@ -1392,7 +1401,7 @@ impl<
 
     pub fn check_health_pre(&mut self, health_cache: &HealthCache) -> Result<I80F48> {
         let pre_init_health = health_cache.health(HealthType::Init);
-        msg!("pre_init_health: {}", pre_init_health);
+        msg!("pre_init_health: {}", pre_init_health.to_num::<f64>());
         self.check_health_pre_checks(health_cache, pre_init_health)?;
         Ok(pre_init_health)
     }
@@ -1424,7 +1433,7 @@ impl<
         pre_init_health: I80F48,
     ) -> Result<I80F48> {
         let post_init_health = health_cache.health(HealthType::Init);
-        msg!("post_init_health: {}", post_init_health);
+        msg!("post_init_health: {}", post_init_health.to_num::<f64>());
         self.check_health_post_checks(pre_init_health, post_init_health)?;
         Ok(post_init_health)
     }

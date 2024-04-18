@@ -3,7 +3,7 @@ use crate::cases::{
     HealthCheckInstruction, TestContext, TestKeypair, TokenWithdrawInstruction,
 };
 use crate::send_tx_expect_error;
-use mango_v4::accounts_ix::{HealthCheck, HealthCheckKind};
+use mango_v4::accounts_ix::HealthCheckKind;
 use mango_v4::error::MangoError;
 use solana_sdk::transport::TransportError;
 

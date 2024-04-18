@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
+use crate::error::*;
 use crate::logs::{emit_stack, TokenConditionalSwapCreateLogV3};
 use crate::state::*;
 
@@ -23,10 +24,25 @@ pub fn token_conditional_swap_create(
             .ensure_token_position(token_conditional_swap.buy_token_index)?
             .0;
         buy_pos.increment_in_use();
+
+        // The complication with unlendable positions is about withdraws that may fail if the token
+        // balance goes negative. This could go wrong with tcs start incentives or withdraws during
+        // execution. If the rounding goes wrong even slightly, it could break even when no borrowing
+        // was intended or strictly necessary.
+        // Thus TCS is currently disabled with these token positions until it's well tested.
+        require!(
+            buy_pos.allow_lending(),
+            MangoError::TokenConditionalSwapUnsupportedUnlendablePosition
+        );
+
         let sell_pos = account
             .ensure_token_position(token_conditional_swap.sell_token_index)?
             .0;
         sell_pos.increment_in_use();
+        require!(
+            sell_pos.allow_lending(),
+            MangoError::TokenConditionalSwapUnsupportedUnlendablePosition
+        );
     }
 
     let id = account.fixed.next_token_conditional_swap_id;
