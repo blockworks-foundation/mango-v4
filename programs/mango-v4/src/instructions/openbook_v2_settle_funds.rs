@@ -114,25 +114,8 @@ pub fn openbook_v2_settle_funds<'info>(
     //
     let before_base_vault = ctx.accounts.base_vault.amount;
     let before_quote_vault = ctx.accounts.quote_vault.amount;
-    let group_key;
-    let owner_key;
-    let account_num;
-    let bump;
-    {
-        // this is so dumb how do i not do this
-        let account = ctx.accounts.account.load()?;
-        group_key = account.group;
-        owner_key = account.owner;
-        account_num = account.account_num;
-        bump = account.bump;
-    }
-    let seeds = &[
-        b"MangoAccount".as_ref(),
-        group_key.as_ref(),
-        owner_key.as_ref(),
-        &account_num.to_le_bytes(),
-        &[bump],
-    ];
+    let mango_account_seeds_data = ctx.accounts.account.load()?.pda_seeds();
+    let seeds = &mango_account_seeds_data.signer_seeds();
     cpi_settle_funds(ctx.accounts, &[seeds])?;
 
     //

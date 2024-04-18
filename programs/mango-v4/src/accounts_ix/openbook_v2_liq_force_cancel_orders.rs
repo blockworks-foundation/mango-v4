@@ -20,6 +20,7 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
+    #[account(mut)]
     pub payer: Signer<'info>,
 
     #[account(mut)]
@@ -36,6 +37,7 @@ pub struct OpenbookV2LiqForceCancelOrders<'info> {
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
     #[account(
+        mut,
         has_one = bids,
         has_one = asks,
         has_one = event_heap,

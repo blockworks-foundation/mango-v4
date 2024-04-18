@@ -112,12 +112,12 @@ pub fn openbook_v2_liq_force_cancel_orders(
     //
     // Cancel all and settle
     //
-    {
-        let account = ctx.accounts.account.load()?;
-        let account_seeds = mango_account_seeds!(account);
-        cpi_cancel_all_orders(ctx.accounts, &[account_seeds], limit)?;
-        cpi_settle_funds(ctx.accounts, &[account_seeds])?;
-    }
+    let mango_account_seeds_data = ctx.accounts.account.load()?.pda_seeds();
+    let seeds = &mango_account_seeds_data.signer_seeds();
+    cpi_cancel_all_orders(ctx.accounts, &[seeds], limit)?;
+    // this requires a mut ctx.accounts.account for no reason
+    drop(openbook_market_external);
+    cpi_settle_funds(ctx.accounts, &[seeds])?;
 
     //
     // After-settle tracking

@@ -189,7 +189,7 @@ impl OpenbookV2OrderPlacer {
         orders.clone()
     }
 
-    async fn _open_orders(&self) -> OpenOrdersSlim {
+    async fn open_orders(&self) -> OpenOrdersSlim {
         let data = self
             .solana
             .get_account::<openbook_v2::state::OpenOrdersAccount>(self.open_orders)
@@ -1097,7 +1097,11 @@ async fn test_openbook_liq_force_close() -> Result<(), TransportError> {
     .unwrap();
 
     let after_init_health = account_init_health(solana, order_placer.account).await;
-    println!("{before_init_health} {after_init_health}");
+    assert!(after_init_health > before_init_health);
+
+    let oo = order_placer.open_orders().await;
+    assert_eq!(oo.native_quote_reserved(), 0);
+    assert_eq!(oo.native_base_reserved(), 0);
 
     Ok(())
 }
