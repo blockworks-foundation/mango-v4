@@ -543,18 +543,13 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                         perp_count,
                         perp_oo_count,
                     );
-                let token_conditional_swap_count = if dynamic_data.len()
-                    > token_conditional_swap_vec_offset + BORSH_VEC_SIZE_BYTES
-                {
+                let token_conditional_swap_count =
                     u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
                         dynamic_data,
                         token_conditional_swap_vec_offset,
                         BORSH_VEC_SIZE_BYTES
                     ]))
-                    .unwrap()
-                } else {
-                    0
-                };
+                    .unwrap();
 
                 let openbook_v2_vec_offset = MangoAccount::dynamic_openbook_v2_vec_offset(
                     token_count,
@@ -563,17 +558,12 @@ impl DynamicHeader for MangoAccountDynamicHeader {
                     perp_oo_count,
                     token_conditional_swap_count,
                 );
-                let openbook_v2_count =
-                    if dynamic_data.len() > openbook_v2_vec_offset + BORSH_VEC_SIZE_BYTES {
-                        u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
-                            dynamic_data,
-                            openbook_v2_vec_offset,
-                            BORSH_VEC_SIZE_BYTES
-                        ]))
-                        .unwrap()
-                    } else {
-                        0
-                    };
+                let openbook_v2_count = u8::try_from(BorshVecLength::from_le_bytes(*array_ref![
+                    dynamic_data,
+                    openbook_v2_vec_offset,
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
 
                 Ok(Self {
                     token_count,
