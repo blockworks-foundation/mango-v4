@@ -4,7 +4,7 @@ use openbook_v2::state::Side;
 
 use crate::accounts_ix::*;
 use crate::error::*;
-use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::logs::{emit_stack, OpenbookV2OpenOrdersBalanceLog};
 use crate::serum3_cpi::OpenOrdersAmounts;
 use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
@@ -62,7 +62,7 @@ pub fn openbook_v2_cancel_all_orders(
         openbook_market_external.quote_lot_size.try_into().unwrap(),
     );
 
-    emit!(OpenbookV2OpenOrdersBalanceLog {
+    emit_stack(OpenbookV2OpenOrdersBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: openbook_market.market_index,

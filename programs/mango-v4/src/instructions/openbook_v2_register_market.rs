@@ -5,7 +5,7 @@ use crate::state::*;
 use crate::util::fill_from_str;
 
 use crate::accounts_ix::*;
-use crate::logs::OpenbookV2RegisterMarketLog;
+use crate::logs::{emit_stack, OpenbookV2RegisterMarketLog};
 
 pub fn openbook_v2_register_market(
     ctx: Context<OpenbookV2RegisterMarket>,
@@ -83,7 +83,7 @@ pub fn openbook_v2_register_market(
         reserved: [0; 38],
     };
 
-    emit!(OpenbookV2RegisterMarketLog {
+    emit_stack(OpenbookV2RegisterMarketLog {
         mango_group: ctx.accounts.group.key(),
         openbook_market: ctx.accounts.openbook_v2_market.key(),
         market_index,

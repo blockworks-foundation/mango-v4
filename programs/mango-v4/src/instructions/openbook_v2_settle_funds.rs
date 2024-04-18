@@ -172,7 +172,7 @@ pub fn openbook_v2_settle_funds<'info>(
         &open_orders,
     )?;
 
-    emit!(OpenbookV2OpenOrdersBalanceLog {
+    emit_stack(OpenbookV2OpenOrdersBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: openbook_market.market_index,

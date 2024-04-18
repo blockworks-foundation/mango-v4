@@ -3,7 +3,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::i80f48::ClampToInt;
 use crate::instructions::{apply_vault_difference, OODifference};
-use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::logs::{emit_stack, OpenbookV2OpenOrdersBalanceLog};
 use crate::serum3_cpi::{OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 use crate::util::clock_now;
@@ -233,7 +233,7 @@ pub fn openbook_v2_place_order(
         }
     }
 
-    emit!(OpenbookV2OpenOrdersBalanceLog {
+    emit_stack(OpenbookV2OpenOrdersBalanceLog {
         mango_group: ctx.accounts.group.key(),
         mango_account: ctx.accounts.account.key(),
         market_index: openbook_market.market_index,

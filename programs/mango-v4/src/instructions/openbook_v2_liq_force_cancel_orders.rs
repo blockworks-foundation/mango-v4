@@ -6,7 +6,7 @@ use crate::error::*;
 use crate::health::*;
 use crate::instructions::openbook_v2_place_order::apply_settle_changes;
 use crate::instructions::openbook_v2_settle_funds::charge_loan_origination_fees;
-use crate::logs::OpenbookV2OpenOrdersBalanceLog;
+use crate::logs::{emit_stack, OpenbookV2OpenOrdersBalanceLog};
 use crate::serum3_cpi::OpenOrdersAmounts;
 use crate::serum3_cpi::OpenOrdersSlim;
 use crate::state::*;
@@ -127,7 +127,7 @@ pub fn openbook_v2_liq_force_cancel_orders(
         let open_orders = ctx.accounts.open_orders.load()?;
         after_oo = OpenOrdersSlim::from_oo_v2(&open_orders, base_lot_size, quote_lot_size);
 
-        emit!(OpenbookV2OpenOrdersBalanceLog {
+        emit_stack(OpenbookV2OpenOrdersBalanceLog {
             mango_group: ctx.accounts.group.key(),
             mango_account: ctx.accounts.account.key(),
             market_index: openbook_market.market_index,
