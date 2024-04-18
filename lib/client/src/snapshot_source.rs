@@ -15,8 +15,7 @@ use futures::{stream, StreamExt};
 use solana_rpc::rpc::rpc_accounts::AccountsDataClient;
 use solana_rpc::rpc::rpc_accounts_scan::AccountsScanClient;
 use std::str::FromStr;
-use std::time::Duration;
-use tokio::task::JoinHandle;
+use std::time::{Duration, Instant};
 use tokio::time;
 use tracing::*;
 
@@ -56,6 +55,7 @@ impl AccountSnapshot {
                     .account
                     .decode()
                     .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
+                reception_time: Instant::now(),
             });
         }
         Ok(())
@@ -75,6 +75,7 @@ impl AccountSnapshot {
                     account: ui_account
                         .decode()
                         .ok_or_else(|| anyhow::anyhow!("could not decode account"))?,
+                    reception_time: Instant::now(),
                 });
             }
         }

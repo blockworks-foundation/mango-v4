@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.23.0",
+  "version": "0.24.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -1757,6 +1757,66 @@ export type MangoV4 = {
         {
           "name": "maxBuybackUsd",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthValue",
+          "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
         }
       ]
     },
@@ -7871,13 +7931,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -9669,13 +9724,8 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -10655,6 +10705,32 @@ export type MangoV4 = {
       }
     },
     {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -11008,6 +11084,12 @@ export type MangoV4 = {
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           }
         ]
       }
@@ -11048,6 +11130,9 @@ export type MangoV4 = {
           },
           {
             "name": "OrcaCLMM"
+          },
+          {
+            "name": "RaydiumCLMM"
           }
         ]
       }
@@ -14347,12 +14432,27 @@ export type MangoV4 = {
       "code": 6069,
       "name": "TokenAssetLiquidationDisabled",
       "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
     }
   ]
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.23.0",
+  "version": "0.24.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -16110,6 +16210,66 @@ export const IDL: MangoV4 = {
         {
           "name": "maxBuybackUsd",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sequenceCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "expectedSequenceNumber",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "healthCheck",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "minHealthValue",
+          "type": "f64"
+        },
+        {
+          "name": "checkKind",
+          "type": {
+            "defined": "HealthCheckKind"
+          }
         }
       ]
     },
@@ -22224,13 +22384,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -24022,13 +24177,8 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "sequenceNumber",
+            "type": "u8"
           },
           {
             "name": "netDeposits",
@@ -25008,6 +25158,32 @@ export const IDL: MangoV4 = {
       }
     },
     {
+      "name": "HealthCheckKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Maint"
+          },
+          {
+            "name": "Init"
+          },
+          {
+            "name": "LiquidationEnd"
+          },
+          {
+            "name": "MaintRatio"
+          },
+          {
+            "name": "InitRatio"
+          },
+          {
+            "name": "LiquidationEndRatio"
+          }
+        ]
+      }
+    },
+    {
       "name": "Serum3SelfTradeBehavior",
       "docs": [
         "Copy paste a bunch of enums so that we could AnchorSerialize & AnchorDeserialize them"
@@ -25361,6 +25537,12 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "TokenForceWithdraw"
+          },
+          {
+            "name": "SequenceCheck"
+          },
+          {
+            "name": "HealthCheck"
           }
         ]
       }
@@ -25401,6 +25583,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "OrcaCLMM"
+          },
+          {
+            "name": "RaydiumCLMM"
           }
         ]
       }
@@ -28700,6 +28885,21 @@ export const IDL: MangoV4 = {
       "code": 6069,
       "name": "TokenAssetLiquidationDisabled",
       "msg": "the asset does not allow liquidation"
+    },
+    {
+      "code": 6070,
+      "name": "BorrowsRequireHealthAccountBank",
+      "msg": "for borrows the bank must be in the health account list"
+    },
+    {
+      "code": 6071,
+      "name": "InvalidSequenceNumber",
+      "msg": "invalid sequence number"
+    },
+    {
+      "code": 6072,
+      "name": "InvalidHealth",
+      "msg": "invalid health"
     }
   ]
 };

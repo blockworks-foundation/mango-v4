@@ -458,6 +458,22 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn sequence_check(ctx: Context<SequenceCheck>, expected_sequence_number: u8) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::sequence_check(ctx, expected_sequence_number)?;
+        Ok(())
+    }
+
+    pub fn health_check(
+        ctx: Context<HealthCheck>,
+        min_health_value: f64,
+        check_kind: HealthCheckKind,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::health_check(ctx, min_health_value, check_kind)?;
+        Ok(())
+    }
+
     // todo:
     // ckamm: generally, using an I80F48 arg will make it harder to call
     // because generic anchor clients won't know how to deal with it

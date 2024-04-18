@@ -36,35 +36,39 @@ impl SerumOrderPlacer {
         None
     }
 
+    fn bid_ix(
+        &mut self,
+        limit_price: f64,
+        max_base: u64,
+        taker: bool,
+    ) -> Serum3PlaceOrderInstruction {
+        let client_order_id = self.inc_client_order_id();
+        let fees = if taker { 0.0004 } else { 0.0 };
+        Serum3PlaceOrderInstruction {
+            side: Serum3Side::Bid,
+            limit_price: (limit_price * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
+            max_base_qty: max_base / 100,                     // in base lot (100)
+            // 4 bps taker fees added in
+            max_native_quote_qty_including_fees: (limit_price * (max_base as f64) * (1.0 + fees))
+                .ceil() as u64,
+            self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
+            order_type: Serum3OrderType::Limit,
+            client_order_id,
+            limit: 10,
+            account: self.account,
+            owner: self.owner,
+            serum_market: self.serum_market,
+        }
+    }
+
     async fn try_bid(
         &mut self,
         limit_price: f64,
         max_base: u64,
         taker: bool,
     ) -> Result<mango_v4::accounts::Serum3PlaceOrder, TransportError> {
-        let client_order_id = self.inc_client_order_id();
-        let fees = if taker { 0.0004 } else { 0.0 };
-        send_tx(
-            &self.solana,
-            Serum3PlaceOrderInstruction {
-                side: Serum3Side::Bid,
-                limit_price: (limit_price * 100.0 / 10.0) as u64, // in quote_lot (10) per base lot (100)
-                max_base_qty: max_base / 100,                     // in base lot (100)
-                // 4 bps taker fees added in
-                max_native_quote_qty_including_fees: (limit_price
-                    * (max_base as f64)
-                    * (1.0 + fees))
-                    .ceil() as u64,
-                self_trade_behavior: Serum3SelfTradeBehavior::AbortTransaction,
-                order_type: Serum3OrderType::Limit,
-                client_order_id,
-                limit: 10,
-                account: self.account,
-                owner: self.owner,
-                serum_market: self.serum_market,
-            },
-        )
-        .await
+        let ix = self.bid_ix(limit_price, max_base, taker);
+        send_tx(&self.solana, ix).await
     }
 
     async fn bid_maker(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
@@ -579,7 +583,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(quote_fees2 - quote_fees1, 0.0, 0.1));
+        assert_eq_fixed_f64!(quote_fees2 - quote_fees1, 0.0, 0.1);
 
         // check account2 balances too
         context
@@ -610,11 +614,11 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             quote_fees3 - quote_fees1,
             loan_origination_fee(fill_amount - deposit_amount) as f64,
             0.1
-        ));
+        );
 
         order_placer.settle().await;
 
@@ -623,11 +627,11 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
             .get_account::<Bank>(quote_bank)
             .await
             .collected_fees_native;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             quote_fees4 - quote_fees3,
             serum_fee(fill_amount) as f64,
             0.1
-        ));
+        );
 
         let account_data = solana.get_account::<MangoAccount>(account).await;
         assert_eq!(
@@ -720,11 +724,11 @@ async fn test_serum_settle_v1() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         quote_fees_end - quote_fees_start,
         (lof + serum_referrer_fee(amount)) as f64,
         0.1
-    ));
+    );
 
     Ok(())
 }
@@ -817,11 +821,11 @@ async fn test_serum_settle_v2_to_dao() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         quote_fees_end - quote_fees_start,
         (lof + serum_referrer_fee(amount)) as f64,
         0.1
-    ));
+    );
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(
@@ -913,11 +917,7 @@ async fn test_serum_settle_v2_to_account() -> Result<(), TransportError> {
         .get_account::<Bank>(quote_bank)
         .await
         .collected_fees_native;
-    assert!(assert_equal(
-        quote_fees_end - quote_fees_start,
-        lof as f64,
-        0.1
-    ));
+    assert_eq_fixed_f64!(quote_fees_end - quote_fees_start, lof as f64, 0.1);
 
     let account_data = solana.get_account::<MangoAccount>(account).await;
     assert_eq!(account_data.buyback_fees_accrued_current, 0);
@@ -1029,7 +1029,7 @@ async fn test_serum_reduce_only_deposits1() -> Result<(), TransportError> {
 #[tokio::test]
 async fn test_serum_reduce_only_deposits2() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
-    test_builder.test().set_compute_max_units(95_000); // Serum3PlaceOrder needs 92.8k
+    test_builder.test().set_compute_max_units(97_000); // Serum3PlaceOrder needs 95.8k
     let context = test_builder.start_default().await;
     let solana = &context.solana.clone();
 
@@ -1948,6 +1948,71 @@ async fn test_serum_deposit_limits() -> Result<(), TransportError> {
     assert_mango_error(&r, MangoError::BankDepositLimit.into(), "dep limit".into());
     // but just selling deposits is fine
     order_placer.try_bid(1.0, 4999, false).await.unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_serum_skip_bank() -> Result<(), TransportError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(150_000); // Serum3PlaceOrder needs lots
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    //
+    // SETUP: Create a group, accounts, market etc
+    //
+    let deposit_amount = 5000;
+    let CommonSetup {
+        group_with_tokens,
+        mut order_placer,
+        ..
+    } = common_setup(&context, deposit_amount).await;
+    let tokens = group_with_tokens.tokens;
+
+    //
+    // TESTS
+    //
+
+    // verify generally good
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: order_placer.bid_ix(1.0, 100, false),
+            skip_banks: vec![],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can skip uninvolved token
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: order_placer.bid_ix(1.0, 100, false),
+            skip_banks: vec![tokens[2].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can't skip base or quote token
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: order_placer.bid_ix(1.0, 100, false),
+            skip_banks: vec![tokens[0].bank],
+        },
+        MangoError::TokenPositionDoesNotExist
+    );
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: order_placer.bid_ix(1.0, 100, false),
+            skip_banks: vec![tokens[1].bank],
+        },
+        MangoError::TokenPositionDoesNotExist
+    );
 
     Ok(())
 }

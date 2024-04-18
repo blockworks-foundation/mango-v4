@@ -78,22 +78,22 @@ async fn test_token_update_index_and_rate() -> Result<(), TransportError> {
     let interest_change = 5000.0 * (dynamic_rate + loan_fee_rate) * diff_ts / year;
     let fee_change = 5000.0 * loan_fee_rate * diff_ts / year;
 
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         bank_after.native_borrows() - bank_before.native_borrows(),
         interest_change,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         bank_after.native_deposits() - bank_before.native_deposits(),
         interest_change,
         0.1
-    ));
-    assert!(assert_equal(
+    );
+    assert_eq_fixed_f64!(
         bank_after.collected_fees_native - bank_before.collected_fees_native,
         fee_change,
         0.1
-    ));
-    assert!(assert_equal(bank_after.avg_utilization, utilization, 0.01));
+    );
+    assert_eq_fixed_f64!(bank_after.avg_utilization, utilization, 0.01);
 
     Ok(())
 }
@@ -140,19 +140,11 @@ async fn test_token_rates_migrate() -> Result<(), TransportError> {
 
     let bank_after = solana.get_account::<Bank>(tokens[0].bank).await;
 
-    assert!(assert_equal_fixed_f64(bank_after.rate0, 0.07 / 3.0, 0.0001));
-    assert!(assert_equal_fixed_f64(bank_after.rate1, 0.9 / 3.0, 0.0001));
-    assert!(assert_equal_fixed_f64(bank_after.max_rate, 0.5, 0.0001));
-    assert!(assert_equal_f64_f64(
-        bank_after.interest_curve_scaling,
-        3.0,
-        0.0001
-    ));
-    assert!(assert_equal_f64_f64(
-        bank_after.interest_target_utilization as f64,
-        0.4,
-        0.0001
-    ));
+    assert_eq_fixed_f64!(bank_after.rate0, 0.07 / 3.0, 0.0001);
+    assert_eq_fixed_f64!(bank_after.rate1, 0.9 / 3.0, 0.0001);
+    assert_eq_fixed_f64!(bank_after.max_rate, 0.5, 0.0001);
+    assert_eq_f64!(bank_after.interest_curve_scaling, 3.0, 0.0001);
+    assert_eq_f64!(bank_after.interest_target_utilization as f64, 0.4, 0.0001);
 
     Ok(())
 }

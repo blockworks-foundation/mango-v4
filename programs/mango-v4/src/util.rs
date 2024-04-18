@@ -31,6 +31,12 @@ pub fn format_zero_terminated_utf8_bytes(
     )
 }
 
+// Returns (now_ts, now_slot)
+pub fn clock_now() -> (u64, u64) {
+    let clock = Clock::get().unwrap();
+    (clock.unix_timestamp.try_into().unwrap(), clock.slot)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -96,7 +96,7 @@ pub fn compute_health_from_fixed_accounts(
     ais: &[AccountInfo],
     now_ts: u64,
 ) -> Result<I80F48> {
-    let retriever = new_fixed_order_account_retriever(ais, account)?;
+    let retriever = new_fixed_order_account_retriever(ais, account, Clock::get()?.slot)?;
     Ok(new_health_cache(account, &retriever, now_ts)?.health(health_type))
 }
 
@@ -820,6 +820,12 @@ impl HealthCache {
             })
     }
 
+    pub fn has_token_info(&self, token_index: TokenIndex) -> bool {
+        self.token_infos
+            .iter()
+            .any(|t| t.token_index == token_index)
+    }
+
     pub fn perp_info(&self, perp_market_index: PerpMarketIndex) -> Result<&PerpInfo> {
         Ok(&self.perp_infos[self.perp_info_index(perp_market_index)?])
     }
@@ -1234,11 +1240,11 @@ pub fn new_health_cache(
 }
 
 /// Generate a special HealthCache for an account and its health accounts
-/// where nonnegative token positions for bad oracles are skipped.
+/// where nonnegative token positions for bad oracles are skipped as well as missing banks.
 ///
 /// This health cache must be used carefully, since it doesn't provide the actual
 /// account health, just a value that is guaranteed to be less than it.
-pub fn new_health_cache_skipping_bad_oracles(
+pub fn new_health_cache_skipping_missing_banks_and_bad_oracles(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
     now_ts: u64,
@@ -1246,22 +1252,49 @@ pub fn new_health_cache_skipping_bad_oracles(
     new_health_cache_impl(account, retriever, now_ts, true)
 }
 
+// On `allow_skipping_banks`:
+//   If (a Bank is not provided or its oracle is stale or inconfident) and the health contribution would
+//   not be negative, skip it. This decreases health, but many operations are still allowed as long
+//   as the decreased amount stays positive.
 fn new_health_cache_impl(
     account: &MangoAccountRef,
     retriever: &impl AccountRetriever,
     now_ts: u64,
-    // If an oracle is stale or inconfident and the health contribution would
-    // not be negative, skip it. This decreases health, but maybe overall it's
-    // still positive?
-    skip_bad_oracles: bool,
+    allow_skipping_banks: bool,
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
 
+    // As a CU optimization, don't call available_banks() unless necessary
+    let available_banks_opt = if allow_skipping_banks {
+        Some(retriever.available_banks()?)
+    } else {
+        None
+    };
+
     for (i, position) in account.active_token_positions().enumerate() {
+        // Allow skipping of missing banks only if the account has a nonnegative balance
+        if allow_skipping_banks {
+            let bank_is_available = available_banks_opt
+                .as_ref()
+                .unwrap()
+                .contains(&position.token_index);
+            if !bank_is_available {
+                require_msg_typed!(
+                    position.indexed_position >= 0,
+                    MangoError::InvalidBank,
+                    "the bank for token index {} is a required health account when the account has a negative balance in it",
+                    position.token_index
+                );
+                continue;
+            }
+        }
+
         let bank_oracle_result =
             retriever.bank_and_oracle(&account.fixed.group, i, position.token_index);
-        if skip_bad_oracles
+
+        // Allow skipping of bad-oracle banks if the account has a nonnegative balance
+        if allow_skipping_banks
             && bank_oracle_result.is_oracle_error()
             && position.indexed_position >= 0
         {
@@ -1301,9 +1334,25 @@ fn new_health_cache_impl(
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
         // find the TokenInfos for the market's base and quote tokens
-        let base_info_index = find_token_info_index(&token_infos, serum_account.base_token_index)?;
-        let quote_info_index =
-            find_token_info_index(&token_infos, serum_account.quote_token_index)?;
+        // and potentially skip the whole serum contribution if they are not available
+        let info_index_results = (
+            find_token_info_index(&token_infos, serum_account.base_token_index),
+            find_token_info_index(&token_infos, serum_account.quote_token_index),
+        );
+        let (base_info_index, quote_info_index) = match info_index_results {
+            (Ok(base), Ok(quote)) => (base, quote),
+            _ => {
+                require_msg_typed!(
+                    allow_skipping_banks,
+                    MangoError::InvalidBank,
+                    "serum market {} misses health accounts for bank {} or {}",
+                    serum_account.market_index,
+                    serum_account.base_token_index,
+                    serum_account.quote_token_index,
+                );
+                continue;
+            }
+        };
 
         // add the amounts that are freely settleable immediately to token balances
         let base_free = I80F48::from(oo.native_coin_free);
@@ -1329,6 +1378,12 @@ fn new_health_cache_impl(
             i,
             perp_position.market_index,
         )?;
+
+        // Ensure the settle token is available in the health cache
+        if allow_skipping_banks {
+            find_token_info_index(&token_infos, perp_market.settle_token_index)?;
+        }
+
         perp_infos.push(PerpInfo::new(
             perp_position,
             perp_market,
@@ -1877,6 +1932,172 @@ mod tests {
         for (i, testcase) in testcases.iter().enumerate() {
             println!("checking testcase {}", i);
             test_health1_runner(testcase);
+        }
+    }
+
+    #[test]
+    fn test_health_with_skips() {
+        let testcase = TestHealth1Case {
+            // 6, reserved oo funds
+            token1: 100,
+            token2: 10,
+            token3: -10,
+            oo_1_2: (5, 1),
+            oo_1_3: (0, 0),
+            ..Default::default()
+        };
+
+        let buffer = MangoAccount::default_for_tests().try_to_vec().unwrap();
+        let mut account = MangoAccountValue::from_bytes(&buffer).unwrap();
+
+        let group = Pubkey::new_unique();
+        account.fixed.group = group;
+
+        let (mut bank1, mut oracle1) = mock_bank_and_oracle(group, 0, 1.0, 0.2, 0.1);
+        let (mut bank2, mut oracle2) = mock_bank_and_oracle(group, 4, 5.0, 0.5, 0.3);
+        let (mut bank3, mut oracle3) = mock_bank_and_oracle(group, 5, 10.0, 0.5, 0.3);
+        bank1
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(0).unwrap().0,
+                I80F48::from(testcase.token1),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+        bank2
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(4).unwrap().0,
+                I80F48::from(testcase.token2),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+        bank3
+            .data()
+            .change_without_fee(
+                account.ensure_token_position(5).unwrap().0,
+                I80F48::from(testcase.token3),
+                DUMMY_NOW_TS,
+            )
+            .unwrap();
+
+        let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
+        let serum3account1 = account.create_serum3_orders(2).unwrap();
+        serum3account1.open_orders = oo1.pubkey;
+        serum3account1.base_token_index = 4;
+        serum3account1.quote_token_index = 0;
+        oo1.data().native_pc_total = testcase.oo_1_2.0;
+        oo1.data().native_coin_total = testcase.oo_1_2.1;
+
+        fn compute_health_with_retriever<'a, 'info>(
+            ais: &[AccountInfo],
+            account: &MangoAccountValue,
+            group: Pubkey,
+            kind: bool,
+        ) -> Result<I80F48> {
+            let hc = if kind {
+                let retriever =
+                    ScanningAccountRetriever::new_with_staleness(&ais, &group, None).unwrap();
+                new_health_cache_skipping_missing_banks_and_bad_oracles(
+                    &account.borrow(),
+                    &retriever,
+                    DUMMY_NOW_TS,
+                )?
+            } else {
+                let retriever = new_fixed_order_account_retriever_with_optional_banks(
+                    &ais,
+                    &account.borrow(),
+                    0,
+                )
+                .unwrap();
+                new_health_cache_skipping_missing_banks_and_bad_oracles(
+                    &account.borrow(),
+                    &retriever,
+                    DUMMY_NOW_TS,
+                )?
+            };
+            Ok(hc.health(HealthType::Init))
+        }
+
+        for retriever_kind in [false, true] {
+            // baseline with everything
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank2.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle2.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(
+                    health,
+                    0.8 * 100.0 + 0.5 * 5.0 * (10.0 + 2.0) - 1.5 * 10.0 * 10.0
+                ));
+            }
+
+            // missing bank1
+            {
+                let ais = vec![
+                    bank2.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle2.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, 0.5 * 5.0 * 10.0 - 1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank2
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank3.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, 0.8 * 100.0 - 1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank1 and 2
+            {
+                let ais = vec![
+                    bank3.as_account_info(),
+                    oracle3.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                let health =
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).unwrap();
+                assert!(health_eq(health, -1.5 * 10.0 * 10.0));
+            }
+
+            // missing bank3
+            {
+                let ais = vec![
+                    bank1.as_account_info(),
+                    bank2.as_account_info(),
+                    oracle1.as_account_info(),
+                    oracle2.as_account_info(),
+                    oo1.as_account_info(),
+                ];
+
+                // bank3 has a negative balance and can't be skipped!
+                assert!(
+                    compute_health_with_retriever(&ais, &account, group, retriever_kind).is_err()
+                );
+            }
         }
     }
 }

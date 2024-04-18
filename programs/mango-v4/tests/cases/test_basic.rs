@@ -450,7 +450,7 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+    assert_eq_f64!(maint_health, 1000.0, 1e-2);
 
     let start_time = solana.clock_timestamp().await;
 
@@ -476,17 +476,17 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .unwrap();
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 1000.0, 1e-2));
+    assert_eq_f64!(maint_health, 1000.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 1500).await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 750.0, 1e-2));
+    assert_eq_f64!(maint_health, 750.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 3000).await;
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 500.0, 1e-2));
+    assert_eq_f64!(maint_health, 500.0, 1e-2);
 
     solana.set_clock_timestamp(start_time + 1600).await;
 
@@ -507,11 +507,11 @@ async fn test_bank_maint_weight_shift() -> Result<(), TransportError> {
     .unwrap();
 
     let maint_health = account_maint_health(solana, account).await;
-    assert!(assert_equal_f64_f64(maint_health, 700.0, 1e-2));
+    assert_eq_f64!(maint_health, 700.0, 1e-2);
 
     let bank: Bank = solana.get_account(tokens[0].bank).await;
-    assert!(assert_equal_fixed_f64(bank.maint_asset_weight, 0.7, 1e-4));
-    assert!(assert_equal_fixed_f64(bank.maint_liab_weight, 1.3, 1e-4));
+    assert_eq_fixed_f64!(bank.maint_asset_weight, 0.7, 1e-4);
+    assert_eq_fixed_f64!(bank.maint_liab_weight, 1.3, 1e-4);
     assert_eq!(bank.maint_weight_shift_duration_inv, I80F48::ZERO);
 
     Ok(())
@@ -684,6 +684,368 @@ async fn test_bank_deposit_limit() -> Result<(), TransportError> {
     )
     .await
     .unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_withdraw_skip_bank() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let payer_token_accounts = &context.users[1].token_accounts;
+    let mints = &context.mints[0..3];
+
+    let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        zero_token_is_quote: true,
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    // Funding to fill the vaults
+    create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints,
+        1_000_000,
+        0,
+    )
+    .await;
+
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        1,
+        &context.users[1],
+        &mints[0..2],
+        1000,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: when all balances are positive
+    //
+
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[1].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    // ok even when total health = 0
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank, tokens[1].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1001,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+        MangoError::BorrowsRequireHealthAccountBank
+    );
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1001,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[1].bank],
+        },
+        MangoError::HealthMustBePositiveOrIncrease
+    );
+
+    //
+    // TEST: create a borrow
+    //
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank, tokens[1].bank],
+        },
+        MangoError::HealthMustBePositiveOrIncrease
+    );
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[2].bank],
+        },
+        MangoError::BorrowsRequireHealthAccountBank
+    );
+
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: true,
+                account,
+                owner,
+                token_account: payer_token_accounts[2],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    //
+    // TEST: withdraw positive balances when there's a borrow
+    //
+
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[1].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[2].bank],
+        },
+        MangoError::InvalidBank
+    );
+
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: TokenWithdrawInstruction {
+                amount: 1,
+                allow_borrow: false,
+                account,
+                owner,
+                token_account: payer_token_accounts[0],
+                bank_index: 0,
+            },
+            skip_banks: vec![tokens[0].bank, tokens[1].bank],
+        },
+        MangoError::HealthMustBePositive
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_sequence_check() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..1];
+
+    let mango_setup::GroupWithTokens { group, .. } = mango_setup::GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..mango_setup::GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let account = send_tx(
+        solana,
+        AccountCreateInstruction {
+            account_num: 0,
+            token_count: 6,
+            serum3_count: 3,
+            perp_count: 3,
+            perp_oo_count: 3,
+            token_conditional_swap_count: 3,
+            group,
+            owner,
+            payer,
+        },
+    )
+    .await
+    .unwrap()
+    .account;
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 0);
+
+    //
+    // TEST: Sequence check with right sequence number
+    //
+
+    send_tx(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 1);
+
+    send_tx(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 1,
+        },
+    )
+    .await
+    .unwrap();
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 2);
+
+    //
+    // TEST: Sequence check with wrong sequence number
+    //
+
+    send_tx_expect_error!(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 1
+        },
+        MangoError::InvalidSequenceNumber
+    );
+
+    send_tx_expect_error!(
+        solana,
+        SequenceCheckInstruction {
+            account,
+            owner,
+            expected_sequence_number: 4
+        },
+        MangoError::InvalidSequenceNumber
+    );
+
+    let mango_account = get_mango_account(solana, account).await;
+    assert_eq!(mango_account.fixed.sequence_number, 2);
 
     Ok(())
 }

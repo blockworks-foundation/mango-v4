@@ -123,8 +123,7 @@ pub struct MangoAccount {
 
     pub bump: u8,
 
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
 
     // (Display only)
     // Cumulative (deposits - withdraws)
@@ -200,7 +199,7 @@ impl MangoAccount {
             in_health_region: 0,
             account_num: 0,
             bump: 0,
-            padding: Default::default(),
+            sequence_number: 0,
             net_deposits: 0,
             perp_spot_transfers: 0,
             health_region_begin_init_health: 0,
@@ -325,7 +324,7 @@ pub struct MangoAccountFixed {
     being_liquidated: u8,
     in_health_region: u8,
     pub bump: u8,
-    pub padding: [u8; 1],
+    pub sequence_number: u8,
     pub net_deposits: i64,
     pub perp_spot_transfers: i64,
     pub health_region_begin_init_health: i64,
@@ -1455,6 +1454,13 @@ impl<
             post_init_health >= 0 || health_does_not_decrease,
             MangoError::HealthMustBePositiveOrIncrease
         );
+        Ok(())
+    }
+
+    /// A stricter version of check_health_post_checks() that requires >=0 health, it not getting
+    /// worse is not sufficient
+    pub fn check_health_post_checks_strict(&mut self, post_init_health: I80F48) -> Result<()> {
+        require!(post_init_health >= 0, MangoError::HealthMustBePositive);
         Ok(())
     }
 
@@ -2897,7 +2903,7 @@ mod tests {
                 being_liquidated: fixed.being_liquidated,
                 in_health_region: fixed.in_health_region,
                 bump: fixed.bump,
-                padding: Default::default(),
+                sequence_number: 0,
                 net_deposits: fixed.net_deposits,
                 perp_spot_transfers: fixed.perp_spot_transfers,
                 health_region_begin_init_health: fixed.health_region_begin_init_health,

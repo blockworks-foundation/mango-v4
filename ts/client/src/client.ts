@@ -83,7 +83,7 @@ import {
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
-import { FlashLoanType, OracleConfigParams } from './types';
+import { FlashLoanType, HealthCheckKind, OracleConfigParams } from './types';
 import {
   I64_MAX_BN,
   U64_MAX_BN,
@@ -1054,6 +1054,50 @@ export class MangoClient {
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async sequenceCheckIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+  ): Promise<TransactionInstruction> {
+    return await this.program.methods
+      .sequenceCheck(mangoAccount.sequenceNumber)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        owner: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+  }
+
+  public async healthCheckIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    minHealthValue: number,
+    checkKind: HealthCheckKind,
+  ): Promise<TransactionInstruction> {
+    const healthRemainingAccounts: PublicKey[] =
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [],
+        [],
+        [],
+      );
+
+    return await this.program.methods
+      .healthCheck(minHealthValue, checkKind)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+      })
+      .remainingAccounts(
+        healthRemainingAccounts.map(
+          (pk) =>
+            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+        ),
+      )
+      .instruction();
   }
 
   public async getMangoAccount(

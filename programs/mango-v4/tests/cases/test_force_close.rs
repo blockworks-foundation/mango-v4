@@ -357,18 +357,18 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -99.99,
         0.001
-    ));
+    );
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         99.98,
         0.001
-    ));
+    );
 
     // Market needs to be in force close
     assert!(send_tx(
@@ -423,18 +423,18 @@ async fn test_force_close_perp() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         0.009,
         0.001
-    ));
+    );
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         -0.0199,
         0.001
-    ));
+    );
 
     Ok(())
 }

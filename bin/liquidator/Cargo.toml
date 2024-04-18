@@ -49,3 +49,4 @@ tokio-stream = { version = "0.1.9"}
 tokio-tungstenite = "0.16.1"
 tracing = "0.1"
 regex = "1.9.5"
+hdrhistogram = "7.5.4"

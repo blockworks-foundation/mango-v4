@@ -16,9 +16,6 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
     let payer_mint0_account = context.users[1].token_accounts[0];
     let loan_origination_fee = 0.0005;
 
-    // higher resolution that the loan_origination_fee for one token
-    let balance_f64eq = |a: f64, b: f64| utils::assert_equal_f64_f64(a, b, 0.0001);
-
     //
     // SETUP: Create a group, account, register a token (mint0)
     //
@@ -173,10 +170,11 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
         margin_account_initial + withdraw_amount - deposit_amount
     );
     // no fee because user had positive balance
-    assert!(balance_f64eq(
+    assert_eq_f64!(
         account_position_f64(solana, account, bank).await,
-        (deposit_amount_initial - withdraw_amount + deposit_amount) as f64
-    ));
+        (deposit_amount_initial - withdraw_amount + deposit_amount) as f64,
+        0.0001
+    );
 
     //
     // TEST: Bringing the balance to 0 deactivates the token
@@ -210,10 +208,11 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
         solana.token_account_balance(margin_account).await,
         margin_account_initial - deposit_amount
     );
-    assert!(balance_f64eq(
+    assert_eq_f64!(
         account_position_f64(solana, account, bank).await,
-        deposit_amount as f64
-    ));
+        deposit_amount as f64,
+        0.0001
+    );
 
     //
     // TEST: Try loan fees by withdrawing more than the user balance
@@ -232,11 +231,12 @@ async fn test_margin_trade() -> Result<(), BanksClientError> {
         solana.token_account_balance(margin_account).await,
         margin_account_initial + withdraw_amount - deposit_amount
     );
-    assert!(balance_f64eq(
+    assert_eq_f64!(
         account_position_f64(solana, account, bank).await,
         (deposit_amount_initial + deposit_amount - withdraw_amount) as f64
-            - (withdraw_amount - deposit_amount_initial) as f64 * loan_origination_fee
-    ));
+            - (withdraw_amount - deposit_amount_initial) as f64 * loan_origination_fee,
+        0.0001
+    );
 
     Ok(())
 }
@@ -254,9 +254,6 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     let mints = &context.mints[0..2];
     let owner_accounts = context.users[0].token_accounts.clone();
     let payer_accounts = context.users[1].token_accounts.clone();
-
-    // higher resolution that the loan_origination_fee for one token
-    let balance_f64eq = |a: f64, b: f64| utils::assert_equal_f64_f64(a, b, 0.0001);
 
     //
     // SETUP: Create a group, account, register a token (mint0)
@@ -414,13 +411,14 @@ async fn test_flash_loan_swap_fee() -> Result<(), BanksClientError> {
     );
 
     let mango_withdraw_amount = account_position_f64(solana, account, tokens[0].bank).await;
-    assert!(balance_f64eq(
+    assert_eq_f64!(
         mango_withdraw_amount,
-        initial_deposit as f64 - withdraw_amount as f64 * (1.0 + swap_fee_rate)
-    ));
+        initial_deposit as f64 - withdraw_amount as f64 * (1.0 + swap_fee_rate),
+        0.0001
+    );
 
     let mango_deposit_amount = account_position_f64(solana, account, tokens[1].bank).await;
-    assert!(balance_f64eq(mango_deposit_amount, deposit_amount as f64));
+    assert_eq_f64!(mango_deposit_amount, deposit_amount as f64, 0.0001);
 
     Ok(())
 }
@@ -729,6 +727,115 @@ async fn test_margin_trade_deposit_limit() -> Result<(), BanksClientError> {
         .unwrap();
 
     make_flash_loan_tx(solana, 899).await.send().await.unwrap();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_margin_trade_skip_bank() -> Result<(), BanksClientError> {
+    let mut test_builder = TestContextBuilder::new();
+    test_builder.test().set_compute_max_units(100_000);
+    let context = test_builder.start_default().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+    let payer_mint0_account = context.users[1].token_accounts[0];
+
+    //
+    // SETUP: Create a group, account, register a token (mint0)
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+    let bank = tokens[0].bank;
+
+    //
+    // create the test user account
+    //
+
+    let deposit_amount_initial = 100;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        &mints,
+        deposit_amount_initial,
+        0,
+    )
+    .await;
+
+    //
+    // TEST: Margin trade
+    //
+    let margin_account = payer_mint0_account;
+    let target_token_account = context.users[0].token_accounts[0];
+    let make_flash_loan_tx = |solana, deposit_amount, skip_banks| async move {
+        let mut tx = ClientTransaction::new(solana);
+        let loans = vec![FlashLoanPart {
+            bank,
+            token_account: target_token_account,
+            withdraw_amount: 0,
+        }];
+        tx.add_instruction(FlashLoanBeginInstruction {
+            account,
+            owner,
+            loans: loans.clone(),
+        })
+        .await;
+        tx.add_instruction_direct(
+            spl_token::instruction::transfer(
+                &spl_token::ID,
+                &margin_account,
+                &target_token_account,
+                &payer.pubkey(),
+                &[&payer.pubkey()],
+                deposit_amount,
+            )
+            .unwrap(),
+        );
+        tx.add_signer(payer);
+        tx.add_instruction(HealthAccountSkipping {
+            inner: FlashLoanEndInstruction {
+                account,
+                owner,
+                loans,
+                // the test only accesses a single token: not a swap
+                flash_loan_type: mango_v4::accounts_ix::FlashLoanType::Unknown,
+            },
+            skip_banks,
+        })
+        .await;
+        tx
+    };
+
+    make_flash_loan_tx(solana, 1, vec![])
+        .await
+        .send()
+        .await
+        .unwrap();
+
+    make_flash_loan_tx(solana, 1, vec![tokens[1].bank])
+        .await
+        .send()
+        .await
+        .unwrap();
+
+    make_flash_loan_tx(solana, 1, vec![tokens[0].bank])
+        .await
+        .send_expect_error(MangoError::InvalidBank)
+        .await
+        .unwrap();
 
     Ok(())
 }

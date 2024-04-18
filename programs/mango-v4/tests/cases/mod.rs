@@ -10,7 +10,8 @@ pub use program_test::*;
 
 pub use super::program_test;
 
-pub use utils::assert_equal_fixed_f64 as assert_equal;
+pub use crate::assert_eq_f64;
+pub use crate::assert_eq_fixed_f64;
 
 mod test_alt;
 mod test_bankrupt_tokens;
@@ -21,6 +22,7 @@ mod test_collateral_fees;
 mod test_delegate;
 mod test_fees_buyback_with_mngo;
 mod test_force_close;
+mod test_health_check;
 mod test_health_compute;
 mod test_health_region;
 mod test_ix_gate_set;
@@ -35,6 +37,7 @@ mod test_perp_settle;
 mod test_perp_settle_fees;
 mod test_position_lifetime;
 mod test_reduce_only;
+mod test_replay;
 mod test_serum;
 mod test_stale_oracles;
 mod test_token_conditional_swap;

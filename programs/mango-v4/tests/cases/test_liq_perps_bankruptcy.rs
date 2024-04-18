@@ -337,11 +337,11 @@ async fn test_liq_perps_bankruptcy() -> Result<(), TransportError> {
             liqor_quote_before + 12
         );
         let acc_data = solana.get_account::<MangoAccount>(account).await;
-        assert!(assert_equal(
+        assert_eq_fixed_f64!(
             acc_data.perps[0].quote_position_native(),
             -50.0 + 11.0 + 27.0,
             0.1
-        ));
+        );
         assert_eq!(acc_data.being_liquidated, 0);
         let (_liqor_data, liqor_perp) = liqor_info(perp_market, liqor).await;
         assert_eq!(liqor_perp.quote_position_native(), -11);

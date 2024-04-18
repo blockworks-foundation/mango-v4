@@ -1,18 +1,12 @@
 import { PublicKey } from '@solana/web3.js';
-import {
-  HealthType,
-  MangoAccount,
-  TokenPosition,
-  TokenPositionDto,
-} from './mangoAccount';
 import BN from 'bn.js';
-import { Bank, TokenIndex } from './bank';
-import { deepClone, toNative, toUiDecimals } from '../utils';
 import { expect } from 'chai';
-import { I80F48, I80F48Dto, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { Group } from './group';
-import { HealthCache } from './healthCache';
 import { assert } from 'console';
+import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { deepClone, toNative, toUiDecimals } from '../utils';
+import { Bank, TokenIndex } from './bank';
+import { Group } from './group';
+import { MangoAccount, TokenPosition } from './mangoAccount';
 
 describe('Mango Account', () => {
   const mangoAccount = new MangoAccount(
@@ -31,6 +25,7 @@ describe('Mango Account', () => {
     new BN(0),
     new BN(0),
     new BN(0),
+    0,
     0,
     new BN(0),
     [],
@@ -105,6 +100,7 @@ describe('maxWithdraw', () => {
     new BN(0),
     new BN(0),
     new BN(0),
+    0,
     0,
     new BN(0),
     [],

@@ -330,12 +330,12 @@ async function createAndPopulateAlt(
       });
       let sig = await client.sendAndConfirmTransaction([createIx[0]]);
       console.log(
-        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
+        `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig.signature}`,
       );
 
       console.log(`ALT: set at index 0 for group...`);
       sig = await client.altSet(group, createIx[1], 0);
-      console.log(`...https://explorer.solana.com/tx/${sig}`);
+      console.log(`...https://explorer.solana.com/tx/${sig.signature}`);
 
       group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
     } catch (error) {
@@ -366,7 +366,7 @@ async function createAndPopulateAlt(
       addresses,
     });
     const sig = await client.sendAndConfirmTransaction([extendIx]);
-    console.log(`https://explorer.solana.com/tx/${sig}`);
+    console.log(`https://explorer.solana.com/tx/${sig.signature}`);
   }
 
   // Extend using mango v4 relevant pub keys

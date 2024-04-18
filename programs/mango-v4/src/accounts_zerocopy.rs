@@ -13,6 +13,10 @@ pub trait AccountReader {
     fn data(&self) -> &[u8];
 }
 
+pub trait AccountDataWriter {
+    fn data_as_mut_slice(&mut self) -> &mut [u8];
+}
+
 /// Like AccountReader, but can also get the account pubkey
 pub trait KeyedAccountReader: AccountReader {
     fn key(&self) -> &Pubkey;
@@ -99,6 +103,12 @@ impl<'info, 'a> KeyedAccountReader for AccountInfoRefMut<'info, 'a> {
     }
 }
 
+impl<'info, 'a> AccountDataWriter for AccountInfoRefMut<'info, 'a> {
+    fn data_as_mut_slice(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
+}
+
 #[cfg(feature = "solana-sdk")]
 impl<T: solana_sdk::account::ReadableAccount> AccountReader for T {
     fn owner(&self) -> &Pubkey {
@@ -107,6 +117,13 @@ impl<T: solana_sdk::account::ReadableAccount> AccountReader for T {
 
     fn data(&self) -> &[u8] {
         self.data()
+    }
+}
+
+#[cfg(feature = "solana-sdk")]
+impl<T: solana_sdk::account::WritableAccount> AccountDataWriter for T {
+    fn data_as_mut_slice(&mut self) -> &mut [u8] {
+        self.data_as_mut_slice()
     }
 }
 
@@ -232,28 +249,29 @@ impl<A: AccountReader> LoadZeroCopy for A {
     }
 }
 
-impl<'info, 'a> LoadMutZeroCopy for AccountInfoRefMut<'info, 'a> {
+impl<A: AccountReader + AccountDataWriter> LoadMutZeroCopy for A {
     fn load_mut<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T> {
-        if self.owner != &T::owner() {
+        if self.owner() != &T::owner() {
             return Err(ErrorCode::AccountOwnedByWrongProgram.into());
         }
 
-        if self.data.len() < 8 {
+        let data = self.data_as_mut_slice();
+        if data.len() < 8 {
             return Err(ErrorCode::AccountDiscriminatorNotFound.into());
         }
-        let disc_bytes = array_ref![self.data, 0, 8];
+        let disc_bytes = array_ref![data, 0, 8];
         if disc_bytes != &T::discriminator() {
             return Err(ErrorCode::AccountDiscriminatorMismatch.into());
         }
 
         Ok(bytemuck::from_bytes_mut(
-            &mut self.data[8..mem::size_of::<T>() + 8],
+            &mut data[8..mem::size_of::<T>() + 8],
         ))
     }
 
     fn load_mut_fully_unchecked<T: ZeroCopy + Owner>(&mut self) -> Result<&mut T> {
         Ok(bytemuck::from_bytes_mut(
-            &mut self.data[8..mem::size_of::<T>() + 8],
+            &mut self.data_as_mut_slice()[8..mem::size_of::<T>() + 8],
         ))
     }
 }

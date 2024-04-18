@@ -1,3 +1,5 @@
+use hdrhistogram::Histogram;
+use std::time::Duration;
 use {
     std::collections::HashMap,
     std::sync::{atomic, Arc, Mutex, RwLock},
@@ -10,6 +12,7 @@ enum Value {
     U64(Arc<atomic::AtomicU64>),
     I64(Arc<atomic::AtomicI64>),
     String(Arc<Mutex<String>>),
+    Latency(Arc<Mutex<Histogram<u64>>>),
 }
 
 #[derive(Debug)]
@@ -46,6 +49,18 @@ impl MetricU64 {
 
     pub fn decrement(&mut self) {
         self.value.fetch_sub(1, atomic::Ordering::AcqRel);
+    }
+}
+
+#[derive(Clone)]
+pub struct MetricLatency {
+    value: Arc<Mutex<Histogram<u64>>>,
+}
+impl MetricLatency {
+    pub fn push(&mut self, duration: std::time::Duration) {
+        let mut guard = self.value.lock().unwrap();
+        let ns: u64 = duration.as_nanos().try_into().unwrap();
+        guard.record(ns).expect("latency error");
     }
 }
 
@@ -105,6 +120,19 @@ impl Metrics {
         MetricI64 {
             value: match value {
                 Value::I64(v) => v.clone(),
+                _ => panic!("bad metric type"),
+            },
+        }
+    }
+
+    pub fn register_latency(&self, name: String) -> MetricLatency {
+        let mut registry = self.registry.write().unwrap();
+        let value = registry.entry(name).or_insert_with(|| {
+            Value::Latency(Arc::new(Mutex::new(Histogram::<u64>::new(3).unwrap())))
+        });
+        MetricLatency {
+            value: match value {
+                Value::Latency(v) => v.clone(),
                 _ => panic!("bad metric type"),
             },
         }
@@ -186,6 +214,16 @@ pub fn start() -> Metrics {
                                 name, &*new_value, previous_value
                             );
                         }
+                    }
+                    Value::Latency(v) => {
+                        let hist = v.lock().unwrap();
+
+                        info!(
+                            "metric: {}: 99'th percentile: {:?}, 99,9'th percentile: {:?}",
+                            name,
+                            Duration::from_nanos(hist.value_at_quantile(0.99)),
+                            Duration::from_nanos(hist.value_at_quantile(0.999))
+                        );
                     }
                 }
             }

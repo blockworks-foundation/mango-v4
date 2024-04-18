@@ -287,19 +287,19 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -99.99,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         99.98,
         0.001
-    ));
+    );
 
     //
     // TEST: closing perp positions
@@ -364,19 +364,19 @@ async fn test_perp_fixed() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         0.02,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), 0);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         -0.04,
         0.001
-    ));
+    );
 
     // settle pnl and fees to bring quote_position_native fully to 0
     send_tx(
@@ -644,19 +644,19 @@ async fn test_perp_oracle_peg() -> Result<(), TransportError> {
 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     assert_eq!(mango_account_0.perps[0].base_position_lots(), 2);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_0.perps[0].quote_position_native(),
         -19998.0,
         0.001
-    ));
+    );
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     assert_eq!(mango_account_1.perps[0].base_position_lots(), -2);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         mango_account_1.perps[0].quote_position_native(),
         19996.0,
         0.001
-    ));
+    );
 
     //
     // TEST: Place a pegged order and check how it behaves with oracle changes
@@ -1008,30 +1008,18 @@ async fn test_perp_realize_partially() -> Result<(), TransportError> {
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let perp_0 = mango_account_0.perps[0];
     assert_eq!(perp_0.base_position_lots(), 1);
-    assert!(assert_equal(
+    assert_eq_fixed_f64!(
         perp_0.quote_position_native(),
         -200_000.0 + 150_000.0,
         0.001
-    ));
-    assert!(assert_equal(
-        perp_0.realized_pnl_for_position_native,
-        50_000.0,
-        0.001
-    ));
+    );
+    assert_eq_fixed_f64!(perp_0.realized_pnl_for_position_native, 50_000.0, 0.001);
 
     let mango_account_1 = solana.get_account::<MangoAccount>(account_1).await;
     let perp_1 = mango_account_1.perps[0];
     assert_eq!(perp_1.base_position_lots(), -1);
-    assert!(assert_equal(
-        perp_1.quote_position_native(),
-        200_000.0 - 150_000.0,
-        0.001
-    ));
-    assert!(assert_equal(
-        perp_1.realized_pnl_for_position_native,
-        -50_000.0,
-        0.001
-    ));
+    assert_eq_fixed_f64!(perp_1.quote_position_native(), 200_000.0 - 150_000.0, 0.001);
+    assert_eq_fixed_f64!(perp_1.realized_pnl_for_position_native, -50_000.0, 0.001);
 
     Ok(())
 }
@@ -1589,6 +1577,138 @@ async fn test_perp_cancel_with_in_flight_events() -> Result<(), TransportError> 
     let mango_account_0 = solana.get_account::<MangoAccount>(account_0).await;
     let perp_0 = mango_account_0.perps[0];
     assert_eq!(perp_0.bids_base_lots, 0);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_perp_skip_bank() -> Result<(), TransportError> {
+    let context = TestContext::new().await;
+    let solana = &context.solana.clone();
+
+    let admin = TestKeypair::new();
+    let owner = context.users[0].key;
+    let payer = context.users[1].key;
+    let mints = &context.mints[0..2];
+
+    //
+    // SETUP: Create a group and an account
+    //
+
+    let GroupWithTokens { group, tokens, .. } = GroupWithTokensConfig {
+        admin,
+        payer,
+        mints: mints.to_vec(),
+        ..GroupWithTokensConfig::default()
+    }
+    .create(solana)
+    .await;
+
+    let deposit_amount = 1000;
+    let account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        0,
+        &context.users[1],
+        mints,
+        deposit_amount,
+        0,
+    )
+    .await;
+
+    //
+    // SETUP: Create a perp market
+    //
+    let mango_v4::accounts::PerpCreateMarket { perp_market, .. } = send_tx(
+        solana,
+        PerpCreateMarketInstruction {
+            group,
+            admin,
+            payer,
+            perp_market_index: 0,
+            quote_lot_size: 10,
+            base_lot_size: 100,
+            maint_base_asset_weight: 0.975,
+            init_base_asset_weight: 0.95,
+            maint_base_liab_weight: 1.025,
+            init_base_liab_weight: 1.05,
+            base_liquidation_fee: 0.012,
+            maker_fee: 0.0000,
+            taker_fee: 0.0000,
+            settle_pnl_limit_factor: -1.0,
+            settle_pnl_limit_window_size_ts: 24 * 60 * 60,
+            ..PerpCreateMarketInstruction::with_new_book_and_queue(&solana, &tokens[1]).await
+        },
+    )
+    .await
+    .unwrap();
+
+    let perp_market_data = solana.get_account::<PerpMarket>(perp_market).await;
+    let price_lots = perp_market_data.native_price_to_lot(I80F48::from(1));
+
+    //
+    // TESTS
+    //
+
+    // good without skips
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can skip unrelated
+    send_tx(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![tokens[1].bank],
+        },
+    )
+    .await
+    .unwrap();
+
+    // can't skip settle token index
+    send_tx_expect_error!(
+        solana,
+        HealthAccountSkipping {
+            inner: PerpPlaceOrderInstruction {
+                account,
+                perp_market,
+                owner,
+                side: Side::Bid,
+                price_lots,
+                max_base_lots: 2,
+                client_order_id: 5,
+                ..PerpPlaceOrderInstruction::default()
+            },
+            skip_banks: vec![tokens[0].bank],
+        },
+        MangoError::TokenPositionDoesNotExist,
+    );
 
     Ok(())
 }
