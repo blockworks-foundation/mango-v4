@@ -186,7 +186,7 @@ pub struct Bank {
     /// Except when first migrating to having this field, then 0.0
     pub interest_curve_scaling: f64,
 
-    /// Largest amount of tokens that might be added the the bank based on
+    /// Largest amount of tokens that might be added the bank based on
     /// serum open order execution.
     pub potential_serum_tokens: u64,
 
@@ -234,7 +234,7 @@ pub struct Bank {
     #[derivative(Debug = "ignore")]
     pub padding2: [u8; 4],
 
-    /// Largest amount of tokens that might be added the the bank based on
+    /// Largest amount of tokens that might be added the bank based on
     /// oenbook open order execution.
     pub potential_openbook_tokens: u64,
 

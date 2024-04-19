@@ -15,18 +15,14 @@ pub struct OpenbookV2Market {
     pub base_token_index: TokenIndex,
     // ABI: Clients rely on this being at offset 42
     pub quote_token_index: TokenIndex,
+    pub market_index: OpenbookV2MarketIndex,
     pub reduce_only: u8,
     pub force_close: u8,
-    pub padding1: [u8; 2],
     pub name: [u8; 16],
     pub openbook_v2_program: Pubkey,
     pub openbook_v2_market_external: Pubkey,
 
-    pub market_index: OpenbookV2MarketIndex,
-
-    pub bump: u8,
-
-    pub padding2: [u8; 1],
+    pub registration_time: u64,
 
     /// Limit orders must be <= oracle * (1+band) and >= oracle / (1+band)
     ///
@@ -34,13 +30,13 @@ pub struct OpenbookV2Market {
     /// same as f32::MAX.
     pub oracle_price_band: f32,
 
-    pub registration_time: u64,
+    pub bump: u8,
 
-    pub reserved: [u8; 1024],
+    pub reserved: [u8; 1027],
 }
 const_assert_eq!(
     size_of::<OpenbookV2Market>(),
-    32 + 2 + 2 + 1 + 3 + 16 + 2 * 32 + 2 + 1 + 5 + 8 + 1024
+    32 + 2 * 3 + 1 * 2 + 1 * 16 + 32 * 2 + 8 + 4 + 1 + 1027
 );
 const_assert_eq!(size_of::<OpenbookV2Market>(), 1160);
 const_assert_eq!(size_of::<OpenbookV2Market>() % 8, 0);
