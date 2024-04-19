@@ -320,36 +320,18 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
     }
 
     // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
-        solana,
-        AccountCreateInstruction {
-            account_num: 2,
-            group,
-            owner,
-            payer,
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap()
-    .account;
     let vault_amount = 100000;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: vault_amount,
-                reduce_only: false,
-                account: vault_account,
-                owner,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 1,
-            },
-        )
-        .await
-        .unwrap();
-    }
+    let vault_account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        2,
+        &context.users[1],
+        mints,
+        vault_amount,
+        1,
+    )
+    .await;
 
     // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
     // It must be enough to not trip the borrow limits on the bank.
@@ -645,6 +627,7 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
     let borrow_token2 = &tokens[1];
     let collateral_token1 = &tokens[2];
     let collateral_token2 = &tokens[3];
+    let insurance_token = collateral_token2;
 
     // fund the insurance vault
     {
@@ -664,54 +647,57 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
         tx.send().await.unwrap();
     }
 
-    // deposit some funds, to the vaults aren't empty
-    let vault_account = send_tx(
+    //
+    // TEST: switch the insurance vault mint, reclaiming the deposited tokens
+    //
+    let before_withdraw_dest = solana.token_account_balance(payer_mint_accounts[0]).await;
+    let insurance_vault = send_tx(
         solana,
-        AccountCreateInstruction {
-            account_num: 2,
+        GroupChangeInsuranceFund {
             group,
-            owner,
+            admin,
             payer,
-            ..Default::default()
+            insurance_mint: insurance_token.mint.pubkey,
+            withdraw_destination: payer_mint_accounts[0],
         },
     )
     .await
     .unwrap()
-    .account;
-    let vault_amount = 100000;
-    for &token_account in payer_mint_accounts {
-        send_tx(
-            solana,
-            TokenDepositInstruction {
-                amount: vault_amount,
-                reduce_only: false,
-                account: vault_account,
-                owner,
-                token_account,
-                token_authority: payer.clone(),
-                bank_index: 1,
-            },
-        )
-        .await
-        .unwrap();
+    .new_insurance_vault;
+    let after_withdraw_dest = solana.token_account_balance(payer_mint_accounts[0]).await;
+    assert_eq!(after_withdraw_dest - before_withdraw_dest, 1051);
+
+    // SETUP: Fund the new insurance vault
+    {
+        let mut tx = ClientTransaction::new(solana);
+        tx.add_instruction_direct(
+            spl_token::instruction::transfer(
+                &spl_token::ID,
+                &payer_mint_accounts[3],
+                &insurance_vault,
+                &payer.pubkey(),
+                &[&payer.pubkey()],
+                2000,
+            )
+            .unwrap(),
+        );
+        tx.add_signer(payer);
+        tx.send().await.unwrap();
     }
 
-    // Also add a tiny amount to bank0 for borrow_token1, so we can test multi-bank socialized loss.
-    // It must be enough to not trip the borrow limits on the bank.
-    send_tx(
-        solana,
-        TokenDepositInstruction {
-            amount: 20,
-            reduce_only: false,
-            account: vault_account,
-            owner,
-            token_account: payer_mint_accounts[0],
-            token_authority: payer.clone(),
-            bank_index: 0,
-        },
+    // deposit some funds, to the vaults aren't empty
+    let vault_amount = 100000;
+    let vault_account = create_funded_account(
+        &solana,
+        group,
+        owner,
+        2,
+        &context.users[1],
+        mints,
+        vault_amount,
+        0,
     )
-    .await
-    .unwrap();
+    .await;
 
     //
     // SETUP: Make an account with some collateral and some borrows
@@ -773,7 +759,7 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[0],
-            bank_index: 1,
+            bank_index: 0,
         },
     )
     .await
@@ -799,7 +785,7 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
             account,
             owner,
             token_account: payer_mint_accounts[1],
-            bank_index: 1,
+            bank_index: 0,
         },
     )
     .await
@@ -862,42 +848,13 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
     // are correct if it depegs
     set_bank_stub_oracle_price(solana, group, borrow_token1, admin, 2.0).await;
 
-    // bankruptcy of an USDC liability: just transfers funds from insurance vault to liqee,
-    // the liqor is uninvolved
-    let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
-    let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    send_tx(
-        solana,
-        TokenLiqBankruptcyInstruction {
-            liqee: account,
-            liqor: vault_account,
-            liqor_owner: owner,
-            liab_mint_info: borrow_token1.mint_info,
-            max_liab_transfer: I80F48::from_num(100000.0),
-        },
-    )
-    .await
-    .unwrap();
-    let liqee = get_mango_account(solana, account).await;
-    assert!(liqee.being_liquidated());
-    assert!(account_position_closed(solana, account, borrow_token1.bank).await);
-    assert_eq!(
-        solana.token_account_balance(insurance_vault).await,
-        // the loan origination fees push the borrow above 50.0 and cause this rounding
-        insurance_vault_before - borrow1_amount - 1
-    );
-    assert_eq!(
-        account_position(solana, vault_account, borrow_token1.bank).await,
-        liqor_before
-    );
-
-    // bankruptcy of a non-USDC liability: USDC to liqor, liability to liqee
+    // bankruptcy: insurance token to liqor, liability to liqee
     // liquidating only a partial amount
     let liab_before = account_position_f64(solana, account, borrow_token2.bank).await;
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
-    let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    let usdc_to_liab = 2.0 / 20.0;
-    let liab_transfer: f64 = 500.0 * usdc_to_liab;
+    let liqor_before = account_position(solana, vault_account, insurance_token.bank).await;
+    let insurance_to_liab = 1.0 / 20.0;
+    let liab_transfer: f64 = 500.0 * insurance_to_liab;
     send_tx(
         solana,
         TokenLiqBankruptcyInstruction {
@@ -912,45 +869,19 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
     .unwrap();
     let liqee = get_mango_account(solana, account).await;
     assert!(liqee.being_liquidated());
-    assert!(account_position_closed(solana, account, borrow_token1.bank).await);
+    assert!(account_position_closed(solana, account, insurance_token.bank).await);
     assert_eq!(
         account_position(solana, account, borrow_token2.bank).await,
         (liab_before + liab_transfer) as i64
     );
-    let usdc_amount = (liab_transfer / usdc_to_liab * 1.02).ceil() as u64;
+    let usdc_amount = (liab_transfer / insurance_to_liab * 1.02).ceil() as u64;
     assert_eq!(
         solana.token_account_balance(insurance_vault).await,
         insurance_vault_before - usdc_amount
     );
     assert_eq!(
-        account_position(solana, vault_account, borrow_token1.bank).await,
+        account_position(solana, vault_account, insurance_token.bank).await,
         liqor_before + usdc_amount as i64
-    );
-
-    // bankruptcy of a non-USDC liability: USDC to liqor, liability to liqee
-    // liquidating fully and then doing socialized loss because the insurance fund is exhausted
-    let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
-    let liqor_before = account_position(solana, vault_account, borrow_token1.bank).await;
-    send_tx(
-        solana,
-        TokenLiqBankruptcyInstruction {
-            liqee: account,
-            liqor: vault_account,
-            liqor_owner: owner,
-            liab_mint_info: borrow_token2.mint_info,
-            max_liab_transfer: I80F48::from_num(1000000.0),
-        },
-    )
-    .await
-    .unwrap();
-    let liqee = get_mango_account(solana, account).await;
-    assert!(!liqee.being_liquidated());
-    assert!(account_position_closed(solana, account, borrow_token1.bank).await);
-    assert!(account_position_closed(solana, account, borrow_token2.bank).await);
-    assert_eq!(solana.token_account_balance(insurance_vault).await, 0);
-    assert_eq!(
-        account_position(solana, vault_account, borrow_token1.bank).await,
-        liqor_before + insurance_vault_before as i64
     );
 
     Ok(())
