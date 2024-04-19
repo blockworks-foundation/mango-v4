@@ -243,6 +243,7 @@ pub enum IxGate {
     TokenForceWithdraw = 72,
     SequenceCheck = 73,
     HealthCheck = 74,
+    GroupChangeInsuranceFund = 75,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
