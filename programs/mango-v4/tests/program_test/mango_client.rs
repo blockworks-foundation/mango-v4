@@ -4388,7 +4388,6 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
-        let group_key = perp_market.group;
         let liqor = account_loader
             .load_mango_account(&self.liqor)
             .await
@@ -4397,23 +4396,36 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             .load_mango_account(&self.liqee)
             .await
             .unwrap();
+
+        let group_key = liqee.fixed.group;
+        let group: Group = account_loader.load(&group_key).await.unwrap();
+
+        let insurance_mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                liqee.fixed.group.as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let insurance_mint_info: MintInfo =
+            account_loader.load(&insurance_mint_info).await.unwrap();
+
         let health_check_metas = derive_liquidation_remaining_account_metas(
             account_loader,
             &liqee,
             &liqor,
-            TokenIndex::MAX,
+            insurance_mint_info.token_index,
             0,
             TokenIndex::MAX,
             0,
         )
         .await;
 
-        let group = account_loader.load::<Group>(&group_key).await.unwrap();
         let settle_mint_info =
             get_mint_info_by_token_index(account_loader, &liqee, perp_market.settle_token_index)
                 .await;
-        let insurance_mint_info =
-            get_mint_info_by_token_index(account_loader, &liqee, QUOTE_TOKEN_INDEX).await;
 
         let accounts = Self::Accounts {
             group: group_key,

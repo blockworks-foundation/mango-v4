@@ -594,7 +594,7 @@ async fn test_bankrupt_tokens_insurance_fund() -> Result<(), TransportError> {
 }
 
 #[tokio::test]
-async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
+async fn test_bankrupt_tokens_other_insurance_fund() -> Result<(), TransportError> {
     let mut test_builder = TestContextBuilder::new();
     test_builder.test().set_compute_max_units(85_000); // TokenLiqWithToken needs 84k
     let context = test_builder.start_default().await;
@@ -793,8 +793,10 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
 
     //
     // SETUP: Change the oracle to make health go very negative
+    // and change the insurance token price to verify it has an effect
     //
     set_bank_stub_oracle_price(solana, group, borrow_token2, admin, 20.0).await;
+    set_bank_stub_oracle_price(solana, group, insurance_token, admin, 1.5).await;
 
     //
     // SETUP: liquidate all the collateral against borrow2
@@ -853,7 +855,7 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
     let liab_before = account_position_f64(solana, account, borrow_token2.bank).await;
     let insurance_vault_before = solana.token_account_balance(insurance_vault).await;
     let liqor_before = account_position(solana, vault_account, insurance_token.bank).await;
-    let insurance_to_liab = 1.0 / 20.0;
+    let insurance_to_liab = 1.5 / 20.0;
     let liab_transfer: f64 = 500.0 * insurance_to_liab;
     send_tx(
         solana,
@@ -872,7 +874,7 @@ async fn test_bankrupt_tokens_insurance_fund2() -> Result<(), TransportError> {
     assert!(account_position_closed(solana, account, insurance_token.bank).await);
     assert_eq!(
         account_position(solana, account, borrow_token2.bank).await,
-        (liab_before + liab_transfer) as i64
+        (liab_before + liab_transfer).floor() as i64
     );
     let usdc_amount = (liab_transfer / insurance_to_liab * 1.02).ceil() as u64;
     assert_eq!(
