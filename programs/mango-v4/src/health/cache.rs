@@ -297,8 +297,8 @@ impl SpotInfo {
     }
 
     fn new_from_openbook(
-        open_orders: &OpenbookV2Orders,
         open_orders_account: &OpenOrdersAccount,
+        open_orders: &OpenbookV2Orders,
         base_info_index: usize,
         quote_info_index: usize,
     ) -> Self {
@@ -973,8 +973,8 @@ impl HealthCache {
 
         let spot_info = &mut self.spot_infos[spot_info_index];
         *spot_info = SpotInfo::new_from_openbook(
-            open_orders,
             open_orders_account,
+            open_orders,
             spot_info.base_info_index,
             spot_info.quote_info_index,
         );
@@ -1513,8 +1513,8 @@ fn new_health_cache_impl(
         quote_info.balance_spot += quote_free;
 
         spot_infos.push(SpotInfo::new_from_openbook(
-            open_orders_account,
             &oo,
+            open_orders_account,
             base_info_index,
             quote_info_index,
         ));

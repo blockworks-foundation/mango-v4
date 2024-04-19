@@ -261,10 +261,7 @@ pub struct OpenbookV2Orders {
     #[derivative(Debug = "ignore")]
     pub reserved: [u8; 162],
 }
-const_assert_eq!(
-    size_of::<OpenbookV2Orders>(),
-    32 + 8 * 10 + 2 * 3 + 162
-);
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 32 + 8 * 10 + 2 * 3 + 162);
 const_assert_eq!(size_of::<OpenbookV2Orders>(), 280);
 const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
 
