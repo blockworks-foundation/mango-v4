@@ -61,7 +61,6 @@ pub fn openbook_v2_register_market(
         quote_token_index: quote_bank.token_index,
         reduce_only: 0,
         force_close: 0,
-        padding1: Default::default(),
         name: fill_from_str(&name)?,
         openbook_v2_program: ctx.accounts.openbook_v2_program.key(),
         openbook_v2_market_external: ctx.accounts.openbook_v2_market_external.key(),
@@ -70,10 +69,9 @@ pub fn openbook_v2_register_market(
             .bumps
             .get("openbook_v2_market")
             .ok_or(MangoError::SomeError)?,
-        padding2: Default::default(),
         oracle_price_band,
         registration_time: Clock::get()?.unix_timestamp.try_into().unwrap(),
-        reserved: [0; 1024],
+        reserved: [0; 1027],
     };
 
     let mut openbook_index_reservation = ctx.accounts.index_reservation.load_init()?;

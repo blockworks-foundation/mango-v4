@@ -215,17 +215,6 @@ pub struct OpenbookV2Orders {
     pub base_borrows_without_fee: u64,
     pub quote_borrows_without_fee: u64,
 
-    pub market_index: OpenbookV2MarketIndex,
-
-    /// Store the base/quote token index, so health computations don't need
-    /// to get passed the static SerumMarket to find which tokens a market
-    /// uses and look up the correct oracles.
-    pub base_token_index: TokenIndex,
-    pub quote_token_index: TokenIndex,
-
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 2],
-
     /// Track something like the highest open bid / lowest open ask, in native/native units.
     ///
     /// Tracking it exactly isn't possible since we don't see fills. So instead track
@@ -261,13 +250,18 @@ pub struct OpenbookV2Orders {
     pub quote_lot_size: i64,
     pub base_lot_size: i64,
 
+    pub market_index: OpenbookV2MarketIndex,
+
+    /// Store the base/quote token index, so health computations don't need
+    /// to get passed the static SerumMarket to find which tokens a market
+    /// uses and look up the correct oracles.
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
+
     #[derivative(Debug = "ignore")]
-    pub reserved: [u8; 160],
+    pub reserved: [u8; 162],
 }
-const_assert_eq!(
-    size_of::<OpenbookV2Orders>(),
-    32 + 8 * 2 + 2 * 3 + 2 + 4 * 8 + 8 + 8 + 8 * 2 + 160
-);
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 32 + 8 * 10 + 2 * 3 + 162);
 const_assert_eq!(size_of::<OpenbookV2Orders>(), 280);
 const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
 
@@ -288,7 +282,6 @@ impl Default for OpenbookV2Orders {
             market_index: OpenbookV2MarketIndex::MAX,
             base_token_index: TokenIndex::MAX,
             quote_token_index: TokenIndex::MAX,
-            padding: Default::default(),
             base_borrows_without_fee: 0,
             quote_borrows_without_fee: 0,
             highest_placed_bid_inv: 0.0,
@@ -299,7 +292,7 @@ impl Default for OpenbookV2Orders {
             potential_quote_tokens: 0,
             quote_lot_size: 0,
             base_lot_size: 0,
-            reserved: [0; 160],
+            reserved: [0; 162],
         }
     }
 }
