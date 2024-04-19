@@ -12,11 +12,6 @@ pub type TokenIndex = u16;
 /// incorrect assumption.
 pub const QUOTE_TOKEN_INDEX: TokenIndex = 0;
 
-/// The token index used for the insurance fund.
-///
-/// We should eventually generalize insurance funds.
-pub const INSURANCE_TOKEN_INDEX: TokenIndex = 0;
-
 /// The token index used for settling perp markets.
 ///
 /// We should eventually generalize to make the whole perp quote (and settle) token

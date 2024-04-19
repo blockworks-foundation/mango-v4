@@ -115,7 +115,7 @@ pub struct PerpLiqNegativePnlOrBankruptcyV2<'info> {
     #[account(
         mut,
         has_one = group,
-        constraint = insurance_bank.load()?.token_index == INSURANCE_TOKEN_INDEX
+        constraint = insurance_bank.load()?.mint == insurance_vault.mint,
     )]
     pub insurance_bank: AccountLoader<'info, Bank>,
 
