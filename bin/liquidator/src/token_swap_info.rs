@@ -6,7 +6,7 @@ use mango_v4_client::error_tracking::ErrorTracking;
 use tracing::*;
 
 use mango_v4::state::TokenIndex;
-use mango_v4_client::jupiter;
+use mango_v4_client::swap;
 use mango_v4_client::MangoClient;
 
 pub struct Config {
@@ -15,7 +15,7 @@ pub struct Config {
     /// Size in quote_index-token native tokens to quote.
     pub quote_amount: u64,
 
-    pub jupiter_version: jupiter::Version,
+    pub jupiter_version: swap::Version,
 }
 
 #[derive(Clone)]
@@ -84,7 +84,7 @@ impl TokenSwapInfoUpdater {
         lock.swap_infos.get(&token_index).cloned()
     }
 
-    fn in_per_out_price(route: &jupiter::Quote) -> f64 {
+    fn in_per_out_price(route: &swap::Quote) -> f64 {
         let in_amount = route.in_amount as f64;
         let out_amount = route.out_amount as f64;
         in_amount / out_amount
@@ -149,7 +149,7 @@ impl TokenSwapInfoUpdater {
         let token_amount = (self.config.quote_amount as f64 * token_per_quote_oracle) as u64;
         let sell_route = self
             .mango_client
-            .jupiter()
+            .swap()
             .quote(
                 token_mint,
                 quote_mint,
@@ -161,7 +161,7 @@ impl TokenSwapInfoUpdater {
             .await?;
         let buy_route = self
             .mango_client
-            .jupiter()
+            .swap()
             .quote(
                 quote_mint,
                 token_mint,

@@ -72,13 +72,7 @@ pub struct SwapRequest {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SwapResponse {
-    pub swap_transaction: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct SwapInstructionsResponse {
+pub struct JupiterSwapInstructionsResponse {
     pub token_ledger_instruction: Option<InstructionResponse>,
     pub compute_budget_instructions: Option<Vec<InstructionResponse>>,
     pub setup_instructions: Option<Vec<InstructionResponse>>,
@@ -294,7 +288,7 @@ impl<'a> JupiterV6<'a> {
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: SwapInstructionsResponse = util::http_error_handling(swap_response)
+        let swap: JupiterSwapInstructionsResponse = util::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 

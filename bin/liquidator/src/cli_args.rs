@@ -1,7 +1,7 @@
 use crate::trigger_tcs;
 use anchor_lang::prelude::Pubkey;
 use clap::Parser;
-use mango_v4_client::{jupiter, priority_fees_cli};
+use mango_v4_client::{priority_fees_cli, swap};
 use std::collections::HashSet;
 
 #[derive(Parser, Debug)]
@@ -28,11 +28,11 @@ pub(crate) enum JupiterVersionArg {
     V6,
 }
 
-impl From<JupiterVersionArg> for jupiter::Version {
+impl From<JupiterVersionArg> for swap::Version {
     fn from(a: JupiterVersionArg) -> Self {
         match a {
-            JupiterVersionArg::Mock => jupiter::Version::Mock,
-            JupiterVersionArg::V6 => jupiter::Version::V6,
+            JupiterVersionArg::Mock => swap::Version::Mock,
+            JupiterVersionArg::V6 => swap::Version::V6,
         }
     }
 }
@@ -121,6 +121,12 @@ pub struct Cli {
     #[clap(long, env, value_parser, value_delimiter = ',')]
     pub(crate) rebalance_alternate_jupiter_route_tokens: Option<Vec<u16>>,
 
+    /// query sanctum for routes to and from these tokens
+    ///
+    /// These routes will only be used when trying to rebalance a LST token
+    #[clap(long, env, value_parser, value_delimiter = ',')]
+    pub(crate) rebalance_alternate_sanctum_route_tokens: Option<Vec<u16>>,
+
     /// When closing borrows, the rebalancer can't close token positions exactly.
     /// Instead it purchases too much and then gets rid of the excess in a second step.
     /// If this is 0.05, then it'll swap borrow_value * (1 + 0.05) quote token into borrow token.
@@ -135,6 +141,12 @@ pub struct Cli {
     /// typically only disabled for tests where swaps are unavailable
     #[clap(long, env, value_enum, default_value = "true")]
     pub(crate) take_tcs: BoolArg,
+
+    #[clap(long, env, default_value = "30")]
+    pub(crate) tcs_refresh_timeout_secs: u64,
+
+    #[clap(long, env, default_value = "1000")]
+    pub(crate) tcs_check_interval_ms: u64,
 
     /// profit margin at which to take tcs orders
     #[clap(long, env, default_value = "0.0005")]
@@ -178,6 +190,10 @@ pub struct Cli {
     #[clap(long, env, default_value = "https://quote-api.jup.ag/v6")]
     pub(crate) jupiter_v6_url: String,
 
+    /// override the jupiter http request timeout
+    #[clap(long, env, default_value = "30")]
+    pub(crate) jupiter_timeout_secs: u64,
+
     /// provide a jupiter token, currently only for jup v6
     #[clap(long, env, default_value = "")]
     pub(crate) jupiter_token: String,
@@ -190,6 +206,12 @@ pub struct Cli {
     /// report liquidator's existence and pubkey
     #[clap(long, env, value_enum, default_value = "true")]
     pub(crate) telemetry: BoolArg,
+
+    /// if liquidation is enabled
+    ///
+    /// might be used to run an instance of liquidator dedicated to TCS and another one for liquidation
+    #[clap(long, env, value_enum, default_value = "true")]
+    pub(crate) liquidation_enabled: BoolArg,
 
     /// liquidation refresh timeout in secs
     #[clap(long, env, default_value = "30")]
@@ -216,4 +238,16 @@ pub struct Cli {
     /// how long should it wait before logging an oracle error again (for the same token)
     #[clap(long, env, default_value = "30")]
     pub(crate) skip_oracle_error_in_logs_duration_secs: u64,
+
+    /// Also use sanctum for rebalancing
+    #[clap(long, env, value_enum, default_value = "false")]
+    pub(crate) sanctum_enabled: BoolArg,
+
+    /// override the url to sanctum
+    #[clap(long, env, default_value = "https://api.sanctum.so/v1")]
+    pub(crate) sanctum_url: String,
+
+    /// override the sanctum http request timeout
+    #[clap(long, env, default_value = "30")]
+    pub(crate) sanctum_timeout_secs: u64,
 }
