@@ -1,6 +1,6 @@
 # syntax = docker/dockerfile:1.2
 # Base image containing all binaries, deployed to ghcr.io/blockworks-foundation/mango-v4:latest
-FROM lukemathwalker/cargo-chef:latest-rust-1.69-slim-bullseye as base
+FROM lukemathwalker/cargo-chef:latest-rust-1.70-slim-bullseye as base
 RUN apt-get update && apt-get -y install clang cmake perl libfindbin-libs-perl
 WORKDIR /app
 

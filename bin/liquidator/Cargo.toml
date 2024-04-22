@@ -53,3 +53,4 @@ regex = "1.9.5"
 hdrhistogram = "7.5.4"
 indexmap = "2.0.0"
 borsh = { version = "0.10.3", features = ["const-generics"] }
+openbook-v2 = { workspace = true, features = ["no-entrypoint"] }

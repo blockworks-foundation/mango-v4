@@ -80,6 +80,7 @@ pub fn account_size_migration(ctx: Context<AccountSizeMigration>) -> Result<()> 
             new_header.perp_count,
             new_header.perp_oo_count,
             new_header.token_conditional_swap_count,
+            new_header.openbook_v2_count,
         )?;
     }
 

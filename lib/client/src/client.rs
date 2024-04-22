@@ -23,8 +23,8 @@ use mango_v4::accounts_ix::{
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthCache;
 use mango_v4::state::{
-    Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
-    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex,
+    Bank, Group, MangoAccountValue, OpenbookV2MarketIndex, OracleAccountInfos, PerpMarket,
+    PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex,
 };
 
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
@@ -1336,6 +1336,62 @@ impl MangoClient {
                 },
                 data: anchor_lang::InstructionData::data(
                     &mango_v4::instruction::Serum3LiqForceCancelOrders { limit },
+                ),
+            },
+            self.instruction_cu(health_cu)
+                + self.context.compute_estimates.cu_per_serum3_order_cancel * limit as u32,
+        );
+        Ok(ix)
+    }
+
+    pub async fn openbook_v2_liq_force_cancel_orders_instruction(
+        &self,
+        liqee: (&Pubkey, &MangoAccountValue),
+        market_index: OpenbookV2MarketIndex,
+        open_orders: &Pubkey,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let openbook_v2_market = self.context.openbook_v2(market_index);
+        let base = self.context.token(openbook_v2_market.base_token_index);
+        let quote = self.context.token(openbook_v2_market.quote_token_index);
+        let (health_remaining_ams, health_cu) = self
+            .derive_health_check_remaining_account_metas(liqee.1, vec![], vec![], vec![])
+            .await
+            .unwrap();
+
+        let limit = 5;
+        let ix = PreparedInstructions::from_single(
+            Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::OpenbookV2LiqForceCancelOrders {
+                            payer: self.owner(),
+                            group: self.group(),
+                            account: *liqee.0,
+                            open_orders: *open_orders,
+                            openbook_v2_market: openbook_v2_market.address,
+                            openbook_v2_program: openbook_v2_market.openbook_v2_program,
+                            openbook_v2_market_external: openbook_v2_market.market_external,
+                            bids: openbook_v2_market.bids,
+                            asks: openbook_v2_market.asks,
+                            event_heap: openbook_v2_market.event_heap,
+                            market_base_vault: openbook_v2_market.market_base_vault,
+                            market_quote_vault: openbook_v2_market.market_quote_vault,
+                            market_vault_signer: openbook_v2_market.market_authority,
+                            quote_bank: quote.first_bank(),
+                            quote_vault: quote.first_vault(),
+                            base_bank: base.first_bank(),
+                            base_vault: base.first_vault(),
+                            token_program: Token::id(),
+                            system_program: System::id(),
+                        },
+                        None,
+                    );
+                    ams.extend(health_remaining_ams.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(
+                    &mango_v4::instruction::OpenbookV2LiqForceCancelOrders { limit },
                 ),
             },
             self.instruction_cu(health_cu)

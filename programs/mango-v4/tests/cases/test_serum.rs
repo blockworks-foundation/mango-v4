@@ -2,6 +2,7 @@
 use super::*;
 
 use anchor_lang::prelude::AccountMeta;
+use mango_client::StubOracleCreate;
 use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
@@ -562,7 +563,7 @@ async fn test_serum_loan_origination_fees() -> Result<(), TransportError> {
         order_placer.settle().await;
 
         let o = order_placer.mango_serum_orders().await;
-        // parts of the order ended up on the book an may cause loan origination fees later
+        // parts of the order ended up on the book and may cause loan origination fees later
         assert_eq!(
             o.base_borrows_without_fee,
             (ask_amount - fill_amount) as u64
@@ -2019,7 +2020,7 @@ async fn test_serum_skip_bank() -> Result<(), TransportError> {
 
 struct CommonSetup {
     group_with_tokens: GroupWithTokens,
-    serum_market_cookie: SpotMarketCookie,
+    serum_market_cookie: SerumMarketCookie,
     quote_token: crate::program_test::mango_setup::Token,
     base_token: crate::program_test::mango_setup::Token,
     order_placer: SerumOrderPlacer,

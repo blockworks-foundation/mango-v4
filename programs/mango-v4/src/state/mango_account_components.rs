@@ -205,6 +205,101 @@ impl Default for Serum3Orders {
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
 #[derivative(Debug)]
+pub struct OpenbookV2Orders {
+    pub open_orders: Pubkey,
+
+    /// Tracks the amount of borrows that have flowed into the open orders account.
+    /// These borrows did not have the loan origination fee applied, and that may happen
+    /// later (in openbook_v2_settle_funds) if we can guarantee that the funds were used.
+    /// In particular a place-on-book, cancel, settle should not cost fees.
+    pub base_borrows_without_fee: u64,
+    pub quote_borrows_without_fee: u64,
+
+    /// Track something like the highest open bid / lowest open ask, in native/native units.
+    ///
+    /// Tracking it exactly isn't possible since we don't see fills. So instead track
+    /// the min/max of the _placed_ bids and asks.
+    ///
+    /// The value is reset in openbook_v2_place_order when a new order is placed without an
+    /// existing one on the book.
+    ///
+    /// 0 is a special "unset" state.
+    pub highest_placed_bid_inv: f64,
+    pub lowest_placed_ask: f64,
+
+    /// An overestimate of the amount of tokens that might flow out of the open orders account.
+    ///
+    /// The bank still considers these amounts user deposits (see Bank::potential_openbook_tokens)
+    /// and that value needs to be updated in conjunction with these numbers.
+    ///
+    /// This estimation is based on the amount of tokens in the open orders account
+    /// (see update_bank_potential_tokens() in openbook_v2_place_order and settle)
+    pub potential_base_tokens: u64,
+    pub potential_quote_tokens: u64,
+
+    /// Track lowest bid/highest ask, same way as for highest bid/lowest ask.
+    ///
+    /// 0 is a special "unset" state.
+    pub lowest_placed_bid_inv: f64,
+    pub highest_placed_ask: f64,
+
+    /// Stores the market's lot sizes
+    ///
+    /// Needed because the obv2 open orders account tells us about reserved amounts in lots and
+    /// we want to be able to compute health without also loading the obv2 market.
+    pub quote_lot_size: i64,
+    pub base_lot_size: i64,
+
+    pub market_index: OpenbookV2MarketIndex,
+
+    /// Store the base/quote token index, so health computations don't need
+    /// to get passed the static SerumMarket to find which tokens a market
+    /// uses and look up the correct oracles.
+    pub base_token_index: TokenIndex,
+    pub quote_token_index: TokenIndex,
+
+    #[derivative(Debug = "ignore")]
+    pub reserved: [u8; 162],
+}
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 32 + 8 * 10 + 2 * 3 + 162);
+const_assert_eq!(size_of::<OpenbookV2Orders>(), 280);
+const_assert_eq!(size_of::<OpenbookV2Orders>() % 8, 0);
+
+impl OpenbookV2Orders {
+    pub fn is_active(&self) -> bool {
+        self.market_index != OpenbookV2MarketIndex::MAX
+    }
+
+    pub fn is_active_for_market(&self, market_index: OpenbookV2MarketIndex) -> bool {
+        self.market_index == market_index
+    }
+}
+
+impl Default for OpenbookV2Orders {
+    fn default() -> Self {
+        Self {
+            open_orders: Pubkey::default(),
+            market_index: OpenbookV2MarketIndex::MAX,
+            base_token_index: TokenIndex::MAX,
+            quote_token_index: TokenIndex::MAX,
+            base_borrows_without_fee: 0,
+            quote_borrows_without_fee: 0,
+            highest_placed_bid_inv: 0.0,
+            lowest_placed_bid_inv: 0.0,
+            highest_placed_ask: 0.0,
+            lowest_placed_ask: 0.0,
+            potential_base_tokens: 0,
+            potential_quote_tokens: 0,
+            quote_lot_size: 0,
+            base_lot_size: 0,
+            reserved: [0; 162],
+        }
+    }
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, Derivative, PartialEq)]
+#[derivative(Debug)]
 pub struct PerpPosition {
     pub market_index: PerpMarketIndex,
 

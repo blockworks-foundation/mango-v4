@@ -4,7 +4,6 @@ use anchor_lang::prelude::*;
 use openbook_v2::{program::OpenbookV2, state::Market};
 
 #[derive(Accounts)]
-#[instruction(account_num: u32)]
 pub struct OpenbookV2CreateOpenOrders<'info> {
     #[account(
         constraint = group.load()?.is_ix_enabled(IxGate::OpenbookV2CreateOpenOrders) @ MangoError::IxIsDisabled,
@@ -19,8 +18,6 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
-    pub authority: Signer<'info>,
-
     #[account(
         has_one = group,
         has_one = openbook_v2_program,
@@ -32,15 +29,14 @@ pub struct OpenbookV2CreateOpenOrders<'info> {
 
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    // initialized by this instruction via cpi to openbook_v2
-    #[account(
-        mut,
-        seeds = [b"OpenOrders".as_ref(), openbook_v2_market.key().as_ref(), openbook_v2_market_external.key().as_ref(), &account_num.to_le_bytes()],
-        bump,
-        seeds::program = openbook_v2_program.key(),
-    )]
+    #[account(mut)]
     /// CHECK: Will be checked against seeds and will be initiated by openbook v2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders_indexer: UncheckedAccount<'info>,
+    #[account(mut)]
+    /// CHECK: Will be checked against seeds and will be initiated by openbook v2
+    pub open_orders_account: UncheckedAccount<'info>,
+
+    pub authority: Signer<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,

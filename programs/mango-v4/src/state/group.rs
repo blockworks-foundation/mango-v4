@@ -147,10 +147,6 @@ impl Group {
     pub fn is_ix_enabled(&self, ix: IxGate) -> bool {
         self.ix_gate & (1 << ix as u128) == 0
     }
-
-    pub fn openbook_v2_supported(&self) -> bool {
-        self.is_testing()
-    }
 }
 
 /// Enum for lookup into ix gate
@@ -243,7 +239,8 @@ pub enum IxGate {
     TokenForceWithdraw = 72,
     SequenceCheck = 73,
     HealthCheck = 74,
-    GroupChangeInsuranceFund = 75,
+    OpenbookV2CancelAllOrders = 75,
+    GroupChangeInsuranceFund = 76,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 

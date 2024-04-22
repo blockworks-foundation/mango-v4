@@ -39,7 +39,7 @@ const DEVNET_ORACLES = new Map([
 // TODO: should these constants be baked right into client.ts or even program?
 const NET_BORROWS_LIMIT_NATIVE = 1 * Math.pow(10, 7) * Math.pow(10, 6);
 
-const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
+const GROUP_NUM = Number(process.env.GROUP_NUM || 420);
 
 async function main() {
   let sig;

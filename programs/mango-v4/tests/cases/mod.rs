@@ -32,6 +32,7 @@ mod test_liq_perps_force_cancel;
 mod test_liq_perps_positive_pnl;
 mod test_liq_tokens;
 mod test_margin_trade;
+mod test_openbook_v2;
 mod test_perp;
 mod test_perp_settle;
 mod test_perp_settle_fees;

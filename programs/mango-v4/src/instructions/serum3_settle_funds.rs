@@ -5,8 +5,8 @@ use crate::error::*;
 use crate::serum3_cpi::{load_open_orders_ref, OpenOrdersAmounts, OpenOrdersSlim};
 use crate::state::*;
 
-use super::apply_settle_changes;
 use crate::accounts_ix::*;
+use crate::instructions::serum3_place_order::apply_settle_changes;
 use crate::logs::{
     emit_stack, LoanOriginationFeeInstruction, Serum3OpenOrdersBalanceLogV2, WithdrawLoanLog,
 };
