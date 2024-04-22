@@ -498,8 +498,11 @@ impl Rebalancer {
 
             if amount > dust_threshold {
                 // Sell
+
+                // To avoid creating a borrow when paying flash loan fees, sell only a fraction
+                let input_amount = amount * I80F48::from_num(0.99);
                 let (txsig, route) = self
-                    .token_swap_sell(token_mint, amount.to_num::<u64>())
+                    .token_swap_sell(token_mint, input_amount.to_num::<u64>())
                     .await?;
                 let out_token = self
                     .mango_client
