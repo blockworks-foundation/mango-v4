@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `programs/mango-v4/src/state/bank.rs`."><title>bank.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `programs/mango-v4/src/state/bank.rs`."><title>bank.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -1811,7 +1811,33 @@
 <a href="#1811" id="1811">1811</a>
 <a href="#1812" id="1812">1812</a>
 <a href="#1813" id="1813">1813</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
+<a href="#1814" id="1814">1814</a>
+<a href="#1815" id="1815">1815</a>
+<a href="#1816" id="1816">1816</a>
+<a href="#1817" id="1817">1817</a>
+<a href="#1818" id="1818">1818</a>
+<a href="#1819" id="1819">1819</a>
+<a href="#1820" id="1820">1820</a>
+<a href="#1821" id="1821">1821</a>
+<a href="#1822" id="1822">1822</a>
+<a href="#1823" id="1823">1823</a>
+<a href="#1824" id="1824">1824</a>
+<a href="#1825" id="1825">1825</a>
+<a href="#1826" id="1826">1826</a>
+<a href="#1827" id="1827">1827</a>
+<a href="#1828" id="1828">1828</a>
+<a href="#1829" id="1829">1829</a>
+<a href="#1830" id="1830">1830</a>
+<a href="#1831" id="1831">1831</a>
+<a href="#1832" id="1832">1832</a>
+<a href="#1833" id="1833">1833</a>
+<a href="#1834" id="1834">1834</a>
+<a href="#1835" id="1835">1835</a>
+<a href="#1836" id="1836">1836</a>
+<a href="#1837" id="1837">1837</a>
+<a href="#1838" id="1838">1838</a>
+<a href="#1839" id="1839">1839</a>
+</pre></div><pre class="rust"><code><span class="kw">use super</span>::{OracleAccountInfos, OracleConfig, TokenIndex, TokenPosition};
 <span class="kw">use </span><span class="kw">crate</span>::accounts_zerocopy::KeyedAccountReader;
 <span class="kw">use </span><span class="kw">crate</span>::error::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::i80f48::ClampToInt;
@@ -1999,7 +2025,7 @@
     /// Except when first migrating to having this field, then 0.0
     </span><span class="kw">pub </span>interest_curve_scaling: f64,
 
-    <span class="doccomment">/// Largest amount of tokens that might be added the the bank based on
+    <span class="doccomment">/// Largest amount of tokens that might be added the bank based on
     /// serum open order execution.
     </span><span class="kw">pub </span>potential_serum_tokens: u64,
 
@@ -2045,7 +2071,14 @@
     </span><span class="kw">pub </span>collateral_fee_per_day: f32,
 
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1900</span>],
+    </span><span class="kw">pub </span>padding2: [u8; <span class="number">4</span>],
+
+    <span class="doccomment">/// Largest amount of tokens that might be added the bank based on
+    /// oenbook open order execution.
+    </span><span class="kw">pub </span>potential_openbook_tokens: u64,
+
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>reserved: [u8; <span class="number">1888</span>],
 }
 <span class="macro">const_assert_eq!</span>(
     size_of::&lt;Bank&gt;(),
@@ -2083,8 +2116,9 @@
         </span>+ <span class="number">32
         </span>+ <span class="number">8
         </span>+ <span class="number">16 </span>* <span class="number">4
-        </span>+ <span class="number">4
-        </span>+ <span class="number">1900
+        </span>+ <span class="number">4 </span>* <span class="number">2
+        </span>+ <span class="number">8
+        </span>+ <span class="number">1888
 </span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;(), <span class="number">3064</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;Bank&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -2135,6 +2169,7 @@
             flash_loan_token_account_initial: u64::MAX,
             net_borrows_in_window: <span class="number">0</span>,
             potential_serum_tokens: <span class="number">0</span>,
+            potential_openbook_tokens: <span class="number">0</span>,
             bump,
             bank_num,
 
@@ -2195,7 +2230,8 @@
             zero_util_rate: existing_bank.zero_util_rate,
             platform_liquidation_fee: existing_bank.platform_liquidation_fee,
             collateral_fee_per_day: existing_bank.collateral_fee_per_day,
-            reserved: [<span class="number">0</span>; <span class="number">1900</span>],
+            padding2: [<span class="number">0</span>; <span class="number">4</span>],
+            reserved: [<span class="number">0</span>; <span class="number">1888</span>],
         }
     }
 
@@ -2774,7 +2810,8 @@
         </span><span class="kw">let </span>deposits = <span class="self">self</span>.deposit_index * (<span class="self">self</span>.indexed_deposits + I80F48::DELTA);
 
         <span class="kw">let </span>serum = I80F48::from(<span class="self">self</span>.potential_serum_tokens);
-        <span class="kw">let </span>total = deposits + serum;
+        <span class="kw">let </span>openbook = I80F48::from(<span class="self">self</span>.potential_openbook_tokens);
+        <span class="kw">let </span>total = deposits + serum + openbook;
 
         I80F48::from(<span class="self">self</span>.deposit_limit) - total
     }
@@ -2789,17 +2826,19 @@
         // will not cause a limit overrun.
         </span><span class="kw">let </span>deposits = <span class="self">self</span>.native_deposits();
         <span class="kw">let </span>serum = I80F48::from(<span class="self">self</span>.potential_serum_tokens);
-        <span class="kw">let </span>total = deposits + serum;
+        <span class="kw">let </span>openbook = I80F48::from(<span class="self">self</span>.potential_openbook_tokens);
+        <span class="kw">let </span>total = deposits + serum + openbook;
         <span class="kw">let </span>remaining = I80F48::from(<span class="self">self</span>.deposit_limit) - total;
         <span class="kw">if </span>remaining &lt; <span class="number">0 </span>{
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">error_msg_typed!</span>(
                 MangoError::BankDepositLimit,
-                <span class="string">&quot;deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}&quot;</span>,
+                <span class="string">&quot;deposit limit exceeded: remaining: {}, total: {}, limit: {}, deposits: {}, serum: {}, openbook: {}&quot;</span>,
                 remaining,
                 total,
                 <span class="self">self</span>.deposit_limit,
                 deposits,
                 serum,
+                openbook,
             ));
         }
 
@@ -3055,8 +3094,9 @@
         <span class="kw">if </span><span class="self">self</span>.deposit_weight_scale_start_quote == f64::MAX {
             <span class="kw">return </span><span class="self">self</span>.init_asset_weight;
         }
-        <span class="kw">let </span>all_deposits =
-            <span class="self">self</span>.native_deposits().to_num::&lt;f64&gt;() + <span class="self">self</span>.potential_serum_tokens <span class="kw">as </span>f64;
+        <span class="kw">let </span>all_deposits = <span class="self">self</span>.native_deposits().to_num::&lt;f64&gt;()
+            + <span class="self">self</span>.potential_serum_tokens <span class="kw">as </span>f64
+            + <span class="self">self</span>.potential_openbook_tokens <span class="kw">as </span>f64;
         <span class="kw">let </span>deposits_quote = all_deposits * price.to_num::&lt;f64&gt;();
         <span class="kw">if </span>deposits_quote &lt;= <span class="self">self</span>.deposit_weight_scale_start_quote {
             <span class="self">self</span>.init_asset_weight
@@ -3093,6 +3133,17 @@
             <span class="self">self</span>.potential_serum_tokens += new - old;
         } <span class="kw">else </span>{
             <span class="self">self</span>.potential_serum_tokens = <span class="self">self</span>.potential_serum_tokens.saturating_sub(old - new);
+        }
+    }
+
+    <span class="doccomment">/// Grows potential_openbook_tokens if new &gt; old, shrinks it otherwise
+    </span><span class="attr">#[inline(always)]
+    </span><span class="kw">pub fn </span>update_potential_openbook_tokens(<span class="kw-2">&amp;mut </span><span class="self">self</span>, old: u64, new: u64) {
+        <span class="kw">if </span>new &gt;= old {
+            <span class="self">self</span>.potential_openbook_tokens += new - old;
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.potential_openbook_tokens =
+                <span class="self">self</span>.potential_openbook_tokens.saturating_sub(old - new);
         }
     }
 }
@@ -3392,7 +3443,8 @@
             bank.net_borrow_limit_per_window_quote = <span class="number">100</span>;
             bank.net_borrows_in_window = <span class="number">200</span>;
             bank.deposit_limit = <span class="number">100</span>;
-            bank.potential_serum_tokens = <span class="number">200</span>;
+            bank.potential_serum_tokens = <span class="number">100</span>;
+            bank.potential_openbook_tokens = <span class="number">100</span>;
 
             <span class="kw">let </span>half = I80F48::from(<span class="number">50</span>);
             bank.checked_transfer_with_fee(<span class="kw-2">&amp;mut </span>a1, half, <span class="kw-2">&amp;mut </span>a2, half, <span class="number">0</span>, I80F48::ONE)
@@ -3624,5 +3676,4 @@
         <span class="macro">assert!</span>(d(interest(<span class="number">1.0 </span>- delta), <span class="number">13.0</span>) &lt;= eps);
     }
 }
-</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>
+</code></pre></div></section></main></body></html>

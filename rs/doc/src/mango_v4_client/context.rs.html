@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/context.rs`."><title>context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../static.files/ayu-be46fdc453a55015.css"><script src="../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../mango_v4_client/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `lib/client/src/context.rs`."><title>context.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../mango_v4_client/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -731,18 +731,103 @@
 <a href="#731" id="731">731</a>
 <a href="#732" id="732">732</a>
 <a href="#733" id="733">733</a>
-</pre><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
+<a href="#734" id="734">734</a>
+<a href="#735" id="735">735</a>
+<a href="#736" id="736">736</a>
+<a href="#737" id="737">737</a>
+<a href="#738" id="738">738</a>
+<a href="#739" id="739">739</a>
+<a href="#740" id="740">740</a>
+<a href="#741" id="741">741</a>
+<a href="#742" id="742">742</a>
+<a href="#743" id="743">743</a>
+<a href="#744" id="744">744</a>
+<a href="#745" id="745">745</a>
+<a href="#746" id="746">746</a>
+<a href="#747" id="747">747</a>
+<a href="#748" id="748">748</a>
+<a href="#749" id="749">749</a>
+<a href="#750" id="750">750</a>
+<a href="#751" id="751">751</a>
+<a href="#752" id="752">752</a>
+<a href="#753" id="753">753</a>
+<a href="#754" id="754">754</a>
+<a href="#755" id="755">755</a>
+<a href="#756" id="756">756</a>
+<a href="#757" id="757">757</a>
+<a href="#758" id="758">758</a>
+<a href="#759" id="759">759</a>
+<a href="#760" id="760">760</a>
+<a href="#761" id="761">761</a>
+<a href="#762" id="762">762</a>
+<a href="#763" id="763">763</a>
+<a href="#764" id="764">764</a>
+<a href="#765" id="765">765</a>
+<a href="#766" id="766">766</a>
+<a href="#767" id="767">767</a>
+<a href="#768" id="768">768</a>
+<a href="#769" id="769">769</a>
+<a href="#770" id="770">770</a>
+<a href="#771" id="771">771</a>
+<a href="#772" id="772">772</a>
+<a href="#773" id="773">773</a>
+<a href="#774" id="774">774</a>
+<a href="#775" id="775">775</a>
+<a href="#776" id="776">776</a>
+<a href="#777" id="777">777</a>
+<a href="#778" id="778">778</a>
+<a href="#779" id="779">779</a>
+<a href="#780" id="780">780</a>
+<a href="#781" id="781">781</a>
+<a href="#782" id="782">782</a>
+<a href="#783" id="783">783</a>
+<a href="#784" id="784">784</a>
+<a href="#785" id="785">785</a>
+<a href="#786" id="786">786</a>
+<a href="#787" id="787">787</a>
+<a href="#788" id="788">788</a>
+<a href="#789" id="789">789</a>
+<a href="#790" id="790">790</a>
+<a href="#791" id="791">791</a>
+<a href="#792" id="792">792</a>
+<a href="#793" id="793">793</a>
+<a href="#794" id="794">794</a>
+<a href="#795" id="795">795</a>
+<a href="#796" id="796">796</a>
+<a href="#797" id="797">797</a>
+<a href="#798" id="798">798</a>
+<a href="#799" id="799">799</a>
+<a href="#800" id="800">800</a>
+<a href="#801" id="801">801</a>
+<a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
+<a href="#808" id="808">808</a>
+<a href="#809" id="809">809</a>
+<a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
 
 <span class="kw">use </span>anchor_lang::__private::bytemuck;
 
 <span class="kw">use </span>mango_v4::{
-    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData},
+    accounts_zerocopy::{KeyedAccountReader, KeyedAccountSharedData, LoadZeroCopy},
     state::{
         determine_oracle_type, load_orca_pool_state, load_raydium_pool_state,
-        oracle_state_unchecked, Group, MangoAccountValue, OracleAccountInfos, OracleConfig,
-        OracleConfigParams, OracleType, PerpMarketIndex, Serum3MarketIndex, TokenIndex, MAX_BANKS,
+        oracle_state_unchecked, Group, MangoAccountValue, OpenbookV2MarketIndex,
+        OracleAccountInfos, OracleConfig, OracleConfigParams, OracleType, PerpMarketIndex,
+        Serum3MarketIndex, TokenIndex, MAX_BANKS,
     },
 };
 
@@ -827,6 +912,24 @@
 }
 
 <span class="attr">#[derive(Clone, PartialEq, Eq)]
+</span><span class="kw">pub struct </span>OpenbookV2MarketContext {
+    <span class="kw">pub </span>address: Pubkey,
+    <span class="kw">pub </span>name: String,
+    <span class="kw">pub </span>openbook_v2_program: Pubkey,
+    <span class="kw">pub </span>market_external: Pubkey,
+    <span class="kw">pub </span>base_token_index: TokenIndex,
+    <span class="kw">pub </span>quote_token_index: TokenIndex,
+    <span class="kw">pub </span>bids: Pubkey,
+    <span class="kw">pub </span>asks: Pubkey,
+    <span class="kw">pub </span>event_heap: Pubkey,
+    <span class="kw">pub </span>market_base_vault: Pubkey,
+    <span class="kw">pub </span>market_quote_vault: Pubkey,
+    <span class="kw">pub </span>market_authority: Pubkey,
+    <span class="kw">pub </span>quote_lot_size: u64,
+    <span class="kw">pub </span>base_lot_size: u64,
+}
+
+<span class="attr">#[derive(Clone, PartialEq, Eq)]
 </span><span class="kw">pub struct </span>PerpMarketContext {
     <span class="kw">pub </span>group: Pubkey,
     <span class="kw">pub </span>perp_market_index: PerpMarketIndex,
@@ -848,8 +951,10 @@
     <span class="kw">pub </span>health_cu_per_token: u32,
     <span class="kw">pub </span>health_cu_per_perp: u32,
     <span class="kw">pub </span>health_cu_per_serum: u32,
+    <span class="kw">pub </span>health_cu_per_obv2: u32,
     <span class="kw">pub </span>cu_per_serum3_order_match: u32,
     <span class="kw">pub </span>cu_per_serum3_order_cancel: u32,
+    <span class="kw">pub </span>cu_per_openbook_v2_order_cancel: u32,
     <span class="kw">pub </span>cu_per_perp_order_match: u32,
     <span class="kw">pub </span>cu_per_perp_order_cancel: u32,
     <span class="kw">pub </span>cu_per_oracle_fallback: u32,
@@ -866,10 +971,12 @@
             health_cu_per_token: <span class="number">5000</span>,
             health_cu_per_perp: <span class="number">8000</span>,
             health_cu_per_serum: <span class="number">6000</span>,
+            health_cu_per_obv2: <span class="number">6000</span>,
             <span class="comment">// measured around 1.5k, see test_serum_compute
             </span>cu_per_serum3_order_match: <span class="number">3_000</span>,
             <span class="comment">// measured around 11k, see test_serum_compute
             </span>cu_per_serum3_order_cancel: <span class="number">20_000</span>,
+            cu_per_openbook_v2_order_cancel: <span class="number">30_000</span>,
             <span class="comment">// measured around 3.5k, see test_perp_compute
             </span>cu_per_perp_order_match: <span class="number">7_000</span>,
             <span class="comment">// measured around 3.5k, see test_perp_compute
@@ -893,15 +1000,18 @@
         tokens: usize,
         perps: usize,
         serums: usize,
+        obv2s: usize,
         fallbacks: usize,
     ) -&gt; u32 {
         <span class="kw">let </span>tokens: u32 = tokens.try_into().unwrap();
         <span class="kw">let </span>perps: u32 = perps.try_into().unwrap();
         <span class="kw">let </span>serums: u32 = serums.try_into().unwrap();
+        <span class="kw">let </span>obv2s: u32 = obv2s.try_into().unwrap();
         <span class="kw">let </span>fallbacks: u32 = fallbacks.try_into().unwrap();
         tokens * <span class="self">self</span>.health_cu_per_token
             + perps * <span class="self">self</span>.health_cu_per_perp
             + serums * <span class="self">self</span>.health_cu_per_serum
+            + obv2s * <span class="self">self</span>.health_cu_per_obv2
             + fallbacks * <span class="self">self</span>.cu_per_oracle_fallback
     }
 
@@ -910,6 +1020,7 @@
             account.active_token_positions().count(),
             account.active_perp_positions().count(),
             account.active_serum3_orders().count(),
+            account.active_openbook_v2_orders().count(),
             num_fallbacks,
         )
     }
@@ -923,6 +1034,9 @@
 
     <span class="kw">pub </span>serum3_markets: HashMap&lt;Serum3MarketIndex, Serum3MarketContext&gt;,
     <span class="kw">pub </span>serum3_market_indexes_by_name: HashMap&lt;String, Serum3MarketIndex&gt;,
+
+    <span class="kw">pub </span>openbook_v2_markets: HashMap&lt;OpenbookV2MarketIndex, OpenbookV2MarketContext&gt;,
+    <span class="kw">pub </span>openbook_v2_market_indexes_by_name: HashMap&lt;String, OpenbookV2MarketIndex&gt;,
 
     <span class="kw">pub </span>perp_markets: HashMap&lt;PerpMarketIndex, PerpMarketContext&gt;,
     <span class="kw">pub </span>perp_market_indexes_by_name: HashMap&lt;String, PerpMarketIndex&gt;,
@@ -959,6 +1073,10 @@
 
     <span class="kw">pub fn </span>serum3_quote_token(<span class="kw-2">&amp;</span><span class="self">self</span>, market_index: Serum3MarketIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
         <span class="self">self</span>.token(<span class="self">self</span>.serum3(market_index).quote_token_index)
+    }
+
+    <span class="kw">pub fn </span>openbook_v2(<span class="kw-2">&amp;</span><span class="self">self</span>, market_index: OpenbookV2MarketIndex) -&gt; <span class="kw-2">&amp;</span>OpenbookV2MarketContext {
+        <span class="self">self</span>.openbook_v2_markets.get(<span class="kw-2">&amp;</span>market_index).unwrap()
     }
 
     <span class="kw">pub fn </span>token(<span class="kw-2">&amp;</span><span class="self">self</span>, token_index: TokenIndex) -&gt; <span class="kw-2">&amp;</span>TokenContext {
@@ -1077,6 +1195,41 @@
             })
             .collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
 
+        <span class="comment">// openbook v2 markets
+        </span><span class="kw">let </span>openbook_v2_market_tuples = fetch_openbook_v2_markets(rpc, program, group).<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>openbook_v2_markets_external = stream::iter(openbook_v2_market_tuples.iter())
+            .then(|(<span class="kw">_</span>, s)| fetch_raw_account(rpc, s.openbook_v2_market_external))
+            .try_collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+            .<span class="kw">await</span><span class="question-mark">?</span>;
+        <span class="kw">let </span>openbook_v2_markets = openbook_v2_market_tuples
+            .iter()
+            .zip(openbook_v2_markets_external.iter())
+            .map(|((pk, s), market_external_account)| {
+                <span class="kw">let </span>market_external = market_external_account
+                    .load::&lt;openbook_v2::state::Market&gt;()
+                    .unwrap();
+                (
+                    s.market_index,
+                    OpenbookV2MarketContext {
+                        address: <span class="kw-2">*</span>pk,
+                        base_token_index: s.base_token_index,
+                        quote_token_index: s.quote_token_index,
+                        name: s.name().to_string(),
+                        openbook_v2_program: s.openbook_v2_program,
+                        market_external: s.openbook_v2_market_external,
+                        bids: market_external.bids,
+                        asks: market_external.asks,
+                        event_heap: market_external.event_heap,
+                        market_base_vault: market_external.market_base_vault,
+                        market_quote_vault: market_external.market_quote_vault,
+                        market_authority: market_external.market_authority,
+                        quote_lot_size: market_external.quote_lot_size.try_into().unwrap(),
+                        base_lot_size: market_external.base_lot_size.try_into().unwrap(),
+                    },
+                )
+            })
+            .collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
+
         <span class="comment">// perp markets
         </span><span class="kw">let </span>perp_market_tuples = fetch_perp_markets(rpc, program, group).<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>perp_markets = perp_market_tuples
@@ -1112,6 +1265,10 @@
             .iter()
             .map(|(i, s)| (s.name.clone(), <span class="kw-2">*</span>i))
             .collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
+        <span class="kw">let </span>openbook_v2_market_indexes_by_name = openbook_v2_markets
+            .iter()
+            .map(|(i, s)| (s.name.clone(), <span class="kw-2">*</span>i))
+            .collect::&lt;HashMap&lt;<span class="kw">_</span>, <span class="kw">_</span>&gt;&gt;();
         <span class="kw">let </span>perp_market_indexes_by_name = perp_markets
             .iter()
             .map(|(i, p)| (p.name.clone(), <span class="kw-2">*</span>i))
@@ -1131,6 +1288,8 @@
             token_indexes_by_name,
             serum3_markets,
             serum3_market_indexes_by_name,
+            openbook_v2_markets,
+            openbook_v2_market_indexes_by_name,
             perp_markets,
             perp_market_indexes_by_name,
             address_lookup_tables,
@@ -1172,6 +1331,7 @@
         }
 
         <span class="kw">let </span>serum_oos = account.active_serum3_orders().map(|<span class="kw-2">&amp;</span>s| s.open_orders);
+        <span class="kw">let </span>obv2_oos = account.active_openbook_v2_orders().map(|o| o.open_orders);
         <span class="kw">let </span>perp_markets = account
             .active_perp_positions()
             .map(|<span class="kw-2">&amp;</span>pa| <span class="self">self</span>.perp_market_address(pa.market_index));
@@ -1204,6 +1364,7 @@
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(obv2_oos.map(to_account_meta))
             .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
@@ -1248,6 +1409,10 @@
             .active_serum3_orders()
             .chain(account1.active_serum3_orders())
             .map(|<span class="kw-2">&amp;</span>s| s.open_orders);
+        <span class="kw">let </span>obv2_oos = account2
+            .active_openbook_v2_orders()
+            .chain(account1.active_openbook_v2_orders())
+            .map(|<span class="kw-2">&amp;</span>s| s.open_orders);
         <span class="kw">let </span>perp_market_indexes = account2
             .active_perp_positions()
             .chain(account1.active_perp_positions())
@@ -1286,6 +1451,7 @@
             .chain(perp_markets.map(to_account_meta))
             .chain(perp_oracles.map(to_account_meta))
             .chain(serum_oos.map(to_account_meta))
+            .chain(obv2_oos.map(to_account_meta))
             .chain(fallback_oracles.into_iter().map(to_account_meta))
             .collect();
 
@@ -1307,11 +1473,13 @@
             account1_token_count,
             account1.active_perp_positions().count(),
             account1.active_serum3_orders().count(),
+            account1.active_openbook_v2_orders().count(),
             fallbacks_len,
         ) + <span class="self">self</span>.compute_estimates.health_for_counts(
             account2_token_count,
             account2.active_perp_positions().count(),
             account2.active_serum3_orders().count(),
+            account2.active_openbook_v2_orders().count(),
             fallbacks_len,
         );
 
@@ -1464,5 +1632,4 @@
 
     maybe_key.unwrap_or_else(|| Pubkey::default())
 }
-</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mango_v4_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>
+</code></pre></div></section></main></body></html>

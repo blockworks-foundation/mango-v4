@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `programs/mango-v4/src/state/mango_account.rs`."><title>mango_account.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-c4dbdcde0fbd8430.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../../static.files/light-db279b6232be9c13.css"><link rel="stylesheet" disabled href="../../../static.files/dark-cf923f49f397b216.css"><link rel="stylesheet" disabled href="../../../static.files/ayu-be46fdc453a55015.css"><script src="../../../static.files/storage-3891ce972e3a2bf8.js"></script><script defer src="../../../static.files/source-script-1b95b7cca98b26e5.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-98a684e84ae5b08b.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `programs/mango-v4/src/state/mango_account.rs`."><title>mango_account.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.70.0 (90c541806 2023-05-31)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../static.files/main-f61008743c98d196.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../../mango_v4/index.html"><img class="rust-logo" src="../../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2955,7 +2955,348 @@
 <a href="#2955" id="2955">2955</a>
 <a href="#2956" id="2956">2956</a>
 <a href="#2957" id="2957">2957</a>
-</pre><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
+<a href="#2958" id="2958">2958</a>
+<a href="#2959" id="2959">2959</a>
+<a href="#2960" id="2960">2960</a>
+<a href="#2961" id="2961">2961</a>
+<a href="#2962" id="2962">2962</a>
+<a href="#2963" id="2963">2963</a>
+<a href="#2964" id="2964">2964</a>
+<a href="#2965" id="2965">2965</a>
+<a href="#2966" id="2966">2966</a>
+<a href="#2967" id="2967">2967</a>
+<a href="#2968" id="2968">2968</a>
+<a href="#2969" id="2969">2969</a>
+<a href="#2970" id="2970">2970</a>
+<a href="#2971" id="2971">2971</a>
+<a href="#2972" id="2972">2972</a>
+<a href="#2973" id="2973">2973</a>
+<a href="#2974" id="2974">2974</a>
+<a href="#2975" id="2975">2975</a>
+<a href="#2976" id="2976">2976</a>
+<a href="#2977" id="2977">2977</a>
+<a href="#2978" id="2978">2978</a>
+<a href="#2979" id="2979">2979</a>
+<a href="#2980" id="2980">2980</a>
+<a href="#2981" id="2981">2981</a>
+<a href="#2982" id="2982">2982</a>
+<a href="#2983" id="2983">2983</a>
+<a href="#2984" id="2984">2984</a>
+<a href="#2985" id="2985">2985</a>
+<a href="#2986" id="2986">2986</a>
+<a href="#2987" id="2987">2987</a>
+<a href="#2988" id="2988">2988</a>
+<a href="#2989" id="2989">2989</a>
+<a href="#2990" id="2990">2990</a>
+<a href="#2991" id="2991">2991</a>
+<a href="#2992" id="2992">2992</a>
+<a href="#2993" id="2993">2993</a>
+<a href="#2994" id="2994">2994</a>
+<a href="#2995" id="2995">2995</a>
+<a href="#2996" id="2996">2996</a>
+<a href="#2997" id="2997">2997</a>
+<a href="#2998" id="2998">2998</a>
+<a href="#2999" id="2999">2999</a>
+<a href="#3000" id="3000">3000</a>
+<a href="#3001" id="3001">3001</a>
+<a href="#3002" id="3002">3002</a>
+<a href="#3003" id="3003">3003</a>
+<a href="#3004" id="3004">3004</a>
+<a href="#3005" id="3005">3005</a>
+<a href="#3006" id="3006">3006</a>
+<a href="#3007" id="3007">3007</a>
+<a href="#3008" id="3008">3008</a>
+<a href="#3009" id="3009">3009</a>
+<a href="#3010" id="3010">3010</a>
+<a href="#3011" id="3011">3011</a>
+<a href="#3012" id="3012">3012</a>
+<a href="#3013" id="3013">3013</a>
+<a href="#3014" id="3014">3014</a>
+<a href="#3015" id="3015">3015</a>
+<a href="#3016" id="3016">3016</a>
+<a href="#3017" id="3017">3017</a>
+<a href="#3018" id="3018">3018</a>
+<a href="#3019" id="3019">3019</a>
+<a href="#3020" id="3020">3020</a>
+<a href="#3021" id="3021">3021</a>
+<a href="#3022" id="3022">3022</a>
+<a href="#3023" id="3023">3023</a>
+<a href="#3024" id="3024">3024</a>
+<a href="#3025" id="3025">3025</a>
+<a href="#3026" id="3026">3026</a>
+<a href="#3027" id="3027">3027</a>
+<a href="#3028" id="3028">3028</a>
+<a href="#3029" id="3029">3029</a>
+<a href="#3030" id="3030">3030</a>
+<a href="#3031" id="3031">3031</a>
+<a href="#3032" id="3032">3032</a>
+<a href="#3033" id="3033">3033</a>
+<a href="#3034" id="3034">3034</a>
+<a href="#3035" id="3035">3035</a>
+<a href="#3036" id="3036">3036</a>
+<a href="#3037" id="3037">3037</a>
+<a href="#3038" id="3038">3038</a>
+<a href="#3039" id="3039">3039</a>
+<a href="#3040" id="3040">3040</a>
+<a href="#3041" id="3041">3041</a>
+<a href="#3042" id="3042">3042</a>
+<a href="#3043" id="3043">3043</a>
+<a href="#3044" id="3044">3044</a>
+<a href="#3045" id="3045">3045</a>
+<a href="#3046" id="3046">3046</a>
+<a href="#3047" id="3047">3047</a>
+<a href="#3048" id="3048">3048</a>
+<a href="#3049" id="3049">3049</a>
+<a href="#3050" id="3050">3050</a>
+<a href="#3051" id="3051">3051</a>
+<a href="#3052" id="3052">3052</a>
+<a href="#3053" id="3053">3053</a>
+<a href="#3054" id="3054">3054</a>
+<a href="#3055" id="3055">3055</a>
+<a href="#3056" id="3056">3056</a>
+<a href="#3057" id="3057">3057</a>
+<a href="#3058" id="3058">3058</a>
+<a href="#3059" id="3059">3059</a>
+<a href="#3060" id="3060">3060</a>
+<a href="#3061" id="3061">3061</a>
+<a href="#3062" id="3062">3062</a>
+<a href="#3063" id="3063">3063</a>
+<a href="#3064" id="3064">3064</a>
+<a href="#3065" id="3065">3065</a>
+<a href="#3066" id="3066">3066</a>
+<a href="#3067" id="3067">3067</a>
+<a href="#3068" id="3068">3068</a>
+<a href="#3069" id="3069">3069</a>
+<a href="#3070" id="3070">3070</a>
+<a href="#3071" id="3071">3071</a>
+<a href="#3072" id="3072">3072</a>
+<a href="#3073" id="3073">3073</a>
+<a href="#3074" id="3074">3074</a>
+<a href="#3075" id="3075">3075</a>
+<a href="#3076" id="3076">3076</a>
+<a href="#3077" id="3077">3077</a>
+<a href="#3078" id="3078">3078</a>
+<a href="#3079" id="3079">3079</a>
+<a href="#3080" id="3080">3080</a>
+<a href="#3081" id="3081">3081</a>
+<a href="#3082" id="3082">3082</a>
+<a href="#3083" id="3083">3083</a>
+<a href="#3084" id="3084">3084</a>
+<a href="#3085" id="3085">3085</a>
+<a href="#3086" id="3086">3086</a>
+<a href="#3087" id="3087">3087</a>
+<a href="#3088" id="3088">3088</a>
+<a href="#3089" id="3089">3089</a>
+<a href="#3090" id="3090">3090</a>
+<a href="#3091" id="3091">3091</a>
+<a href="#3092" id="3092">3092</a>
+<a href="#3093" id="3093">3093</a>
+<a href="#3094" id="3094">3094</a>
+<a href="#3095" id="3095">3095</a>
+<a href="#3096" id="3096">3096</a>
+<a href="#3097" id="3097">3097</a>
+<a href="#3098" id="3098">3098</a>
+<a href="#3099" id="3099">3099</a>
+<a href="#3100" id="3100">3100</a>
+<a href="#3101" id="3101">3101</a>
+<a href="#3102" id="3102">3102</a>
+<a href="#3103" id="3103">3103</a>
+<a href="#3104" id="3104">3104</a>
+<a href="#3105" id="3105">3105</a>
+<a href="#3106" id="3106">3106</a>
+<a href="#3107" id="3107">3107</a>
+<a href="#3108" id="3108">3108</a>
+<a href="#3109" id="3109">3109</a>
+<a href="#3110" id="3110">3110</a>
+<a href="#3111" id="3111">3111</a>
+<a href="#3112" id="3112">3112</a>
+<a href="#3113" id="3113">3113</a>
+<a href="#3114" id="3114">3114</a>
+<a href="#3115" id="3115">3115</a>
+<a href="#3116" id="3116">3116</a>
+<a href="#3117" id="3117">3117</a>
+<a href="#3118" id="3118">3118</a>
+<a href="#3119" id="3119">3119</a>
+<a href="#3120" id="3120">3120</a>
+<a href="#3121" id="3121">3121</a>
+<a href="#3122" id="3122">3122</a>
+<a href="#3123" id="3123">3123</a>
+<a href="#3124" id="3124">3124</a>
+<a href="#3125" id="3125">3125</a>
+<a href="#3126" id="3126">3126</a>
+<a href="#3127" id="3127">3127</a>
+<a href="#3128" id="3128">3128</a>
+<a href="#3129" id="3129">3129</a>
+<a href="#3130" id="3130">3130</a>
+<a href="#3131" id="3131">3131</a>
+<a href="#3132" id="3132">3132</a>
+<a href="#3133" id="3133">3133</a>
+<a href="#3134" id="3134">3134</a>
+<a href="#3135" id="3135">3135</a>
+<a href="#3136" id="3136">3136</a>
+<a href="#3137" id="3137">3137</a>
+<a href="#3138" id="3138">3138</a>
+<a href="#3139" id="3139">3139</a>
+<a href="#3140" id="3140">3140</a>
+<a href="#3141" id="3141">3141</a>
+<a href="#3142" id="3142">3142</a>
+<a href="#3143" id="3143">3143</a>
+<a href="#3144" id="3144">3144</a>
+<a href="#3145" id="3145">3145</a>
+<a href="#3146" id="3146">3146</a>
+<a href="#3147" id="3147">3147</a>
+<a href="#3148" id="3148">3148</a>
+<a href="#3149" id="3149">3149</a>
+<a href="#3150" id="3150">3150</a>
+<a href="#3151" id="3151">3151</a>
+<a href="#3152" id="3152">3152</a>
+<a href="#3153" id="3153">3153</a>
+<a href="#3154" id="3154">3154</a>
+<a href="#3155" id="3155">3155</a>
+<a href="#3156" id="3156">3156</a>
+<a href="#3157" id="3157">3157</a>
+<a href="#3158" id="3158">3158</a>
+<a href="#3159" id="3159">3159</a>
+<a href="#3160" id="3160">3160</a>
+<a href="#3161" id="3161">3161</a>
+<a href="#3162" id="3162">3162</a>
+<a href="#3163" id="3163">3163</a>
+<a href="#3164" id="3164">3164</a>
+<a href="#3165" id="3165">3165</a>
+<a href="#3166" id="3166">3166</a>
+<a href="#3167" id="3167">3167</a>
+<a href="#3168" id="3168">3168</a>
+<a href="#3169" id="3169">3169</a>
+<a href="#3170" id="3170">3170</a>
+<a href="#3171" id="3171">3171</a>
+<a href="#3172" id="3172">3172</a>
+<a href="#3173" id="3173">3173</a>
+<a href="#3174" id="3174">3174</a>
+<a href="#3175" id="3175">3175</a>
+<a href="#3176" id="3176">3176</a>
+<a href="#3177" id="3177">3177</a>
+<a href="#3178" id="3178">3178</a>
+<a href="#3179" id="3179">3179</a>
+<a href="#3180" id="3180">3180</a>
+<a href="#3181" id="3181">3181</a>
+<a href="#3182" id="3182">3182</a>
+<a href="#3183" id="3183">3183</a>
+<a href="#3184" id="3184">3184</a>
+<a href="#3185" id="3185">3185</a>
+<a href="#3186" id="3186">3186</a>
+<a href="#3187" id="3187">3187</a>
+<a href="#3188" id="3188">3188</a>
+<a href="#3189" id="3189">3189</a>
+<a href="#3190" id="3190">3190</a>
+<a href="#3191" id="3191">3191</a>
+<a href="#3192" id="3192">3192</a>
+<a href="#3193" id="3193">3193</a>
+<a href="#3194" id="3194">3194</a>
+<a href="#3195" id="3195">3195</a>
+<a href="#3196" id="3196">3196</a>
+<a href="#3197" id="3197">3197</a>
+<a href="#3198" id="3198">3198</a>
+<a href="#3199" id="3199">3199</a>
+<a href="#3200" id="3200">3200</a>
+<a href="#3201" id="3201">3201</a>
+<a href="#3202" id="3202">3202</a>
+<a href="#3203" id="3203">3203</a>
+<a href="#3204" id="3204">3204</a>
+<a href="#3205" id="3205">3205</a>
+<a href="#3206" id="3206">3206</a>
+<a href="#3207" id="3207">3207</a>
+<a href="#3208" id="3208">3208</a>
+<a href="#3209" id="3209">3209</a>
+<a href="#3210" id="3210">3210</a>
+<a href="#3211" id="3211">3211</a>
+<a href="#3212" id="3212">3212</a>
+<a href="#3213" id="3213">3213</a>
+<a href="#3214" id="3214">3214</a>
+<a href="#3215" id="3215">3215</a>
+<a href="#3216" id="3216">3216</a>
+<a href="#3217" id="3217">3217</a>
+<a href="#3218" id="3218">3218</a>
+<a href="#3219" id="3219">3219</a>
+<a href="#3220" id="3220">3220</a>
+<a href="#3221" id="3221">3221</a>
+<a href="#3222" id="3222">3222</a>
+<a href="#3223" id="3223">3223</a>
+<a href="#3224" id="3224">3224</a>
+<a href="#3225" id="3225">3225</a>
+<a href="#3226" id="3226">3226</a>
+<a href="#3227" id="3227">3227</a>
+<a href="#3228" id="3228">3228</a>
+<a href="#3229" id="3229">3229</a>
+<a href="#3230" id="3230">3230</a>
+<a href="#3231" id="3231">3231</a>
+<a href="#3232" id="3232">3232</a>
+<a href="#3233" id="3233">3233</a>
+<a href="#3234" id="3234">3234</a>
+<a href="#3235" id="3235">3235</a>
+<a href="#3236" id="3236">3236</a>
+<a href="#3237" id="3237">3237</a>
+<a href="#3238" id="3238">3238</a>
+<a href="#3239" id="3239">3239</a>
+<a href="#3240" id="3240">3240</a>
+<a href="#3241" id="3241">3241</a>
+<a href="#3242" id="3242">3242</a>
+<a href="#3243" id="3243">3243</a>
+<a href="#3244" id="3244">3244</a>
+<a href="#3245" id="3245">3245</a>
+<a href="#3246" id="3246">3246</a>
+<a href="#3247" id="3247">3247</a>
+<a href="#3248" id="3248">3248</a>
+<a href="#3249" id="3249">3249</a>
+<a href="#3250" id="3250">3250</a>
+<a href="#3251" id="3251">3251</a>
+<a href="#3252" id="3252">3252</a>
+<a href="#3253" id="3253">3253</a>
+<a href="#3254" id="3254">3254</a>
+<a href="#3255" id="3255">3255</a>
+<a href="#3256" id="3256">3256</a>
+<a href="#3257" id="3257">3257</a>
+<a href="#3258" id="3258">3258</a>
+<a href="#3259" id="3259">3259</a>
+<a href="#3260" id="3260">3260</a>
+<a href="#3261" id="3261">3261</a>
+<a href="#3262" id="3262">3262</a>
+<a href="#3263" id="3263">3263</a>
+<a href="#3264" id="3264">3264</a>
+<a href="#3265" id="3265">3265</a>
+<a href="#3266" id="3266">3266</a>
+<a href="#3267" id="3267">3267</a>
+<a href="#3268" id="3268">3268</a>
+<a href="#3269" id="3269">3269</a>
+<a href="#3270" id="3270">3270</a>
+<a href="#3271" id="3271">3271</a>
+<a href="#3272" id="3272">3272</a>
+<a href="#3273" id="3273">3273</a>
+<a href="#3274" id="3274">3274</a>
+<a href="#3275" id="3275">3275</a>
+<a href="#3276" id="3276">3276</a>
+<a href="#3277" id="3277">3277</a>
+<a href="#3278" id="3278">3278</a>
+<a href="#3279" id="3279">3279</a>
+<a href="#3280" id="3280">3280</a>
+<a href="#3281" id="3281">3281</a>
+<a href="#3282" id="3282">3282</a>
+<a href="#3283" id="3283">3283</a>
+<a href="#3284" id="3284">3284</a>
+<a href="#3285" id="3285">3285</a>
+<a href="#3286" id="3286">3286</a>
+<a href="#3287" id="3287">3287</a>
+<a href="#3288" id="3288">3288</a>
+<a href="#3289" id="3289">3289</a>
+<a href="#3290" id="3290">3290</a>
+<a href="#3291" id="3291">3291</a>
+<a href="#3292" id="3292">3292</a>
+<a href="#3293" id="3293">3293</a>
+<a href="#3294" id="3294">3294</a>
+<a href="#3295" id="3295">3295</a>
+<a href="#3296" id="3296">3296</a>
+<a href="#3297" id="3297">3297</a>
+<a href="#3298" id="3298">3298</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::cell::{Ref, RefMut};
 <span class="kw">use </span>std::mem::size_of;
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2973,7 +3314,6 @@
 <span class="kw">use </span><span class="kw">crate</span>::logs::{emit_stack, DeactivatePerpPositionLog, DeactivateTokenPositionLog};
 <span class="kw">use </span><span class="kw">crate</span>::util;
 
-<span class="kw">use </span><span class="kw">super</span>::BookSideOrderTree;
 <span class="kw">use </span><span class="kw">super</span>::FillEvent;
 <span class="kw">use </span><span class="kw">super</span>::LeafNode;
 <span class="kw">use </span><span class="kw">super</span>::PerpMarket;
@@ -2984,6 +3324,7 @@
 <span class="kw">use </span><span class="kw">super</span>::TokenIndex;
 <span class="kw">use </span><span class="kw">super</span>::FREE_ORDER_SLOT;
 <span class="kw">use super</span>::{dynamic_account::<span class="kw-2">*</span>, Group};
+<span class="kw">use super</span>::{BookSideOrderTree, OpenbookV2MarketIndex, OpenbookV2Orders};
 <span class="kw">use super</span>::{PerpPosition, Serum3Orders, TokenPosition};
 <span class="kw">use super</span>::{Side, SideAndOrderTree};
 
@@ -2991,7 +3332,7 @@
 <span class="kw">const </span>BORSH_VEC_PADDING_BYTES: usize = <span class="number">4</span>;
 <span class="kw">const </span>BORSH_VEC_SIZE_BYTES: usize = <span class="number">4</span>;
 <span class="kw">const </span>DEFAULT_MANGO_ACCOUNT_VERSION: u8 = <span class="number">1</span>;
-<span class="kw">const </span>DYNAMIC_RESERVED_BYTES: usize = <span class="number">64</span>;
+<span class="kw">const </span>DYNAMIC_RESERVED_BYTES: usize = <span class="number">56</span>;
 
 <span class="comment">// Return variants for check_liquidatable method, should be wrapped in a Result
 // for a future possiblity of returning any error
@@ -3140,9 +3481,12 @@
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
     </span><span class="kw">pub </span>padding8: u32,
     <span class="kw">pub </span>token_conditional_swaps: Vec&lt;TokenConditionalSwap&gt;,
+    <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
+    </span><span class="kw">pub </span>padding9: u32,
+    <span class="kw">pub </span>openbook_v2: Vec&lt;OpenbookV2Orders&gt;,
 
     <span class="attr">#[derivative(Debug = <span class="string">&quot;ignore&quot;</span>)]
-    </span><span class="kw">pub </span>reserved_dynamic: [u8; <span class="number">64</span>],
+    </span><span class="kw">pub </span>reserved_dynamic: [u8; <span class="number">56</span>],
 }
 
 <span class="kw">impl </span>MangoAccount {
@@ -3181,7 +3525,9 @@
             perp_open_orders: <span class="macro">vec!</span>[PerpOpenOrder::default(); <span class="number">6</span>],
             padding8: Default::default(),
             token_conditional_swaps: <span class="macro">vec!</span>[TokenConditionalSwap::default(); <span class="number">2</span>],
-            reserved_dynamic: [<span class="number">0</span>; <span class="number">64</span>],
+            padding9: Default::default(),
+            openbook_v2: <span class="macro">vec!</span>[OpenbookV2Orders::default(); <span class="number">5</span>],
+            reserved_dynamic: [<span class="number">0</span>; <span class="number">56</span>],
         }
     }
 
@@ -3192,6 +3538,7 @@
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
     ) -&gt; usize {
         <span class="number">8 </span>+ size_of::&lt;MangoAccountFixed&gt;()
             + <span class="self">Self</span>::dynamic_size(
@@ -3200,6 +3547,7 @@
                 perp_count,
                 perp_oo_count,
                 token_conditional_swap_count,
+                openbook_v2_count,
             )
     }
 
@@ -3237,7 +3585,7 @@
             + BORSH_VEC_PADDING_BYTES
     }
 
-    <span class="kw">pub fn </span>dynamic_reserved_bytes_offset(
+    <span class="kw">pub fn </span>dynamic_openbook_v2_vec_offset(
         token_count: u8,
         serum3_count: u8,
         perp_count: u8,
@@ -3251,6 +3599,24 @@
             perp_oo_count,
         ) + (BORSH_VEC_SIZE_BYTES
             + size_of::&lt;TokenConditionalSwap&gt;() * usize::from(token_conditional_swap_count))
+            + BORSH_VEC_PADDING_BYTES
+    }
+
+    <span class="kw">pub fn </span>dynamic_reserved_bytes_offset(
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+    ) -&gt; usize {
+        <span class="self">Self</span>::dynamic_openbook_v2_vec_offset(
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+        ) + (BORSH_VEC_SIZE_BYTES + size_of::&lt;OpenbookV2Orders&gt;() * usize::from(openbook_v2_count))
     }
 
     <span class="kw">pub fn </span>dynamic_size(
@@ -3259,6 +3625,7 @@
         perp_count: u8,
         perp_oo_count: u8,
         token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
     ) -&gt; usize {
         <span class="self">Self</span>::dynamic_reserved_bytes_offset(
             token_count,
@@ -3266,6 +3633,7 @@
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            openbook_v2_count,
         ) + DYNAMIC_RESERVED_BYTES
     }
 }
@@ -3429,6 +3797,7 @@
     <span class="kw">pub </span>perp_count: u8,
     <span class="kw">pub </span>perp_oo_count: u8,
     <span class="kw">pub </span>token_conditional_swap_count: u8,
+    <span class="kw">pub </span>openbook_v2_count: u8,
 }
 
 <span class="kw">impl </span>DynamicHeader <span class="kw">for </span>MangoAccountDynamicHeader {
@@ -3472,18 +3841,27 @@
                         perp_count,
                         perp_oo_count,
                     );
-                <span class="kw">let </span>token_conditional_swap_count = <span class="kw">if </span>dynamic_data.len()
-                    &gt; token_conditional_swap_vec_offset + BORSH_VEC_SIZE_BYTES
-                {
+                <span class="kw">let </span>token_conditional_swap_count =
                     u8::try_from(BorshVecLength::from_le_bytes(<span class="kw-2">*</span><span class="macro">array_ref!</span>[
                         dynamic_data,
                         token_conditional_swap_vec_offset,
                         BORSH_VEC_SIZE_BYTES
                     ]))
-                    .unwrap()
-                } <span class="kw">else </span>{
-                    <span class="number">0
-                </span>};
+                    .unwrap();
+
+                <span class="kw">let </span>openbook_v2_vec_offset = MangoAccount::dynamic_openbook_v2_vec_offset(
+                    token_count,
+                    serum3_count,
+                    perp_count,
+                    perp_oo_count,
+                    token_conditional_swap_count,
+                );
+                <span class="kw">let </span>openbook_v2_count = u8::try_from(BorshVecLength::from_le_bytes(<span class="kw-2">*</span><span class="macro">array_ref!</span>[
+                    dynamic_data,
+                    openbook_v2_vec_offset,
+                    BORSH_VEC_SIZE_BYTES
+                ]))
+                .unwrap();
 
                 <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
                     token_count,
@@ -3491,6 +3869,7 @@
                     perp_count,
                     perp_oo_count,
                     token_conditional_swap_count,
+                    openbook_v2_count,
                 })
             }
             <span class="kw">_ </span>=&gt; <span class="macro">err!</span>(MangoError::NotImplementedError).context(<span class="string">&quot;unexpected header version number&quot;</span>),
@@ -3520,6 +3899,7 @@
             <span class="self">self</span>.perp_count,
             <span class="self">self</span>.perp_oo_count,
             <span class="self">self</span>.token_conditional_swap_count,
+            <span class="self">self</span>.openbook_v2_count,
         )
     }
 
@@ -3565,6 +3945,17 @@
             + raw_index * size_of::&lt;TokenConditionalSwap&gt;()
     }
 
+    <span class="kw">fn </span>openbook_v2_offset(<span class="kw-2">&amp;</span><span class="self">self</span>, raw_index: usize) -&gt; usize {
+        MangoAccount::dynamic_openbook_v2_vec_offset(
+            <span class="self">self</span>.token_count,
+            <span class="self">self</span>.serum3_count,
+            <span class="self">self</span>.perp_count,
+            <span class="self">self</span>.perp_oo_count,
+            <span class="self">self</span>.token_conditional_swap_count,
+        ) + BORSH_VEC_SIZE_BYTES
+            + raw_index * size_of::&lt;OpenbookV2Orders&gt;()
+    }
+
     <span class="kw">fn </span>reserved_bytes_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         MangoAccount::dynamic_reserved_bytes_offset(
             <span class="self">self</span>.token_count,
@@ -3572,6 +3963,7 @@
             <span class="self">self</span>.perp_count,
             <span class="self">self</span>.perp_oo_count,
             <span class="self">self</span>.token_conditional_swap_count,
+            <span class="self">self</span>.openbook_v2_count,
         )
     }
 
@@ -3590,6 +3982,9 @@
     <span class="kw">pub fn </span>token_conditional_swap_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.token_conditional_swap_count.into()
     }
+    <span class="kw">pub fn </span>openbook_v2_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.openbook_v2_count.into()
+    }
 
     <span class="kw">pub fn </span>zero() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
@@ -3598,12 +3993,16 @@
             perp_count: <span class="number">0</span>,
             perp_oo_count: <span class="number">0</span>,
             token_conditional_swap_count: <span class="number">0</span>,
+            openbook_v2_count: <span class="number">0</span>,
         }
     }
 
     <span class="kw">pub fn </span>expected_health_accounts(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.token_count() * <span class="number">2 </span>+ <span class="self">self</span>.serum3_count() + <span class="self">self</span>.perp_count() * <span class="number">2
-    </span>}
+        <span class="self">self</span>.token_count() * <span class="number">2
+            </span>+ <span class="self">self</span>.serum3_count()
+            + <span class="self">self</span>.perp_count() * <span class="number">2
+            </span>+ <span class="self">self</span>.openbook_v2_count()
+    }
 
     <span class="kw">pub fn </span>max_health_accounts() -&gt; usize {
         <span class="number">28
@@ -3878,6 +4277,42 @@
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;no free token conditional swap index&quot;</span>))
     }
 
+    <span class="kw">pub fn </span>openbook_v2_orders(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        market_index: OpenbookV2MarketIndex,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>OpenbookV2Orders&gt; {
+        <span class="self">self</span>.all_openbook_v2_orders()
+            .find(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| {
+                <span class="macro">error_msg!</span>(
+                    <span class="string">&quot;openbook v2 orders for market index {} not found&quot;</span>,
+                    market_index
+                )
+            })
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>openbook_v2_orders_by_raw_index_unchecked(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        raw_index: usize,
+    ) -&gt; <span class="kw-2">&amp;</span>OpenbookV2Orders {
+        get_helper(<span class="self">self</span>.dynamic(), <span class="self">self</span>.header().openbook_v2_offset(raw_index))
+    }
+
+    <span class="kw">pub fn </span>openbook_v2_orders_by_raw_index(<span class="kw-2">&amp;</span><span class="self">self</span>, raw_index: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>OpenbookV2Orders&gt; {
+        <span class="macro">require_gt!</span>(<span class="self">self</span>.header().openbook_v2_count(), raw_index);
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>.openbook_v2_orders_by_raw_index_unchecked(raw_index))
+    }
+
+    <span class="kw">pub fn </span>all_openbook_v2_orders(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>OpenbookV2Orders&gt; + <span class="lifetime">&#39;_ </span>{
+        (<span class="number">0</span>..<span class="self">self</span>.header().openbook_v2_count())
+            .map(|i| <span class="self">self</span>.openbook_v2_orders_by_raw_index_unchecked(i))
+    }
+
+    <span class="kw">pub fn </span>active_openbook_v2_orders(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>OpenbookV2Orders&gt; + <span class="lifetime">&#39;_ </span>{
+        <span class="self">self</span>.all_openbook_v2_orders()
+            .filter(|openbook_v2_order| openbook_v2_order.is_active())
+    }
+
     <span class="kw">pub fn </span>borrow(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MangoAccountRef {
         MangoAccountRef {
             header: <span class="self">self</span>.header(),
@@ -4076,6 +4511,67 @@
         raw_index_opt
             .map(|raw_index| <span class="self">self</span>.serum3_orders_mut_by_raw_index(raw_index))
             .ok_or_else(|| <span class="macro">error_msg!</span>(<span class="string">&quot;serum3 orders for market index {} not found&quot;</span>, market_index))
+    }
+
+    <span class="comment">// get mut OpenbookV2Orders at raw_index
+    </span><span class="kw">pub fn </span>openbook_v2_orders_mut_by_raw_index(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        raw_index: usize,
+    ) -&gt; <span class="kw-2">&amp;mut </span>OpenbookV2Orders {
+        <span class="kw">let </span>offset = <span class="self">self</span>.header().openbook_v2_offset(raw_index);
+        get_helper_mut(<span class="self">self</span>.dynamic_mut(), offset)
+    }
+
+    <span class="kw">pub fn </span>create_openbook_v2_orders(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        market_index: OpenbookV2MarketIndex,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;mut </span>OpenbookV2Orders&gt; {
+        <span class="kw">if </span><span class="self">self</span>.openbook_v2_orders(market_index).is_ok() {
+            <span class="kw">return </span><span class="macro">err!</span>(MangoError::OpenbookV2OpenOrdersExistAlready);
+        }
+
+        <span class="kw">let </span>raw_index_opt = <span class="self">self</span>.all_openbook_v2_orders().position(|p| !p.is_active());
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(raw_index) = raw_index_opt {
+            <span class="kw-2">*</span>(<span class="self">self</span>.openbook_v2_orders_mut_by_raw_index(raw_index)) = OpenbookV2Orders {
+                market_index: market_index <span class="kw">as </span>OpenbookV2MarketIndex,
+                ..OpenbookV2Orders::default()
+            };
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.openbook_v2_orders_mut_by_raw_index(raw_index))
+        } <span class="kw">else </span>{
+            <span class="macro">err!</span>(MangoError::NoFreeOpenbookV2OpenOrdersIndex)
+        }
+    }
+
+    <span class="kw">pub fn </span>deactivate_openbook_v2_orders(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        market_index: OpenbookV2MarketIndex,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>raw_index = <span class="self">self
+            </span>.all_openbook_v2_orders()
+            .position(|p| p.is_active_for_market(market_index))
+            .ok_or_else(|| {
+                <span class="macro">error_msg!</span>(<span class="string">&quot;openbook v2 open orders index {} not found&quot;</span>, market_index)
+            })<span class="question-mark">?</span>;
+        <span class="self">self</span>.openbook_v2_orders_mut_by_raw_index(raw_index)
+            .market_index = OpenbookV2MarketIndex::MAX;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>openbook_v2_orders_mut(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        market_index: OpenbookV2MarketIndex,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;mut </span>OpenbookV2Orders&gt; {
+        <span class="kw">let </span>raw_index_opt = <span class="self">self
+            </span>.all_openbook_v2_orders()
+            .position(|p| p.is_active_for_market(market_index));
+        raw_index_opt
+            .map(|raw_index| <span class="self">self</span>.openbook_v2_orders_mut_by_raw_index(raw_index))
+            .ok_or_else(|| {
+                <span class="macro">error_msg!</span>(
+                    <span class="string">&quot;openbook v2 orders for market index {} not found&quot;</span>,
+                    market_index
+                )
+            })
     }
 
     <span class="comment">// get mut PerpPosition at raw_index
@@ -4486,6 +4982,12 @@
         <span class="self">self</span>.write_borsh_vec_length_and_padding(offset, count)
     }
 
+    <span class="kw">fn </span>write_openbook_v2_length(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">let </span>offset = <span class="self">self</span>.header().openbook_v2_offset(<span class="number">0</span>);
+        <span class="kw">let </span>count = <span class="self">self</span>.header().openbook_v2_count;
+        <span class="self">self</span>.write_borsh_vec_length_and_padding(offset, count)
+    }
+
     <span class="kw">pub fn </span>resize_dynamic_content(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         new_token_count: u8,
@@ -4493,6 +4995,7 @@
         new_perp_count: u8,
         new_perp_oo_count: u8,
         new_token_conditional_swap_count: u8,
+        new_openbook_v2_count: u8,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span>new_header = MangoAccountDynamicHeader {
             token_count: new_token_count,
@@ -4500,6 +5003,7 @@
             perp_count: new_perp_count,
             perp_oo_count: new_perp_oo_count,
             token_conditional_swap_count: new_token_conditional_swap_count,
+            openbook_v2_count: new_openbook_v2_count,
         };
         <span class="kw">let </span>old_header = <span class="self">self</span>.header().clone();
 
@@ -4620,12 +5124,33 @@
             active_tcs += <span class="number">1</span>;
         }
 
+        <span class="kw">let </span><span class="kw-2">mut </span>active_openbook_v2_orders = <span class="number">0</span>;
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..old_header.openbook_v2_count() {
+            <span class="kw">let </span>src = old_header.openbook_v2_offset(i);
+            <span class="kw">let </span>pos: <span class="kw-2">&amp;</span>OpenbookV2Orders = get_helper(dynamic, src);
+            <span class="kw">if </span>!pos.is_active() {
+                <span class="kw">continue</span>;
+            }
+            <span class="kw">if </span>i != active_openbook_v2_orders {
+                <span class="kw">let </span>dst = old_header.openbook_v2_offset(active_openbook_v2_orders);
+                <span class="kw">unsafe </span>{
+                    sol_memmove(
+                        <span class="kw-2">&amp;mut </span>dynamic[dst],
+                        <span class="kw-2">&amp;mut </span>dynamic[src],
+                        size_of::&lt;OpenbookV2Orders&gt;(),
+                    );
+                }
+            }
+            active_openbook_v2_orders += <span class="number">1</span>;
+        }
+
         <span class="comment">// Check that the new allocations can fit the existing data
         </span><span class="macro">require_gte!</span>(new_header.token_count(), active_token_positions);
         <span class="macro">require_gte!</span>(new_header.serum3_count(), active_serum3_orders);
         <span class="macro">require_gte!</span>(new_header.perp_count(), active_perp_positions);
         <span class="macro">require_gte!</span>(new_header.perp_oo_count(), blocked_perp_oo);
         <span class="macro">require_gte!</span>(new_header.token_conditional_swap_count(), active_tcs);
+        <span class="macro">require_gte!</span>(new_header.openbook_v2_count(), active_openbook_v2_orders);
 
         <span class="comment">// First move pass: go left-to-right and move any blocks that need to be moved
         // to the left. This will never overwrite other data, because:
@@ -4683,6 +5208,18 @@
                     );
                 }
             }
+
+            <span class="kw">let </span>old_openbook_v2_start = old_header.openbook_v2_offset(<span class="number">0</span>);
+            <span class="kw">let </span>new_openbook_v2_start = new_header.openbook_v2_offset(<span class="number">0</span>);
+            <span class="kw">if </span>new_openbook_v2_start &lt; old_openbook_v2_start &amp;&amp; active_openbook_v2_orders &gt; <span class="number">0 </span>{
+                <span class="kw">unsafe </span>{
+                    sol_memmove(
+                        <span class="kw-2">&amp;mut </span>dynamic[new_openbook_v2_start],
+                        <span class="kw-2">&amp;mut </span>dynamic[old_openbook_v2_start],
+                        size_of::&lt;OpenbookV2Orders&gt;() * active_openbook_v2_orders,
+                    );
+                }
+            }
         }
 
         <span class="comment">// Second move pass: Go right-to-left and move everything to the right if needed.
@@ -4692,6 +5229,18 @@
         // - if the block to the right was moved to the left, we know that its start will
         //   be &gt;= our block&#39;s end
         </span>{
+            <span class="kw">let </span>old_openbook_v2_start = old_header.openbook_v2_offset(<span class="number">0</span>);
+            <span class="kw">let </span>new_openbook_v2_start = new_header.openbook_v2_offset(<span class="number">0</span>);
+            <span class="kw">if </span>new_openbook_v2_start &gt; old_openbook_v2_start &amp;&amp; active_openbook_v2_orders &gt; <span class="number">0 </span>{
+                <span class="kw">unsafe </span>{
+                    sol_memmove(
+                        <span class="kw-2">&amp;mut </span>dynamic[new_openbook_v2_start],
+                        <span class="kw-2">&amp;mut </span>dynamic[old_openbook_v2_start],
+                        size_of::&lt;OpenbookV2Orders&gt;() * active_openbook_v2_orders,
+                    );
+                }
+            }
+
             <span class="kw">let </span>old_tcs_start = old_header.token_conditional_swap_offset(<span class="number">0</span>);
             <span class="kw">let </span>new_tcs_start = new_header.token_conditional_swap_offset(<span class="number">0</span>);
             <span class="kw">if </span>new_tcs_start &gt; old_tcs_start &amp;&amp; active_tcs &gt; <span class="number">0 </span>{
@@ -4761,6 +5310,10 @@
                 <span class="kw-2">*</span>get_helper_mut(dynamic, new_header.token_conditional_swap_offset(i)) =
                     TokenConditionalSwap::default();
             }
+            <span class="kw">for </span>i <span class="kw">in </span>active_openbook_v2_orders..new_header.openbook_v2_count() {
+                <span class="kw-2">*</span>get_helper_mut(dynamic, new_header.openbook_v2_offset(i)) =
+                    OpenbookV2Orders::default();
+            }
         }
         {
             <span class="kw">let </span>offset = new_header.reserved_bytes_offset();
@@ -4777,6 +5330,7 @@
         <span class="self">self</span>.write_perp_length();
         <span class="self">self</span>.write_perp_oo_length();
         <span class="self">self</span>.write_token_conditional_swap_length();
+        <span class="self">self</span>.write_openbook_v2_length();
 
         <span class="prelude-val">Ok</span>(())
     }
@@ -4862,7 +5416,9 @@
             account.perps.len() <span class="kw">as </span>u8,
             account.perp_open_orders.len() <span class="kw">as </span>u8,
             account.token_conditional_swaps.len() <span class="kw">as </span>u8,
+            account.openbook_v2.len() <span class="kw">as </span>u8,
         );
+
         <span class="macro">assert_eq!</span>(expected_space, <span class="number">8 </span>+ bytes.len());
 
         MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap()
@@ -4897,7 +5453,10 @@
         account.token_conditional_swaps[<span class="number">0</span>].buy_token_index = <span class="number">14</span>;
 
         <span class="kw">let </span>account_bytes = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
-        <span class="macro">assert_eq!</span>(<span class="number">8 </span>+ account_bytes.len(), MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>));
+        <span class="macro">assert_eq!</span>(
+            <span class="number">8 </span>+ account_bytes.len(),
+            MangoAccount::space(<span class="number">8</span>, <span class="number">8</span>, <span class="number">4</span>, <span class="number">8</span>, <span class="number">12</span>, <span class="number">5</span>)
+        );
 
         <span class="kw">let </span>account2 = MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>account_bytes).unwrap();
         <span class="macro">assert_eq!</span>(account.group, account2.fixed.group);
@@ -5243,6 +5802,62 @@
         <span class="macro">assert_eq!</span>(tcs.id, <span class="number">123</span>); <span class="comment">// old data
     </span>}
 
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>test_openbook_v2_orders() {
+        <span class="kw">let </span><span class="kw-2">mut </span>account = make_test_account();
+        <span class="macro">assert!</span>(account.openbook_v2_orders(<span class="number">1</span>).is_err());
+        <span class="macro">assert!</span>(account.openbook_v2_orders_mut(<span class="number">3</span>).is_err());
+
+        <span class="comment">// When we make the test account we zero init the dynamic section.
+        // This would never happen outside of tests. If it did we would incorrectly think the orders slot is active.
+        // assert_eq!(
+        //     account.openbook_v2_orders_by_raw_index_unchecked(0).market_index,
+        //     OpenbookV2MarketIndex::MAX
+        // );
+
+        </span><span class="macro">assert_eq!</span>(
+            account.create_openbook_v2_orders(<span class="number">1</span>).unwrap().market_index,
+            <span class="number">1
+        </span>);
+        <span class="macro">assert_eq!</span>(
+            account.create_openbook_v2_orders(<span class="number">7</span>).unwrap().market_index,
+            <span class="number">7
+        </span>);
+        <span class="macro">assert_eq!</span>(
+            account.create_openbook_v2_orders(<span class="number">42</span>).unwrap().market_index,
+            <span class="number">42
+        </span>);
+        <span class="macro">assert!</span>(account.create_openbook_v2_orders(<span class="number">7</span>).is_err());
+        <span class="macro">assert_eq!</span>(account.active_openbook_v2_orders().count(), <span class="number">3</span>);
+
+        <span class="macro">assert!</span>(account.deactivate_openbook_v2_orders(<span class="number">7</span>).is_ok());
+        <span class="macro">assert_eq!</span>(
+            account
+                .openbook_v2_orders_by_raw_index_unchecked(<span class="number">1</span>)
+                .market_index,
+            OpenbookV2MarketIndex::MAX
+        );
+        <span class="macro">assert!</span>(account.create_openbook_v2_orders(<span class="number">8</span>).is_ok());
+        <span class="macro">assert_eq!</span>(
+            account
+                .openbook_v2_orders_by_raw_index_unchecked(<span class="number">1</span>)
+                .market_index,
+            <span class="number">8
+        </span>);
+
+        <span class="macro">assert_eq!</span>(account.active_openbook_v2_orders().count(), <span class="number">3</span>);
+        <span class="macro">assert!</span>(account.deactivate_openbook_v2_orders(<span class="number">1</span>).is_ok());
+        <span class="macro">assert!</span>(account.openbook_v2_orders(<span class="number">1</span>).is_err());
+        <span class="macro">assert!</span>(account.openbook_v2_orders_mut(<span class="number">1</span>).is_err());
+        <span class="macro">assert!</span>(account.openbook_v2_orders(<span class="number">8</span>).is_ok());
+        <span class="macro">assert!</span>(account.openbook_v2_orders(<span class="number">42</span>).is_ok());
+        <span class="macro">assert_eq!</span>(account.active_openbook_v2_orders().count(), <span class="number">2</span>);
+
+        <span class="macro">assert_eq!</span>(account.openbook_v2_orders_mut(<span class="number">42</span>).unwrap().market_index, <span class="number">42</span>);
+        <span class="macro">assert_eq!</span>(account.openbook_v2_orders_mut(<span class="number">8</span>).unwrap().market_index, <span class="number">8</span>);
+        <span class="macro">assert!</span>(account.openbook_v2_orders_mut(<span class="number">7</span>).is_err());
+    }
+
     <span class="kw">fn </span>make_resize_test_account(header: <span class="kw-2">&amp;</span>MangoAccountDynamicHeader) -&gt; MangoAccountValue {
         <span class="kw">let </span><span class="kw-2">mut </span>account = MangoAccount::default_for_tests();
         account
@@ -5257,6 +5872,9 @@
         account
             .perp_open_orders
             .resize(header.perp_oo_count(), PerpOpenOrder::default());
+        account
+            .openbook_v2
+            .resize(header.openbook_v2_count(), OpenbookV2Orders::default());
         <span class="kw">let </span><span class="kw-2">mut </span>bytes = AnchorSerialize::try_to_vec(<span class="kw-2">&amp;</span>account).unwrap();
 
         <span class="comment">// The MangoAccount struct is missing some dynamic fields, add space for them
@@ -5267,14 +5885,23 @@
         </span><span class="kw">let </span>(fixed, dynamic) = bytes.split_at_mut(size_of::&lt;MangoAccountFixed&gt;());
         <span class="kw">let </span><span class="kw-2">mut </span>out_header = MangoAccountDynamicHeader::from_bytes(dynamic).unwrap();
         out_header.token_conditional_swap_count = header.token_conditional_swap_count;
+        out_header.openbook_v2_count = header.openbook_v2_count;
         <span class="kw">let </span><span class="kw-2">mut </span>account = MangoAccountRefMut {
             header: <span class="kw-2">&amp;mut </span>out_header,
             fixed: bytemuck::from_bytes_mut(fixed),
             dynamic,
         };
         account.write_token_conditional_swap_length();
+        account.write_openbook_v2_length();
 
-        MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap()
+        <span class="kw">let </span><span class="kw-2">mut </span>account = MangoAccountValue::from_bytes(<span class="kw-2">&amp;</span>bytes).unwrap();
+
+        <span class="comment">// Initialize the openbook orders with defaults as they would be in the program
+        </span><span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..header.openbook_v2_count() {
+            <span class="kw-2">*</span>account.openbook_v2_orders_mut_by_raw_index(i) = OpenbookV2Orders::default();
+        }
+
+        account
     }
 
     <span class="kw">fn </span>check_account_active_and_order(
@@ -5385,6 +6012,7 @@
             perp_count: <span class="number">6</span>,
             perp_oo_count: <span class="number">7</span>,
             token_conditional_swap_count: <span class="number">8</span>,
+            openbook_v2_count: <span class="number">5</span>,
         };
         <span class="kw">let </span><span class="kw-2">mut </span>account = make_resize_test_account(<span class="kw-2">&amp;</span>header);
 
@@ -5423,12 +6051,18 @@
         make_tcs(<span class="number">2</span>, <span class="number">0</span>);
         make_tcs(<span class="number">4</span>, <span class="number">1</span>);
 
+        account.create_openbook_v2_orders(<span class="number">0</span>)<span class="question-mark">?</span>;
+        account.create_openbook_v2_orders(<span class="number">7</span>)<span class="question-mark">?</span>;
+        account.create_openbook_v2_orders(<span class="number">1</span>)<span class="question-mark">?</span>;
+        <span class="kw-2">*</span>account.openbook_v2_orders_mut_by_raw_index(<span class="number">1</span>) = OpenbookV2Orders::default();
+
         <span class="kw">let </span>active = MangoAccountDynamicHeader {
             token_count: <span class="number">2</span>,
             serum3_count: <span class="number">2</span>,
             perp_count: <span class="number">4</span>,
             perp_oo_count: <span class="number">5</span>,
             token_conditional_swap_count: <span class="number">2</span>,
+            openbook_v2_count: <span class="number">2</span>,
         };
 
         <span class="comment">// Resizing to the same size just removes the empty spaces
@@ -5440,6 +6074,7 @@
                 header.perp_count,
                 header.perp_oo_count,
                 header.token_conditional_swap_count,
+                header.openbook_v2_count,
             )<span class="question-mark">?</span>;
             check_account_active_and_order(<span class="kw-2">&amp;</span>ta, <span class="kw-2">&amp;</span>active)<span class="question-mark">?</span>;
         }
@@ -5453,6 +6088,7 @@
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )<span class="question-mark">?</span>;
             check_account_active_and_order(<span class="kw-2">&amp;</span>ta, <span class="kw-2">&amp;</span>active)<span class="question-mark">?</span>;
         }
@@ -5466,6 +6102,7 @@
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -5474,6 +6111,7 @@
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -5482,6 +6120,7 @@
                 active.perp_count - <span class="number">1</span>,
                 active.perp_oo_count,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -5490,6 +6129,7 @@
                 active.perp_count,
                 active.perp_oo_count - <span class="number">1</span>,
                 active.token_conditional_swap_count,
+                active.openbook_v2_count,
             )
             .unwrap_err();
             ta.resize_dynamic_content(
@@ -5498,6 +6138,16 @@
                 active.perp_count,
                 active.perp_oo_count,
                 active.token_conditional_swap_count - <span class="number">1</span>,
+                active.openbook_v2_count,
+            )
+            .unwrap_err();
+            ta.resize_dynamic_content(
+                active.token_count,
+                active.serum3_count,
+                active.perp_count,
+                active.perp_oo_count,
+                active.token_conditional_swap_count,
+                active.openbook_v2_count - <span class="number">1</span>,
             )
             .unwrap_err();
         }
@@ -5516,6 +6166,7 @@
                 perp_count: <span class="number">4</span>,
                 perp_oo_count: <span class="number">8</span>,
                 token_conditional_swap_count: <span class="number">4</span>,
+                openbook_v2_count: <span class="number">2</span>,
             };
             <span class="kw">let </span><span class="kw-2">mut </span>account = make_resize_test_account(<span class="kw-2">&amp;</span>header);
 
@@ -5526,6 +6177,7 @@
                 perp_oo_count: rng.gen_range(<span class="number">0</span>..header.perp_oo_count + <span class="number">1</span>),
                 token_conditional_swap_count: rng
                     .gen_range(<span class="number">0</span>..header.token_conditional_swap_count + <span class="number">1</span>),
+                openbook_v2_count: rng.gen_range(<span class="number">0</span>..header.openbook_v2_count + <span class="number">1</span>),
             };
 
             <span class="kw">let </span>options = (<span class="number">0</span>..header.token_count()).collect_vec();
@@ -5560,12 +6212,21 @@
                 tcs.id = i <span class="kw">as </span>u64;
             }
 
+            <span class="kw">let </span>options = (<span class="number">0</span>..header.openbook_v2_count()).collect_vec();
+            <span class="kw">let </span>selected = options.choose_multiple(<span class="kw-2">&amp;mut </span>rng, active.openbook_v2_count());
+            <span class="kw">for </span>(i, index) <span class="kw">in </span>selected.sorted().enumerate() {
+                account
+                    .openbook_v2_orders_mut_by_raw_index(<span class="kw-2">*</span>index)
+                    .market_index = i <span class="kw">as </span>OpenbookV2MarketIndex;
+            }
+
             <span class="kw">let </span>target = MangoAccountDynamicHeader {
                 token_count: rng.gen_range(active.token_count..<span class="number">6</span>),
-                serum3_count: rng.gen_range(active.serum3_count..<span class="number">7</span>),
+                serum3_count: rng.gen_range(active.serum3_count..<span class="number">6</span>),
                 perp_count: rng.gen_range(active.perp_count..<span class="number">6</span>),
                 perp_oo_count: rng.gen_range(active.perp_oo_count..<span class="number">16</span>),
-                token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..<span class="number">8</span>),
+                token_conditional_swap_count: rng.gen_range(active.token_conditional_swap_count..<span class="number">6</span>),
+                openbook_v2_count: rng.gen_range(active.openbook_v2_count..<span class="number">4</span>),
             };
 
             <span class="kw">let </span>target_size = target.account_size();
@@ -5582,6 +6243,7 @@
                     target.perp_count,
                     target.perp_oo_count,
                     target.token_conditional_swap_count,
+                    target.openbook_v2_count,
                 )
                 .unwrap();
 
@@ -5838,7 +6500,7 @@
 
         <span class="comment">// Grab live accounts with
         // solana account CZGf1qbYPaSoabuA1EmdN8W5UHvH5CeXcNZ7RTx65aVQ --output-file programs/mango-v4/resources/test/mangoaccount-v0.21.3.bin
-        </span><span class="kw">let </span>fixtures = <span class="macro">vec!</span>[<span class="string">&quot;mangoaccount-v0.21.3&quot;</span>];
+        </span><span class="kw">let </span>fixtures = <span class="macro">vec!</span>[<span class="string">&quot;mangoaccount-v0.21.3&quot;</span>, <span class="string">&quot;mangoaccount-v0.23.0&quot;</span>];
 
         <span class="kw">for </span>fixture <span class="kw">in </span>fixtures {
             <span class="kw">let </span>filename = <span class="macro">format!</span>(<span class="string">&quot;resources/test/{}.bin&quot;</span>, fixture);
@@ -5895,6 +6557,12 @@
                     .cloned()
                     .collect_vec(),
 
+                padding9: Default::default(),
+                openbook_v2: zerocopy_reader
+                    .all_openbook_v2_orders()
+                    .cloned()
+                    .collect_vec(),
+
                 reserved_dynamic: zerocopy_reader.dynamic_reserved_bytes().try_into().unwrap(),
             };
 
@@ -5912,5 +6580,18 @@
         <span class="prelude-val">Ok</span>(())
     }
 }
-</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="mango_v4" data-themes="" data-resource-suffix="" data-rustdoc-version="1.69.0 (84c898d65 2023-04-16)" data-search-js="search-8a59a8356673ec1f.js" data-settings-js="settings-f0c5c39777a9a2f6.js" data-settings-css="settings-0bcba95ff279c1db.css" ></div></body></html>
+
+<span class="attr">#[macro_export]
+</span><span class="macro">macro_rules! </span>mango_account_seeds {
+    ( <span class="macro-nonterminal">$account</span>:expr ) =&gt; {
+        <span class="kw-2">&amp;</span>[
+            <span class="string">b&quot;MangoAccount&quot;</span>.as_ref(),
+            <span class="macro-nonterminal">$account</span>.group.as_ref(),
+            <span class="macro-nonterminal">$account</span>.owner.as_ref(),
+            <span class="kw-2">&amp;</span><span class="macro-nonterminal">$account</span>.account_num.to_le_bytes(),
+            <span class="kw-2">&amp;</span>[<span class="macro-nonterminal">$account</span>.bump],
+        ]
+    };
+}
+<span class="kw">pub use </span>mango_account_seeds;
+</code></pre></div></section></main></body></html>
