@@ -486,6 +486,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
   toggleIx(ixGate, p, 'SequenceCheck', 73);
   toggleIx(ixGate, p, 'HealthCheck', 74);
+  toggleIx(ixGate, p, 'GroupChangeInsuranceFund', 75);
 
   return ixGate;
 }
