@@ -349,6 +349,7 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             0,
+            0,
             name,
         )?;
         Ok(())
@@ -376,6 +377,36 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            0,
+            name,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_create_v3(
+        ctx: Context<AccountCreateV3>,
+        account_num: u32,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+        name: String,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_create(
+            &ctx.accounts.account,
+            *ctx.bumps.get("account").ok_or(MangoError::SomeError)?,
+            ctx.accounts.group.key(),
+            ctx.accounts.owner.key(),
+            account_num,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+            openbook_v2_count,
             name,
         )?;
         Ok(())
@@ -389,7 +420,15 @@ pub mod mango_v4 {
         perp_oo_count: u8,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::account_expand(ctx, token_count, serum3_count, perp_count, perp_oo_count, 0)?;
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            0,
+            0,
+        )?;
         Ok(())
     }
 
@@ -409,6 +448,29 @@ pub mod mango_v4 {
             perp_count,
             perp_oo_count,
             token_conditional_swap_count,
+            0,
+        )?;
+        Ok(())
+    }
+
+    pub fn account_expand_v3(
+        ctx: Context<AccountExpand>,
+        token_count: u8,
+        serum3_count: u8,
+        perp_count: u8,
+        perp_oo_count: u8,
+        token_conditional_swap_count: u8,
+        openbook_v2_count: u8,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::account_expand(
+            ctx,
+            token_count,
+            serum3_count,
+            perp_count,
+            perp_oo_count,
+            token_conditional_swap_count,
+            openbook_v2_count,
         )?;
         Ok(())
     }
@@ -1676,7 +1738,10 @@ pub mod mango_v4 {
         ctx: Context<OpenbookV2RegisterMarket>,
         market_index: OpenbookV2MarketIndex,
         name: String,
+        oracle_price_band: f32,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_register_market(ctx, market_index, name, oracle_price_band)?;
         Ok(())
     }
 
@@ -1684,59 +1749,91 @@ pub mod mango_v4 {
         ctx: Context<OpenbookV2EditMarket>,
         reduce_only_opt: Option<bool>,
         force_close_opt: Option<bool>,
+        name_opt: Option<String>,
+        oracle_price_band_opt: Option<f32>,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_edit_market(
+            ctx,
+            reduce_only_opt,
+            force_close_opt,
+            name_opt,
+            oracle_price_band_opt,
+        )?;
         Ok(())
     }
 
     pub fn openbook_v2_deregister_market(ctx: Context<OpenbookV2DeregisterMarket>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_deregister_market(ctx)?;
         Ok(())
     }
 
-    pub fn openbook_v2_create_open_orders(
-        ctx: Context<OpenbookV2CreateOpenOrders>,
-        account_num: u32,
-    ) -> Result<()> {
+    pub fn openbook_v2_create_open_orders(ctx: Context<OpenbookV2CreateOpenOrders>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_create_open_orders(ctx)?;
         Ok(())
     }
 
     pub fn openbook_v2_close_open_orders(ctx: Context<OpenbookV2CloseOpenOrders>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_close_open_orders(ctx)?;
         Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn openbook_v2_place_order(
         ctx: Context<OpenbookV2PlaceOrder>,
-        side: u8, // openbook_v2::state::Side
-        limit_price: u64,
-        max_base_qty: u64,
-        max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
-        order_type: u8,          // openbook_v2::state::PlaceOrderType
+        side: OpenbookV2Side,
+        price_lots: i64,
+        max_base_lots: i64,
+        max_quote_lots_including_fees: i64,
         client_order_id: u64,
-        limit: u16,
+        order_type: OpenbookV2PlaceOrderType,
+        self_trade_behavior: OpenbookV2SelfTradeBehavior,
+        reduce_only: bool,
+        expiry_timestamp: u64,
+        limit: u8,
     ) -> Result<()> {
-        Ok(())
-    }
+        use openbook_v2::state::{Order, OrderParams};
+        let time_in_force = match Order::tif_from_expiry(expiry_timestamp) {
+            Some(t) => t,
+            None => {
+                msg!("Order is already expired");
+                return Ok(());
+            }
+        };
+        let order = Order {
+            side: side.to_external(),
+            max_base_lots,
+            max_quote_lots_including_fees,
+            client_order_id,
+            time_in_force,
+            self_trade_behavior: self_trade_behavior.to_external(),
+            params: match order_type {
+                OpenbookV2PlaceOrderType::Market => OrderParams::Market {},
+                OpenbookV2PlaceOrderType::ImmediateOrCancel => {
+                    OrderParams::ImmediateOrCancel { price_lots }
+                }
+                _ => OrderParams::Fixed {
+                    price_lots,
+                    order_type: order_type.to_external_post_order_type()?,
+                },
+            },
+        };
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn openbook_v2_place_taker_order(
-        ctx: Context<OpenbookV2PlaceTakeOrder>,
-        side: u8, // openbook_v2::state::Side
-        limit_price: u64,
-        max_base_qty: u64,
-        max_native_quote_qty_including_fees: u64,
-        self_trade_behavior: u8, // openbook_v2::state::SelfTradeBehavior
-        client_order_id: u64,
-        limit: u16,
-    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_place_order(ctx, order, limit)?;
         Ok(())
     }
 
     pub fn openbook_v2_cancel_order(
         ctx: Context<OpenbookV2CancelOrder>,
-        side: u8, // openbook_v2::state::Side
+        side: OpenbookV2Side,
         order_id: u128,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_cancel_order(ctx, side.to_external(), order_id)?;
         Ok(())
     }
 
@@ -1744,6 +1841,8 @@ pub mod mango_v4 {
         ctx: Context<OpenbookV2SettleFunds>,
         fees_to_dao: bool,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_settle_funds(ctx, fees_to_dao)?;
         Ok(())
     }
 
@@ -1751,13 +1850,25 @@ pub mod mango_v4 {
         ctx: Context<OpenbookV2LiqForceCancelOrders>,
         limit: u8,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_liq_force_cancel_orders(ctx, limit)?;
         Ok(())
     }
 
     pub fn openbook_v2_cancel_all_orders(
         ctx: Context<OpenbookV2CancelOrder>,
         limit: u8,
+        side_opt: Option<OpenbookV2Side>,
     ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_cancel_all_orders(
+            ctx,
+            limit,
+            match side_opt {
+                Some(side) => Some(side.to_external()),
+                None => None,
+            },
+        )?;
         Ok(())
     }
 

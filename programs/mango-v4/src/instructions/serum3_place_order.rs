@@ -324,7 +324,7 @@ pub fn serum3_place_order(
         apply_vault_difference(
             ctx.accounts.account.key(),
             &mut account.borrow_mut(),
-            serum_market.market_index,
+            SpotMarketIndex::Serum3(serum_market.market_index),
             &mut payer_bank,
             after_vault,
             before_vault,
@@ -390,7 +390,7 @@ pub fn serum3_place_order(
             Serum3Side::Bid => {
                 require_msg_typed!(
                     limit_price_in_dollar * band_factor >= base_oracle_f64,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "bid price {} must be larger than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 / (quote_oracle_f64 * band_factor),
@@ -400,7 +400,7 @@ pub fn serum3_place_order(
             Serum3Side::Ask => {
                 require_msg_typed!(
                     limit_price_in_dollar <= base_oracle_f64 * band_factor,
-                    MangoError::Serum3PriceBandExceeded,
+                    MangoError::SpotPriceBandExceeded,
                     "ask price {} must be smaller than {} ({}% of oracle)",
                     limit_price,
                     base_oracle_f64 * band_factor / quote_oracle_f64,
@@ -425,26 +425,16 @@ pub fn serum3_place_order(
     // Check the receiver's reduce only flag.
     //
     // Note that all orders on the book executing can still cause a net deposit. That's because
-    // the total serum3 potential amount assumes all reserved amounts convert at the current
+    // the total spot potential amount assumes all reserved amounts convert at the current
     // oracle price.
     //
-    // This also requires that all serum3 oos that touch the receiver_token are avaliable in the
+    // This also requires that all spot oos that touch the receiver_token are avaliable in the
     // health cache. We make this a general requirement to avoid surprises.
-    for serum3 in account.active_serum3_orders() {
-        if serum3.base_token_index == receiver_token_index
-            || serum3.quote_token_index == receiver_token_index
-        {
-            require_msg!(
-                health_cache.serum3_infos.iter().any(|s3| s3.market_index == serum3.market_index),
-                "health cache is missing serum3 info {} involving receiver token {}; passed banks and oracles?",
-                serum3.market_index, receiver_token_index
-            );
-        }
-    }
+    health_cache.check_has_all_spot_infos_for_token(&account.borrow(), receiver_token_index)?;
     if receiver_bank_reduce_only {
         let balance = health_cache.token_info(receiver_token_index)?.balance_spot;
         let potential =
-            health_cache.total_serum3_potential(HealthType::Maint, receiver_token_index)?;
+            health_cache.total_spot_potential(HealthType::Maint, receiver_token_index)?;
         require_msg_typed!(
             balance + potential < 1,
             MangoError::TokenInReduceOnlyMode,
@@ -490,6 +480,20 @@ impl OODifference {
             self.free_quote_change,
         )
     }
+
+    pub fn recompute_health_cache_openbook_v2_state(
+        &self,
+        health_cache: &mut HealthCache,
+        openbook_account: &OpenbookV2Orders,
+        open_orders: &openbook_v2::state::OpenOrdersAccount,
+    ) -> Result<()> {
+        health_cache.recompute_openbook_v2_info(
+            openbook_account,
+            open_orders,
+            self.free_base_change,
+            self.free_quote_change,
+        )
+    }
 }
 
 pub struct VaultDifference {
@@ -512,10 +516,10 @@ impl VaultDifference {
 /// Called in apply_settle_changes() and place_order to adjust token positions after
 /// changing the vault balances
 /// Also logs changes to token balances
-fn apply_vault_difference(
+pub fn apply_vault_difference(
     account_pk: Pubkey,
     account: &mut MangoAccountRefMut,
-    serum_market_index: Serum3MarketIndex,
+    spot_market_index: SpotMarketIndex,
     bank: &mut Bank,
     vault_after: u64,
     vault_before: u64,
@@ -540,16 +544,32 @@ fn apply_vault_difference(
         .to_num::<u64>();
 
     let indexed_position = position.indexed_position;
-    let market = account.serum3_orders_mut(serum_market_index).unwrap();
     let borrows_without_fee;
-    if bank.token_index == market.base_token_index {
-        borrows_without_fee = &mut market.base_borrows_without_fee;
-    } else if bank.token_index == market.quote_token_index {
-        borrows_without_fee = &mut market.quote_borrows_without_fee;
-    } else {
-        return Err(error_msg!(
-            "assert failed: apply_vault_difference called with bad token index"
-        ));
+    match spot_market_index {
+        SpotMarketIndex::Serum3(index) => {
+            let market = account.serum3_orders_mut(index).unwrap();
+            if bank.token_index == market.base_token_index {
+                borrows_without_fee = &mut market.base_borrows_without_fee;
+            } else if bank.token_index == market.quote_token_index {
+                borrows_without_fee = &mut market.quote_borrows_without_fee;
+            } else {
+                return Err(error_msg!(
+                    "assert failed: apply_vault_difference called with bad token index"
+                ));
+            };
+        }
+        SpotMarketIndex::OpenbookV2(index) => {
+            let market = account.openbook_v2_orders_mut(index).unwrap();
+            if bank.token_index == market.base_token_index {
+                borrows_without_fee = &mut market.base_borrows_without_fee;
+            } else if bank.token_index == market.quote_token_index {
+                borrows_without_fee = &mut market.quote_borrows_without_fee;
+            } else {
+                return Err(error_msg!(
+                    "assert failed: apply_vault_difference called with bad token index"
+                ));
+            };
+        }
     };
 
     // Only for place: Add to potential borrow amount
@@ -635,7 +655,7 @@ pub fn apply_settle_changes(
     let base_difference = apply_vault_difference(
         account_pk,
         account,
-        serum_market.market_index,
+        SpotMarketIndex::Serum3(serum_market.market_index),
         base_bank,
         after_base_vault,
         before_base_vault,
@@ -643,7 +663,7 @@ pub fn apply_settle_changes(
     let quote_difference = apply_vault_difference(
         account_pk,
         account,
-        serum_market.market_index,
+        SpotMarketIndex::Serum3(serum_market.market_index),
         quote_bank,
         after_quote_vault_adjusted,
         before_quote_vault,

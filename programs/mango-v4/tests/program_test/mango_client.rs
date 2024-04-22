@@ -7,7 +7,8 @@ use anchor_spl::token::{Token, TokenAccount};
 use fixed::types::I80F48;
 use itertools::Itertools;
 use mango_v4::accounts_ix::{
-    HealthCheckKind, InterestRateParams, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+    HealthCheckKind, InterestRateParams, OpenbookV2PlaceOrderType, OpenbookV2SelfTradeBehavior,
+    OpenbookV2Side, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
 };
 use mango_v4::state::{MangoAccount, MangoAccountValue};
 use solana_program::instruction::Instruction;
@@ -310,6 +311,7 @@ async fn derive_health_check_remaining_account_metas(
     }
 
     let serum_oos = account.active_serum3_orders().map(|&s| s.open_orders);
+    let openbook_oos = account.active_openbook_v2_orders().map(|&s| s.open_orders);
 
     let to_account_meta = |pubkey| AccountMeta {
         pubkey,
@@ -328,6 +330,7 @@ async fn derive_health_check_remaining_account_metas(
         .chain(perp_markets.map(to_account_meta))
         .chain(perp_oracles.into_iter().map(to_account_meta))
         .chain(serum_oos.map(to_account_meta))
+        .chain(openbook_oos.map(to_account_meta))
         .collect()
 }
 
@@ -1992,6 +1995,7 @@ pub struct AccountCreateInstruction {
     pub perp_count: u8,
     pub perp_oo_count: u8,
     pub token_conditional_swap_count: u8,
+    pub openbook_v2_count: u8,
     pub group: Pubkey,
     pub owner: TestKeypair,
     pub payer: TestKeypair,
@@ -2001,10 +2005,11 @@ impl Default for AccountCreateInstruction {
         AccountCreateInstruction {
             account_num: 0,
             token_count: 8,
-            serum3_count: 4,
+            serum3_count: 2,
             perp_count: 4,
             perp_oo_count: 16,
             token_conditional_swap_count: 1,
+            openbook_v2_count: 2,
             group: Default::default(),
             owner: Default::default(),
             payer: Default::default(),
@@ -2014,7 +2019,7 @@ impl Default for AccountCreateInstruction {
 #[async_trait::async_trait(?Send)]
 impl ClientInstruction for AccountCreateInstruction {
     type Accounts = mango_v4::accounts::AccountCreate;
-    type Instruction = mango_v4::instruction::AccountCreateV2;
+    type Instruction = mango_v4::instruction::AccountCreateV3;
     async fn to_instruction(
         &self,
         _account_loader: &(impl ClientAccountLoader + 'async_trait),
@@ -2027,6 +2032,7 @@ impl ClientInstruction for AccountCreateInstruction {
             perp_count: self.perp_count,
             perp_oo_count: self.perp_oo_count,
             token_conditional_swap_count: self.token_conditional_swap_count,
+            openbook_v2_count: self.openbook_v2_count,
             name: "my_mango_account".to_string(),
         };
 
@@ -5087,6 +5093,707 @@ impl ClientInstruction for TokenConditionalSwapStartInstruction {
 
     fn signers(&self) -> Vec<TestKeypair> {
         vec![self.liqor_owner]
+    }
+}
+
+pub struct OpenbookV2RegisterMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
+
+    pub openbook_v2_program: Pubkey,
+    pub openbook_v2_market_external: Pubkey,
+
+    pub base_bank: Pubkey,
+    pub quote_bank: Pubkey,
+
+    pub market_index: OpenbookV2MarketIndex,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2RegisterMarketInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2RegisterMarket;
+    type Instruction = mango_v4::instruction::OpenbookV2RegisterMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {
+            market_index: self.market_index,
+            name: "UUU/usdc".to_string(),
+            oracle_price_band: f32::MAX,
+        };
+
+        let openbook_v2_market = Pubkey::find_program_address(
+            &[
+                b"OpenbookV2Market".as_ref(),
+                self.group.as_ref(),
+                self.openbook_v2_market_external.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let index_reservation = Pubkey::find_program_address(
+            &[
+                b"OpenbookV2Index".as_ref(),
+                self.group.as_ref(),
+                &self.market_index.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            openbook_v2_program: self.openbook_v2_program,
+            openbook_v2_market_external: self.openbook_v2_market_external,
+            openbook_v2_market,
+            index_reservation,
+            base_bank: self.base_bank,
+            quote_bank: self.quote_bank,
+            payer: self.payer.pubkey(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin, self.payer]
+    }
+}
+
+pub fn openbook_v2_edit_market_instruction_default() -> mango_v4::instruction::OpenbookV2EditMarket
+{
+    mango_v4::instruction::OpenbookV2EditMarket {
+        reduce_only_opt: None,
+        force_close_opt: None,
+        name_opt: None,
+        oracle_price_band_opt: None,
+    }
+}
+
+pub struct OpenbookV2EditMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub market: Pubkey,
+    pub options: mango_v4::instruction::OpenbookV2EditMarket,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2EditMarketInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2EditMarket;
+    type Instruction = mango_v4::instruction::OpenbookV2EditMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            market: self.market,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &self.options);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct OpenbookV2DeregisterMarketInstruction {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
+
+    pub openbook_v2_market_external: Pubkey,
+
+    pub market_index: OpenbookV2MarketIndex,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2DeregisterMarketInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2DeregisterMarket;
+    type Instruction = mango_v4::instruction::OpenbookV2DeregisterMarket;
+    async fn to_instruction(
+        &self,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let openbook_v2_market = Pubkey::find_program_address(
+            &[
+                b"OpenbookV2Market".as_ref(),
+                self.group.as_ref(),
+                self.openbook_v2_market_external.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let index_reservation = Pubkey::find_program_address(
+            &[
+                b"OpenbookV2Index".as_ref(),
+                self.group.as_ref(),
+                &self.market_index.to_le_bytes(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            openbook_v2_market,
+            index_reservation,
+            sol_destination: self.payer.pubkey(),
+            token_program: Token::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin]
+    }
+}
+
+pub struct OpenbookV2CreateOpenOrdersInstruction {
+    pub group: Pubkey,
+    pub payer: TestKeypair,
+    pub owner: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+    pub openbook_v2_program: Pubkey,
+    pub openbook_v2_market_external: Pubkey,
+
+    pub next_open_orders_index: u32,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2CreateOpenOrdersInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2CreateOpenOrders;
+    type Instruction = mango_v4::instruction::OpenbookV2CreateOpenOrders;
+    async fn to_instruction(
+        &self,
+        _account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {};
+
+        let open_orders_indexer = Pubkey::find_program_address(
+            &[b"OpenOrdersIndexer".as_ref(), self.account.as_ref()],
+            &openbook_program_id,
+        )
+        .0;
+
+        let open_orders_account = Pubkey::find_program_address(
+            &[
+                b"OpenOrders".as_ref(),
+                self.account.as_ref(),
+                &(self.next_open_orders_index).to_le_bytes(),
+            ],
+            &openbook_program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            account: self.account,
+            open_orders_indexer,
+            open_orders_account,
+            openbook_v2_program: self.openbook_v2_program,
+            openbook_v2_market_external: self.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            payer: self.payer.pubkey(),
+            authority: self.owner.pubkey(),
+            system_program: System::id(),
+            rent: Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer, self.owner]
+    }
+}
+
+pub struct OpenbookV2PlaceOrderInstruction {
+    pub owner: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+
+    pub side: OpenbookV2Side,
+    pub price_lots: i64,
+    pub max_base_lots: i64,
+    pub max_quote_lots_including_fees: i64,
+    pub client_order_id: u64,
+    pub order_type: OpenbookV2PlaceOrderType,
+    pub self_trade_behavior: OpenbookV2SelfTradeBehavior,
+    pub reduce_only: bool,
+    pub expiry_timestamp: u64,
+    pub limit: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2PlaceOrderInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2PlaceOrder;
+    type Instruction = mango_v4::instruction::OpenbookV2PlaceOrder;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let instruction = Self::Instruction {
+            side: self.side,
+            price_lots: self.price_lots,
+            max_base_lots: self.max_base_lots,
+            max_quote_lots_including_fees: self.max_quote_lots_including_fees,
+            client_order_id: self.client_order_id,
+            order_type: self.order_type,
+            reduce_only: self.reduce_only,
+            expiry_timestamp: self.expiry_timestamp,
+            self_trade_behavior: self.self_trade_behavior,
+            limit: self.limit,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+
+        let quote_info =
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
+        let base_info =
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
+
+        let (payer_bank, payer_vault, receiver_bank, market_vault) = match self.side {
+            OpenbookV2Side::Ask => (
+                base_info.banks[0],
+                base_info.vaults[0],
+                quote_info.banks[0],
+                external_market.market_base_vault,
+            ),
+            OpenbookV2Side::Bid => (
+                quote_info.banks[0],
+                quote_info.vaults[0],
+                base_info.banks[0],
+                external_market.market_quote_vault,
+            ),
+        };
+
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
+
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            open_orders: open_orders_account,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+            event_heap: external_market.event_heap,
+            payer_bank,
+            payer_vault,
+            receiver_bank,
+            market_vault,
+            market_vault_signer: external_market.market_authority,
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct OpenbookV2CancelOrderInstruction {
+    pub payer: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+
+    pub side: OpenbookV2Side,
+
+    pub order_id: u128,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2CancelOrderInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2CancelOrder;
+    type Instruction = mango_v4::instruction::OpenbookV2CancelOrder;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {
+            side: self.side,
+            order_id: self.order_id,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.payer.pubkey(),
+            open_orders: open_orders_account,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
+    }
+}
+
+pub struct OpenbookV2CancelAllOrdersInstruction {
+    pub payer: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+
+    pub side_opt: Option<OpenbookV2Side>,
+    pub limit: u8,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2CancelAllOrdersInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2CancelOrder;
+    type Instruction = mango_v4::instruction::OpenbookV2CancelAllOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {
+            side_opt: self.side_opt,
+            limit: self.limit,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.payer.pubkey(),
+            open_orders: open_orders_account,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
+    }
+}
+
+pub struct OpenbookV2SettleFundsInstruction {
+    pub owner: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+
+    pub fees_to_dao: bool,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2SettleFundsInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2SettleFunds;
+    type Instruction = mango_v4::instruction::OpenbookV2SettleFunds;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {
+            fees_to_dao: self.fees_to_dao,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+        let quote_info =
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
+        let base_info =
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
+
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            open_orders: open_orders_account,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            market_base_vault: external_market.market_base_vault,
+            market_quote_vault: external_market.market_quote_vault,
+            market_vault_signer: external_market.market_authority,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
+            quote_oracle: quote_info.oracle,
+            base_oracle: base_info.oracle,
+            token_program: Token::id(),
+            system_program: System::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct OpenbookV2CloseOpenOrdersInstruction {
+    pub owner: TestKeypair,
+    pub account: Pubkey,
+    pub sol_destination: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2CloseOpenOrdersInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2CloseOpenOrders;
+    type Instruction = mango_v4::instruction::OpenbookV2CloseOpenOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {};
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+
+        let quote_info =
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
+        let base_info =
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
+
+        let open_orders_indexer = Pubkey::find_program_address(
+            &[b"OpenOrdersIndexer".as_ref(), self.account.as_ref()],
+            &openbook_program_id,
+        )
+        .0;
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.owner.pubkey(),
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            quote_bank: quote_info.first_bank(),
+            base_bank: base_info.first_bank(),
+            open_orders_indexer,
+            open_orders_account,
+            sol_destination: self.sol_destination,
+            system_program: System::id(),
+            token_program: Token::id(),
+        };
+
+        println!(
+            "{:?}",
+            vec![
+                account.fixed.group,
+                self.account,
+                self.owner.pubkey(),
+                openbook_program_id,
+                market.openbook_v2_market_external,
+                self.openbook_v2_market,
+                quote_info.first_bank(),
+                base_info.first_bank(),
+                open_orders_indexer,
+                open_orders_account,
+                self.sol_destination,
+                System::id(),
+                Token::id(),
+            ]
+        );
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.owner]
+    }
+}
+
+pub struct OpenbookV2LiqForceCancelInstruction {
+    pub account: Pubkey,
+    pub payer: TestKeypair,
+
+    pub openbook_v2_market: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2LiqForceCancelInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2LiqForceCancelOrders;
+    type Instruction = mango_v4::instruction::OpenbookV2LiqForceCancelOrders;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction { limit: 10 };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let quote_info =
+            get_mint_info_by_token_index(account_loader, &account, market.quote_token_index).await;
+        let base_info =
+            get_mint_info_by_token_index(account_loader, &account, market.base_token_index).await;
+
+        let open_orders = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let health_check_metas =
+            derive_health_check_remaining_account_metas(account_loader, &account, None, true, None)
+                .await;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            payer: self.payer.pubkey(),
+            open_orders,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+            event_heap: external_market.event_heap,
+            market_base_vault: external_market.market_base_vault,
+            market_quote_vault: external_market.market_quote_vault,
+            market_vault_signer: external_market.market_authority,
+            quote_bank: quote_info.first_bank(),
+            quote_vault: quote_info.first_vault(),
+            base_bank: base_info.first_bank(),
+            base_vault: base_info.first_vault(),
+            system_program: System::id(),
+            token_program: Token::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        instruction.accounts.extend(health_check_metas.into_iter());
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
     }
 }
 

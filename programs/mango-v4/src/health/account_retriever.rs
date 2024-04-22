@@ -1,7 +1,9 @@
 use anchor_lang::prelude::*;
+use anchor_lang::Discriminator;
 use anchor_lang::ZeroCopy;
 
 use fixed::types::I80F48;
+use openbook_v2::state::OpenOrdersAccount;
 use serum_dex::state::OpenOrders;
 
 use std::cell::Ref;
@@ -37,6 +39,11 @@ pub trait AccountRetriever {
     ) -> Result<(&Bank, I80F48)>;
 
     fn serum_oo(&self, active_serum_oo_index: usize, key: &Pubkey) -> Result<&OpenOrders>;
+    fn openbook_oo(
+        &self,
+        active_openbook_oo_index: usize,
+        key: &Pubkey,
+    ) -> Result<&OpenOrdersAccount>;
 
     fn perp_market_and_oracle_price(
         &self,
@@ -61,6 +68,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub n_perps: usize,
     pub begin_perp: usize,
     pub begin_serum3: usize,
+    pub begin_openbook_v2: usize,
     pub staleness_slot: Option<u64>,
     pub begin_fallback_oracles: usize,
     pub usdc_oracle_index: Option<usize>,
@@ -120,14 +128,16 @@ pub fn new_fixed_order_account_retriever_inner<'a, 'info>(
     n_banks: usize,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_serum3_len = account.active_serum3_orders().count();
+    let active_openbook_v2_len = account.active_openbook_v2_orders().count();
     let active_perp_len = account.active_perp_positions().count();
     let expected_ais = n_banks * 2 // banks + oracles
         + active_perp_len * 2 // PerpMarkets + Oracles
-        + active_serum3_len; // open_orders
+        + active_serum3_len // open_orders
+        + active_openbook_v2_len; // open_orders
     require_msg_typed!(ais.len() >= expected_ais, MangoError::InvalidHealthAccountCount,
-        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos)",
+        "received {} accounts but expected {} ({} banks, {} bank oracles, {} perp markets, {} perp oracles, {} serum3 oos, {} obv2 oos)",
         ais.len(), expected_ais,
-        n_banks, n_banks, active_perp_len, active_perp_len, active_serum3_len
+        n_banks, n_banks, active_perp_len, active_perp_len, active_serum3_len, active_openbook_v2_len
     );
     let usdc_oracle_index = ais[..]
         .iter()
@@ -142,6 +152,7 @@ pub fn new_fixed_order_account_retriever_inner<'a, 'info>(
         n_perps: active_perp_len,
         begin_perp: n_banks * 2,
         begin_serum3: n_banks * 2 + active_perp_len * 2,
+        begin_openbook_v2: n_banks * 2 + active_perp_len * 2 + active_serum3_len,
         staleness_slot: Some(now_slot),
         begin_fallback_oracles: expected_ais,
         usdc_oracle_index,
@@ -292,6 +303,27 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
             )
         })
     }
+
+    fn openbook_oo(
+        &self,
+        active_openbook_oo_index: usize,
+        key: &Pubkey,
+    ) -> Result<&OpenOrdersAccount> {
+        let openbook_oo_index = self.begin_openbook_v2 + active_openbook_oo_index;
+        let ai = &self.ais[openbook_oo_index];
+        (|| {
+            require_keys_eq!(*key, *ai.key());
+            let loaded = ai.load::<OpenOrdersAccount>()?;
+            Ok(loaded)
+        })()
+        .with_context(|| {
+            format!(
+                "loading openbook open orders with health account index {}, passed account {}",
+                openbook_oo_index,
+                ai.key(),
+            )
+        })
+    }
 }
 
 pub struct ScannedBanksAndOracles<'a, 'info> {
@@ -404,6 +436,7 @@ impl<'a, 'info> ScannedBanksAndOracles<'a, 'info> {
 /// - an unknown number of PerpMarket accounts
 /// - the same number of oracles in the same order as the perp markets
 /// - an unknown number of serum3 OpenOrders accounts
+/// - an unknown number of openbook_v2 OpenOrders accounts
 /// - an unknown number of fallback oracle accounts
 /// and retrieves accounts needed for the health computation by doing a linear
 /// scan for each request.
@@ -411,7 +444,7 @@ pub struct ScanningAccountRetriever<'a, 'info> {
     banks_and_oracles: ScannedBanksAndOracles<'a, 'info>,
     perp_markets: Vec<AccountInfoRef<'a, 'info>>,
     perp_oracles: Vec<AccountInfoRef<'a, 'info>>,
-    serum3_oos: Vec<AccountInfoRef<'a, 'info>>,
+    spot_oos: Vec<AccountInfoRef<'a, 'info>>,
     perp_index_map: HashMap<PerpMarketIndex, usize>,
 }
 
@@ -497,7 +530,16 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
                     && serum3_cpi::has_serum_header(&x.data.borrow())
             })
             .count();
-        let fallback_oracles_start = serum3_start + n_serum3;
+        let openbook_v2_start = serum3_start + n_serum3;
+        let n_openbook_v2 = ais[openbook_v2_start..]
+            .iter()
+            .take_while(|x| {
+                x.data_len() == std::mem::size_of::<openbook_v2::state::OpenOrdersAccount>() + 8
+                    && x.data.borrow()[0..8]
+                        == openbook_v2::state::OpenOrdersAccount::discriminator()
+            })
+            .count();
+        let fallback_oracles_start = openbook_v2_start + n_openbook_v2;
         let usd_oracle_index = ais[fallback_oracles_start..]
             .iter()
             .position(|o| o.key == &pyth_mainnet_usdc_oracle::ID);
@@ -517,7 +559,7 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
             },
             perp_markets: AccountInfoRef::borrow_slice(&ais[perps_start..perp_oracles_start])?,
             perp_oracles: AccountInfoRef::borrow_slice(&ais[perp_oracles_start..serum3_start])?,
-            serum3_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..fallback_oracles_start])?,
+            spot_oos: AccountInfoRef::borrow_slice(&ais[serum3_start..fallback_oracles_start])?,
             perp_index_map,
         })
     }
@@ -560,11 +602,21 @@ impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
 
     pub fn scanned_serum_oo(&self, key: &Pubkey) -> Result<&OpenOrders> {
         let oo = self
-            .serum3_oos
+            .spot_oos
             .iter()
             .find(|ai| ai.key == key)
             .ok_or_else(|| error_msg!("no serum3 open orders for key {}", key))?;
         serum3_cpi::load_open_orders(oo)
+    }
+
+    pub fn scanned_openbook_oo(&self, key: &Pubkey) -> Result<&OpenOrdersAccount> {
+        let oo = self
+            .spot_oos
+            .iter()
+            .find(|ai| ai.key == key)
+            .ok_or_else(|| error_msg!("no openbook open orders for key {}", key))?;
+        let loaded = oo.load::<OpenOrdersAccount>()?;
+        Ok(loaded)
     }
 
     pub fn into_banks_and_oracles(self) -> ScannedBanksAndOracles<'a, 'info> {
@@ -598,6 +650,10 @@ impl<'a, 'info> AccountRetriever for ScanningAccountRetriever<'a, 'info> {
     fn serum_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrders> {
         self.scanned_serum_oo(key)
     }
+
+    fn openbook_oo(&self, _account_index: usize, key: &Pubkey) -> Result<&OpenOrdersAccount> {
+        self.scanned_openbook_oo(key)
+    }
 }
 
 #[cfg(test)]
@@ -606,6 +662,7 @@ mod tests {
 
     use super::super::test::*;
     use super::*;
+    use openbook_v2::state::OpenOrdersAccount;
     use serum_dex::state::OpenOrders;
     use std::convert::identity;
 
@@ -625,6 +682,10 @@ mod tests {
         let mut oo1 = TestAccount::<OpenOrders>::new_zeroed();
         let oo1key = oo1.pubkey;
         oo1.data().native_pc_total = 20;
+
+        let mut oo2 = TestAccount::<OpenOrdersAccount>::new_zeroed();
+        let oo2key = oo2.pubkey;
+        oo2.data().position.asks_base_lots = 21;
 
         let mut perp1 = mock_perp_market(
             group,
@@ -657,6 +718,7 @@ mod tests {
             oracle2_account_info,
             oracle1_account_info,
             oo1.as_account_info(),
+            oo2.as_account_info(),
         ];
 
         let mut retriever =
@@ -668,7 +730,7 @@ mod tests {
         assert_eq!(retriever.perp_markets.len(), 2);
         assert_eq!(retriever.perp_oracles.len(), 2);
         assert_eq!(retriever.perp_index_map.len(), 2);
-        assert_eq!(retriever.serum3_oos.len(), 1);
+        assert_eq!(retriever.spot_oos.len(), 2);
 
         {
             let (b1, o1, opt_b2o2) = retriever.banks_mut_and_oracles(1, 4).unwrap();
@@ -703,10 +765,22 @@ mod tests {
             assert_eq!(o, 5 * I80F48::ONE);
         }
 
-        let oo = retriever.serum_oo(0, &oo1key).unwrap();
-        assert_eq!(identity(oo.native_pc_total), 20);
+        let oo1 = retriever.serum_oo(0, &oo1key).unwrap();
+        assert_eq!(identity(oo1.native_pc_total), 20);
 
         assert!(retriever.serum_oo(1, &Pubkey::default()).is_err());
+
+        let oo2 = retriever.openbook_oo(0, &oo2key).unwrap();
+        assert_eq!(identity(oo2.position.asks_base_lots), 21);
+
+        assert!(retriever.openbook_oo(1, &Pubkey::default()).is_err());
+
+        // check retrieval fails when using the wrong function for the account type
+        retriever
+            .serum_oo(0, &oo2key)
+            .map(|_| "should fail to load serum3 oo")
+            .unwrap_err();
+        retriever.openbook_oo(0, &oo1key).unwrap_err();
 
         let (perp, oracle_price) = retriever
             .perp_market_and_oracle_price(&group, 0, 9)

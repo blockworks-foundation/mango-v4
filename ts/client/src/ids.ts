@@ -7,6 +7,7 @@ export class Id {
     public name: string,
     public publicKey: string,
     public serum3ProgramId: string,
+    public openbookV2ProgramId: string,
     public mangoProgramId: string,
     public banks: {
       name: string;
@@ -19,6 +20,12 @@ export class Id {
     public stubOracles: { name: string; publicKey: string }[],
     public mintInfos: { name: string; publicKey: string }[],
     public serum3Markets: {
+      name: string;
+      publicKey: string;
+      active: boolean;
+      marketExternal: string;
+    }[],
+    public openbookV2Markets: {
       name: string;
       publicKey: string;
       active: boolean;
@@ -63,6 +70,24 @@ export class Id {
     );
   }
 
+  public getOpenbookV2Markets(): PublicKey[] {
+    return Array.from(
+      this.openbookV2Markets
+        .filter((openbookV2Market) => openbookV2Market.active)
+        .map((openbookV2Market) => new PublicKey(openbookV2Market.publicKey)),
+    );
+  }
+
+  public getOpenbookV2ExternalMarkets(): PublicKey[] {
+    return Array.from(
+      this.openbookV2Markets
+        .filter((openbookV2Market) => openbookV2Market.active)
+        .map(
+          (openbookV2Market) => new PublicKey(openbookV2Market.marketExternal),
+        ),
+    );
+  }
+
   public getPerpMarkets(): PublicKey[] {
     return Array.from(
       this.perpMarkets.map((perpMarket) => new PublicKey(perpMarket.publicKey)),
@@ -78,11 +103,13 @@ export class Id {
       groupConfig.name,
       groupConfig.publicKey,
       groupConfig.serum3ProgramId,
+      groupConfig.openbookV2ProgramId,
       groupConfig.mangoProgramId,
       groupConfig['banks'],
       groupConfig['stubOracles'],
       groupConfig['mintInfos'],
       groupConfig['serum3Markets'],
+      groupConfig['openbookV2Markets'],
       groupConfig['perpMarkets'],
     );
   }
@@ -99,11 +126,13 @@ export class Id {
       groupConfig.name,
       groupConfig.publicKey,
       groupConfig.serum3ProgramId,
+      groupConfig.openbookV2ProgramId,
       groupConfig.mangoProgramId,
       groupConfig['banks'],
       groupConfig['stubOracles'],
       groupConfig['mintInfos'],
       groupConfig['serum3Markets'],
+      groupConfig['openbookV2Markets'],
       groupConfig['perpMarkets'],
     );
   }
@@ -117,11 +146,13 @@ export class Id {
       (group) => group.publicKey === groupPk.toString(),
     );
 
+    // todo-pan: api won't return obv2 stuff yet
     return new Id(
       groupConfig.cluster as Cluster,
       groupConfig.name,
       groupConfig.publicKey,
       groupConfig.serum3ProgramId,
+      groupConfig.openbookV2ProgramId,
       groupConfig.mangoProgramId,
       groupConfig.tokens.flatMap((t) =>
         t.banks.map((b) => ({
@@ -149,6 +180,12 @@ export class Id {
         name: s.name,
         publicKey: s.publicKey,
         marketExternal: s.serumMarketExternal,
+        active: s.active,
+      })),
+      groupConfig.openbookV2Markets.map((s) => ({
+        name: s.name,
+        publicKey: s.publicKey,
+        marketExternal: s.openbookMarketExternal,
         active: s.active,
       })),
       groupConfig.perpMarkets.map((p) => ({

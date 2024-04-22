@@ -25,7 +25,7 @@ See DEVELOPING.md and FAQ-DEV.md
 
 ### Dependencies
 
-- rust version 1.69.0
+- rust version 1.70.0
 - solana-cli 1.16.7
 - anchor-cli 0.28.0
 - npm 8.1.2

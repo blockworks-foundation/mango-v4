@@ -1,7 +1,8 @@
 #![cfg(test)]
 
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, Discriminator};
 use fixed::types::I80F48;
+use openbook_v2::state::OpenOrdersAccount;
 use serum_dex::state::OpenOrders;
 use std::cell::RefCell;
 use std::mem::size_of;
@@ -61,6 +62,18 @@ impl<T: MyZeroCopy> TestAccount<T> {
     }
 
     pub fn data(&mut self) -> &mut T {
+        bytemuck::from_bytes_mut(&mut self.bytes[8..])
+    }
+}
+
+impl TestAccount<OpenOrdersAccount> {
+    pub fn new_zeroed() -> Self {
+        let mut bytes = vec![0u8; 8 + size_of::<OpenOrdersAccount>()];
+        bytes[0..8].copy_from_slice(&openbook_v2::state::OpenOrdersAccount::discriminator());
+        Self::new(bytes, openbook_v2::ID)
+    }
+
+    pub fn data(&mut self) -> &mut OpenOrdersAccount {
         bytemuck::from_bytes_mut(&mut self.bytes[8..])
     }
 }

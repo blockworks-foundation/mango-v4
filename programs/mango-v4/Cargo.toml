@@ -1,6 +1,6 @@
 [package]
 name = "mango-v4"
-version = "0.24.0"
+version = "0.25.0"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -52,9 +52,7 @@ switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 
 
-openbook-v2 = { git = "https://github.com/openbook-dex/openbook-v2.git", features = [
-    "no-entrypoint",
-] }
+openbook-v2 = { workspace = true, features = ["no-entrypoint", "cpi", "enable-gpl"] }
 
 
 [dev-dependencies]

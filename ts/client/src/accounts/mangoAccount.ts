@@ -1,7 +1,8 @@
-import { AnchorProvider, BN } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { OpenOrdersAccount, OpenBookV2Client } from '@openbook-dex/openbook-v2';
+import { AccountInfo, Keypair, PublicKey } from '@solana/web3.js';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -12,6 +13,7 @@ import {
   ZERO_I80F48,
 } from '../numbers/I80F48';
 import {
+  EmptyWallet,
   U64_MAX_BN,
   deepClone,
   roundTo5,
@@ -30,6 +32,7 @@ export class MangoAccount {
   public name: string;
   public tokens: TokenPosition[];
   public serum3: Serum3Orders[];
+  public openbookV2: OpenbookV2Orders[];
   public perps: PerpPosition[];
   public perpOpenOrders: PerpOo[];
   public tokenConditionalSwaps: TokenConditionalSwap[];
@@ -55,6 +58,7 @@ export class MangoAccount {
       headerVersion: number;
       tokens: unknown;
       serum3: unknown;
+      openbookV2: unknown;
       perps: unknown;
       perpOpenOrders: unknown;
       tokenConditionalSwaps: unknown;
@@ -80,10 +84,12 @@ export class MangoAccount {
       obj.headerVersion,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
+      obj.openbookV2 as OpenbookV2PositionDto[],
       obj.perps as PerpPositionDto[],
       obj.perpOpenOrders as PerpOoDto[],
       obj.tokenConditionalSwaps as TokenConditionalSwapDto[],
       new Map(), // serum3OosMapByMarketIndex
+      new Map(), // openbookV2OosMapByMarketIndex
     );
   }
 
@@ -107,14 +113,17 @@ export class MangoAccount {
     public headerVersion: number,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
+    openbookV2: OpenbookV2PositionDto[],
     perps: PerpPositionDto[],
     perpOpenOrders: PerpOoDto[],
     tokenConditionalSwaps: TokenConditionalSwapDto[],
     public serum3OosMapByMarketIndex: Map<number, OpenOrders>,
+    public openbookV2OosMapByMarketIndex: Map<number, OpenOrdersAccount>,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
     this.tokens = tokens.map((dto) => TokenPosition.from(dto));
     this.serum3 = serum3.map((dto) => Serum3Orders.from(dto));
+    this.openbookV2 = openbookV2.map((dto) => OpenbookV2Orders.from(dto));
     this.perps = perps.map((dto) => PerpPosition.from(dto));
     this.perpOpenOrders = perpOpenOrders.map((dto) => PerpOo.from(dto));
     this.tokenConditionalSwaps = tokenConditionalSwaps.map((dto) =>
@@ -125,6 +134,7 @@ export class MangoAccount {
   public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this.publicKey);
     await mangoAccount.reloadSerum3OpenOrders(client);
+    await mangoAccount.reloadOpenbookV2OpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
@@ -134,6 +144,7 @@ export class MangoAccount {
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
     await resp?.value.reloadSerum3OpenOrders(client);
+    await resp?.value.reloadOpenbookV2OpenOrders(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
   }
@@ -166,6 +177,43 @@ export class MangoAccount {
     return this;
   }
 
+  async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
+    const openbookClient = new OpenBookV2Client(
+      new AnchorProvider(
+        client.connection,
+        new EmptyWallet(Keypair.generate()),
+        {
+          commitment: client.connection.commitment,
+        },
+      ),
+    ); // readonly client for deserializing accounts
+    const openbookV2Active = this.openbookV2Active();
+    if (!openbookV2Active.length) return this;
+    const ais =
+      await client.program.provider.connection.getMultipleAccountsInfo(
+        openbookV2Active.map((openbookV2) => openbookV2.openOrders),
+      );
+    this.openbookV2OosMapByMarketIndex = new Map(
+      Array.from(
+        ais.map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
+            );
+          }
+          const oo =
+            openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+              'openOrdersAccount',
+              ai.data,
+            );
+          return [openbookV2Active[i].marketIndex, oo];
+        }),
+      ),
+    );
+
+    return this;
+  }
+
   loadSerum3OpenOrders(serum3OosMapByOo: Map<string, OpenOrders>): void {
     const serum3Active = this.serum3Active();
     if (!serum3Active.length) return;
@@ -173,6 +221,24 @@ export class MangoAccount {
       Array.from(
         serum3Active.map((mangoOo) => {
           const oo = serum3OosMapByOo.get(mangoOo.openOrders.toBase58());
+          if (!oo) {
+            throw new Error(`Undefined open orders for ${mangoOo.openOrders}`);
+          }
+          return [mangoOo.marketIndex, oo];
+        }),
+      ),
+    );
+  }
+
+  loadOpenbookV2OpenOrders(
+    openbookV2OosMapByOo: Map<string, OpenOrdersAccount>,
+  ): void {
+    const openbookV2Active = this.openbookV2Active();
+    if (!openbookV2Active.length) return;
+    this.openbookV2OosMapByMarketIndex = new Map(
+      Array.from(
+        openbookV2Active.map((mangoOo) => {
+          const oo = openbookV2OosMapByOo.get(mangoOo.openOrders.toBase58());
           if (!oo) {
             throw new Error(`Undefined open orders for ${mangoOo.openOrders}`);
           }
@@ -211,6 +277,10 @@ export class MangoAccount {
     return this.serum3.filter((serum3) => serum3.isActive());
   }
 
+  public openbookV2Active(): OpenbookV2Orders[] {
+    return this.openbookV2.filter((openbookV2) => openbookV2.isActive());
+  }
+
   public tokenConditionalSwapsActive(): TokenConditionalSwap[] {
     return this.tokenConditionalSwaps.filter((tcs) => tcs.isConfigured);
   }
@@ -245,6 +315,12 @@ export class MangoAccount {
     return this.serum3.find((sa) => sa.marketIndex == marketIndex);
   }
 
+  public getOpenbookV2Account(
+    marketIndex: MarketIndex,
+  ): OpenbookV2Orders | undefined {
+    return this.openbookV2.find((sa) => sa.marketIndex == marketIndex);
+  }
+
   public getPerpPosition(
     perpMarketIndex: PerpMarketIndex,
   ): PerpPosition | undefined {
@@ -270,7 +346,19 @@ export class MangoAccount {
 
     if (!oo) {
       throw new Error(
-        `Open orders account not loaded for market with marketIndex ${marketIndex}!`,
+        `Serum3 open orders account not loaded for market with marketIndex ${marketIndex}!`,
+      );
+    }
+    return oo;
+  }
+
+  public getOpenbookV2OoAccount(marketIndex: MarketIndex): OpenOrdersAccount {
+    const oo: OpenOrdersAccount | undefined =
+      this.openbookV2OosMapByMarketIndex.get(marketIndex);
+
+    if (!oo) {
+      throw new Error(
+        `Openbook V2 open orders account not loaded for market with marketIndex ${marketIndex}!`,
       );
     }
     return oo;
@@ -306,6 +394,20 @@ export class MangoAccount {
         }
         if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
           bal.add(I80F48.fromI64(oo.quoteTokenFree));
+        }
+      }
+
+      for (const openbookV2Market of Array.from(
+        group.openbookV2MarketsMapByMarketIndex.values(),
+      )) {
+        const oo = this.openbookV2OosMapByMarketIndex.get(
+          openbookV2Market.marketIndex,
+        );
+        if (openbookV2Market.baseTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.position.baseFreeNative));
+        }
+        if (openbookV2Market.quoteTokenIndex == bank.tokenIndex && oo) {
+          bal.add(I80F48.fromI64(oo.position.quoteFreeNative));
         }
       }
       return bal;
@@ -1413,6 +1515,33 @@ export class Serum3Orders {
   }
 }
 
+export class OpenbookV2Orders {
+  static OpenbookV2MarketIndexUnset = 65535;
+  static from(dto: OpenbookV2PositionDto): Serum3Orders {
+    return new OpenbookV2Orders(
+      dto.openOrders,
+      dto.marketIndex as MarketIndex,
+      dto.baseTokenIndex as TokenIndex,
+      dto.quoteTokenIndex as TokenIndex,
+      dto.highestPlacedBidInv,
+      dto.lowestPlacedAsk,
+    );
+  }
+
+  constructor(
+    public openOrders: PublicKey,
+    public marketIndex: MarketIndex,
+    public baseTokenIndex: TokenIndex,
+    public quoteTokenIndex: TokenIndex,
+    public highestPlacedBidInv: number,
+    public lowestPlacedAsk: number,
+  ) {}
+
+  public isActive(): boolean {
+    return this.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset;
+  }
+}
+
 export class Serum3PositionDto {
   constructor(
     public openOrders: PublicKey,
@@ -1425,6 +1554,20 @@ export class Serum3PositionDto {
     public lowestPlacedAsk: number,
     // public baseDepositsReserved: BN,
     // public quoteDepositsReserved: BN,
+    public reserved: number[],
+  ) {}
+}
+
+export class OpenbookV2PositionDto {
+  constructor(
+    public openOrders: PublicKey,
+    public marketIndex: number,
+    public baseBorrowsWithoutFee: BN,
+    public quoteBorrowsWithoutFee: BN,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
+    public highestPlacedBidInv: number,
+    public lowestPlacedAsk: number,
     public reserved: number[],
   ) {}
 }

@@ -1,3 +1,4 @@
+use anchor_lang::Discriminator;
 use jsonrpc_core::futures::StreamExt;
 use jsonrpc_core_client::transports::ws;
 
@@ -43,7 +44,7 @@ async fn feed_data(
         with_context: Some(true),
         account_config: account_info_config.clone(),
     };
-    let open_orders_accounts_config = RpcProgramAccountsConfig {
+    let serum_oo_accounts_config = RpcProgramAccountsConfig {
         // filter for only OpenOrders with v4 authority
         filters: Some(vec![
             RpcFilterType::DataSize(3228), // open orders size
@@ -55,6 +56,25 @@ async fn feed_data(
             )),
             RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
                 45,
+                config.open_orders_authority.to_bytes().to_vec(),
+            )),
+        ]),
+        with_context: Some(true),
+        account_config: account_info_config.clone(),
+    };
+    let obv2_oo_accounts_config = RpcProgramAccountsConfig {
+        // filter for only OpenOrders with the delegate as the mango group
+        // (the individual mango accounts are the owners)
+        filters: Some(vec![
+            RpcFilterType::DataSize(
+                8 + std::mem::size_of::<openbook_v2::state::OpenOrdersAccount>() as u64,
+            ),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                0,
+                openbook_v2::state::OpenOrdersAccount::DISCRIMINATOR.to_vec(),
+            )),
+            RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+                96,
                 config.open_orders_authority.to_bytes().to_vec(),
             )),
         ]),
@@ -86,24 +106,31 @@ async fn feed_data(
         );
     }
 
-    let mut serum3_oo_sub_map = StreamMap::new();
+    let mut spot_oo_sub_map = StreamMap::new();
     for serum_program in config.serum_programs.iter() {
-        serum3_oo_sub_map.insert(
+        spot_oo_sub_map.insert(
             *serum_program,
             client
                 .program_subscribe(
                     serum_program.to_string(),
-                    Some(open_orders_accounts_config.clone()),
+                    Some(serum_oo_accounts_config.clone()),
                 )
                 .map_err_anyhow()?,
         );
     }
+    spot_oo_sub_map.insert(
+        openbook_v2::id(),
+        client
+            .program_subscribe(openbook_v2::id().to_string(), Some(obv2_oo_accounts_config))
+            .map_err_anyhow()?,
+    );
+
     // Make sure the serum3_oo_sub_map does not exit when there's no serum_programs
     let _unused_serum_sender;
     if config.serum_programs.is_empty() {
         let (sender, receiver) = jsonrpc_core::futures::channel::mpsc::unbounded();
         _unused_serum_sender = sender;
-        serum3_oo_sub_map.insert(
+        spot_oo_sub_map.insert(
             Pubkey::default(),
             jsonrpc_core_client::TypedSubscriptionStream::new(receiver, "foo"),
         );
@@ -132,12 +159,12 @@ async fn feed_data(
                     return Ok(());
                 }
             },
-            message = serum3_oo_sub_map.next() => {
+            message = spot_oo_sub_map.next() => {
                 if let Some(data) = message {
                     let response = data.1.map_err_anyhow()?;
                     sender.send(Message::Account(AccountUpdate::from_rpc(response)?)).await.expect("sending must succeed");
                 } else {
-                    warn!("serum stream closed");
+                    warn!("spot oo stream closed");
                     return Ok(());
                 }
             },

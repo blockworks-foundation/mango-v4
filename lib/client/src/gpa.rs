@@ -1,6 +1,8 @@
 use anchor_lang::{AccountDeserialize, Discriminator};
 use futures::{stream, StreamExt};
-use mango_v4::state::{Bank, MangoAccount, MangoAccountValue, MintInfo, PerpMarket, Serum3Market};
+use mango_v4::state::{
+    Bank, MangoAccount, MangoAccountValue, MintInfo, OpenbookV2Market, PerpMarket, Serum3Market,
+};
 
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
@@ -105,6 +107,22 @@ pub async fn fetch_serum3_markets(
     group: Pubkey,
 ) -> anyhow::Result<Vec<(Pubkey, Serum3Market)>> {
     fetch_anchor_accounts::<Serum3Market>(
+        rpc,
+        program,
+        vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(
+            8,
+            group.to_bytes().to_vec(),
+        ))],
+    )
+    .await
+}
+
+pub async fn fetch_openbook_v2_markets(
+    rpc: &RpcClientAsync,
+    program: Pubkey,
+    group: Pubkey,
+) -> anyhow::Result<Vec<(Pubkey, OpenbookV2Market)>> {
+    fetch_anchor_accounts::<OpenbookV2Market>(
         rpc,
         program,
         vec![RpcFilterType::Memcmp(Memcmp::new_raw_bytes(

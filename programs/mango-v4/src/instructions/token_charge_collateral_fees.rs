@@ -52,9 +52,9 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
     // pretend all spot orders are closed and settled and add their funds back to
     // the token positions.
     let mut token_balances = health_cache.effective_token_balances(HealthType::Maint);
-    for s3info in health_cache.serum3_infos.iter() {
-        token_balances[s3info.base_info_index].spot_and_perp += s3info.reserved_base;
-        token_balances[s3info.quote_info_index].spot_and_perp += s3info.reserved_quote;
+    for spot_info in health_cache.spot_infos.iter() {
+        token_balances[spot_info.base_info_index].spot_and_perp += spot_info.reserved_base;
+        token_balances[spot_info.quote_info_index].spot_and_perp += spot_info.reserved_quote;
     }
 
     let mut total_liab_health = I80F48::ZERO;

@@ -182,6 +182,11 @@ async fn feed_snapshots(
             mango_account
                 .active_serum3_orders()
                 .map(|serum3account| serum3account.open_orders)
+                .chain(
+                    mango_account
+                        .active_openbook_v2_orders()
+                        .map(|obv2| obv2.open_orders),
+                )
                 .collect::<Vec<_>>()
         })
         .collect::<Vec<Pubkey>>();

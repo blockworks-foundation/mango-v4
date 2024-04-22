@@ -1,5 +1,5 @@
 use super::*;
-
+use mango_client::StubOracleCloseInstruction;
 // This is an unspecific happy-case test that just runs a few instructions to check
 // that they work in principle. It should be split up / renamed.
 #[tokio::test]
@@ -38,6 +38,7 @@ async fn test_basic() -> Result<(), TransportError> {
             perp_count: 3,
             perp_oo_count: 3,
             token_conditional_swap_count: 3,
+            openbook_v2_count: 3,
             group,
             owner,
             payer,
@@ -339,6 +340,7 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
             perp_count: 3,
             perp_oo_count: 3,
             token_conditional_swap_count: 3,
+            openbook_v2_count: 3,
             group,
             owner,
             payer,
@@ -367,9 +369,9 @@ async fn test_account_size_migration() -> Result<(), TransportError> {
     for _ in 0..10 {
         new_bytes.extend_from_slice(&bytemuck::bytes_of(&PerpPosition::default()));
     }
-    // remove the 64 reserved bytes at the end
+    // remove the 56 reserved bytes at the end
     new_bytes
-        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 64]);
+        .extend_from_slice(&mango_account.dynamic[perp_start..mango_account.dynamic.len() - 56]);
 
     account_raw.data = new_bytes.clone();
     account_raw.lamports = 1_000_000_000; // 1 SOL is enough
@@ -976,6 +978,7 @@ async fn test_sequence_check() -> Result<(), TransportError> {
             perp_count: 3,
             perp_oo_count: 3,
             token_conditional_swap_count: 3,
+            openbook_v2_count: 3,
             group,
             owner,
             payer,

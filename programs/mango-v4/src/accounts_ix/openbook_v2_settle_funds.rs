@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{Token, TokenAccount};
+use openbook_v2::state::OpenOrdersAccount;
 
 use crate::error::*;
 use crate::state::*;
@@ -20,11 +21,11 @@ pub struct OpenbookV2SettleFunds<'info> {
     )]
     pub account: AccountLoader<'info, MangoAccountFixed>,
 
+    #[account(mut)]
     pub authority: Signer<'info>,
 
     #[account(mut)]
-    /// CHECK: Validated inline by checking against the pubkey stored in the account at #2
-    pub open_orders: UncheckedAccount<'info>,
+    pub open_orders: AccountLoader<'info, OpenOrdersAccount>,
 
     #[account(
         has_one = group,
@@ -35,19 +36,17 @@ pub struct OpenbookV2SettleFunds<'info> {
 
     pub openbook_v2_program: Program<'info, OpenbookV2>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        has_one = market_base_vault,
+        has_one = market_quote_vault,
+    )]
     pub openbook_v2_market_external: AccountLoader<'info, Market>,
 
-    #[account(
-        mut,
-        constraint = market_base_vault.mint == base_vault.mint,
-    )]
+    #[account(mut)]
     pub market_base_vault: Box<Account<'info, TokenAccount>>,
 
-    #[account(
-        mut,
-        constraint = market_quote_vault.mint == quote_vault.mint,
-    )]
+    #[account(mut)]
     pub market_quote_vault: Box<Account<'info, TokenAccount>>,
 
     /// needed for the automatic settle_funds call
@@ -67,10 +66,11 @@ pub struct OpenbookV2SettleFunds<'info> {
     #[account(mut)]
     pub base_vault: Box<Account<'info, TokenAccount>>,
 
-    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    /// CHECK: validated against banks at #4
     pub quote_oracle: UncheckedAccount<'info>,
-    /// CHECK: The oracle can be one of several different account types and the pubkey is checked in the parent
+    /// CHECK: validated against banks at #4
     pub base_oracle: UncheckedAccount<'info>,
 
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }

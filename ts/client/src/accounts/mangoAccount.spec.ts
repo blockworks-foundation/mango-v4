@@ -38,6 +38,8 @@ describe('Mango Account', () => {
     [],
     [],
     [],
+    [],
+    new Map(),
     new Map(),
   );
 
@@ -112,6 +114,8 @@ describe('maxWithdraw', () => {
     [],
     [],
     [],
+    [],
+    new Map(),
     new Map(),
   );
   protoAccount.tokens.push(
