@@ -1,5 +1,5 @@
 {
-  "version": "0.24.0",
+  "version": "0.25.0",
   "name": "mango_v4",
   "instructions": [
     {
@@ -6487,7 +6487,10 @@
         {
           "name": "group",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "admin"
+          ]
         },
         {
           "name": "admin",
@@ -7011,7 +7014,11 @@
         {
           "name": "openbookV2MarketExternal",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "relations": [
+            "market_base_vault",
+            "market_quote_vault"
+          ]
         },
         {
           "name": "marketBaseVault",
@@ -7103,7 +7110,7 @@
         },
         {
           "name": "payer",
-          "isMut": false,
+          "isMut": true,
           "isSigner": true
         },
         {
@@ -7128,12 +7135,14 @@
         },
         {
           "name": "openbookV2MarketExternal",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false,
           "relations": [
             "bids",
             "asks",
-            "event_heap"
+            "event_heap",
+            "market_base_vault",
+            "market_quote_vault"
           ]
         },
         {
@@ -7673,7 +7682,7 @@
           {
             "name": "potentialSerumTokens",
             "docs": [
-              "Largest amount of tokens that might be added the the bank based on",
+              "Largest amount of tokens that might be added the bank based on",
               "serum open order execution."
             ],
             "type": "u64"
@@ -7795,7 +7804,7 @@
           {
             "name": "potentialOpenbookTokens",
             "docs": [
-              "Largest amount of tokens that might be added the the bank based on",
+              "Largest amount of tokens that might be added the bank based on",
               "oenbook open order execution."
             ],
             "type": "u64"
@@ -8282,21 +8291,16 @@
             "type": "u16"
           },
           {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
             "name": "reduceOnly",
             "type": "u8"
           },
           {
             "name": "forceClose",
             "type": "u8"
-          },
-          {
-            "name": "padding1",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
           },
           {
             "name": "name",
@@ -8316,21 +8320,8 @@
             "type": "publicKey"
           },
           {
-            "name": "marketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          },
-          {
-            "name": "padding2",
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "name": "registrationTime",
+            "type": "u64"
           },
           {
             "name": "oraclePriceBand",
@@ -8343,15 +8334,15 @@
             "type": "f32"
           },
           {
-            "name": "registrationTime",
-            "type": "u64"
+            "name": "bump",
+            "type": "u8"
           },
           {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                1024
+                1027
               ]
             }
           }
@@ -9518,32 +9509,6 @@
             "type": "u64"
           },
           {
-            "name": "marketIndex",
-            "type": "u16"
-          },
-          {
-            "name": "baseTokenIndex",
-            "docs": [
-              "Store the base/quote token index, so health computations don't need",
-              "to get passed the static SerumMarket to find which tokens a market",
-              "uses and look up the correct oracles."
-            ],
-            "type": "u16"
-          },
-          {
-            "name": "quoteTokenIndex",
-            "type": "u16"
-          },
-          {
-            "name": "padding",
-            "type": {
-              "array": [
-                "u8",
-                2
-              ]
-            }
-          },
-          {
             "name": "highestPlacedBidInv",
             "docs": [
               "Track something like the highest open bid / lowest open ask, in native/native units.",
@@ -9607,11 +9572,28 @@
             "type": "i64"
           },
           {
+            "name": "marketIndex",
+            "type": "u16"
+          },
+          {
+            "name": "baseTokenIndex",
+            "docs": [
+              "Store the base/quote token index, so health computations don't need",
+              "to get passed the static SerumMarket to find which tokens a market",
+              "uses and look up the correct oracles."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "quoteTokenIndex",
+            "type": "u16"
+          },
+          {
             "name": "reserved",
             "type": {
               "array": [
                 "u8",
-                160
+                162
               ]
             }
           }

@@ -2,17 +2,32 @@ import { Idl, IdlError } from '@coral-xyz/anchor';
 import { IdlField, IdlType, IdlTypeDef } from '@coral-xyz/anchor/dist/cjs/idl';
 import fs from 'fs';
 
-const ignoredIx = ['tokenRegister', 'groupEdit', 'tokenEdit'];
+const ignoredIx = [
+  'tokenRegister',
+  'groupEdit',
+  'tokenEdit',
+  'openbookV2EditMarket',
+  'openbookV2RegisterMarket',
+];
 
 const emptyFieldPrefixes = ['padding', 'reserved'];
 
-const skippedErrors = [
-  // The account data layout moved from (v1 or v2) to the v3 layout for all accounts
-  ['AccountSize', 'MangoAccount', 440, 512],
-];
+const skippedErrors = {
+  '0.25.0': [
+    ['Instruction', 'openbookV2CreateOpenOrders'],
+    ['Instruction', 'openbookV2PlaceOrder'],
+    ['Instruction', 'openbookV2PlaceTakerOrder'],
+    ['Instruction', 'openbookV2CancelAllOrders'],
+    ['Account', 'OpenbookV2Market'],
+  ],
+};
 
-function isAllowedError(errorTuple): boolean {
-  return !skippedErrors.some(
+function skipError(newIdl, errorTuple): boolean {
+  const errors = skippedErrors[newIdl.version];
+  if (!errors) {
+    return false;
+  }
+  return errors.some(
     (a) =>
       a.length == errorTuple.length &&
       a.every((value, index) => value === errorTuple[index]),
@@ -31,6 +46,9 @@ function main(): void {
 
   // Old instructions still exist
   for (const oldIx of oldIdl.instructions) {
+    if (skipError(newIdl, ['Instruction', oldIx.name])) {
+      continue;
+    }
     const newIx = newIdl.instructions.find((x) => x.name == oldIx.name);
     if (!newIx) {
       console.log(`Error: instruction '${oldIx.name}' was removed`);
@@ -112,6 +130,9 @@ function main(): void {
   }
 
   for (const oldAcc of oldIdl.accounts ?? []) {
+    if (skipError(newIdl, ['Account', oldAcc.name])) {
+      continue;
+    }
     const newAcc = newIdl.accounts?.find((x) => x.name == oldAcc.name);
 
     // Old accounts still exist
@@ -125,7 +146,7 @@ function main(): void {
     const newSize = accountSize(newIdl, newAcc);
     if (
       oldSize != newSize &&
-      isAllowedError(['AccountSize', oldAcc.name, oldSize, newSize])
+      !skipError(newIdl, ['AccountSize', oldAcc.name, oldSize, newSize])
     ) {
       console.log(`Error: account '${oldAcc.name}' has changed size`);
       hasError = true;
