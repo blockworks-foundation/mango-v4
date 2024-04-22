@@ -472,7 +472,7 @@ impl Rebalancer {
             // Imagine SOL at 0.04 USDC-native per SOL-native: Any amounts below 25 SOL-native
             // would not be worth a single USDC-native.
             //
-            // To avoid errors, we consider all amounts below 2 * (1/oracle) dust and don't try
+            // To avoid errors, we consider all amounts below 1000 * (1/oracle) dust and don't try
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.

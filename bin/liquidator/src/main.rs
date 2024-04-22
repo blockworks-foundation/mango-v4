@@ -116,11 +116,6 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
-    let signer_is_owner = mango_account.fixed.owner == liqor_owner.pubkey();
-    if cli.rebalance == BoolArg::True && !signer_is_owner {
-        warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
-    }
-
     let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
