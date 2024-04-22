@@ -640,7 +640,7 @@ impl MangoClient {
             vec![
                 spl_associated_token_account::instruction::create_associated_token_account_idempotent(
                     &self.owner(),
-                    &self.owner(),
+                    &account.fixed.owner,
                     &mint,
                     &Token::id(),
                 ),
@@ -656,7 +656,7 @@ impl MangoClient {
                                 vault: token.first_vault(),
                                 oracle: token.oracle,
                                 token_account: get_associated_token_address(
-                                    &self.owner(),
+                                    &account.fixed.owner,
                                     &token.mint,
                                 ),
                                 token_program: Token::id(),
