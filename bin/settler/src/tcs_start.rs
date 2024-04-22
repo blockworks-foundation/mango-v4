@@ -142,7 +142,7 @@ impl State {
             }
 
             let txsig = match mango_client
-                .send_and_confirm_owner_tx(instructions.to_instructions())
+                .send_and_confirm_authority_tx(instructions.to_instructions())
                 .await
             {
                 Ok(v) => v,

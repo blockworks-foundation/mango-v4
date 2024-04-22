@@ -126,9 +126,16 @@ async fn main() -> anyhow::Result<()> {
     let mango_oracles = group_context
         .tokens
         .values()
-        .map(|value| value.oracle)
+        .flat_map(|value| {
+            [
+                value.oracle,
+                value.fallback_context.key,
+                value.fallback_context.quote_key,
+            ]
+        })
         .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .unique()
+        .filter(|&k| k != Pubkey::default())
         .collect::<Vec<Pubkey>>();
 
     let serum_programs = group_context

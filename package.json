@@ -27,8 +27,8 @@
     "lint": "eslint ./ts/client/src --ext ts --ext tsx --ext js --quiet",
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
-    "validate": "yarn lint && yarn format",
     "deduplicate": "npx yarn-deduplicate --list --fail",
+    "validate": "yarn lint && yarn format",
     "prepare": "yarn build"
   },
   "devDependencies": {
@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "0.14.15",
-    "@blockworks-foundation/mangolana": "0.0.14",
+    "@blockworks-foundation/mangolana": "0.0.15",
     "@coral-xyz/anchor": "^0.29.0",
     "@openbook-dex/openbook-v2": "^0.1.2",
     "@project-serum/serum": "0.13.65",

@@ -324,7 +324,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
+            .send_and_confirm_authority_tx(liq_ixs.to_instructions())
             .await
             .context("sending perp_liq_base_or_positive_pnl_instruction")?;
         info!(
@@ -370,7 +370,7 @@ impl<'a> LiquidateHelper<'a> {
         liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
+            .send_and_confirm_authority_tx(liq_ixs.to_instructions())
             .await
             .context("sending perp_liq_negative_pnl_or_bankruptcy_instruction")?;
         info!(
@@ -578,7 +578,7 @@ impl<'a> LiquidateHelper<'a> {
 
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
+            .send_and_confirm_authority_tx(liq_ixs.to_instructions())
             .await
             .context("sending liq_token_with_token")?;
         info!(
@@ -635,7 +635,7 @@ impl<'a> LiquidateHelper<'a> {
         liq_ixs.cu = liq_ixs.cu.max(self.config.compute_limit_for_liq_ix);
         let txsig = self
             .client
-            .send_and_confirm_owner_tx(liq_ixs.to_instructions())
+            .send_and_confirm_authority_tx(liq_ixs.to_instructions())
             .await
             .context("sending liq_token_with_token")?;
         info!(

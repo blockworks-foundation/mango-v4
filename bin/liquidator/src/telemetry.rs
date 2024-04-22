@@ -21,9 +21,9 @@ async fn report(client: &MangoClient, min_health_ratio: f64) -> anyhow::Result<(
     })
     .to_string();
 
-    let signature = client.owner.sign_message(message.as_bytes());
+    let signature = client.authority.sign_message(message.as_bytes());
     let payload = serde_json::json!({
-        "wallet_pk": client.owner.pubkey().to_string(),
+        "wallet_pk": client.authority.pubkey().to_string(),
         "message": message,
         "signature": signature.to_string(),
     });

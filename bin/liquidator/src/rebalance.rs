@@ -485,11 +485,11 @@ impl Rebalancer {
             };
 
             let Ok(dust_threshold) = dust_threshold_res
-            else {
-                let e = dust_threshold_res.unwrap_err();
-                error!("Cannot rebalance token {}, probably missing USDC market ? - error: {}", token.name, e);
-                continue;
-            };
+                else {
+                    let e = dust_threshold_res.unwrap_err();
+                    error!("Cannot rebalance token {}, probably missing USDC market ? - error: {}", token.name, e);
+                    continue;
+                };
 
             // Some rebalancing can actually change non-USDC positions (rebalancing to SOL)
             // So re-fetch the current token position amount
@@ -693,7 +693,7 @@ impl Rebalancer {
 
         let txsig = self
             .mango_client
-            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .send_and_confirm_authority_tx(ixs.to_instructions())
             .await?;
 
         info!(
@@ -739,9 +739,9 @@ impl Rebalancer {
         quote: &TokenContext,
     ) -> anyhow::Result<()> {
         let Ok(open_orders) = account.serum3_orders(*market_index).map(|x| x.open_orders)
-        else {
-            return Ok(());
-        };
+            else {
+                return Ok(());
+            };
 
         let oo_acc = self.account_fetcher.fetch_raw(&open_orders)?;
         let oo = serum3_cpi::load_open_orders_bytes(oo_acc.data())?;
@@ -765,7 +765,7 @@ impl Rebalancer {
 
         let txsig = self
             .mango_client
-            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .send_and_confirm_authority_tx(ixs.to_instructions())
             .await?;
 
         info!(
@@ -843,13 +843,13 @@ impl Rebalancer {
     }
 
     #[instrument(
-        skip_all,
-        fields(
-            perp_market_name = perp.name,
-            base_lots = perp_position.base_position_lots(),
-            effective_lots = perp_position.effective_base_position_lots(),
-            quote_native = %perp_position.quote_position_native()
-        )
+    skip_all,
+    fields(
+    perp_market_name = perp.name,
+    base_lots = perp_position.base_position_lots(),
+    effective_lots = perp_position.effective_base_position_lots(),
+    quote_native = %perp_position.quote_position_native()
+    )
     )]
     async fn rebalance_perp(
         &self,
@@ -937,7 +937,7 @@ impl Rebalancer {
 
             let tx_builder = TransactionBuilder {
                 instructions: ixs.to_instructions(),
-                signers: vec![self.mango_client.owner.clone()],
+                signers: vec![self.mango_client.authority.clone()],
                 ..self.mango_client.transaction_builder().await?
             };
 
