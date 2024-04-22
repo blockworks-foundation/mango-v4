@@ -5,6 +5,7 @@ import {
   Provider,
   Wallet,
 } from '@coral-xyz/anchor';
+import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 import { OpenOrders, decodeEventQueue } from '@project-serum/serum';
 import {
   createAccount,
@@ -49,6 +50,15 @@ import {
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
+import {
+  OpenbookV2Market,
+  OpenbookV2OrderType,
+  OpenbookV2SelfTradeBehavior,
+  OpenbookV2Side,
+  baseSizeNumberToLots,
+  generateOpenbookV2MarketExternalVaultSignerAddress,
+  priceNumberToLots,
+} from './accounts/openbookV2';
 import { StubOracle } from './accounts/oracle';
 import {
   FillEvent,
@@ -101,16 +111,6 @@ import {
   sendTransaction,
 } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
-import {
-  OpenbookV2Market,
-  OpenbookV2OrderType,
-  OpenbookV2SelfTradeBehavior,
-  OpenbookV2Side,
-  baseSizeNumberToLots,
-  generateOpenbookV2MarketExternalVaultSignerAddress,
-  priceNumberToLots,
-} from './accounts/openbookV2';
-import { OpenBookV2Client } from '@openbook-dex/openbook-v2';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
 export const PERP_SETTLE_PNL_CU_LIMIT = 400000;
@@ -2989,9 +2989,15 @@ export class MangoClient {
       externalMarketPk.toBase58(),
     )!;
 
-    const openOrdersAccount = mangoAccount.getOpenbookV2Account(
+    const openOrders = mangoAccount.getOpenbookV2Account(
       openbookV2Market.marketIndex,
-    )?.openOrders!;
+    )?.openOrders;
+
+    if (openOrders === undefined) {
+      throw new Error(
+        `No open orders account for market with index ${openbookV2Market.marketIndex}!`,
+      );
+    }
 
     return await this.program.methods
       .openbookV2CloseOpenOrders()
@@ -3005,7 +3011,7 @@ export class MangoClient {
           openbookV2Market.openbookProgram,
           mangoAccount.publicKey,
         ),
-        openOrdersAccount,
+        openOrdersAccount: openOrders,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -3047,7 +3053,13 @@ export class MangoClient {
     )!;
     const openOrders = mangoAccount.getOpenbookV2Account(
       openbookV2Market.marketIndex,
-    )?.openOrders!;
+    )?.openOrders;
+
+    if (openOrders === undefined) {
+      throw new Error(
+        `No open orders account for market with index ${openbookV2Market.marketIndex}!`,
+      );
+    }
 
     const healthRemainingAccounts: PublicKey[] =
       this.buildHealthRemainingAccounts(
@@ -3284,7 +3296,13 @@ export class MangoClient {
 
     const openOrders = mangoAccount.getOpenbookV2Account(
       openbookV2Market.marketIndex,
-    )?.openOrders!;
+    )?.openOrders;
+
+    if (openOrders === undefined) {
+      throw new Error(
+        `No open orders account for market with index ${openbookV2Market.marketIndex}!`,
+      );
+    }
 
     return await this.program.methods
       .openbookV2CancelAllOrders(limit ? limit : 10, side ? side : null)
