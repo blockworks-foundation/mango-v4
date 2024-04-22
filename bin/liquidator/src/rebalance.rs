@@ -644,7 +644,7 @@ impl Rebalancer {
 
             let tx_builder = TransactionBuilder {
                 instructions: ixs.to_instructions(),
-                signers: vec![self.mango_client.owner.clone()],
+                signers: vec![self.mango_client.authority.clone()],
                 ..self.mango_client.transaction_builder().await?
             };
 
