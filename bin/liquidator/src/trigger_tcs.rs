@@ -1202,7 +1202,7 @@ impl Context {
             let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
-                signers: vec![self.mango_client.owner.clone(), fee_payer],
+                signers: vec![self.mango_client.authority.clone(), fee_payer],
                 ..self.mango_client.transaction_builder().await?
             }
         };
