@@ -62,6 +62,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
       tokenConditionalSwaps: unknown;
+      lastCollateralFeeCharge: BN;
     },
   ): MangoAccount {
     return new MangoAccount(
@@ -82,6 +83,7 @@ export class MangoAccount {
       obj.buybackFeesExpiryTimestamp,
       obj.sequenceNumber,
       obj.headerVersion,
+      obj.lastCollateralFeeCharge,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
       obj.openbookV2 as OpenbookV2PositionDto[],
@@ -111,6 +113,7 @@ export class MangoAccount {
     public buybackFeesExpiryTimestamp: BN,
     public sequenceNumber: number,
     public headerVersion: number,
+    public lastCollateralFeeCharge: BN,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     openbookV2: OpenbookV2PositionDto[],
@@ -1762,12 +1765,10 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     const cumulativeFunding = this.getCumulativeFunding(perpMarket);
-    // can't be long and short at the same time
-    if (cumulativeFunding.cumulativeLongFunding !== 0) {
-      return -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding);
-    } else {
-      return toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding);
-    }
+    return (
+      -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding) +
+      toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding)
+    );
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {

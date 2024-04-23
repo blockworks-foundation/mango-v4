@@ -472,7 +472,7 @@ impl Rebalancer {
             // Imagine SOL at 0.04 USDC-native per SOL-native: Any amounts below 25 SOL-native
             // would not be worth a single USDC-native.
             //
-            // To avoid errors, we consider all amounts below 2 * (1/oracle) dust and don't try
+            // To avoid errors, we consider all amounts below 1000 * (1/oracle) dust and don't try
             // to sell them. Instead they will be withdrawn at the end.
             // Purchases will aim to purchase slightly more than is needed, such that we can
             // again withdraw the dust at the end.
@@ -693,7 +693,7 @@ impl Rebalancer {
 
         let txsig = self
             .mango_client
-            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .send_and_confirm_authority_tx(ixs.to_instructions())
             .await?;
 
         info!(
@@ -765,7 +765,7 @@ impl Rebalancer {
 
         let txsig = self
             .mango_client
-            .send_and_confirm_owner_tx(ixs.to_instructions())
+            .send_and_confirm_authority_tx(ixs.to_instructions())
             .await?;
 
         info!(
@@ -937,7 +937,7 @@ impl Rebalancer {
 
             let tx_builder = TransactionBuilder {
                 instructions: ixs.to_instructions(),
-                signers: vec![self.mango_client.owner.clone()],
+                signers: vec![self.mango_client.authority.clone()],
                 ..self.mango_client.transaction_builder().await?
             };
 

@@ -193,7 +193,7 @@ pub async fn loop_update_index_and_rate(
             .map(|token_index| client.context.token(*token_index).name.to_owned())
             .join(",");
 
-        let mut instructions = vec![];
+        let mut instructions = PreparedInstructions::new();
         for token_index in token_indices_clone.iter() {
             let token = client.context.token(*token_index);
             let banks_for_a_token = token.banks();
@@ -225,7 +225,14 @@ pub async fn loop_update_index_and_rate(
 
             ix.accounts.append(&mut banks);
 
-            let sim_result = match client.simulate(vec![ix.clone()]).await {
+            let pix = PreparedInstructions::from_single(
+                ix,
+                client
+                    .context
+                    .compute_estimates
+                    .cu_token_update_index_and_rates,
+            );
+            let sim_result = match client.simulate(pix.clone().to_instructions()).await {
                 Ok(response) => response.value,
                 Err(e) => {
                     error!(token.name, "simulation request error: {e:?}");
@@ -238,28 +245,29 @@ pub async fn loop_update_index_and_rate(
                 continue;
             }
 
-            instructions.push(ix);
+            instructions.append(pix);
         }
+
         let pre = Instant::now();
         let sig_result = client
-            .send_and_confirm_permissionless_tx(instructions)
+            .send_and_confirm_permissionless_tx(instructions.to_instructions())
             .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
             info!(
                 "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                token_names, confirmation_time, e
+                token_names, duration_ms, e
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_TOKENS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                token_names, confirmation_time,
+                token_names, duration_ms,
             );
             info!("{:?}", sig_result);
         }
@@ -358,26 +366,37 @@ pub async fn loop_consume_events(
             }),
         };
 
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_consume_events_base
+                + num_of_events
+                    * client
+                        .context
+                        .compute_estimates
+                        .cu_perp_consume_events_per_event,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_CONSUME_EVENTS_FAILURE.inc();
             info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 num_of_events,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_CONSUME_EVENTS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
-                perp_market.name, confirmation_time, num_of_events,
+                perp_market.name, duration_ms, num_of_events,
             );
             info!("{:?}", sig_result);
         }
@@ -411,25 +430,31 @@ pub async fn loop_update_funding(
             ),
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
         };
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_update_funding,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_FUNDING_FAILURE.inc();
             error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_FUNDING_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
-                perp_market.name, confirmation_time,
+                perp_market.name, duration_ms,
             );
             info!("{:?}", sig_result);
         }

@@ -145,6 +145,10 @@ pub struct ComputeEstimates {
     pub cu_per_charge_collateral_fees_token: u32,
     pub cu_for_sequence_check: u32,
     pub cu_per_associated_token_account_creation: u32,
+    pub cu_perp_update_funding: u32,
+    pub cu_perp_consume_events_base: u32,
+    pub cu_perp_consume_events_per_event: u32,
+    pub cu_token_update_index_and_rates: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -173,6 +177,10 @@ impl Default for ComputeEstimates {
             // measured around 8k, see test_basics
             cu_for_sequence_check: 10_000,
             cu_per_associated_token_account_creation: 21_000,
+            cu_perp_update_funding: 40_000,
+            cu_perp_consume_events_base: 10_000,
+            cu_perp_consume_events_per_event: 18_000,
+            cu_token_update_index_and_rates: 90_000,
         }
     }
 }
