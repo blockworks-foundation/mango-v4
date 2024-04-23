@@ -89,7 +89,7 @@ impl OpenbookV2Cookie {
     pub async fn consume_spot_events(&self, spot_market_cookie: &OpenbookMarketCookie, limit: u8) {
         let event_heap = self
             .solana
-            .get_account::<EventHeap>(spot_market_cookie.event_heap)
+            .get_account_boxed::<EventHeap>(spot_market_cookie.event_heap)
             .await;
         let to_consume = event_heap
             .iter()
