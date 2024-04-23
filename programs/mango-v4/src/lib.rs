@@ -115,6 +115,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn group_change_insurance_fund(ctx: Context<GroupChangeInsuranceFund>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::group_change_insurance_fund(ctx)?;
+        Ok(())
+    }
+
     pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::ix_gate_set(ctx, ix_gate)?;

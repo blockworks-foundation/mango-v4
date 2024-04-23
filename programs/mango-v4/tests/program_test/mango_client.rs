@@ -1917,6 +1917,58 @@ impl ClientInstruction for GroupEdit {
     }
 }
 
+pub struct GroupChangeInsuranceFund {
+    pub group: Pubkey,
+    pub admin: TestKeypair,
+    pub payer: TestKeypair,
+    pub insurance_mint: Pubkey,
+    pub withdraw_destination: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for GroupChangeInsuranceFund {
+    type Accounts = mango_v4::accounts::GroupChangeInsuranceFund;
+    type Instruction = mango_v4::instruction::GroupChangeInsuranceFund;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let group = account_loader.load::<Group>(&self.group).await.unwrap();
+
+        let new_insurance_vault = Pubkey::find_program_address(
+            &[
+                b"InsuranceVault".as_ref(),
+                self.group.as_ref(),
+                self.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+
+        let accounts = Self::Accounts {
+            group: self.group,
+            admin: self.admin.pubkey(),
+            insurance_vault: group.insurance_vault,
+            withdraw_destination: self.withdraw_destination,
+            new_insurance_mint: self.insurance_mint,
+            new_insurance_vault,
+            payer: self.payer.pubkey(),
+            token_program: Token::id(),
+            system_program: System::id(),
+            rent: sysvar::rent::Rent::id(),
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.admin, self.payer]
+    }
+}
+
 pub struct IxGateSetInstruction {
     pub group: Pubkey,
     pub admin: TestKeypair,
@@ -1960,21 +2012,17 @@ impl ClientInstruction for GroupCloseInstruction {
     type Instruction = mango_v4::instruction::GroupClose;
     async fn to_instruction(
         &self,
-        _account_loader: &(impl ClientAccountLoader + 'async_trait),
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
     ) -> (Self::Accounts, instruction::Instruction) {
         let program_id = mango_v4::id();
         let instruction = Self::Instruction {};
 
-        let insurance_vault = Pubkey::find_program_address(
-            &[b"InsuranceVault".as_ref(), self.group.as_ref()],
-            &program_id,
-        )
-        .0;
+        let group = account_loader.load::<Group>(&self.group).await.unwrap();
 
         let accounts = Self::Accounts {
             group: self.group,
             admin: self.admin.pubkey(),
-            insurance_vault,
+            insurance_vault: group.insurance_vault,
             sol_destination: self.sol_destination,
             token_program: Token::id(),
         };
@@ -3259,21 +3307,11 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
             .load_mango_account(&self.liqor)
             .await
             .unwrap();
-        let health_check_metas = derive_liquidation_remaining_account_metas(
-            account_loader,
-            &liqee,
-            &liqor,
-            QUOTE_TOKEN_INDEX,
-            0,
-            liab_mint_info.token_index,
-            0,
-        )
-        .await;
 
         let group_key = liqee.fixed.group;
         let group: Group = account_loader.load(&group_key).await.unwrap();
 
-        let quote_mint_info = Pubkey::find_program_address(
+        let insurance_mint_info = Pubkey::find_program_address(
             &[
                 b"MintInfo".as_ref(),
                 liqee.fixed.group.as_ref(),
@@ -3282,13 +3320,19 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
             &program_id,
         )
         .0;
-        let quote_mint_info: MintInfo = account_loader.load(&quote_mint_info).await.unwrap();
+        let insurance_mint_info: MintInfo =
+            account_loader.load(&insurance_mint_info).await.unwrap();
 
-        let insurance_vault = Pubkey::find_program_address(
-            &[b"InsuranceVault".as_ref(), group_key.as_ref()],
-            &program_id,
+        let health_check_metas = derive_liquidation_remaining_account_metas(
+            account_loader,
+            &liqee,
+            &liqor,
+            insurance_mint_info.token_index,
+            0,
+            liab_mint_info.token_index,
+            0,
         )
-        .0;
+        .await;
 
         let accounts = Self::Accounts {
             group: group_key,
@@ -3296,8 +3340,8 @@ impl ClientInstruction for TokenLiqBankruptcyInstruction {
             liqor: self.liqor,
             liqor_owner: self.liqor_owner.pubkey(),
             liab_mint_info: self.liab_mint_info,
-            quote_vault: quote_mint_info.first_vault(),
-            insurance_vault,
+            quote_vault: insurance_mint_info.first_vault(),
+            insurance_vault: group.insurance_vault,
             token_program: Token::id(),
         };
 
@@ -4350,7 +4394,6 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
         };
 
         let perp_market: PerpMarket = account_loader.load(&self.perp_market).await.unwrap();
-        let group_key = perp_market.group;
         let liqor = account_loader
             .load_mango_account(&self.liqor)
             .await
@@ -4359,23 +4402,36 @@ impl ClientInstruction for PerpLiqNegativePnlOrBankruptcyInstruction {
             .load_mango_account(&self.liqee)
             .await
             .unwrap();
+
+        let group_key = liqee.fixed.group;
+        let group: Group = account_loader.load(&group_key).await.unwrap();
+
+        let insurance_mint_info = Pubkey::find_program_address(
+            &[
+                b"MintInfo".as_ref(),
+                liqee.fixed.group.as_ref(),
+                group.insurance_mint.as_ref(),
+            ],
+            &program_id,
+        )
+        .0;
+        let insurance_mint_info: MintInfo =
+            account_loader.load(&insurance_mint_info).await.unwrap();
+
         let health_check_metas = derive_liquidation_remaining_account_metas(
             account_loader,
             &liqee,
             &liqor,
-            TokenIndex::MAX,
+            insurance_mint_info.token_index,
             0,
             TokenIndex::MAX,
             0,
         )
         .await;
 
-        let group = account_loader.load::<Group>(&group_key).await.unwrap();
         let settle_mint_info =
             get_mint_info_by_token_index(account_loader, &liqee, perp_market.settle_token_index)
                 .await;
-        let insurance_mint_info =
-            get_mint_info_by_token_index(account_loader, &liqee, QUOTE_TOKEN_INDEX).await;
 
         let accounts = Self::Accounts {
             group: group_key,
