@@ -313,6 +313,7 @@ export interface IxGateParams {
   SequenceCheck: boolean;
   HealthCheck: boolean;
   OpenbookV2CancelAllOrders: boolean;
+  GroupChangeInsuranceFund: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -396,6 +397,7 @@ export const TrueIxGateParams: IxGateParams = {
   SequenceCheck: true,
   HealthCheck: true,
   OpenbookV2CancelAllOrders: true,
+  GroupChangeInsuranceFund: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -489,6 +491,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'SequenceCheck', 73);
   toggleIx(ixGate, p, 'HealthCheck', 74);
   toggleIx(ixGate, p, 'OpenbookV2CancelAllOrders', 75);
+  toggleIx(ixGate, p, 'GroupChangeInsuranceFund', 76);
 
   return ixGate;
 }

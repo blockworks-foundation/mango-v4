@@ -327,6 +327,86 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "groupChangeInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "insurance_vault",
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "withdrawDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "new_insurance_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -11410,6 +11490,9 @@ export type MangoV4 = {
           },
           {
             "name": "OpenbookV2CancelAllOrders"
+          },
+          {
+            "name": "GroupChangeInsuranceFund"
           }
         ]
       }
@@ -15205,6 +15288,86 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "groupChangeInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "insurance_vault",
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "withdrawDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "new_insurance_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -26288,6 +26451,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "OpenbookV2CancelAllOrders"
+          },
+          {
+            "name": "GroupChangeInsuranceFund"
           }
         ]
       }
