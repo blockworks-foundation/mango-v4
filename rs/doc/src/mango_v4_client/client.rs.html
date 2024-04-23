@@ -2701,8 +2701,6 @@
 <a href="#2701" id="2701">2701</a>
 <a href="#2702" id="2702">2702</a>
 <a href="#2703" id="2703">2703</a>
-<a href="#2704" id="2704">2704</a>
-<a href="#2705" id="2705">2705</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anchor_client::ClientError::AnchorError;
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
@@ -2730,7 +2728,6 @@
 <span class="kw">use </span>mango_v4::state::{
     Bank, Group, MangoAccountValue, OpenbookV2MarketIndex, OracleAccountInfos, PerpMarket,
     PerpMarketIndex, PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex,
-    INSURANCE_TOKEN_INDEX,
 };
 
 <span class="kw">use </span><span class="kw">crate</span>::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
@@ -4559,13 +4556,13 @@
         <span class="kw">let </span>mango_account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
         <span class="kw">let </span>perp = <span class="self">self</span>.context.perp(market_index);
         <span class="kw">let </span>settle_token_info = <span class="self">self</span>.context.token(perp.settle_token_index);
-        <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token(INSURANCE_TOKEN_INDEX);
+        <span class="kw">let </span>insurance_token_info = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>group.insurance_mint)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>(health_remaining_ams, health_cu) = <span class="self">self
             </span>.derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.<span class="number">1</span>,
-                <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
+                <span class="kw-2">&amp;</span>[insurance_token_info.token_index],
                 <span class="kw-2">&amp;</span>[],
             )
             .<span class="kw">await
@@ -4713,10 +4710,15 @@
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -&gt; anyhow::Result&lt;PreparedInstructions&gt; {
-        <span class="kw">let </span>mango_account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
-        <span class="kw">let </span>quote_token_index = <span class="number">0</span>;
+        <span class="kw">let </span>group = account_fetcher_fetch_anchor_account::&lt;Group&gt;(
+            <span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher,
+            <span class="kw-2">&amp;</span><span class="self">self</span>.context.group,
+        )
+        .<span class="kw">await</span><span class="question-mark">?</span>;
 
-        <span class="kw">let </span>quote_info = <span class="self">self</span>.context.token(quote_token_index);
+        <span class="kw">let </span>mango_account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
+
+        <span class="kw">let </span>insurance_info = <span class="self">self</span>.context.token_by_mint(<span class="kw-2">&amp;</span>group.insurance_mint)<span class="question-mark">?</span>;
         <span class="kw">let </span>liab_info = <span class="self">self</span>.context.token(liab_token_index);
 
         <span class="kw">let </span>bank_remaining_ams = liab_info
@@ -4729,17 +4731,11 @@
             </span>.derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.<span class="number">1</span>,
-                <span class="kw-2">&amp;</span>[INSURANCE_TOKEN_INDEX],
-                <span class="kw-2">&amp;</span>[quote_token_index, liab_token_index],
+                <span class="kw-2">&amp;</span>[insurance_info.token_index],
+                <span class="kw-2">&amp;</span>[insurance_info.token_index, liab_token_index],
             )
             .<span class="kw">await
             </span>.unwrap();
-
-        <span class="kw">let </span>group = account_fetcher_fetch_anchor_account::&lt;Group&gt;(
-            <span class="kw-2">&amp;*</span><span class="self">self</span>.account_fetcher,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.context.group,
-        )
-        .<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let </span>ix = Instruction {
             program_id: mango_v4::id(),
@@ -4751,7 +4747,7 @@
                         liqor: <span class="self">self</span>.mango_account_address,
                         liqor_owner: <span class="self">self</span>.owner(),
                         liab_mint_info: liab_info.mint_info_address,
-                        quote_vault: quote_info.first_vault(),
+                        quote_vault: insurance_info.first_vault(),
                         insurance_vault: group.insurance_vault,
                         token_program: Token::id(),
                     },

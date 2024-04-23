@@ -260,7 +260,7 @@
     <span class="attr">#[account(
         <span class="kw-2">mut</span>,
         has_one = group,
-        constraint = insurance_bank.load()<span class="question-mark">?</span>.token_index == INSURANCE_TOKEN_INDEX
+        constraint = insurance_bank.load()<span class="question-mark">?</span>.mint == insurance_vault.mint,
     )]
     </span><span class="kw">pub </span>insurance_bank: AccountLoader&lt;<span class="lifetime">&#39;info</span>, Bank&gt;,
 
