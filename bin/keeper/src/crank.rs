@@ -23,7 +23,9 @@ use mango_v4_client::{
     RpcAccountFetcher, TransactionBuilder,
 };
 use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
+    commitment_config::CommitmentConfig,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signature::Signature,
@@ -471,9 +473,16 @@ pub async fn loop_charge_collateral_fees(
     }
 
     // Make a new one separate from the mango_client.account_fetcher,
-    // because we don't want cached responses
-    let fetcher = RpcAccountFetcher {
-        rpc: mango_client.client.new_rpc_async(),
+    // because we don't want cached responses and we need a longer timeout
+    let fetcher = {
+        let config = mango_client.client.config();
+        RpcAccountFetcher {
+            rpc: RpcClient::new_with_timeout_and_commitment(
+                config.cluster.url().to_string(),
+                Duration::from_secs(120),
+                CommitmentConfig::confirmed(),
+            ),
+        }
     };
 
     let group: Group = account_fetcher_fetch_anchor_account(&fetcher, &mango_client.context.group)
@@ -528,6 +537,9 @@ async fn charge_collateral_fees_inner(
         .unwrap()
         .as_secs() as u64;
     for (pk, account) in mango_accounts {
+        if account.fixed.group != client.group() {
+            continue;
+        }
         let should_reset =
             collateral_fee_interval == 0 && account.fixed.last_collateral_fee_charge > 0;
         let should_charge = collateral_fee_interval > 0
