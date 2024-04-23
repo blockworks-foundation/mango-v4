@@ -815,6 +815,14 @@
 <a href="#815" id="815">815</a>
 <a href="#816" id="816">816</a>
 <a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
+<a href="#823" id="823">823</a>
+<a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::collections::HashMap;
 
 <span class="kw">use </span>anchor_client::ClientError;
@@ -962,6 +970,10 @@
     <span class="kw">pub </span>cu_per_charge_collateral_fees_token: u32,
     <span class="kw">pub </span>cu_for_sequence_check: u32,
     <span class="kw">pub </span>cu_per_associated_token_account_creation: u32,
+    <span class="kw">pub </span>cu_perp_update_funding: u32,
+    <span class="kw">pub </span>cu_perp_consume_events_base: u32,
+    <span class="kw">pub </span>cu_perp_consume_events_per_event: u32,
+    <span class="kw">pub </span>cu_token_update_index_and_rates: u32,
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>ComputeEstimates {
@@ -990,6 +1002,10 @@
             <span class="comment">// measured around 8k, see test_basics
             </span>cu_for_sequence_check: <span class="number">10_000</span>,
             cu_per_associated_token_account_creation: <span class="number">21_000</span>,
+            cu_perp_update_funding: <span class="number">40_000</span>,
+            cu_perp_consume_events_base: <span class="number">10_000</span>,
+            cu_perp_consume_events_per_event: <span class="number">18_000</span>,
+            cu_token_update_index_and_rates: <span class="number">90_000</span>,
         }
     }
 }

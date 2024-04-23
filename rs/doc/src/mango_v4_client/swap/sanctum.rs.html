@@ -530,14 +530,14 @@
             .map(util::to_writable_account_meta)
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
 
-        <span class="kw">let </span>owner = <span class="self">self</span>.mango_client.owner();
+        <span class="kw">let </span>authority = <span class="self">self</span>.mango_client.authority();
         <span class="kw">let </span>account = <span class="kw-2">&amp;</span><span class="self">self</span>.mango_client.mango_account().<span class="kw">await</span><span class="question-mark">?</span>;
 
         <span class="kw">let </span>token_ams = [source_token.mint, target_token.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(<span class="kw-2">&amp;</span>owner, <span class="kw-2">&amp;</span>mint),
+                    anchor_spl::associated_token::get_associated_token_address(<span class="kw-2">&amp;</span>authority, <span class="kw-2">&amp;</span>mint),
                 )
             })
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
@@ -582,7 +582,7 @@
                 input: input_mint.to_string(),
                 mode: <span class="string">&quot;ExactIn&quot;</span>.to_string(),
                 output_lst_mint: output_mint.to_string(),
-                signer: owner.to_string(),
+                signer: authority.to_string(),
                 swap_src: quote.swap_src.clone(),
             })
             .timeout(<span class="self">self</span>.timeout_duration)
@@ -650,8 +650,8 @@
         <span class="comment">// Ensure the source token account is created (sanctum takes care of the output account)
         </span>instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                <span class="kw-2">&amp;</span>owner,
-                <span class="kw-2">&amp;</span>owner,
+                <span class="kw-2">&amp;</span>authority,
+                <span class="kw-2">&amp;</span>authority,
                 <span class="kw-2">&amp;</span>source_token.mint,
                 <span class="kw-2">&amp;</span>Token::id(),
             ),
@@ -663,7 +663,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
                     <span class="kw-2">&amp;</span>mango_v4::accounts::FlashLoanBegin {
                         account: <span class="self">self</span>.mango_client.mango_account_address,
-                        owner,
+                        owner: authority,
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -690,7 +690,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>ams = anchor_lang::ToAccountMetas::to_account_metas(
                     <span class="kw-2">&amp;</span>mango_v4::accounts::FlashLoanEnd {
                         account: <span class="self">self</span>.mango_client.mango_account_address,
-                        owner,
+                        owner: authority,
                         token_program: Token::id(),
                     },
                     <span class="prelude-val">None</span>,
@@ -714,13 +714,13 @@
         <span class="kw">let </span><span class="kw-2">mut </span>address_lookup_tables = <span class="self">self</span>.mango_client.mango_address_lookup_tables().<span class="kw">await</span><span class="question-mark">?</span>;
         address_lookup_tables.extend(sanctum_alts.into_iter());
 
-        <span class="kw">let </span>payer = owner; <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
+        <span class="kw">let </span>payer = authority; <span class="comment">// maybe use fee_payer? but usually it&#39;s the same
 
         </span><span class="prelude-val">Ok</span>(TransactionBuilder {
             instructions,
             address_lookup_tables,
             payer,
-            signers: <span class="macro">vec!</span>[<span class="self">self</span>.mango_client.owner.clone()],
+            signers: <span class="macro">vec!</span>[<span class="self">self</span>.mango_client.authority.clone()],
             config: <span class="self">self
                 </span>.mango_client
                 .client
