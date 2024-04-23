@@ -26,6 +26,23 @@ pub fn token_liq_bankruptcy(
     let (bank_ais, health_ais) = &ctx.remaining_accounts.split_at(liab_mint_info.num_banks());
     liab_mint_info.verify_banks_ais(bank_ais)?;
 
+    // find the insurance bank token index
+    let insurance_mint = ctx.accounts.insurance_vault.mint;
+    let insurance_token_index = health_ais
+        .iter()
+        .find_map(|ai| {
+            ai.load::<Bank>()
+                .and_then(|b| {
+                    if b.mint == insurance_mint {
+                        Ok(b.token_index)
+                    } else {
+                        Err(MangoError::InvalidBank.into())
+                    }
+                })
+                .ok()
+        })
+        .ok_or_else(|| error_msg!("could not find bank for insurance mint in health accounts"))?;
+
     require_keys_neq!(ctx.accounts.liqor.key(), ctx.accounts.liqee.key());
 
     let mut liqor = ctx.accounts.liqor.load_full_mut()?;
@@ -51,10 +68,10 @@ pub fn token_liq_bankruptcy(
     liqee_health_cache.require_after_phase2_liquidation()?;
     liqee.fixed.set_being_liquidated(true);
 
-    let liab_is_insurance_token = liab_token_index == INSURANCE_TOKEN_INDEX;
-    let (liab_bank, liab_oracle_price, opt_quote_bank_and_price) =
-        account_retriever.banks_mut_and_oracles(liab_token_index, INSURANCE_TOKEN_INDEX)?;
-    assert!(liab_is_insurance_token == opt_quote_bank_and_price.is_none());
+    let liab_is_insurance_token = liab_token_index == insurance_token_index;
+    let (liab_bank, liab_oracle_price, opt_insurance_bank_and_price) =
+        account_retriever.banks_mut_and_oracles(liab_token_index, insurance_token_index)?;
+    assert!(liab_is_insurance_token == opt_insurance_bank_and_price.is_none());
 
     let mut liab_deposit_index = liab_bank.deposit_index;
     let liab_borrow_index = liab_bank.borrow_index;
@@ -76,11 +93,12 @@ pub fn token_liq_bankruptcy(
     // guaranteed positive
     let mut remaining_liab_loss = (-initial_liab_native).min(-liqee_liab_health_balance);
 
-    // We pay for the liab token in quote. Example: SOL is at $20 and USDC is at $2, then for a liab
+    // We pay for the liab token in insurance token.
+    // Example: SOL is at $20 and USDC is at $2, then for a liab
     // of 3 SOL, we'd pay 3 * 20 / 2 * (1+fee) = 30 * (1+fee) USDC.
-    let liab_to_quote_with_fee =
-        if let Some((_quote_bank, quote_price)) = opt_quote_bank_and_price.as_ref() {
-            liab_oracle_price * (I80F48::ONE + liab_bank.liquidation_fee) / quote_price
+    let liab_to_insurance_with_fee =
+        if let Some((_insurance_bank, insurance_price)) = opt_insurance_bank_and_price.as_ref() {
+            liab_oracle_price * (I80F48::ONE + liab_bank.liquidation_fee) / insurance_price
         } else {
             I80F48::ONE
         };
@@ -93,7 +111,7 @@ pub fn token_liq_bankruptcy(
         0
     };
 
-    let insurance_transfer = (liab_transfer_unrounded * liab_to_quote_with_fee)
+    let insurance_transfer = (liab_transfer_unrounded * liab_to_insurance_with_fee)
         .ceil()
         .to_num::<u64>()
         .min(insurance_vault_amount);
@@ -105,7 +123,7 @@ pub fn token_liq_bankruptcy(
     // AUDIT: v3 does this, but it seems bad, because it can make liab_transfer
     // exceed max_liab_transfer due to the ceil() above! Otoh, not doing it would allow
     // liquidators to exploit the insurance fund for 1 native token each call.
-    let liab_transfer = insurance_transfer_i80f48 / liab_to_quote_with_fee;
+    let liab_transfer = insurance_transfer_i80f48 / liab_to_insurance_with_fee;
 
     let mut liqee_liab_active = true;
     if insurance_transfer > 0 {
@@ -115,36 +133,36 @@ pub fn token_liq_bankruptcy(
         // update correctly even if dusting happened
         remaining_liab_loss -= liqee_liab.native(liab_bank) - initial_liab_native;
 
-        // move insurance assets into quote bank
+        // move insurance assets into insurance bank
         let group_seeds = group_seeds!(group);
         token::transfer(
             ctx.accounts.transfer_ctx().with_signer(&[group_seeds]),
             insurance_transfer,
         )?;
 
-        // move quote assets into liqor and withdraw liab assets
-        if let Some((quote_bank, _)) = opt_quote_bank_and_price {
+        // move insurance assets into liqor and withdraw liab assets
+        if let Some((insurance_bank, _)) = opt_insurance_bank_and_price {
             // account constraint #2 a)
-            require_keys_eq!(quote_bank.vault, ctx.accounts.quote_vault.key());
-            require_keys_eq!(quote_bank.mint, ctx.accounts.insurance_vault.mint);
+            require_keys_eq!(insurance_bank.vault, ctx.accounts.quote_vault.key());
+            require_keys_eq!(insurance_bank.mint, ctx.accounts.insurance_vault.mint);
 
-            let quote_deposit_index = quote_bank.deposit_index;
-            let quote_borrow_index = quote_bank.borrow_index;
+            let insurance_deposit_index = insurance_bank.deposit_index;
+            let insurance_borrow_index = insurance_bank.borrow_index;
 
             // credit the liqor
-            let (liqor_quote, liqor_quote_raw_token_index, _) =
-                liqor.ensure_token_position(INSURANCE_TOKEN_INDEX)?;
-            let liqor_quote_active =
-                quote_bank.deposit(liqor_quote, insurance_transfer_i80f48, now_ts)?;
+            let (liqor_insurance, liqor_insurance_raw_token_index, _) =
+                liqor.ensure_token_position(insurance_token_index)?;
+            let liqor_insurance_active =
+                insurance_bank.deposit(liqor_insurance, insurance_transfer_i80f48, now_ts)?;
 
-            // liqor quote
+            // liqor insurance
             emit_stack(TokenBalanceLog {
                 mango_group: ctx.accounts.group.key(),
                 mango_account: ctx.accounts.liqor.key(),
-                token_index: INSURANCE_TOKEN_INDEX,
-                indexed_position: liqor_quote.indexed_position.to_bits(),
-                deposit_index: quote_deposit_index.to_bits(),
-                borrow_index: quote_borrow_index.to_bits(),
+                token_index: insurance_token_index,
+                indexed_position: liqor_insurance.indexed_position.to_bits(),
+                deposit_index: insurance_deposit_index.to_bits(),
+                borrow_index: insurance_borrow_index.to_bits(),
             });
 
             // transfer liab from liqee to liqor
@@ -189,9 +207,9 @@ pub fn token_liq_bankruptcy(
                 });
             }
 
-            if !liqor_quote_active {
+            if !liqor_insurance_active {
                 liqor.deactivate_token_position_and_log(
-                    liqor_quote_raw_token_index,
+                    liqor_insurance_raw_token_index,
                     ctx.accounts.liqor.key(),
                 );
             }
@@ -202,12 +220,12 @@ pub fn token_liq_bankruptcy(
                 );
             }
         } else {
-            // For liab_token_index == INSURANCE_TOKEN_INDEX: the insurance fund deposits directly into liqee,
+            // For liab_token_index == insurance_token_index: the insurance fund deposits directly into liqee,
             // without a fee or the liqor being involved
             // account constraint #2 b)
             require_keys_eq!(liab_bank.vault, ctx.accounts.quote_vault.key());
-            require_eq!(liab_token_index, INSURANCE_TOKEN_INDEX);
-            require_eq!(liab_to_quote_with_fee, I80F48::ONE);
+            require_eq!(liab_token_index, insurance_token_index);
+            require_eq!(liab_to_insurance_with_fee, I80F48::ONE);
             require_eq!(insurance_transfer_i80f48, liab_transfer);
         }
     }
@@ -287,7 +305,7 @@ pub fn token_liq_bankruptcy(
         liab_token_index,
         initial_liab_native: initial_liab_native.to_bits(),
         liab_price: liab_oracle_price.to_bits(),
-        insurance_token_index: INSURANCE_TOKEN_INDEX,
+        insurance_token_index,
         insurance_transfer: insurance_transfer_i80f48.to_bits(),
         socialized_loss: socialized_loss.to_bits(),
         starting_liab_deposit_index: starting_deposit_index.to_bits(),

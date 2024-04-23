@@ -36,7 +36,7 @@ export interface TokenRegisterParams {
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
   oracleConfig: {
-    confFilter: 0,
+    confFilter: 0.3,
     maxStalenessSlots: null,
   },
   groupInsuranceFund: false,
@@ -312,6 +312,7 @@ export interface IxGateParams {
   TokenForceWithdraw: boolean;
   SequenceCheck: boolean;
   HealthCheck: boolean;
+  GroupChangeInsuranceFund: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -394,6 +395,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenForceWithdraw: true,
   SequenceCheck: true,
   HealthCheck: true,
+  GroupChangeInsuranceFund: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -486,6 +488,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
   toggleIx(ixGate, p, 'SequenceCheck', 73);
   toggleIx(ixGate, p, 'HealthCheck', 74);
+  toggleIx(ixGate, p, 'GroupChangeInsuranceFund', 76);
 
   return ixGate;
 }

@@ -24,7 +24,7 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthCache;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
-    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex,
 };
 
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
@@ -1763,13 +1763,13 @@ impl MangoClient {
         let mango_account = &self.mango_account().await?;
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
-        let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
+        let insurance_token_info = self.context.token_by_mint(&group.insurance_mint)?;
 
         let (health_remaining_ams, health_cu) = self
             .derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.1,
-                &[INSURANCE_TOKEN_INDEX],
+                &[insurance_token_info.token_index],
                 &[],
             )
             .await
@@ -1917,10 +1917,15 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
-        let mango_account = &self.mango_account().await?;
-        let quote_token_index = 0;
+        let group = account_fetcher_fetch_anchor_account::<Group>(
+            &*self.account_fetcher,
+            &self.context.group,
+        )
+        .await?;
 
-        let quote_info = self.context.token(quote_token_index);
+        let mango_account = &self.mango_account().await?;
+
+        let insurance_info = self.context.token_by_mint(&group.insurance_mint)?;
         let liab_info = self.context.token(liab_token_index);
 
         let bank_remaining_ams = liab_info
@@ -1933,8 +1938,8 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.1,
-                &[INSURANCE_TOKEN_INDEX],
-                &[quote_token_index, liab_token_index],
+                &[insurance_info.token_index],
+                &[insurance_info.token_index, liab_token_index],
             )
             .await
             .unwrap();
@@ -1955,7 +1960,7 @@ impl MangoClient {
                         liqor: self.mango_account_address,
                         liqor_owner: self.authority(),
                         liab_mint_info: liab_info.mint_info_address,
-                        quote_vault: quote_info.first_vault(),
+                        quote_vault: insurance_info.first_vault(),
                         insurance_vault: group.insurance_vault,
                         token_program: Token::id(),
                     },
