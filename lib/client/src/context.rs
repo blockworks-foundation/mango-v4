@@ -272,7 +272,7 @@ impl MangoGroupContext {
                         name: String::new(),
                         mint_info_address: *pk,
                         decimals: u8::MAX,
-                        closed: false,
+                        closed: true,
                         banks: mi.banks,
                         vaults: mi.vaults,
                         oracle: mi.oracle,
@@ -299,7 +299,7 @@ impl MangoGroupContext {
         let fallback_oracle_accounts = fetch_multiple_accounts(rpc, &fallback_keys[..]).await?;
         for (index, (_, bank)) in bank_tuples.iter().enumerate() {
             let token = tokens.get_mut(&bank.token_index).unwrap();
-            token.closed =
+            token.closed &=
                 bank.native_deposits() == 0 && bank.native_borrows() == 0 && bank.reduce_only == 1;
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
