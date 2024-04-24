@@ -104,7 +104,9 @@ pub async fn runner(
     let handles1 = mango_client
         .context
         .tokens
-        .keys()
+        .values()
+        .filter(|t| t.closed == false)
+        .map(|t| &t.token_index)
         // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
