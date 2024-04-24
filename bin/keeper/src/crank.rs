@@ -105,7 +105,7 @@ pub async fn runner(
         .context
         .tokens
         .values()
-        .filter(|t| t.closed == false)
+        .filter(|t| !t.closed)
         .map(|t| &t.token_index)
         // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
