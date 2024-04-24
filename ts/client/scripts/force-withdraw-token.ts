@@ -38,16 +38,6 @@ async function forceWithdrawTokens(): Promise<void> {
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const forceWithdrawBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
-  if (forceWithdrawBank.reduceOnly != 2) {
-    throw new Error(
-      `Unexpected reduce only state ${forceWithdrawBank.reduceOnly}`,
-    );
-  }
-  if (!forceWithdrawBank.forceWithdraw) {
-    throw new Error(
-      `Unexpected force withdraw state ${forceWithdrawBank.forceWithdraw}`,
-    );
-  }
 
   // Get all mango accounts with deposits for given token
   const mangoAccountsWithDeposits = (

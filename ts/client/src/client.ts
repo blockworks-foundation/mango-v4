@@ -725,7 +725,11 @@ export class MangoClient {
         vault: bank.vault,
         oracle: bank.oracle,
         ownerAtaTokenAccount,
-        alternateOwnerTokenAccount,
+        alternateOwnerTokenAccount: alternateOwnerTokenAccount.equals(
+          PublicKey.default,
+        )
+          ? ownerAtaTokenAccount
+          : alternateOwnerTokenAccount,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [
