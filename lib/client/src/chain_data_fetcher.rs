@@ -248,10 +248,11 @@ impl crate::AccountFetcher for AccountFetcher {
         keys: &[Pubkey],
     ) -> anyhow::Result<Vec<(Pubkey, AccountSharedData)>> {
         let chain_data = self.chain_data.read().unwrap();
-        Ok(keys
+        let result = keys
             .iter()
-            .map(|pk| (*pk, chain_data.account(pk).unwrap().account.clone()))
-            .collect::<Vec<_>>())
+            .map(|pk| chain_data.account(pk).map(|x| (*pk, x.account.clone())))
+            .collect::<anyhow::Result<Vec<_>>>();
+        result
     }
 
     async fn get_slot(&self) -> anyhow::Result<u64> {
