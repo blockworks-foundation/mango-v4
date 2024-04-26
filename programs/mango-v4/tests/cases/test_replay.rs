@@ -82,7 +82,7 @@ async fn test_replay() -> anyhow::Result<()> {
     let known_accounts = [
         "ComputeBudget111111111111111111111111111111",
         "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-        "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg",
+        "zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25",
         "11111111111111111111111111111111",
         "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
     ]
