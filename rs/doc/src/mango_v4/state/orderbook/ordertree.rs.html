@@ -678,6 +678,7 @@
 <a href="#678" id="678">678</a>
 <a href="#679" id="679">679</a>
 <a href="#680" id="680">680</a>
+<a href="#681" id="681">681</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>bytemuck::{cast, cast_mut, cast_ref};
 
@@ -942,7 +943,8 @@
             },
             padding: Default::default(),
             next: <span class="self">self</span>.free_list_head,
-            reserved: [<span class="number">0</span>; <span class="number">112</span>],
+            reserved: [<span class="number">0</span>; <span class="number">104</span>],
+            force_align: <span class="number">0</span>,
         });
 
         <span class="self">self</span>.free_list_len += <span class="number">1</span>;

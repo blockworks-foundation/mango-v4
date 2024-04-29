@@ -434,7 +434,15 @@
 <a href="#434" id="434">434</a>
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::size_of;
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>std::mem::{align_of, size_of};
 
 <span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>bytemuck::{cast_mut, cast_ref};
@@ -688,7 +696,9 @@
     <span class="kw">pub</span>(<span class="kw">crate</span>) tag: u8, <span class="comment">// NodeTag
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) padding: [u8; <span class="number">3</span>],
     <span class="kw">pub</span>(<span class="kw">crate</span>) next: NodeHandle,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) reserved: [u8; NODE_SIZE - <span class="number">8</span>],
+    <span class="kw">pub</span>(<span class="kw">crate</span>) reserved: [u8; NODE_SIZE - <span class="number">16</span>],
+    <span class="comment">// ensure that FreeNode has the same 8-byte alignment as other nodes
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) force_align: u64,
 }
 <span class="macro">const_assert_eq!</span>(size_of::&lt;FreeNode&gt;(), NODE_SIZE);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;FreeNode&gt;() % <span class="number">8</span>, <span class="number">0</span>);
@@ -697,13 +707,19 @@
 #[derive(bytemuck::Pod, bytemuck::Zeroable)]
 </span><span class="kw">pub struct </span>AnyNode {
     <span class="kw">pub </span>tag: u8,
-    <span class="kw">pub </span>data: [u8; <span class="number">119</span>],
+    <span class="kw">pub </span>data: [u8; <span class="number">111</span>],
+    <span class="comment">// ensure that AnyNode has the same 8-byte alignment as other nodes
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) force_align: u64,
 }
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyNode&gt;(), NODE_SIZE);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyNode&gt;() % <span class="number">8</span>, <span class="number">0</span>);
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyNode&gt;(), size_of::&lt;InnerNode&gt;());
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyNode&gt;(), size_of::&lt;LeafNode&gt;());
 <span class="macro">const_assert_eq!</span>(size_of::&lt;AnyNode&gt;(), size_of::&lt;FreeNode&gt;());
+<span class="macro">const_assert_eq!</span>(align_of::&lt;AnyNode&gt;(), <span class="number">8</span>);
+<span class="macro">const_assert_eq!</span>(align_of::&lt;AnyNode&gt;(), align_of::&lt;InnerNode&gt;());
+<span class="macro">const_assert_eq!</span>(align_of::&lt;AnyNode&gt;(), align_of::&lt;LeafNode&gt;());
+<span class="macro">const_assert_eq!</span>(align_of::&lt;AnyNode&gt;(), align_of::&lt;FreeNode&gt;());
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>NodeRef&lt;<span class="lifetime">&#39;a</span>&gt; {
     Inner(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>InnerNode),
