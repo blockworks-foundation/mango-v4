@@ -104,13 +104,13 @@ async function updateSpotMarkets(): Promise<void> {
         console.log(`${bank.name} ${markets.map((m) => m.name).join(',')}`);
       }
 
-      markets.forEach(async (m) => {
+      for (const market of markets) {
         const ix = await client.program.methods
           .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
           .accounts({
             group: group.publicKey,
             admin: group.admin,
-            market: m.publicKey,
+            market: market.publicKey,
           })
           .instruction();
 
@@ -118,14 +118,14 @@ async function updateSpotMarkets(): Promise<void> {
         const simulated = await client.connection.simulateTransaction(tx);
 
         if (simulated.value.err) {
-          console.log('error', simulated.value.logs);
+          console.log('sim error', simulated.value.logs);
           throw simulated.value.logs;
         }
 
         if (change) {
           instructions.push(ix);
         }
-      });
+      }
     });
 
   const tokenOwnerRecordPk = await getTokenOwnerRecordAddress(
