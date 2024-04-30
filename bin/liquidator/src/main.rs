@@ -256,6 +256,8 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default(),
         use_sanctum: cli.sanctum_enabled == BoolArg::True,
         allow_withdraws: true,
+        perp_twap_interval: Duration::from_secs(5),
+        perp_twap_max_quote: 100_000_000_000, // $100k
     };
     rebalance_config.validate(&mango_client.context);
 
@@ -265,6 +267,7 @@ async fn main() -> anyhow::Result<()> {
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
         sanctum_supported_mints: HashSet::<Pubkey>::new(),
+        state: Arc::new(RwLock::new(Default::default())),
     });
 
     let mut liquidation = Box::new(LiquidationState {
