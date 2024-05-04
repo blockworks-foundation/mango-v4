@@ -449,7 +449,9 @@ impl Rebalancer {
     }
 
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
-        self.close_and_settle_all_openbook_orders().await?;
+        if self.config.use_limit_order {
+            self.close_and_settle_all_openbook_orders().await?;
+        }
         let account = self.mango_account()?;
 
         // TODO: configurable?
