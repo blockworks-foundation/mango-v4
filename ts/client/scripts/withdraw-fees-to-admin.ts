@@ -71,6 +71,7 @@ async function updateSpotMarkets(): Promise<void> {
     .map((banks) => banks[0])
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
+      // todo need to create wsol ata
       if (bank.name == 'SOL') {
         return;
       }
