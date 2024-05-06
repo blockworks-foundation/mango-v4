@@ -450,7 +450,7 @@ impl Rebalancer {
 
     async fn rebalance_tokens(&self) -> anyhow::Result<()> {
         if self.config.use_limit_order {
-            self.close_and_settle_all_openbook_orders().await?;
+            self.settle_and_close_all_openbook_orders().await?;
         }
         let account = self.mango_account()?;
 
@@ -712,7 +712,7 @@ impl Rebalancer {
         Ok(())
     }
 
-    async fn close_and_settle_all_openbook_orders(&self) -> anyhow::Result<()> {
+    async fn settle_and_close_all_openbook_orders(&self) -> anyhow::Result<()> {
         let account = self.mango_account()?;
 
         for x in Self::shuffle(account.active_serum3_orders()) {
@@ -725,14 +725,14 @@ impl Rebalancer {
                 .serum3_markets
                 .get(&market_index)
                 .expect("no openbook market found");
-            self.close_and_settle_openbook_orders(&account, token, &market_index, market, quote)
+            self.settle_and_close_openbook_orders(&account, token, &market_index, market, quote)
                 .await?;
         }
         Ok(())
     }
 
     /// This will only settle funds when there is no more active orders (avoid doing too many settle tx)
-    async fn close_and_settle_openbook_orders(
+    async fn settle_and_close_openbook_orders(
         &self,
         account: &Box<MangoAccountValue>,
         token: &TokenContext,
@@ -762,8 +762,8 @@ impl Rebalancer {
             .serum3_close_open_orders_instruction(*market_index);
 
         let mut ixs = PreparedInstructions::new();
-        ixs.append(close_ixs);
         ixs.append(settle_ixs);
+        ixs.append(close_ixs);
 
         let txsig = self
             .mango_client
