@@ -145,7 +145,7 @@ export class HealthCache {
         );
       }
 
-      return SpotInfo.fromOoModifyingTokenInfos(
+      return SpotInfo.fromSerum3OoModifyingTokenInfos(
         serum3,
         baseInfoIndex,
         baseInfo,
@@ -1570,7 +1570,7 @@ export class SpotInfo {
     );
   }
 
-  static fromOoModifyingTokenInfos(
+  static fromSerum3OoModifyingTokenInfos(
     serumAccount: Serum3Orders,
     baseInfoIndex: number,
     baseInfo: TokenInfo,

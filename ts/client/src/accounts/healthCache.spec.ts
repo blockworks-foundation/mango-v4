@@ -112,7 +112,7 @@ describe('Health Cache', () => {
     const ti1 = TokenInfo.fromBank(sourceBank, I80F48.fromNumber(100));
     const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
 
-    const si1 = SpotInfo.fromOoModifyingTokenInfos(
+    const si1 = SpotInfo.fromSerum3OoModifyingTokenInfos(
       new Serum3Orders(
         PublicKey.default,
         2 as MarketIndex,
@@ -242,7 +242,7 @@ describe('Health Cache', () => {
       const ti2 = TokenInfo.fromBank(bank2, I80F48.fromNumber(fixture.token2));
       const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
 
-      const si1 = SpotInfo.fromOoModifyingTokenInfos(
+      const si1 = SpotInfo.fromSerum3OoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
           2 as MarketIndex,
@@ -265,7 +265,7 @@ describe('Health Cache', () => {
         } as any as OpenOrders,
       );
 
-      const si2 = SpotInfo.fromOoModifyingTokenInfos(
+      const si2 = SpotInfo.fromSerum3OoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
           3 as MarketIndex,
@@ -971,6 +971,7 @@ describe('Health Cache', () => {
             1,
             0,
             0 as MarketIndex,
+            true,
           ),
         ];
 
