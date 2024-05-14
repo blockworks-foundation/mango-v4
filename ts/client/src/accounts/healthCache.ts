@@ -122,7 +122,7 @@ export class HealthCache {
     }
     // Fill the TokenInfo balance with free funds in serum3 oo accounts, and fill
     // the serum3MaxReserved with their reserved funds. Also build Serum3Infos.
-    const serum3Infos = mangoAccount.serum3Active().map((serum3) => {
+    const spotInfos = mangoAccount.serum3Active().map((serum3) => {
       const oo = mangoAccount.getSerum3OoAccount(serum3.marketIndex);
 
       // find the TokenInfos for the market's base and quote tokens
@@ -164,7 +164,7 @@ export class HealthCache {
       return PerpInfo.fromPerpPosition(perpMarket, perpPosition);
     });
 
-    return new HealthCache(tokenInfos, serum3Infos, perpInfos);
+    return new HealthCache(tokenInfos, spotInfos, perpInfos);
   }
 
   computeSerum3Reservations(healthType: HealthType | undefined): {
