@@ -17,7 +17,7 @@ import {
   PerpPosition,
   Serum3Orders,
 } from './mangoAccount';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
@@ -91,7 +91,7 @@ function spotAmountGivenForHealthZero(
 export class HealthCache {
   constructor(
     public tokenInfos: TokenInfo[],
-    public serum3Infos: Serum3Info[],
+    public serum3Infos: SpotInfo[],
     public perpInfos: PerpInfo[],
   ) {}
 
@@ -145,7 +145,7 @@ export class HealthCache {
         );
       }
 
-      return Serum3Info.fromOoModifyingTokenInfos(
+      return SpotInfo.fromOoModifyingTokenInfos(
         serum3,
         baseInfoIndex,
         baseInfo,
@@ -570,7 +570,7 @@ export class HealthCache {
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
     if (index == -1) {
       this.serum3Infos.push(
-        Serum3Info.emptyFromSerum3Market(
+        SpotInfo.emptyFromSerum3Market(
           serum3Market,
           baseEntryIndex,
           quoteEntryIndex,
@@ -1541,7 +1541,7 @@ export class Serum3Reserved {
   ) {}
 }
 
-export class Serum3Info {
+export class SpotInfo {
   constructor(
     public reservedBase: I80F48,
     public reservedQuote: I80F48,
@@ -1550,14 +1550,15 @@ export class Serum3Info {
     public baseInfoIndex: number,
     public quoteInfoIndex: number,
     public marketIndex: MarketIndex,
+    public hasZeroFunds: boolean,
   ) {}
 
   static emptyFromSerum3Market(
     serum3Market: Serum3Market,
     baseEntryIndex: number,
     quoteEntryIndex: number,
-  ): Serum3Info {
-    return new Serum3Info(
+  ): SpotInfo {
+    return new SpotInfo(
       ZERO_I80F48(),
       ZERO_I80F48(),
       ZERO_I80F48(),
@@ -1565,6 +1566,7 @@ export class Serum3Info {
       baseEntryIndex,
       quoteEntryIndex,
       serum3Market.marketIndex,
+      true,
     );
   }
 
@@ -1576,7 +1578,7 @@ export class Serum3Info {
     quoteInfo: TokenInfo,
     marketIndex: MarketIndex,
     oo: OpenOrders,
-  ): Serum3Info {
+  ): SpotInfo {
     // add the amounts that are freely settleable immediately to token balances
     const baseFree = I80F48.fromI64(oo.baseTokenFree);
     const quoteFree = I80F48.fromI64(oo.quoteTokenFree);
@@ -1598,7 +1600,10 @@ export class Serum3Info {
       I80F48.fromNumber(serumAccount.highestPlacedBidInv),
     );
 
-    return new Serum3Info(
+    const hasZeroFunds =
+      oo.baseTokenTotal.eq(new BN(0)) && oo.quoteTokenTotal.eq(new BN(0));
+
+    return new SpotInfo(
       reservedBase,
       reservedQuote,
       reservedBaseAsQuoteLowestAsk,
@@ -1606,6 +1611,7 @@ export class Serum3Info {
       baseInfoIndex,
       quoteInfoIndex,
       marketIndex,
+      hasZeroFunds,
     );
   }
 

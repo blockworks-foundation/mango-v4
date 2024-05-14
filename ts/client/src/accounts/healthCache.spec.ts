@@ -5,12 +5,12 @@ import range from 'lodash/range';
 
 import { PublicKey } from '@solana/web3.js';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
+import { deepClone } from '../utils';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
-import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
+import { HealthCache, PerpInfo, SpotInfo, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition, Serum3Orders } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';
 import { MarketIndex } from './serum3';
-import { deepClone } from '../utils';
 
 function mockBankAndOracle(
   tokenIndex: TokenIndex,
@@ -112,7 +112,7 @@ describe('Health Cache', () => {
     const ti1 = TokenInfo.fromBank(sourceBank, I80F48.fromNumber(100));
     const ti2 = TokenInfo.fromBank(targetBank, I80F48.fromNumber(-10));
 
-    const si1 = Serum3Info.fromOoModifyingTokenInfos(
+    const si1 = SpotInfo.fromOoModifyingTokenInfos(
       new Serum3Orders(
         PublicKey.default,
         2 as MarketIndex,
@@ -242,7 +242,7 @@ describe('Health Cache', () => {
       const ti2 = TokenInfo.fromBank(bank2, I80F48.fromNumber(fixture.token2));
       const ti3 = TokenInfo.fromBank(bank3, I80F48.fromNumber(fixture.token3));
 
-      const si1 = Serum3Info.fromOoModifyingTokenInfos(
+      const si1 = SpotInfo.fromOoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
           2 as MarketIndex,
@@ -265,7 +265,7 @@ describe('Health Cache', () => {
         } as any as OpenOrders,
       );
 
-      const si2 = Serum3Info.fromOoModifyingTokenInfos(
+      const si2 = SpotInfo.fromOoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
           3 as MarketIndex,
@@ -963,7 +963,7 @@ describe('Health Cache', () => {
         console.log(' - test 6');
         const clonedHc: HealthCache = deepClone<HealthCache>(hc);
         clonedHc.serum3Infos = [
-          new Serum3Info(
+          new SpotInfo(
             I80F48.fromNumber(30 / 3),
             I80F48.fromNumber(30 / 2),
             ZERO_I80F48(),
