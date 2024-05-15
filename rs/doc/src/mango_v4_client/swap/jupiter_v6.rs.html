@@ -418,6 +418,8 @@
 <a href="#418" id="418">418</a>
 <a href="#419" id="419">419</a>
 <a href="#420" id="420">420</a>
+<a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::str::FromStr;
 <span class="kw">use </span>std::time::Duration;
 
@@ -624,6 +626,7 @@
             .send()
             .<span class="kw">await
             </span>.context(<span class="string">&quot;quote request to jupiter&quot;</span>)<span class="question-mark">?</span>;
+
         <span class="kw">let </span>quote: QuoteResponse =
             util::http_error_handling(response).<span class="kw">await</span>.with_context(|| {
                 <span class="macro">format!</span>(<span class="string">&quot;error requesting jupiter route between {input_mint} and {output_mint}&quot;</span>)
@@ -812,6 +815,7 @@
                 .config()
                 .transaction_builder_config
                 .clone(),
+            additional_cus: <span class="macro">vec!</span>[],
         })
     }
 

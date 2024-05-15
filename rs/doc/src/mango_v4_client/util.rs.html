@@ -154,11 +154,20 @@
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
 <a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>solana_sdk::compute_budget::ComputeBudgetInstruction;
 <span class="kw">use </span>solana_sdk::instruction::Instruction;
 
 <span class="kw">use </span>anchor_lang::prelude::{AccountMeta, Pubkey};
 <span class="kw">use </span>anyhow::Context;
+<span class="kw">use </span>tracing::warn;
 
 <span class="doccomment">/// Some Result&lt;&gt; types don&#39;t convert to anyhow::Result nicely. Force them through stringification.
 </span><span class="kw">pub trait </span>AnyhowWrap {
@@ -236,8 +245,15 @@
     <span class="kw">if </span>!status.is_success() {
         <span class="macro">anyhow::bail!</span>(<span class="string">&quot;http request failed, status: {status}, body: {response_text}&quot;</span>);
     }
-    serde_json::from_str::&lt;T&gt;(<span class="kw-2">&amp;</span>response_text)
-        .with_context(|| <span class="macro">format!</span>(<span class="string">&quot;response has unexpected format, body: {response_text}&quot;</span>))
+    <span class="kw">let </span>object = serde_json::from_str::&lt;T&gt;(<span class="kw-2">&amp;</span>response_text);
+
+    <span class="kw">match </span>object {
+        <span class="prelude-val">Ok</span>(o) =&gt; <span class="prelude-val">Ok</span>(o),
+        <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="macro">warn!</span>(<span class="string">&quot;{}&quot;</span>, e);
+            <span class="macro">anyhow::bail!</span>(<span class="string">&quot;response has unexpected format, body: {response_text}&quot;</span>)
+        }
+    }
 }
 
 <span class="kw">pub fn </span>to_readonly_account_meta(pubkey: Pubkey) -&gt; AccountMeta {

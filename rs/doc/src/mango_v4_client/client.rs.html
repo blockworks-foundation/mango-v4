@@ -2711,6 +2711,17 @@
 <a href="#2711" id="2711">2711</a>
 <a href="#2712" id="2712">2712</a>
 <a href="#2713" id="2713">2713</a>
+<a href="#2714" id="2714">2714</a>
+<a href="#2715" id="2715">2715</a>
+<a href="#2716" id="2716">2716</a>
+<a href="#2717" id="2717">2717</a>
+<a href="#2718" id="2718">2718</a>
+<a href="#2719" id="2719">2719</a>
+<a href="#2720" id="2720">2720</a>
+<a href="#2721" id="2721">2721</a>
+<a href="#2722" id="2722">2722</a>
+<a href="#2723" id="2723">2723</a>
+<a href="#2724" id="2724">2724</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>anchor_client::ClientError::AnchorError;
 <span class="kw">use </span>std::ops::Deref;
 <span class="kw">use </span>std::str::FromStr;
@@ -3108,6 +3119,7 @@
             payer: payer.pubkey(),
             signers: <span class="macro">vec!</span>[owner, payer],
             config: client.config.transaction_builder_config.clone(),
+            additional_cus: <span class="macro">vec!</span>[],
         }
         .send_and_confirm(<span class="kw-2">&amp;</span>client)
         .<span class="kw">await</span><span class="question-mark">?</span>;
@@ -5108,6 +5120,7 @@
             payer: fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[fee_payer],
             config: <span class="self">self</span>.client.config.transaction_builder_config.clone(),
+            additional_cus: <span class="macro">vec!</span>[],
         })
     }
 
@@ -5122,6 +5135,7 @@
             payer: fee_payer.pubkey(),
             signers: <span class="macro">vec!</span>[fee_payer],
             config: <span class="self">self</span>.client.config.transaction_builder_config.clone(),
+            additional_cus: <span class="macro">vec!</span>[],
         }
         .simulate(<span class="kw-2">&amp;</span><span class="self">self</span>.client)
         .<span class="kw">await
@@ -5231,6 +5245,7 @@
     <span class="kw">pub </span>signers: Vec&lt;Arc&lt;Keypair&gt;&gt;,
     <span class="kw">pub </span>payer: Pubkey,
     <span class="kw">pub </span>config: TransactionBuilderConfig,
+    <span class="kw">pub </span>additional_cus: Vec&lt;u32&gt;,
 }
 
 <span class="kw">pub type </span>SimulateTransactionResponse =
@@ -5271,10 +5286,15 @@
 
         <span class="kw">let </span>cu_per_ix = <span class="self">self</span>.config.compute_budget_per_instruction.unwrap_or(<span class="number">0</span>);
         <span class="kw">if </span>!has_compute_unit_limit &amp;&amp; cu_per_ix &gt; <span class="number">0 </span>{
-            <span class="kw">let </span>ix_count: u32 = (ixs.len() - cu_instructions).try_into().unwrap();
+            <span class="kw">let </span>ix_count: u32 = (ixs.len() - cu_instructions - <span class="self">self</span>.additional_cus.len())
+                .try_into()
+                .unwrap();
+            <span class="kw">let </span>additional_cu_sum: u32 = <span class="self">self</span>.additional_cus.iter().sum();
             ixs.insert(
                 <span class="number">0</span>,
-                ComputeBudgetInstruction::set_compute_unit_limit(cu_per_ix * ix_count),
+                ComputeBudgetInstruction::set_compute_unit_limit(
+                    cu_per_ix * ix_count + additional_cu_sum,
+                ),
             );
         }
 
@@ -5362,8 +5382,10 @@
     }
 
     <span class="kw">pub fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, prepared_instructions: PreparedInstructions) {
-        <span class="self">self</span>.instructions
-            .extend(prepared_instructions.to_instructions());
+        <span class="comment">// Do NOT use to instruction s it would add a CU limit
+        // That CU limit would overwrite the one computed by the transaction builder
+        </span><span class="self">self</span>.instructions.extend(prepared_instructions.instructions);
+        <span class="self">self</span>.additional_cus.push(prepared_instructions.cu);
     }
 }
 
