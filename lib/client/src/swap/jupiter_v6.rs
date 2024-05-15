@@ -204,6 +204,7 @@ impl<'a> JupiterV6<'a> {
             .send()
             .await
             .context("quote request to jupiter")?;
+
         let quote: QuoteResponse =
             util::http_error_handling(response).await.with_context(|| {
                 format!("error requesting jupiter route between {input_mint} and {output_mint}")
@@ -392,6 +393,7 @@ impl<'a> JupiterV6<'a> {
                 .config()
                 .transaction_builder_config
                 .clone(),
+            additional_cus: vec![],
         })
     }
 

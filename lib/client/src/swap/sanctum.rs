@@ -321,6 +321,7 @@ impl<'a> Sanctum<'a> {
                 .config()
                 .transaction_builder_config
                 .clone(),
+            additional_cus: vec![],
         })
     }
 

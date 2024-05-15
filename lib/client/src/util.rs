@@ -3,6 +3,7 @@ use solana_sdk::instruction::Instruction;
 
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use anyhow::Context;
+use tracing::warn;
 
 /// Some Result<> types don't convert to anyhow::Result nicely. Force them through stringification.
 pub trait AnyhowWrap {
@@ -80,8 +81,15 @@ pub async fn http_error_handling<T: serde::de::DeserializeOwned>(
     if !status.is_success() {
         anyhow::bail!("http request failed, status: {status}, body: {response_text}");
     }
-    serde_json::from_str::<T>(&response_text)
-        .with_context(|| format!("response has unexpected format, body: {response_text}"))
+    let object = serde_json::from_str::<T>(&response_text);
+
+    match object {
+        Ok(o) => Ok(o),
+        Err(e) => {
+            warn!("{}", e);
+            anyhow::bail!("response has unexpected format, body: {response_text}")
+        }
+    }
 }
 
 pub fn to_readonly_account_meta(pubkey: Pubkey) -> AccountMeta {

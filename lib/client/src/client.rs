@@ -395,6 +395,7 @@ impl MangoClient {
             payer: payer.pubkey(),
             signers: vec![owner, payer],
             config: client.config.transaction_builder_config.clone(),
+            additional_cus: vec![],
         }
         .send_and_confirm(&client)
         .await?;
@@ -2395,6 +2396,7 @@ impl MangoClient {
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
             config: self.client.config.transaction_builder_config.clone(),
+            additional_cus: vec![],
         })
     }
 
@@ -2409,6 +2411,7 @@ impl MangoClient {
             payer: fee_payer.pubkey(),
             signers: vec![fee_payer],
             config: self.client.config.transaction_builder_config.clone(),
+            additional_cus: vec![],
         }
         .simulate(&self.client)
         .await
@@ -2518,6 +2521,7 @@ pub struct TransactionBuilder {
     pub signers: Vec<Arc<Keypair>>,
     pub payer: Pubkey,
     pub config: TransactionBuilderConfig,
+    pub additional_cus: Vec<u32>,
 }
 
 pub type SimulateTransactionResponse =
@@ -2558,10 +2562,15 @@ impl TransactionBuilder {
 
         let cu_per_ix = self.config.compute_budget_per_instruction.unwrap_or(0);
         if !has_compute_unit_limit && cu_per_ix > 0 {
-            let ix_count: u32 = (ixs.len() - cu_instructions).try_into().unwrap();
+            let ix_count: u32 = (ixs.len() - cu_instructions - self.additional_cus.len())
+                .try_into()
+                .unwrap();
+            let additional_cu_sum: u32 = self.additional_cus.iter().sum();
             ixs.insert(
                 0,
-                ComputeBudgetInstruction::set_compute_unit_limit(cu_per_ix * ix_count),
+                ComputeBudgetInstruction::set_compute_unit_limit(
+                    cu_per_ix * ix_count + additional_cu_sum,
+                ),
             );
         }
 
@@ -2649,8 +2658,10 @@ impl TransactionBuilder {
     }
 
     pub fn append(&mut self, prepared_instructions: PreparedInstructions) {
-        self.instructions
-            .extend(prepared_instructions.to_instructions());
+        // Do NOT use to instruction s it would add a CU limit
+        // That CU limit would overwrite the one computed by the transaction builder
+        self.instructions.extend(prepared_instructions.instructions);
+        self.additional_cus.push(prepared_instructions.cu);
     }
 }
 
