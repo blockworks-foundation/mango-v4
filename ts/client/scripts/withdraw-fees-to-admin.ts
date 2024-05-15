@@ -16,6 +16,12 @@ import {
 import fs from 'fs';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
+import { I80F48 } from '../src/numbers/I80F48';
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  toUiDecimals,
+} from '../src/utils';
+import { sendTransaction } from '../src/utils/rpc';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -59,9 +65,23 @@ async function setupVsr(
   return vsrClient;
 }
 
-async function updateSpotMarkets(): Promise<void> {
+async function withdrawFeesToAdmin(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
   const vsrClient = await setupVsr(client.connection, wallet);
+
+  // create wsol ata
+  const ix = await createAssociatedTokenAccountIdempotentInstruction(
+    wallet.publicKey,
+    new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
+    new PublicKey('So11111111111111111111111111111111111111112'),
+  );
+  const res = await sendTransaction(
+    vsrClient.program.provider as AnchorProvider,
+    [ix],
+    [],
+    {},
+  );
+  console.log(`${res.signature}`);
 
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
 
@@ -71,15 +91,19 @@ async function updateSpotMarkets(): Promise<void> {
     .map((banks) => banks[0])
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
-      // todo need to create wsol ata
-      if (bank.name == 'SOL') {
-        return;
-      }
-
       const tokenAccount = await getAssociatedTokenAddress(
         bank.mint,
         new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
       );
+
+      const fees = bank.collectedFeesNative.sub(
+        I80F48.fromU64(bank.feesWithdrawn),
+      );
+      const feesUi = toUiDecimals(fees, bank.mintDecimals);
+      const feesInQuoteUi = feesUi * bank.uiPrice;
+      if (feesInQuoteUi < 50) {
+        return;
+      }
 
       const ix = await client.program.methods
         .adminTokenWithdrawFees()
@@ -140,7 +164,7 @@ async function updateSpotMarkets(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    await updateSpotMarkets();
+    await withdrawFeesToAdmin();
   } catch (error) {
     console.log(error);
   }
