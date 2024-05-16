@@ -102,7 +102,7 @@ fn cpi_close_open_orders(ctx: &OpenbookV2CloseOpenOrders, seeds: &[&[&[u8]]]) ->
             seeds,
         );
         openbook_v2::cpi::close_open_orders_indexer(cpi_ctx)?;
-    }
+}
 
     Ok(())
 }

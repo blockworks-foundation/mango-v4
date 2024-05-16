@@ -1,10 +1,10 @@
-import { AnchorProvider, BorshAccountsCoder, Wallet } from '@coral-xyz/anchor';
-import { Market, Orderbook } from '@project-serum/serum';
+import { AnchorProvider, BorshAccountsCoder } from '@coral-xyz/anchor';
 import {
-  MarketAccount,
   BookSideAccount,
+  MarketAccount,
   OpenBookV2Client,
 } from '@openbook-dex/openbook-v2';
+import { Market, Orderbook } from '@project-serum/serum';
 import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
@@ -29,6 +29,7 @@ import {
   toUiDecimals,
 } from '../utils';
 import { Bank, MintInfo, TokenIndex } from './bank';
+import { OpenbookV2Market } from './openbookV2';
 import {
   OracleProvider,
   isPythOracle,
@@ -37,8 +38,6 @@ import {
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
 import { MarketIndex, Serum3Market } from './serum3';
-import { OpenbookV2MarketIndex, OpenbookV2Market } from './openbookV2';
-import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 
 export class Group {
   static from(
@@ -339,6 +338,7 @@ export class Group {
         openbookV2Market,
       ]),
     );
+
     this.openbookV2MarketsMapByMarketIndex = new Map(
       openbookV2Markets.map((openbookV2Market) => [
         openbookV2Market.marketIndex,

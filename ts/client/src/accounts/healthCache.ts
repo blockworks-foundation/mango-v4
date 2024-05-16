@@ -14,11 +14,12 @@ import { Group } from './group';
 import {
   HealthType,
   MangoAccount,
+  OpenbookV2Orders,
   PerpPosition,
   Serum3Orders,
 } from './mangoAccount';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
-import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
+import { MarketIndex, Serum3Side } from './serum3';
 
 //               ░░░░
 //
@@ -91,7 +92,7 @@ function spotAmountGivenForHealthZero(
 export class HealthCache {
   constructor(
     public tokenInfos: TokenInfo[],
-    public serum3Infos: Serum3Info[],
+    public spotInfos: SpotInfo[],
     public perpInfos: PerpInfo[],
   ) {}
 
@@ -145,13 +146,47 @@ export class HealthCache {
         );
       }
 
-      return Serum3Info.fromOoModifyingTokenInfos(
+      return SpotInfo.fromSerum3OoModifyingTokenInfos(
         serum3,
         baseInfoIndex,
         baseInfo,
         quoteInfoIndex,
         quoteInfo,
         serum3.marketIndex,
+        oo,
+      );
+    });
+
+    const obv2Infos = mangoAccount.openbookV2Active().map((obv2) => {
+      const oo = mangoAccount.getOpenbookV2OoAccount(obv2.marketIndex);
+
+      // find the TokenInfos for the market's base and quote tokens
+      const baseInfoIndex = tokenInfos.findIndex(
+        (tokenInfo) => tokenInfo.tokenIndex === obv2.baseTokenIndex,
+      );
+      const baseInfo = tokenInfos[baseInfoIndex];
+      if (!baseInfo) {
+        throw new Error(
+          `BaseInfo not found for market with marketIndex ${obv2.marketIndex}!`,
+        );
+      }
+      const quoteInfoIndex = tokenInfos.findIndex(
+        (tokenInfo) => tokenInfo.tokenIndex === obv2.quoteTokenIndex,
+      );
+      const quoteInfo = tokenInfos[quoteInfoIndex];
+      if (!quoteInfo) {
+        throw new Error(
+          `QuoteInfo not found for market with marketIndex ${obv2.marketIndex}!`,
+        );
+      }
+
+      return SpotInfo.fromObv2OoModifyingTokenInfos(
+        obv2,
+        baseInfoIndex,
+        baseInfo,
+        quoteInfoIndex,
+        quoteInfo,
+        obv2.marketIndex,
         oo,
       );
     });
@@ -164,7 +199,11 @@ export class HealthCache {
       return PerpInfo.fromPerpPosition(perpMarket, perpPosition);
     });
 
-    return new HealthCache(tokenInfos, serum3Infos, perpInfos);
+    return new HealthCache(
+      tokenInfos,
+      [...serum3Infos, ...obv2Infos],
+      perpInfos,
+    );
   }
 
   computeSerum3Reservations(healthType: HealthType | undefined): {
@@ -180,7 +219,7 @@ export class HealthCache {
     // or reserved_quote was converted to base.
     const serum3Reserved: Serum3Reserved[] = [];
 
-    for (const info of this.serum3Infos) {
+    for (const info of this.spotInfos) {
       const quote = this.tokenInfos[info.quoteInfoIndex];
       const base = this.tokenInfos[info.baseInfoIndex];
 
@@ -318,7 +357,7 @@ export class HealthCache {
       health.iadd(contrib);
     }
     const res = this.computeSerum3Reservations(healthType);
-    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+    for (const [index, serum3Info] of this.spotInfos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
@@ -378,7 +417,7 @@ export class HealthCache {
       });
     }
     const res = this.computeSerum3Reservations(healthType);
-    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+    for (const [index, serum3Info] of this.spotInfos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
@@ -387,7 +426,11 @@ export class HealthCache {
         res.serum3Reserved[index],
       );
       ret.push({
-        asset: group.getSerum3MarketByMarketIndex(serum3Info.marketIndex).name,
+        asset:
+          serum3Info.market.type +
+          ' ' +
+          group.getSerum3MarketByMarketIndex(serum3Info.market.marketIndex)
+            .name,
         contribution: toUiDecimalsForQuote(contrib),
         contributionDetails: undefined,
       });
@@ -489,7 +532,7 @@ export class HealthCache {
 
     const tokenBalances = this.effectiveTokenBalances(healthType);
     const res = this.computeSerum3Reservations(healthType);
-    for (const [index, serum3Info] of this.serum3Infos.entries()) {
+    for (const [index, serum3Info] of this.spotInfos.entries()) {
       const contrib = serum3Info.healthContribution(
         healthType,
         this.tokenInfos,
@@ -554,36 +597,44 @@ export class HealthCache {
     return adjustedCache.healthRatio(healthType);
   }
 
-  findSerum3InfoIndex(marketIndex: MarketIndex): number {
-    return this.serum3Infos.findIndex(
-      (serum3Info) => serum3Info.marketIndex === marketIndex,
+  findSerum3InfoIndex(
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
+  ): number {
+    return this.spotInfos.findIndex(
+      (serum3Info) =>
+        serum3Info.market.marketIndex === marketIndex &&
+        serum3Info.market.type == type,
     );
   }
 
   getOrCreateSerum3InfoIndex(
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
   ): number {
-    const index = this.findSerum3InfoIndex(serum3Market.marketIndex);
+    const index = this.findSerum3InfoIndex(marketIndex, type);
     const baseEntryIndex = this.getOrCreateTokenInfoIndex(baseBank);
     const quoteEntryIndex = this.getOrCreateTokenInfoIndex(quoteBank);
     if (index == -1) {
-      this.serum3Infos.push(
-        Serum3Info.emptyFromSerum3Market(
-          serum3Market,
+      this.spotInfos.push(
+        SpotInfo.emptyFromSerum3Market(
+          marketIndex,
+          type,
           baseEntryIndex,
           quoteEntryIndex,
         ),
       );
     }
-    return this.findSerum3InfoIndex(serum3Market.marketIndex);
+    return this.findSerum3InfoIndex(marketIndex, type);
   }
 
   adjustSerum3Reserved(
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
     reservedBaseChange: I80F48,
     freeBaseChange: I80F48,
     reservedQuoteChange: I80F48,
@@ -603,9 +654,10 @@ export class HealthCache {
     const index = this.getOrCreateSerum3InfoIndex(
       baseBank,
       quoteBank,
-      serum3Market,
+      marketIndex,
+      type,
     );
-    const serum3Info = this.serum3Infos[index];
+    const serum3Info = this.spotInfos[index];
     serum3Info.reservedBase.iadd(reservedBaseChange);
     serum3Info.reservedQuote.iadd(reservedQuoteChange);
   }
@@ -614,7 +666,8 @@ export class HealthCache {
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
     bidNativeQuoteAmount: I80F48,
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = deepClone<HealthCache>(this);
@@ -630,7 +683,8 @@ export class HealthCache {
     adjustedCache.adjustSerum3Reserved(
       baseBank,
       quoteBank,
-      serum3Market,
+      marketIndex,
+      type,
       ZERO_I80F48(),
       ZERO_I80F48(),
       bidNativeQuoteAmount,
@@ -643,7 +697,8 @@ export class HealthCache {
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
     askNativeBaseAmount: I80F48,
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
     healthType: HealthType = HealthType.init,
   ): I80F48 {
     const adjustedCache: HealthCache = deepClone<HealthCache>(this);
@@ -659,7 +714,8 @@ export class HealthCache {
     adjustedCache.adjustSerum3Reserved(
       baseBank,
       quoteBank,
-      serum3Market,
+      marketIndex,
+      type,
       askNativeBaseAmount,
       ZERO_I80F48(),
       ZERO_I80F48(),
@@ -1085,7 +1141,8 @@ export class HealthCache {
   getMaxSerum3OrderForHealthRatio(
     baseBank: BankForHealth,
     quoteBank: BankForHealth,
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'Serum3' | 'OpenbookV2',
     side: Serum3Side,
     minRatio: I80F48,
   ): I80F48 {
@@ -1182,7 +1239,8 @@ export class HealthCache {
       adjustedCache.adjustSerum3Reserved(
         baseBank,
         quoteBank,
-        serum3Market,
+        marketIndex,
+        type,
         side === Serum3Side.ask
           ? amount.div(base.prices.oracle)
           : ZERO_I80F48(),
@@ -1541,7 +1599,7 @@ export class Serum3Reserved {
   ) {}
 }
 
-export class Serum3Info {
+export class SpotInfo {
   constructor(
     public reservedBase: I80F48,
     public reservedQuote: I80F48,
@@ -1549,26 +1607,27 @@ export class Serum3Info {
     public reservedQuoteAsBaseHighestBid: I80F48,
     public baseInfoIndex: number,
     public quoteInfoIndex: number,
-    public marketIndex: MarketIndex,
+    public market: { marketIndex: MarketIndex; type: 'OpenbookV2' | 'Serum3' },
   ) {}
 
   static emptyFromSerum3Market(
-    serum3Market: Serum3Market,
+    marketIndex: MarketIndex,
+    type: 'OpenbookV2' | 'Serum3',
     baseEntryIndex: number,
     quoteEntryIndex: number,
-  ): Serum3Info {
-    return new Serum3Info(
+  ): SpotInfo {
+    return new SpotInfo(
       ZERO_I80F48(),
       ZERO_I80F48(),
       ZERO_I80F48(),
       ZERO_I80F48(),
       baseEntryIndex,
       quoteEntryIndex,
-      serum3Market.marketIndex,
+      { marketIndex, type },
     );
   }
 
-  static fromOoModifyingTokenInfos(
+  static fromSerum3OoModifyingTokenInfos(
     serumAccount: Serum3Orders,
     baseInfoIndex: number,
     baseInfo: TokenInfo,
@@ -1576,7 +1635,7 @@ export class Serum3Info {
     quoteInfo: TokenInfo,
     marketIndex: MarketIndex,
     oo: OpenOrders,
-  ): Serum3Info {
+  ): SpotInfo {
     // add the amounts that are freely settleable immediately to token balances
     const baseFree = I80F48.fromI64(oo.baseTokenFree);
     const quoteFree = I80F48.fromI64(oo.quoteTokenFree);
@@ -1598,14 +1657,62 @@ export class Serum3Info {
       I80F48.fromNumber(serumAccount.highestPlacedBidInv),
     );
 
-    return new Serum3Info(
+    return new SpotInfo(
       reservedBase,
       reservedQuote,
       reservedBaseAsQuoteLowestAsk,
       reservedQuoteAsBaseHighestBid,
       baseInfoIndex,
       quoteInfoIndex,
-      marketIndex,
+      { marketIndex, type: 'Serum3' },
+    );
+  }
+
+  static fromObv2OoModifyingTokenInfos(
+    openOrders: OpenbookV2Orders,
+    baseInfoIndex: number,
+    baseInfo: TokenInfo,
+    quoteInfoIndex: number,
+    quoteInfo: TokenInfo,
+    marketIndex: MarketIndex,
+    ooAccount: {
+      position: {
+        baseFreeNative: BN;
+        quoteFreeNative: BN;
+        bidsQuoteLots: BN;
+        asksBaseLots: BN;
+      };
+    },
+  ): SpotInfo {
+    // add the amounts that are freely settleable immediately to token balances
+    const baseFree = I80F48.fromU64(ooAccount.position.baseFreeNative);
+    const quoteFree = I80F48.fromU64(ooAccount.position.quoteFreeNative);
+    baseInfo.balanceSpot.iadd(baseFree);
+    quoteInfo.balanceSpot.iadd(quoteFree);
+
+    // track the reserved amounts
+    const reservedBase = I80F48.fromU64(
+      ooAccount.position.asksBaseLots.mul(new BN(openOrders.baseLotSize)),
+    );
+    const reservedQuote = I80F48.fromU64(
+      ooAccount.position.bidsQuoteLots.mul(new BN(openOrders.quoteLotSize)),
+    );
+
+    const reservedBaseAsQuoteLowestAsk = reservedBase.mul(
+      I80F48.fromNumber(openOrders.lowestPlacedAsk),
+    );
+    const reservedQuoteAsBaseHighestBid = reservedQuote.mul(
+      I80F48.fromNumber(openOrders.highestPlacedBidInv),
+    );
+
+    return new SpotInfo(
+      reservedBase,
+      reservedQuote,
+      reservedBaseAsQuoteLowestAsk,
+      reservedQuoteAsBaseHighestBid,
+      baseInfoIndex,
+      quoteInfoIndex,
+      { marketIndex, type: 'OpenbookV2' },
     );
   }
 
@@ -1697,7 +1804,7 @@ export class Serum3Info {
     tokenMaxReserved: TokenMaxReserved[],
     marketReserved: Serum3Reserved,
   ): string {
-    return `  marketIndex: ${this.marketIndex}, baseInfoIndex: ${
+    return `  marketIndex: ${this.market.marketIndex}, baseInfoIndex: ${
       this.baseInfoIndex
     }, quoteInfoIndex: ${this.quoteInfoIndex}, reservedBase: ${
       this.reservedBase

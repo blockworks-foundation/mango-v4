@@ -1,20 +1,19 @@
+import { AnchorProvider } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import {
-  OpenBookV2Client,
   BookSideAccount,
   MarketAccount,
+  OpenBookV2Client,
   baseLotsToUi,
   priceLotsToUi,
 } from '@openbook-dex/openbook-v2';
-import { Cluster, Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_V2_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, EmptyWallet } from '../utils';
 import { TokenIndex } from './bank';
 import { Group } from './group';
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 
 export type OpenbookV2MarketIndex = number & As<'market-index'>;
 
@@ -118,7 +117,6 @@ export class OpenbookV2Market {
       [Buffer.from('OpenOrders'), mangoAccount.toBuffer(), indexBuf],
       programId,
     );
-    console.log('nextoo', nextIndex, openOrderPublicKey.toBase58());
     return openOrderPublicKey;
   }
 

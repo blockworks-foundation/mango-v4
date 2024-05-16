@@ -2972,7 +2972,7 @@ export class MangoClient {
         openbookV2Program: openbookV2Market.openbookProgram,
         openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
         openOrdersIndexer: openbookV2Market.findOoIndexerPda(
-          this.programId,
+          new PublicKey('opnb2LAfJYbRMAHHvqjCwQxanZn7ReEHp1k81EohpZb'), // TODO replace with OPENBOOK_PROGRAM_ID
           mangoAccount.publicKey,
         ),
         openOrdersAccount: await openbookV2Market.getNextOoPda(
@@ -3052,6 +3052,12 @@ export class MangoClient {
           mangoAccount.publicKey,
         ),
         openOrdersAccount: openOrders,
+        baseBank: group.getFirstBankByTokenIndex(
+          openbookV2Market.baseTokenIndex,
+        ).publicKey,
+        quoteBank: group.getFirstBankByTokenIndex(
+          openbookV2Market.quoteTokenIndex,
+        ).publicKey,
         solDestination: (this.program.provider as AnchorProvider).wallet
           .publicKey,
       })
@@ -3201,10 +3207,7 @@ export class MangoClient {
         [],
         openOrdersForMarket,
       );
-    console.log('healthremaining')
-    healthRemainingAccounts.forEach(pk => {
-      console.log(pk.toBase58())
-    });
+
     const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
@@ -3242,7 +3245,7 @@ export class MangoClient {
 
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
     const receiverBank = group.getFirstBankByTokenIndex(receiverTokenIndex);
-    console.log('openOrderPk', openOrderPk?.toBase58())
+    // console.log('openOrderPk', openOrderPk?.toBase58());
     const ix = await this.program.methods
       .openbookV2PlaceOrder(
         side,
@@ -6129,28 +6132,28 @@ export class MangoClient {
         })),
       )
       .flat();
-    console.log('indices')
-    openbookPositionMarketIndices.forEach((p) => {
-      console.log(p.marketIndex, p.openOrders.toBase58())
-    })
-    console.log('oos for market')
-    openbookOpenOrdersForMarket.forEach((p) => {
-      console.log(p[0].baseTokenIndex, p[1].toBase58())
-    })
+    // console.log('indices');
+    // openbookPositionMarketIndices.forEach((p) => {
+    //   console.log(p.marketIndex, p.openOrders.toBase58());
+    // });
+    // // console.log('oos for market');
+    // openbookOpenOrdersForMarket.forEach((p) => {
+    //   console.log(p[0].baseTokenIndex, p[1].toBase58());
+    // });
     for (const [openbookV2Market, openOrderPk] of openbookOpenOrdersForMarket) {
       const ooPositionExists =
         serumPositionMarketIndices.findIndex(
           (i) => i.marketIndex === openbookV2Market.marketIndex,
         ) > -1;
       if (!ooPositionExists) {
-        console.log('postion does not exist')
+        // console.log('postion does not exist');
         const inactiveOpenbookPosition =
           openbookPositionMarketIndices.findIndex(
             (serumPos) =>
               serumPos.marketIndex ===
               OpenbookV2Orders.OpenbookV2MarketIndexUnset,
           );
-          console.log('new pos index', inactiveOpenbookPosition)
+        // console.log('new pos index', inactiveOpenbookPosition);
         if (inactiveOpenbookPosition != -1) {
           openbookPositionMarketIndices[inactiveOpenbookPosition].marketIndex =
             openbookV2Market.marketIndex;
@@ -6169,10 +6172,10 @@ export class MangoClient {
         .map((serumPosition) => serumPosition.openOrders),
     );
 
-    console.log('pushing')
-    openbookPositionMarketIndices.forEach((p) => {
-      console.log(p.marketIndex, p.openOrders.toBase58())
-    })
+    // console.log('pushing');
+    // openbookPositionMarketIndices.forEach((p) => {
+    //   console.log(p.marketIndex, p.openOrders.toBase58());
+    // });
     healthRemainingAccounts.push(
       ...openbookPositionMarketIndices
         .filter(
