@@ -3171,7 +3171,12 @@ export class MangoClient {
     let openOrderPk: PublicKey | undefined = undefined;
     const banks: Bank[] = [];
     const openOrdersForMarket: [OpenbookV2Market, PublicKey][] = [];
-    if (!mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)) {
+    if (
+      !mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex) ||
+      mangoAccount
+        .getOpenbookV2Account(openbookV2Market.marketIndex)
+        ?.openOrders.equals(PublicKey.default)
+    ) {
       const { ix, openOrdersAccount } = await this.openbookV2CreateOpenOrdersIx(
         group,
         mangoAccount,
@@ -3196,7 +3201,10 @@ export class MangoClient {
         [],
         openOrdersForMarket,
       );
-
+    console.log('healthremaining')
+    healthRemainingAccounts.forEach(pk => {
+      console.log(pk.toBase58())
+    });
     const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
       externalMarketPk.toBase58(),
     )!;
@@ -3234,6 +3242,7 @@ export class MangoClient {
 
     const payerBank = group.getFirstBankByTokenIndex(payerTokenIndex);
     const receiverBank = group.getFirstBankByTokenIndex(receiverTokenIndex);
+    console.log('openOrderPk', openOrderPk?.toBase58())
     const ix = await this.program.methods
       .openbookV2PlaceOrder(
         side,
@@ -6120,18 +6129,28 @@ export class MangoClient {
         })),
       )
       .flat();
+    console.log('indices')
+    openbookPositionMarketIndices.forEach((p) => {
+      console.log(p.marketIndex, p.openOrders.toBase58())
+    })
+    console.log('oos for market')
+    openbookOpenOrdersForMarket.forEach((p) => {
+      console.log(p[0].baseTokenIndex, p[1].toBase58())
+    })
     for (const [openbookV2Market, openOrderPk] of openbookOpenOrdersForMarket) {
       const ooPositionExists =
         serumPositionMarketIndices.findIndex(
           (i) => i.marketIndex === openbookV2Market.marketIndex,
         ) > -1;
       if (!ooPositionExists) {
+        console.log('postion does not exist')
         const inactiveOpenbookPosition =
           openbookPositionMarketIndices.findIndex(
             (serumPos) =>
               serumPos.marketIndex ===
               OpenbookV2Orders.OpenbookV2MarketIndexUnset,
           );
+          console.log('new pos index', inactiveOpenbookPosition)
         if (inactiveOpenbookPosition != -1) {
           openbookPositionMarketIndices[inactiveOpenbookPosition].marketIndex =
             openbookV2Market.marketIndex;
@@ -6150,6 +6169,10 @@ export class MangoClient {
         .map((serumPosition) => serumPosition.openOrders),
     );
 
+    console.log('pushing')
+    openbookPositionMarketIndices.forEach((p) => {
+      console.log(p.marketIndex, p.openOrders.toBase58())
+    })
     healthRemainingAccounts.push(
       ...openbookPositionMarketIndices
         .filter(
