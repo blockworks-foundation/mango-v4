@@ -201,7 +201,7 @@
 
 "@openbook-dex/openbook-v2@git+https://github.com/openbook-dex/openbook-v2#pan/ts-client-anchor-0.29.0":
   version "0.2.7"
-  resolved "git+https://github.com/openbook-dex/openbook-v2#89c47c98e775e1559560d58f413a3bb0e8450c3f"
+  resolved "git+https://github.com/openbook-dex/openbook-v2#380d2a8a8d9b3ba6fe360cc894e60282dfbf9812"
   dependencies:
     "@coral-xyz/anchor" "^0.29.0"
     "@solana/spl-token" "^0.4.0"
