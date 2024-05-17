@@ -62,8 +62,8 @@
     "trailingComma": "all"
   },
   "dependencies": {
-    "@blockworks-foundation/mango-v4-settings": "0.14.15",
-    "@blockworks-foundation/mangolana": "0.0.15",
+    "@blockworks-foundation/mango-v4-settings": "0.14.22",
+    "@blockworks-foundation/mangolana": "0.0.17",
     "@coral-xyz/anchor": "^0.28.1-beta.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
