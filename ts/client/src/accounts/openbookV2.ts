@@ -269,21 +269,21 @@ export class OpenbookV2Market {
         },
       ),
     ); // readonly client for deserializing accounts
-    const bidNodes = bidsAccount
-      ? openbookClient.getLeafNodes(bidsAccount)
-      : [];
-    const askNodes = asksAccount
-      ? openbookClient.getLeafNodes(asksAccount)
-      : [];
+    // const bidNodes = bidsAccount
+    //   ? openbookClient.getLeafNodes(bidsAccount)
+    //   : [];
+    // const askNodes = asksAccount
+    //   ? openbookClient.getLeafNodes(asksAccount)
+    //   : [];
     const levels: [number, number][] = [];
 
-    for (const node of bidNodes.concat(askNodes)) {
-      const priceLots = node.key.shrn(64);
-      levels.push([
-        priceLotsToUi(marketAccount, priceLots),
-        baseLotsToUi(marketAccount, node.quantity),
-      ]);
-    }
+    // for (const node of bidNodes.concat(askNodes)) {
+    //   const priceLots = node.key.shrn(64);
+    //   levels.push([
+    //     priceLotsToUi(marketAccount, priceLots),
+    //     baseLotsToUi(marketAccount, node.quantity),
+    //   ]);
+    // }
     return levels;
   }
 

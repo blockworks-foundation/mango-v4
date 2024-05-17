@@ -66,7 +66,7 @@
     "@blockworks-foundation/mango-v4-settings": "0.14.15",
     "@blockworks-foundation/mangolana": "0.0.15",
     "@coral-xyz/anchor": "^0.29.0",
-    "@openbook-dex/openbook-v2": "^0.1.2",
+    "@openbook-dex/openbook-v2": "git+https://github.com/openbook-dex/openbook-v2#pan/ts-client-anchor-0.29.0",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",
