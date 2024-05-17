@@ -2,18 +2,33 @@ import BN from "bn.js";
 import { MangoClient, PerpMarket, RUST_U64_MAX, U64_MAX_BN } from "..";
 import { PublicKey } from "@solana/web3.js";
 
+interface BookSideAccount {
+  roots: OrderTreeRoot[];
+  nodes: OrderTreeNodes;
+}
+
 interface OrderTreeNodes {
   bumpIndex: number;
   freeListLen: number;
   freeListHead: number;
-  nodes: [any];
-  nodeData: Buffer[];
+  nodes: AnyNode[]
+}
+
+interface AnyNode {
+  tag: number; data?: number[], nodeData?: Buffer;
 }
 
 interface OrderTreeRoot {
   maybeNode: number;
   leafCount: number;
 }
+
+function decodeOrderTreeRootStruct(data: Buffer): OrderTreeRoot {
+  const maybeNode = data.readUInt32LE(0);
+  const leafCount = data.readUInt32LE(4);
+  return { maybeNode, leafCount };
+}
+
 
 export class BookSide {
   private static INNER_NODE_TAG = 1;
@@ -24,44 +39,79 @@ export class BookSide {
     client: MangoClient,
     perpMarket: PerpMarket,
     bookSideType: BookSideType,
-    obj: {
-      roots: OrderTreeRoot[];
-      nodes: OrderTreeNodes;
-    },
+    account: BookSideAccount,
   ): BookSide {
     return new BookSide(
       client,
       perpMarket,
       bookSideType,
-      obj.roots[0],
-      obj.roots[1],
-      obj.nodes,
+      account
     );
+  }
+
+  static decodeAccountfromBuffer(
+    data: Buffer
+  ): BookSideAccount {
+    // TODO: add discriminator parsing & check
+    const roots = [
+      decodeOrderTreeRootStruct(data.subarray(8)),
+      decodeOrderTreeRootStruct(data.subarray(16)),
+    ];
+
+    // skip reserved
+    let offset = 56 + 256;
+
+    const orderTreeType = data.readUInt8(offset);
+    const bumpIndex = data.readUInt32LE(offset + 4);
+    const freeListLen = data.readUInt32LE(offset + 8);
+    const freeListHead = data.readUInt32LE(offset + 12);
+
+    // skip more reserved data
+    offset += 16 + 512;
+
+    const nodes: { tag: number, nodeData: Buffer }[] = [];
+    for (let i = 0; i < 1024; ++i) {
+      const tag = data.readUInt8(offset);
+      const nodeData = data.subarray(offset, offset + 88);
+      nodes.push({ tag, nodeData });
+      offset += 88;
+    }
+
+    // this result has a slightly different layout than the regular account
+    // it doesn't include reserved data and it's AnyNodes don't have the field
+    // data: number[] (excluding the tag prefix byte)
+    // but nodeData: Buffer (including the tag prefix byte)
+    const result = {
+      roots,
+      nodes: { orderTreeType, bumpIndex, freeListLen, freeListHead, nodes },
+    };
+
+    return result;
   }
 
   constructor(
     public client: MangoClient,
     public perpMarket: PerpMarket,
     public type: BookSideType,
-    public rootFixed: OrderTreeRoot,
-    public rootOraclePegged: OrderTreeRoot,
-    public orderTreeNodes: OrderTreeNodes,
+    public account: BookSideAccount,
     maxBookDelay?: number,
   ) {
     // Determine the maxTimestamp found on the book to use for tif
     // If maxBookDelay is not provided, use 3600 as a very large number
     maxBookDelay = maxBookDelay === undefined ? 3600 : maxBookDelay;
     let maxTimestamp = new BN(new Date().getTime() / 1000 - maxBookDelay);
-    for (const node of this.orderTreeNodes.nodes) {
+
+    for (const node of account.nodes.nodes) {
       if (node.tag !== BookSide.LEAF_NODE_TAG) {
         continue;
       }
 
-      const leafNode = BookSide.toLeafNode(client, node.data);
+      const leafNode = BookSide.toLeafNode(client, node);
       if (leafNode.timestamp.gt(maxTimestamp)) {
         maxTimestamp = leafNode.timestamp;
       }
     }
+
     this.now = maxTimestamp;
   }
 
@@ -143,12 +193,12 @@ export class BookSide {
 
     while (stack.length > 0) {
       const index = stack.pop()!;
-      const node = this.orderTreeNodes.nodes[index];
+      const node = this.account.nodes.nodes[index];
       if (node.tag === BookSide.INNER_NODE_TAG) {
-        const innerNode = BookSide.toInnerNode(this.client, node.data);
+        const innerNode = BookSide.toInnerNode(this.client, node);
         stack.push(innerNode.children[right], innerNode.children[left]);
       } else if (node.tag === BookSide.LEAF_NODE_TAG) {
-        const leafNode = BookSide.toLeafNode(this.client, node.data);
+        const leafNode = BookSide.toLeafNode(this.client, node);
         const expiryTimestamp = leafNode.timeInForce
           ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
           : U64_MAX_BN;
@@ -173,12 +223,12 @@ export class BookSide {
 
     while (stack.length > 0) {
       const index = stack.pop()!;
-      const node = this.orderTreeNodes.nodes[index];
+      const node = this.account.nodes.nodes[index];
       if (node.tag === BookSide.INNER_NODE_TAG) {
-        const innerNode = BookSide.toInnerNode(this.client, node.data);
+        const innerNode = BookSide.toInnerNode(this.client, node);
         stack.push(innerNode.children[right], innerNode.children[left]);
       } else if (node.tag === BookSide.LEAF_NODE_TAG) {
-        const leafNode = BookSide.toLeafNode(this.client, node.data);
+        const leafNode = BookSide.toLeafNode(this.client, node);
         const expiryTimestamp = leafNode.timeInForce
           ? leafNode.timestamp.add(new BN(leafNode.timeInForce))
           : U64_MAX_BN;
@@ -242,17 +292,27 @@ export class BookSide {
     return levels;
   }
 
-  static toInnerNode(client: MangoClient, data: [number]): InnerNode {
-    return (client.program as any)._coder.types.typeLayouts
-      .get('InnerNode')
-      .decode(Buffer.from([BookSide.INNER_NODE_TAG].concat(data)));
+  get rootFixed(): OrderTreeRoot { return this.account.roots[0]; }
+  get rootOraclePegged(): OrderTreeRoot { return this.account.roots[1]; }
+
+  static toInnerNode(client: MangoClient, node: AnyNode): InnerNode {
+    const layout = (client.program as any)._coder.types.typeLayouts
+      .get('InnerNode');
+    if (node.nodeData) {
+      return layout.decode(node.nodeData);
+    }
+    return layout
+      .decode(Buffer.from([BookSide.INNER_NODE_TAG].concat(node.data!)));
   }
-  static toLeafNode(client: MangoClient, data: [number]): LeafNode {
-    return LeafNode.from(
-      (client.program as any)._coder.types.typeLayouts
-        .get('LeafNode')
-        .decode(Buffer.from([BookSide.LEAF_NODE_TAG].concat(data))),
-    );
+
+  static toLeafNode(client: MangoClient, node: AnyNode): LeafNode {
+    const layout = (client.program as any)._coder.types.typeLayouts
+      .get('LeafNode');
+    if (node.nodeData) {
+      return layout.decode(node.nodeData);
+  }
+    return layout
+      .decode(Buffer.from([BookSide.LEAF_NODE_TAG].concat(node.data!)));
   }
 }
 

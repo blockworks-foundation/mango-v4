@@ -326,7 +326,8 @@ export class PerpMarket {
     forceReload = false,
   ): Promise<BookSide> {
     if (forceReload || !this._asks) {
-      const asks = await client.program.account.bookSide.fetch(this.asks);
+      const askInfo = await client.connection.getAccountInfo(this.asks);
+      const asks = BookSide.decodeAccountfromBuffer(askInfo!.data);
       this._asks = BookSide.from(client, this, BookSideType.asks, asks as any);
     }
     return this._asks;
@@ -337,7 +338,8 @@ export class PerpMarket {
     forceReload = false,
   ): Promise<BookSide> {
     if (forceReload || !this._bids) {
-      const bids = await client.program.account.bookSide.fetch(this.bids);
+      const bidInfo = await client.connection.getAccountInfo(this.bids);
+      const bids = BookSide.decodeAccountfromBuffer(bidInfo!.data);
       this._bids = BookSide.from(client, this, BookSideType.bids, bids as any);
     }
     return this._bids;
