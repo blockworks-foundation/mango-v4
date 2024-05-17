@@ -1,6 +1,6 @@
-import BN from "bn.js";
-import { MangoClient, PerpMarket, RUST_U64_MAX, U64_MAX_BN } from "..";
-import { PublicKey } from "@solana/web3.js";
+import BN from 'bn.js';
+import { MangoClient, PerpMarket, RUST_U64_MAX, U64_MAX_BN } from '..';
+import { PublicKey } from '@solana/web3.js';
 
 interface BookSideAccount {
   roots: OrderTreeRoot[];
@@ -11,11 +11,13 @@ interface OrderTreeNodes {
   bumpIndex: number;
   freeListLen: number;
   freeListHead: number;
-  nodes: AnyNode[]
+  nodes: AnyNode[];
 }
 
 interface AnyNode {
-  tag: number; data?: number[], nodeData?: Buffer;
+  tag: number;
+  data?: number[];
+  nodeData?: Buffer;
 }
 
 interface OrderTreeRoot {
@@ -29,7 +31,6 @@ function decodeOrderTreeRootStruct(data: Buffer): OrderTreeRoot {
   return { maybeNode, leafCount };
 }
 
-
 export class BookSide {
   private static INNER_NODE_TAG = 1;
   private static LEAF_NODE_TAG = 2;
@@ -41,17 +42,10 @@ export class BookSide {
     bookSideType: BookSideType,
     account: BookSideAccount,
   ): BookSide {
-    return new BookSide(
-      client,
-      perpMarket,
-      bookSideType,
-      account
-    );
+    return new BookSide(client, perpMarket, bookSideType, account);
   }
 
-  static decodeAccountfromBuffer(
-    data: Buffer
-  ): BookSideAccount {
+  static decodeAccountfromBuffer(data: Buffer): BookSideAccount {
     // TODO: add discriminator parsing & check
     const roots = [
       decodeOrderTreeRootStruct(data.subarray(8)),
@@ -69,7 +63,7 @@ export class BookSide {
     // skip more reserved data
     offset += 16 + 512;
 
-    const nodes: { tag: number, nodeData: Buffer }[] = [];
+    const nodes: { tag: number; nodeData: Buffer }[] = [];
     for (let i = 0; i < 1024; ++i) {
       const tag = data.readUInt8(offset);
       const nodeData = data.subarray(offset, offset + 88);
@@ -127,8 +121,8 @@ export class BookSide {
       return a.priceLots.eq(b.priceLots)
         ? a.seqNum.lt(b.seqNum) // if prices are equal prefer perp orders in the order they are placed
         : type === BookSideType.bids // else compare the actual prices
-          ? a.priceLots.gt(b.priceLots)
-          : b.priceLots.gt(a.priceLots);
+        ? a.priceLots.gt(b.priceLots)
+        : b.priceLots.gt(a.priceLots);
     }
 
     const fGen = this.fixedItems();
@@ -292,27 +286,35 @@ export class BookSide {
     return levels;
   }
 
-  get rootFixed(): OrderTreeRoot { return this.account.roots[0]; }
-  get rootOraclePegged(): OrderTreeRoot { return this.account.roots[1]; }
+  get rootFixed(): OrderTreeRoot {
+    return this.account.roots[0];
+  }
+  get rootOraclePegged(): OrderTreeRoot {
+    return this.account.roots[1];
+  }
 
   static toInnerNode(client: MangoClient, node: AnyNode): InnerNode {
-    const layout = (client.program as any)._coder.types.typeLayouts
-      .get('InnerNode');
+    const layout = (client.program as any)._coder.types.typeLayouts.get(
+      'InnerNode',
+    );
     if (node.nodeData) {
       return layout.decode(node.nodeData);
     }
-    return layout
-      .decode(Buffer.from([BookSide.INNER_NODE_TAG].concat(node.data!)));
+    return layout.decode(
+      Buffer.from([BookSide.INNER_NODE_TAG].concat(node.data!)),
+    );
   }
 
   static toLeafNode(client: MangoClient, node: AnyNode): LeafNode {
-    const layout = (client.program as any)._coder.types.typeLayouts
-      .get('LeafNode');
+    const layout = (client.program as any)._coder.types.typeLayouts.get(
+      'LeafNode',
+    );
     if (node.nodeData) {
       return layout.decode(node.nodeData);
-  }
-    return layout
-      .decode(Buffer.from([BookSide.LEAF_NODE_TAG].concat(node.data!)));
+    }
+    return layout.decode(
+      Buffer.from([BookSide.LEAF_NODE_TAG].concat(node.data!)),
+    );
   }
 }
 
@@ -357,14 +359,14 @@ export class LeafNode {
     public quantity: BN,
     public timestamp: BN,
     public pegLimit: BN,
-  ) { }
+  ) {}
 }
 export class InnerNode {
   static from(obj: { children: [number] }): InnerNode {
     return new InnerNode(obj.children);
   }
 
-  constructor(public children: [number]) { }
+  constructor(public children: [number]) {}
 }
 
 export type PerpSelfTradeBehavior =
@@ -477,7 +479,7 @@ export class PerpOrder {
     public isOraclePegged = false,
     public orderType: PerpOrderType,
     public oraclePeggedProperties?: OraclePeggedProperties,
-  ) { }
+  ) {}
 
   get price(): number {
     return this.uiPrice;

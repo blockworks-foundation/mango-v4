@@ -5,12 +5,7 @@ import Big from 'big.js';
 import { MangoClient } from '../client';
 import { I80F48, I80F48Dto, ZERO_I80F48 } from '../numbers/I80F48';
 import { Modify } from '../types';
-import {
-  As,
-  QUOTE_DECIMALS,
-  toNative,
-  toUiDecimals,
-} from '../utils';
+import { As, QUOTE_DECIMALS, toNative, toUiDecimals } from '../utils';
 import {
   OracleConfig,
   OracleConfigDto,
@@ -20,7 +15,12 @@ import {
 import { Group } from './group';
 import { MangoAccount } from './mangoAccount';
 import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
-import { BookSide, BookSideType, PerpOrderSide, PerpOrderType } from './bookSide';
+import {
+  BookSide,
+  BookSideType,
+  PerpOrderSide,
+  PerpOrderType,
+} from './bookSide';
 
 export type PerpMarketIndex = number & As<'perp-market-index'>;
 
@@ -601,7 +601,6 @@ export class PerpMarket {
     );
   }
 }
-
 
 export class PerpEventQueue {
   static FILL_EVENT_TYPE = 0;
