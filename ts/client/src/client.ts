@@ -66,9 +66,6 @@ import {
   PerpEventQueue,
   PerpMarket,
   PerpMarketIndex,
-  PerpOrderSide,
-  PerpOrderType,
-  PerpSelfTradeBehavior,
 } from './accounts/perp';
 import {
   MarketIndex,
@@ -111,6 +108,7 @@ import {
   sendTransaction,
 } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
+import { PerpOrderSide, PerpOrderType, PerpSelfTradeBehavior } from './accounts/bookSide';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
 export const PERP_SETTLE_PNL_CU_LIMIT = 400000;

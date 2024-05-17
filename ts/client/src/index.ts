@@ -7,6 +7,7 @@ export * from './accounts/bank';
 export * from './accounts/mangoAccount';
 export * from './accounts/oracle';
 export * from './accounts/perp';
+export * from './accounts/bookSide';
 export * from './accounts/openbookV2';
 export {
   Serum3Market,

@@ -26,7 +26,7 @@ import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from '..';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;

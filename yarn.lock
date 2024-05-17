@@ -199,9 +199,9 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@openbook-dex/openbook-v2@git+https://github.com/openbook-dex/openbook-v2#pan/ts-client-anchor-0.29.0":
+"@openbook-dex/openbook-v2@git+https://github.com/openbook-dex/openbook-v2":
   version "0.2.7"
-  resolved "git+https://github.com/openbook-dex/openbook-v2#380d2a8a8d9b3ba6fe360cc894e60282dfbf9812"
+  resolved "git+https://github.com/openbook-dex/openbook-v2#c0cf159271544f5e10136bc94d1b634fbf48ee3a"
   dependencies:
     "@coral-xyz/anchor" "^0.29.0"
     "@solana/spl-token" "^0.4.0"

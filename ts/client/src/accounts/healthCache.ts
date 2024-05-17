@@ -18,7 +18,7 @@ import {
   PerpPosition,
   Serum3Orders,
 } from './mangoAccount';
-import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from '..';
 import { MarketIndex, Serum3Side } from './serum3';
 
 //               ░░░░
