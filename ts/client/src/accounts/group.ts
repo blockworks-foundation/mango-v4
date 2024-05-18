@@ -36,7 +36,7 @@ import {
   isSwitchboardOracle,
   parseSwitchboardOracle,
 } from './oracle';
-import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
+import { BookSide, PerpMarket, PerpMarketIndex } from '..';
 import { MarketIndex, Serum3Market } from './serum3';
 
 export class Group {

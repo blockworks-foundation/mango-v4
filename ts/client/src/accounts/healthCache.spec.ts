@@ -9,7 +9,7 @@ import { deepClone } from '../utils';
 import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
 import { HealthCache, PerpInfo, SpotInfo, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition, Serum3Orders } from './mangoAccount';
-import { PerpMarket, PerpOrderSide } from './perp';
+import { PerpMarket, PerpOrderSide } from '..';
 import { MarketIndex } from './serum3';
 
 function mockBankAndOracle(
