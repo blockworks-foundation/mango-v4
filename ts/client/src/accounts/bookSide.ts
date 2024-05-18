@@ -66,9 +66,9 @@ export class BookSide {
     const nodes: { tag: number; nodeData: Buffer }[] = [];
     for (let i = 0; i < 1024; ++i) {
       const tag = data.readUInt8(offset);
-      const nodeData = data.subarray(offset, offset + 88);
+      const nodeData = data.subarray(offset, offset + 120);
       nodes.push({ tag, nodeData });
-      offset += 88;
+      offset += 120;
     }
 
     // this result has a slightly different layout than the regular account
