@@ -136,8 +136,7 @@ export class MangoAccount {
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this.publicKey);
-    await mangoAccount.reloadSerum3OpenOrders(client);
-    await mangoAccount.reloadOpenbookV2OpenOrders(client);
+    await mangoAccount.reloadAllOpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
@@ -146,17 +145,57 @@ export class MangoAccount {
     client: MangoClient,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
-    await resp?.value.reloadSerum3OpenOrders(client);
-    await resp?.value.reloadOpenbookV2OpenOrders(client);
+    await resp?.value.reloadAllOpenOrders(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
+  }
+
+  async reloadAllOpenOrders(client: MangoClient): Promise<MangoAccount> {
+    const serum3Active = this.serum3Active();
+    const openbookV2Active = this.openbookV2Active();
+    const ooPks = [...serum3Active.map(oo => oo.openOrders), ...openbookV2Active.map(oo => oo.openOrders)];
+    if (!ooPks.length) return this;
+
+    const ais = await client.connection.getMultipleAccountsInfo(ooPks);
+
+    if (serum3Active.length) {
+      this.serum3OosMapByMarketIndex = new Map(ais.slice(0, serum3Active.length).map((ai, i) => {
+        if (!ai) {
+          throw new Error(
+            `Undefined AI for open orders ${serum3Active[i].openOrders} and market ${serum3Active[i].marketIndex}!`,
+          );
+        }
+        const oo = OpenOrders.fromAccountInfo(
+          serum3Active[i].openOrders,
+          ai,
+          OPENBOOK_PROGRAM_ID[client.cluster],
+        );
+        return [serum3Active[i].marketIndex, oo];
+      }));
+    }
+    if (openbookV2Active.length) {
+      this.openbookV2OosMapByMarketIndex = new Map(ais.slice(serum3Active.length).map((ai, i) => {
+        if (!ai) {
+          throw new Error(
+            `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
+          );
+        }
+        const oo =
+          client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+            'openOrdersAccount',
+            ai.data,
+          );
+        return [openbookV2Active[i].marketIndex, oo];
+      }));
+    }
+    return this;
   }
 
   async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     if (!serum3Active.length) return this;
     const ais =
-      await client.program.provider.connection.getMultipleAccountsInfo(
+      await client.connection.getMultipleAccountsInfo(
         serum3Active.map((serum3) => serum3.openOrders),
       );
     this.serum3OosMapByMarketIndex = new Map(
@@ -181,19 +220,10 @@ export class MangoAccount {
   }
 
   async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
-    const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(
-        client.connection,
-        new EmptyWallet(Keypair.generate()),
-        {
-          commitment: client.connection.commitment,
-        },
-      ),
-    ); // readonly client for deserializing accounts
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return this;
     const ais =
-      await client.program.provider.connection.getMultipleAccountsInfo(
+      await client.connection.getMultipleAccountsInfo(
         openbookV2Active.map((openbookV2) => openbookV2.openOrders),
       );
     this.openbookV2OosMapByMarketIndex = new Map(
@@ -205,7 +235,7 @@ export class MangoAccount {
             );
           }
           const oo =
-            openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+            client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
               'openOrdersAccount',
               ai.data,
             );
@@ -917,7 +947,7 @@ export class MangoAccount {
       (s) => s.marketIndex === serum3Market.marketIndex,
     );
     if (!serum3OO) {
-      throw new Error(`No open orders account found for ${externalMarketPk}`);
+      throw new Error(`No Serum open orders account found for ${externalMarketPk}`);
     }
 
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
@@ -1439,6 +1469,11 @@ export class MangoAccount {
     res =
       this.serum3Active().length > 0
         ? res + '\n serum:' + JSON.stringify(this.serum3Active(), null, 4)
+        : res + '';
+
+    res =
+      this.openbookV2Active().length > 1
+        ? res + '\n openbook:' + JSON.stringify(this.openbookV2Active(), null, 4)
         : res + '';
 
     res =
