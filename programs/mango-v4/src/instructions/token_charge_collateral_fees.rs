@@ -73,15 +73,35 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         return Ok(());
     }
 
-    // Users only pay for assets that are actively used to cover their liabilities.
-    let asset_usage_scaling = (total_liab_health / total_asset_health)
-        .max(I80F48::ZERO)
-        .min(I80F48::ONE);
-
-    let scaling = asset_usage_scaling * time_scaling;
-
     let token_position_count = account.active_token_positions().count();
-    for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
+
+    // Rather than pay by the pro-rata collateral fees across all assets that
+    // are used as collateral, an account should get credit for their most
+    // credit-worthy assets first, then others in order. Without this sorting, a
+    // user that is paying a collateral fee which is supposed to pay for the
+    // risk associated with being able to liquidate their volatile collateral
+    // would have their fees increase when they deposit additional volatile
+    // collateral without any new liabilities. The program should not penalize a
+    // user for depositing more collateral.
+    let mut collateral_fee_per_day_and_bank_ai_index = Vec::with_capacity(token_position_count);
+    for index in 0..token_position_count {
+        let bank_ai = &ctx.remaining_accounts[index];
+
+        // Could directly get the bytes from the bank since they are in a fixed
+        // position and save CU, but for code readability, deserialize the whole
+        // account.
+        let bank = bank_ai.load::<Bank>()?;
+        let collateral_fee_per_day = bank.collateral_fee_per_day;
+
+        collateral_fee_per_day_and_bank_ai_index.push((collateral_fee_per_day, index));
+    }
+    // Custom sort because f32 doesnt have sort by default.
+    collateral_fee_per_day_and_bank_ai_index.sort_by(|a, b| (a.0).partial_cmp(&b.0).unwrap());
+
+    // Remaining amount of liability health that needs to be covered by collateral.
+    let mut remaining_liab = total_liab_health;
+    for (_collateral_fee, index) in collateral_fee_per_day_and_bank_ai_index.iter() {
+        let bank_ai = &ctx.remaining_accounts[*index];
         let mut bank = bank_ai.load_mut::<Bank>()?;
         if bank.collateral_fee_per_day <= 0.0 || bank.maint_asset_weight.is_zero() {
             continue;
@@ -93,7 +113,24 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             continue;
         }
 
-        let fee = token_balance * scaling * I80F48::from_num(bank.collateral_fee_per_day);
+        let token_balance = token_position.native(&bank);
+        // Contribution from this bank used as collateral. This is always
+        // positive since the check above guarantees token balance is positive.
+        let possible_health_contribution = health_cache.token_infos[*index].health_contribution(
+            HealthType::Maint, token_balance
+        );
+
+        let asset_usage_scaling = if possible_health_contribution < remaining_liab {
+            remaining_liab -= possible_health_contribution;
+            I80F48::ONE
+        } else {
+            let scaling = remaining_liab / possible_health_contribution;
+            remaining_liab = I80F48::ZERO;
+            scaling
+        };
+
+        let fee = token_balance * asset_usage_scaling * time_scaling *
+            I80F48::from_num(bank.collateral_fee_per_day);
         assert!(fee <= token_balance);
 
         let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
@@ -123,7 +160,12 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             indexed_position: token_position.indexed_position.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
             borrow_index: bank.borrow_index.to_bits(),
-        })
+        });
+
+        // Once all liability health is covered, no more need to charge collateral fees.
+        if remaining_liab <= I80F48::ZERO {
+            break;
+        }
     }
 
     Ok(())
