@@ -1,10 +1,15 @@
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import {
+  OpenbookV2OrderType,
+  OpenbookV2SelfTradeBehavior,
+  OpenbookV2Side,
+} from '../../src';
 import { Bank } from '../../src/accounts/bank';
+import { PerpOrderSide, PerpOrderType } from '../../src/accounts/bookSide';
 import { MangoAccount } from '../../src/accounts/mangoAccount';
 import { PerpMarket } from '../../src/accounts/perp';
-import { PerpOrderSide, PerpOrderType } from '../../src/accounts/bookSide';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -17,11 +22,6 @@ import {
   NullTokenEditParams,
 } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../../src/constants';
-import {
-  OpenbookV2OrderType,
-  OpenbookV2SelfTradeBehavior,
-  OpenbookV2Side,
-} from '../../src';
 
 //
 // This script creates liquidation candidates
@@ -84,7 +84,9 @@ async function main() {
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroup(
+    new PublicKey('1eQmQRTHTekjzkorXn84bjTJJPXK1fZMVRdTepPyrAt'),
+  );
   console.log(group.toString());
 
   const MAINNET_MINTS = new Map([
@@ -102,7 +104,7 @@ async function main() {
   async function createMangoAccount(name: string): Promise<MangoAccount> {
     const accountNum = maxAccountNum + 1;
     maxAccountNum = maxAccountNum + 1;
-    await client.createMangoAccount(group, accountNum, name, 5, 4, 4, 4);
+    await client.createMangoAccount(group, accountNum, name, 5, 2, 2, 32, 4, 4);
     return (await client.getMangoAccountForOwner(
       group,
       admin.publicKey,
@@ -316,10 +318,12 @@ async function main() {
       );
       await mangoAccount.reload(client);
 
+      console.log(mangoAccount.openbookV2);
       for (let market of group.openbookV2MarketsMapByMarketIndex.values()) {
         if (market.name == 'SOL/USDC') {
           continue;
         }
+        console.log(`placing order for ${market.name} ${market.marketIndex}`);
         await client.openbookV2PlaceOrder(
           group,
           mangoAccount,

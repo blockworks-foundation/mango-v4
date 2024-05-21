@@ -1,8 +1,9 @@
 import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
-import { OpenBookV2Client, OpenOrdersAccount } from '@openbook-dex/openbook-v2';
+import { OpenOrdersAccount } from '@openbook-dex/openbook-v2';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, Keypair, PublicKey } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from '..';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -13,7 +14,6 @@ import {
   ZERO_I80F48,
 } from '../numbers/I80F48';
 import {
-  EmptyWallet,
   U64_MAX_BN,
   deepClone,
   roundTo5,
@@ -26,7 +26,6 @@ import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from '..';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -153,40 +152,47 @@ export class MangoAccount {
   async reloadAllOpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     const openbookV2Active = this.openbookV2Active();
-    const ooPks = [...serum3Active.map(oo => oo.openOrders), ...openbookV2Active.map(oo => oo.openOrders)];
+    const ooPks = [
+      ...serum3Active.map((oo) => oo.openOrders),
+      ...openbookV2Active.map((oo) => oo.openOrders),
+    ];
     if (!ooPks.length) return this;
 
     const ais = await client.connection.getMultipleAccountsInfo(ooPks);
 
     if (serum3Active.length) {
-      this.serum3OosMapByMarketIndex = new Map(ais.slice(0, serum3Active.length).map((ai, i) => {
-        if (!ai) {
-          throw new Error(
-            `Undefined AI for open orders ${serum3Active[i].openOrders} and market ${serum3Active[i].marketIndex}!`,
+      this.serum3OosMapByMarketIndex = new Map(
+        ais.slice(0, serum3Active.length).map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${serum3Active[i].openOrders} and market ${serum3Active[i].marketIndex}!`,
+            );
+          }
+          const oo = OpenOrders.fromAccountInfo(
+            serum3Active[i].openOrders,
+            ai,
+            OPENBOOK_PROGRAM_ID[client.cluster],
           );
-        }
-        const oo = OpenOrders.fromAccountInfo(
-          serum3Active[i].openOrders,
-          ai,
-          OPENBOOK_PROGRAM_ID[client.cluster],
-        );
-        return [serum3Active[i].marketIndex, oo];
-      }));
+          return [serum3Active[i].marketIndex, oo];
+        }),
+      );
     }
     if (openbookV2Active.length) {
-      this.openbookV2OosMapByMarketIndex = new Map(ais.slice(serum3Active.length).map((ai, i) => {
-        if (!ai) {
-          throw new Error(
-            `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
-          );
-        }
-        const oo =
-          client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
-            'openOrdersAccount',
-            ai.data,
-          );
-        return [openbookV2Active[i].marketIndex, oo];
-      }));
+      this.openbookV2OosMapByMarketIndex = new Map(
+        ais.slice(serum3Active.length).map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
+            );
+          }
+          const oo =
+            client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+              'openOrdersAccount',
+              ai.data,
+            );
+          return [openbookV2Active[i].marketIndex, oo];
+        }),
+      );
     }
     return this;
   }
@@ -194,10 +200,9 @@ export class MangoAccount {
   async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     if (!serum3Active.length) return this;
-    const ais =
-      await client.connection.getMultipleAccountsInfo(
-        serum3Active.map((serum3) => serum3.openOrders),
-      );
+    const ais = await client.connection.getMultipleAccountsInfo(
+      serum3Active.map((serum3) => serum3.openOrders),
+    );
     this.serum3OosMapByMarketIndex = new Map(
       Array.from(
         ais.map((ai, i) => {
@@ -222,10 +227,9 @@ export class MangoAccount {
   async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return this;
-    const ais =
-      await client.connection.getMultipleAccountsInfo(
-        openbookV2Active.map((openbookV2) => openbookV2.openOrders),
-      );
+    const ais = await client.connection.getMultipleAccountsInfo(
+      openbookV2Active.map((openbookV2) => openbookV2.openOrders),
+    );
     this.openbookV2OosMapByMarketIndex = new Map(
       Array.from(
         ais.map((ai, i) => {
@@ -947,7 +951,9 @@ export class MangoAccount {
       (s) => s.marketIndex === serum3Market.marketIndex,
     );
     if (!serum3OO) {
-      throw new Error(`No Serum open orders account found for ${externalMarketPk}`);
+      throw new Error(
+        `No Serum open orders account found for ${externalMarketPk}`,
+      );
     }
 
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
@@ -1473,7 +1479,9 @@ export class MangoAccount {
 
     res =
       this.openbookV2Active().length > 1
-        ? res + '\n openbook:' + JSON.stringify(this.openbookV2Active(), null, 4)
+        ? res +
+          '\n openbook:' +
+          JSON.stringify(this.openbookV2Active(), null, 4)
         : res + '';
 
     res =
@@ -1692,7 +1700,7 @@ export class OpenbookV2Orders {
   ) {}
 
   public isActive(): boolean {
-    console.log(`isActive - ${this.marketIndex} ${this.openOrders}`);
+    // console.log(`isActive - ${this.marketIndex} ${this.openOrders}`);
     return (
       this.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset &&
       !this.openOrders.equals(PublicKey.default)

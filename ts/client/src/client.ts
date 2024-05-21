@@ -3438,11 +3438,11 @@ export class MangoClient {
     const openOrders =
       mangoAccount.getOpenbookV2Account(openbookV2Market.marketIndex)
         ?.openOrders ??
-      openbookV2Market.findOoPda(
+      (await openbookV2Market.getNextOoPda(
+        this,
         openbookV2Market.openbookProgram,
         mangoAccount.publicKey,
-        1,
-      );
+      ));
     const openbookV2MarketExternalVaultSigner =
       generateOpenbookV2MarketExternalVaultSignerAddress(openbookV2Market);
 
@@ -6150,13 +6150,13 @@ export class MangoClient {
         })),
       )
       .flat();
-    console.log('indices');
+    // console.log('indices');
     openbookPositionMarketIndices.forEach((p) => {
-      console.log(p.marketIndex, p.openOrders.toBase58());
+      // console.log(p.marketIndex, p.openOrders.toBase58());
     });
-    console.log('oos for market');
+    // console.log('oos for market');
     openbookOpenOrdersForMarket.forEach((p) => {
-      console.log(p[0].baseTokenIndex, p[1].toBase58());
+      // console.log(p[0].baseTokenIndex, p[1].toBase58());
     });
     for (const [openbookV2Market, openOrderPk] of openbookOpenOrdersForMarket) {
       const ooPositionExists =
@@ -6164,14 +6164,14 @@ export class MangoClient {
           (i) => i.marketIndex === openbookV2Market.marketIndex,
         ) > -1;
       if (!ooPositionExists) {
-        console.log('postion does not exist');
+        // console.log('postion does not exist');
         const inactiveOpenbookPosition =
           openbookPositionMarketIndices.findIndex(
             (serumPos) =>
               serumPos.marketIndex ===
               OpenbookV2Orders.OpenbookV2MarketIndexUnset,
           );
-        console.log('new pos index', inactiveOpenbookPosition);
+        // console.log('new pos index', inactiveOpenbookPosition);
         if (inactiveOpenbookPosition != -1) {
           openbookPositionMarketIndices[inactiveOpenbookPosition].marketIndex =
             openbookV2Market.marketIndex;
@@ -6190,9 +6190,9 @@ export class MangoClient {
         .map((serumPosition) => serumPosition.openOrders),
     );
 
-    console.log('pushing');
+    // console.log('pushing');
     openbookPositionMarketIndices.forEach((p) => {
-      console.log(p.marketIndex);
+      // console.log(p.marketIndex);
     });
     healthRemainingAccounts.push(
       ...openbookPositionMarketIndices
