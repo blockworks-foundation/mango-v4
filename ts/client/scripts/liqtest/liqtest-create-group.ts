@@ -261,6 +261,7 @@ async function main(): Promise<void> {
       nextSerumMarketIndex += 1;
     } catch (error) {
       console.log(error);
+      nextSerumMarketIndex += 1;
     }
   }
 
@@ -284,6 +285,7 @@ async function main(): Promise<void> {
       nextOpbv2MarketIndex += 1;
     } catch (error) {
       console.log(error);
+      nextOpbv2MarketIndex += 1;
     }
   }
 

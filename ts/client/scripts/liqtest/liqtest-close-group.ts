@@ -55,6 +55,17 @@ async function main() {
       );
     }
 
+    // deregister all obv2 markets
+    for (const market of group.openbookV2MarketsMapByExternal.values()) {
+      sig = await client.openbookV2deregisterMarket(
+        group,
+        market.openbookMarketExternal,
+      );
+      console.log(
+        `Deregistered obv2 market ${market.name}, sig https://explorer.solana.com/tx/${sig.signature}`,
+      );
+    }
+
     // close all perp markets
     for (const market of group.perpMarketsMapByMarketIndex.values()) {
       sig = await client.perpCloseMarket(group, market.perpMarketIndex);
