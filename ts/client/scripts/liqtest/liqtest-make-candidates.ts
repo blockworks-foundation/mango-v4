@@ -3,11 +3,8 @@ import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { Bank } from '../../src/accounts/bank';
 import { MangoAccount } from '../../src/accounts/mangoAccount';
-import {
-  PerpMarket,
-  PerpOrderSide,
-  PerpOrderType,
-} from '../../src/accounts/perp';
+import { PerpMarket } from '../../src/accounts/perp';
+import { PerpOrderSide, PerpOrderType } from '../../src/accounts/bookSide';
 import {
   Serum3OrderType,
   Serum3SelfTradeBehavior,
@@ -20,6 +17,11 @@ import {
   NullTokenEditParams,
 } from '../../src/clientIxParamBuilder';
 import { MANGO_V4_ID } from '../../src/constants';
+import {
+  OpenbookV2OrderType,
+  OpenbookV2SelfTradeBehavior,
+  OpenbookV2Side,
+} from '../../src';
 
 //
 // This script creates liquidation candidates
@@ -246,6 +248,87 @@ async function main() {
           1,
           Serum3SelfTradeBehavior.abortTransaction,
           Serum3OrderType.limit,
+          0,
+          5,
+        );
+        await mangoAccount.reload(client);
+      }
+    } finally {
+      // restore the weights
+      await client.tokenEdit(
+        group,
+        buyMint,
+        Builder(NullTokenEditParams)
+          .oracle(group.getFirstBankByMint(buyMint).oracle)
+          .maintAssetWeight(0.9)
+          .initAssetWeight(0.8)
+          .build(),
+      );
+    }
+  }
+
+  // Openbook-v2 order scenario
+  {
+    const name = 'LIQTEST, obv2 orders';
+
+    console.log(`Creating mangoaccount...`);
+    const mangoAccount = await createMangoAccount(name);
+    console.log(
+      `...created mangoAccount ${mangoAccount.publicKey} for ${name}`,
+    );
+
+    const market = group.getOpenbookV2MarketByName('SOL/USDC')!;
+    const sellMint = new PublicKey(MAINNET_MINTS.get('USDC')!);
+    const buyMint = new PublicKey(MAINNET_MINTS.get('SOL')!);
+
+    await client.tokenDepositNative(
+      group,
+      mangoAccount,
+      sellMint,
+      new BN(150000),
+    );
+    await mangoAccount.reload(client);
+
+    // temporarily up the init asset weight of the bought token
+    await client.tokenEdit(
+      group,
+      buyMint,
+      Builder(NullTokenEditParams)
+        .oracle(group.getFirstBankByMint(buyMint).oracle)
+        .maintAssetWeight(1.0)
+        .initAssetWeight(1.0)
+        .build(),
+    );
+    try {
+      // At a price of $0.015/ui-SOL we can buy 10 ui-SOL for the 0.15 USDC (150k native-USDC) we have.
+      // With maint weight of 0.9 we have 10x main-leverage. Buying 11x as much causes liquidation.
+      await client.openbookV2PlaceOrder(
+        group,
+        mangoAccount,
+        market.openbookMarketExternal,
+        OpenbookV2Side.bid,
+        0.015,
+        11 * 10,
+        OpenbookV2SelfTradeBehavior.abortTransaction,
+        OpenbookV2OrderType.limit,
+        0,
+        5,
+      );
+      await mangoAccount.reload(client);
+
+      for (let market of group.openbookV2MarketsMapByMarketIndex.values()) {
+        if (market.name == 'SOL/USDC') {
+          continue;
+        }
+        await client.openbookV2PlaceOrder(
+          group,
+          mangoAccount,
+          market.openbookMarketExternal,
+          OpenbookV2Side.bid,
+          0.001,
+          1,
+          OpenbookV2SelfTradeBehavior.abortTransaction,
+          OpenbookV2OrderType.limit,
           0,
           5,
         );

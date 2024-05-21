@@ -23,6 +23,9 @@ const MINTS = JSON.parse(process.env.MINTS || '').map((s) => new PublicKey(s));
 const SERUM_MARKETS = JSON.parse(process.env.SERUM_MARKETS || '').map(
   (s) => new PublicKey(s),
 );
+const OBV2_MARKETS = JSON.parse(process.env.OBV2_MARKETS || '').map(
+  (s) => new PublicKey(s),
+);
 
 const MAINNET_MINTS = new Map([
   ['USDC', MINTS[0]],
@@ -256,6 +259,29 @@ async function main(): Promise<void> {
         0,
       );
       nextSerumMarketIndex += 1;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  let nextOpbv2MarketIndex = 0;
+  for (const [name, mint] of MAINNET_MINTS) {
+    if (name == 'USDC') {
+      continue;
+    }
+
+    console.log(`Registering ${name}/USDC obv2 market...`);
+    try {
+      await client.openbookV2RegisterMarket(
+        group,
+        new PublicKey(OBV2_MARKETS[nextOpbv2MarketIndex]),
+        group.getFirstBankByMint(new PublicKey(mint)),
+        group.getFirstBankByMint(usdcMint),
+        nextOpbv2MarketIndex,
+        `${name}/USDC`,
+        0,
+      );
+      nextOpbv2MarketIndex += 1;
     } catch (error) {
       console.log(error);
     }
