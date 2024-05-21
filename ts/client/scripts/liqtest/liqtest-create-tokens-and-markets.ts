@@ -1,28 +1,22 @@
-import { BN, AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
+import * as obv2 from '@openbook-dex/openbook-v2';
+import * as serum from '@project-serum/serum';
+import * as splToken from '@solana/spl-token';
 import {
-  Transaction,
-  SystemProgram,
-  AddressLookupTableProgram,
   Connection,
   Keypair,
   PublicKey,
   sendAndConfirmTransaction,
-  TransactionInstruction,
   Signer,
+  SystemProgram,
+  Transaction,
 } from '@solana/web3.js';
-import * as splToken from '@solana/spl-token';
-import * as serum from '@project-serum/serum';
-import * as obv2 from '@openbook-dex/openbook-v2';
 import fs from 'fs';
-import { MangoClient } from '../../src/client';
+import { OracleConfigParams } from '../../src';
 import {
-  MANGO_V4_ID,
   OPENBOOK_PROGRAM_ID,
   OPENBOOK_V2_PROGRAM_ID,
 } from '../../src/constants';
-import { connect } from 'http2';
-import { generateSerum3MarketExternalVaultSignerAddress } from '../../src/accounts/serum3';
-import { OracleConfigParams } from '../../src';
 
 //
 // Script which creates three mints and two serum3 markets relating them
@@ -83,7 +77,15 @@ async function main(): Promise<void> {
       mint,
       admin.publicKey,
     );
-    await splToken.mintTo(connection, admin, mint, tokenAccount, admin, 1e15);
+    const sig = await splToken.mintTo(
+      connection,
+      admin,
+      mint,
+      tokenAccount,
+      admin,
+      1e15,
+    );
+    console.log(sig);
   }
   //const mints = [new PublicKey('5aMD1uEcWnXnptwmyfxmTWHzx3KeMsZ7jmiJAZ3eiAdH'), new PublicKey('FijXcDUkgTiMsghQVpjRDBdUPtkrJfQdfRZkr6zLkdkW'), new PublicKey('3tVDfiFQAAT3rqLNMXUaH2p5X5R4fjz8LYEvFEQ9fDYB')]
 
