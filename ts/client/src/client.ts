@@ -77,6 +77,7 @@ import {
   Serum3Market,
   Serum3OrderType,
   Serum3SelfTradeBehavior,
+  Serum3Side,
   generateSerum3MarketExternalVaultSignerAddress,
 } from './accounts/serum3';
 import {
@@ -2493,7 +2494,7 @@ export class MangoClient {
     );
 
     const payerTokenIndex = ((): TokenIndex => {
-      if (side == OpenbookV2Side.bid) {
+      if (side == Serum3Side.bid) {
         return serum3Market.quoteTokenIndex;
       } else {
         return serum3Market.baseTokenIndex;
@@ -2501,7 +2502,7 @@ export class MangoClient {
     })();
 
     const receiverTokenIndex = ((): TokenIndex => {
-      if (side == OpenbookV2Side.bid) {
+      if (side == Serum3Side.bid) {
         return serum3Market.baseTokenIndex;
       } else {
         return serum3Market.quoteTokenIndex;
