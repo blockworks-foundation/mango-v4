@@ -39,6 +39,11 @@ import mapValues from 'lodash/mapValues';
 import maxBy from 'lodash/maxBy';
 import uniq from 'lodash/uniq';
 import { Bank, MintInfo, TokenIndex } from './accounts/bank';
+import {
+  PerpOrderSide,
+  PerpOrderType,
+  PerpSelfTradeBehavior,
+} from './accounts/bookSide';
 import { Group } from './accounts/group';
 import {
   MangoAccount,
@@ -108,11 +113,6 @@ import {
   sendTransaction,
 } from './utils/rpc';
 import { NATIVE_MINT, TOKEN_PROGRAM_ID } from './utils/spl';
-import {
-  PerpOrderSide,
-  PerpOrderType,
-  PerpSelfTradeBehavior,
-} from './accounts/bookSide';
 
 export const DEFAULT_TOKEN_CONDITIONAL_SWAP_COUNT = 8;
 export const PERP_SETTLE_PNL_CU_LIMIT = 400000;
@@ -181,7 +181,11 @@ export class MangoClient {
     Error.stackTraceLimit = 1000;
     this.multipleConnections = opts?.multipleConnections ?? [];
     this.fallbackOracleConfig = opts?.fallbackOracleConfig ?? 'never';
-    this.openbookClient = new OpenBookV2Client((program.provider as AnchorProvider), undefined, opts);
+    this.openbookClient = new OpenBookV2Client(
+      program.provider as AnchorProvider,
+      undefined,
+      opts,
+    );
   }
 
   /// Convenience accessors
@@ -962,15 +966,21 @@ export class MangoClient {
     serum3Count?: number,
     perpCount?: number,
     perpOoCount?: number,
+    tokenConditionalSwapCount?: number,
+    openbookV2Count?: number,
   ): Promise<MangoSignatureStatus> {
     const ix = await this.program.methods
-      .accountCreate(
+      .accountCreateV3(
         accountNumber ?? 0,
-        tokenCount ?? 8,
-        serum3Count ?? 4,
-        perpCount ?? 4,
+        tokenCount ?? 8, // 8 * 2
+        serum3Count ?? 2, // 2 * 1
+        perpCount ?? 2, // 2 * 2
         perpOoCount ?? 32,
+        tokenConditionalSwapCount ?? 0,
+        openbookV2Count ?? 2, // 2 * 1
         name ?? '',
+        // final sum of default health accounts
+        // 8 * 2 + 2 * 1 + 2 * 2 + 2 * 1
       )
       .accounts({
         group: group.publicKey,
@@ -1193,11 +1203,9 @@ export class MangoClient {
     const mangoAccount = await this.getMangoAccountFromPk(mangoAccountPk);
     if (loadSerum3Oo && !loadOpenbookV2Oo) {
       await mangoAccount.reloadSerum3OpenOrders(this);
-    }
-    else if (loadOpenbookV2Oo && !loadSerum3Oo) {
+    } else if (loadOpenbookV2Oo && !loadSerum3Oo) {
       await mangoAccount.reloadOpenbookV2OpenOrders(this);
-    }
-    else if (loadOpenbookV2Oo && loadSerum3Oo) {
+    } else if (loadOpenbookV2Oo && loadSerum3Oo) {
       await mangoAccount.reloadAllOpenOrders(this);
     }
     return mangoAccount;
@@ -5890,7 +5898,6 @@ export class MangoClient {
         [account],
         [...banks],
         [...perpMarkets],
-
       );
     const parsedHealthAccounts = healthRemainingAccounts.map(
       (pk) =>
@@ -6184,7 +6191,7 @@ export class MangoClient {
 
     console.log('pushing');
     openbookPositionMarketIndices.forEach((p) => {
-      console.log(p.marketIndex,);
+      console.log(p.marketIndex);
     });
     healthRemainingAccounts.push(
       ...openbookPositionMarketIndices
