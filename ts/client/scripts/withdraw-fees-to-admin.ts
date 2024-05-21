@@ -17,11 +17,7 @@ import fs from 'fs';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
 import { I80F48 } from '../src/numbers/I80F48';
-import {
-  createAssociatedTokenAccountIdempotentInstruction,
-  toUiDecimals,
-} from '../src/utils';
-import { sendTransaction } from '../src/utils/rpc';
+import { toUiDecimals } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -69,19 +65,19 @@ async function withdrawFeesToAdmin(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
   const vsrClient = await setupVsr(client.connection, wallet);
 
-  // create wsol ata
-  const ix = await createAssociatedTokenAccountIdempotentInstruction(
-    wallet.publicKey,
-    new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
-    new PublicKey('So11111111111111111111111111111111111111112'),
-  );
-  const res = await sendTransaction(
-    vsrClient.program.provider as AnchorProvider,
-    [ix],
-    [],
-    {},
-  );
-  console.log(`${res.signature}`);
+  // // create wsol ata
+  // const ix = await createAssociatedTokenAccountIdempotentInstruction(
+  //   wallet.publicKey,
+  //   new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
+  //   new PublicKey('So11111111111111111111111111111111111111112'),
+  // );
+  // const res = await sendTransaction(
+  //   vsrClient.program.provider as AnchorProvider,
+  //   [ix],
+  //   [],
+  //   {},
+  // );
+  // console.log(`${res.signature}`);
 
   const group = await client.getGroup(MANGO_V4_PRIMARY_GROUP);
 
@@ -104,6 +100,8 @@ async function withdrawFeesToAdmin(): Promise<void> {
       if (feesInQuoteUi < 50) {
         return;
       }
+
+      console.log(`${bank.name} ${feesInQuoteUi}`);
 
       const ix = await client.program.methods
         .adminTokenWithdrawFees()
