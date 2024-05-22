@@ -84,9 +84,7 @@ async function main() {
   console.log(`User ${userWallet.publicKey.toBase58()}`);
 
   // fetch group
-  const group = await client.getGroup(
-    new PublicKey('1eQmQRTHTekjzkorXn84bjTJJPXK1fZMVRdTepPyrAt'),
-  );
+  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
   console.log(group.toString());
 
   const MAINNET_MINTS = new Map([
@@ -104,7 +102,7 @@ async function main() {
   async function createMangoAccount(name: string): Promise<MangoAccount> {
     const accountNum = maxAccountNum + 1;
     maxAccountNum = maxAccountNum + 1;
-    await client.createMangoAccount(group, accountNum, name, 5, 2, 2, 32, 4, 4);
+    await client.createMangoAccount(group, accountNum, name, 5, 4, 2, 16, 2, 4);
     return (await client.getMangoAccountForOwner(
       group,
       admin.publicKey,
