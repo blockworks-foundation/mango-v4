@@ -8,7 +8,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
-    "target": "esnext"
+    "target": "ES2022"
   },
   "ts-node": {
     // these options are overrides used only by ts-node
