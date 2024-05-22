@@ -223,7 +223,7 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
             reduce_only: false,
             account,
             owner,
-            token_account:  context.users[1].token_accounts[context.mints[2].index],
+            token_account: context.users[1].token_accounts[context.mints[2].index],
             token_authority: context.users[1].key,
             bank_index: 0,
         },

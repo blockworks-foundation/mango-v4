@@ -77,19 +77,15 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
 
     // Rather than pay by the pro-rata collateral fees across all assets that
     // are used as collateral, an account should get credit for their most
-    // credit-worthy assets first, then others in order. Without this sorting, a
-    // user that is paying a collateral fee which is supposed to pay for the
-    // risk associated with being able to liquidate their volatile collateral
-    // would have their fees increase when they deposit additional volatile
-    // collateral without any new liabilities. The program should not penalize a
-    // user for depositing more collateral.
+    // credit-worthy assets first, then others in order. Without this sorting,
+    // suppose a user has enough collateral to cover their liabilities using
+    // just tokens without a collateral fee. Once they add additional collateral
+    // of a type that does have a fee, if all collateral was contributing to
+    // this health pro-rata, they would now have a fee as a result of adding
+    // collateral without a new liability.
     let mut collateral_fee_per_day_and_bank_ai_index = Vec::with_capacity(token_position_count);
     for index in 0..token_position_count {
         let bank_ai = &ctx.remaining_accounts[index];
-
-        // Could directly get the bytes from the bank since they are in a fixed
-        // position and save CU, but for code readability, deserialize the whole
-        // account.
         let bank = bank_ai.load::<Bank>()?;
         let collateral_fee_per_day = bank.collateral_fee_per_day;
 
@@ -108,17 +104,15 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         }
 
         let (token_position, raw_token_index) = account.token_position_mut(bank.token_index)?;
-        let token_balance = token_position.native(&bank);
+        let token_balance = token_balances[*index].spot_and_perp;
         if token_balance <= 0 {
             continue;
         }
 
-        let token_balance = token_position.native(&bank);
         // Contribution from this bank used as collateral. This is always
         // positive since the check above guarantees token balance is positive.
-        let possible_health_contribution = health_cache.token_infos[*index].health_contribution(
-            HealthType::Maint, token_balance
-        );
+        let possible_health_contribution =
+            health_cache.token_infos[*index].health_contribution(HealthType::Maint, token_balance);
 
         let asset_usage_scaling = if possible_health_contribution < remaining_liab {
             remaining_liab -= possible_health_contribution;
@@ -129,8 +123,10 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             scaling
         };
 
-        let fee = token_balance * asset_usage_scaling * time_scaling *
-            I80F48::from_num(bank.collateral_fee_per_day);
+        let fee = token_balance
+            * asset_usage_scaling
+            * time_scaling
+            * I80F48::from_num(bank.collateral_fee_per_day);
         assert!(fee <= token_balance);
 
         let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
