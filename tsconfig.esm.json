@@ -3,8 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "declarationMap": false,
-    "module": "esnext",
+    "module": "CommonJS",
     "outDir": "dist/esm",
-    "sourceMap": false,
+    "sourceMap": false
   }
 }
