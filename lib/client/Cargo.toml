@@ -2,9 +2,14 @@
 name = "mango-v4-client"
 version = "0.3.0"
 edition = "2021"
+build = "build.rs"
 
 [lib]
 doctest = false
+
+[build-dependencies]
+anyhow = "1.0"
+vergen = { version = "8.3.1", features = ["git", "gitcl"] }
 
 [dependencies]
 anchor-client = { workspace = true }
