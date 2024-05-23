@@ -3,7 +3,7 @@
     keys: &amp;[Pubkey],
     max_chunk_size: <a class="primitive" href="https://doc.rust-lang.org/1.70.0/std/primitive.usize.html">usize</a>,
     parallel_rpc_requests: <a class="primitive" href="https://doc.rust-lang.org/1.70.0/std/primitive.usize.html">usize</a>
-) -&gt; <a class="type" href="https://docs.rs/anyhow/1.0.75/anyhow/type.Result.html" title="type anyhow::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.70.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;(Pubkey, Account)&gt;&gt;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Fetch multiple account using one request per chunk of <code>max_chunk_size</code> accounts
+) -&gt; <a class="type" href="https://docs.rs/anyhow/1.0.85/anyhow/type.Result.html" title="type anyhow::Result">Result</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.70.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;(Pubkey, Account)&gt;&gt;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Fetch multiple account using one request per chunk of <code>max_chunk_size</code> accounts
 Can execute in parallel up to <code>parallel_rpc_requests</code></p>
 <p>WARNING: some accounts requested may be missing from the result</p>
 </div></details></section></div></main></body></html>

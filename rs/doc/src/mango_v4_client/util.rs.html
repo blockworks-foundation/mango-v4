@@ -162,12 +162,25 @@
 <a href="#162" id="162">162</a>
 <a href="#163" id="163">163</a>
 <a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>solana_sdk::compute_budget::ComputeBudgetInstruction;
 <span class="kw">use </span>solana_sdk::instruction::Instruction;
 
 <span class="kw">use </span>anchor_lang::prelude::{AccountMeta, Pubkey};
 <span class="kw">use </span>anyhow::Context;
-<span class="kw">use </span>tracing::warn;
+<span class="kw">use </span>tracing::{info, warn};
 
 <span class="doccomment">/// Some Result&lt;&gt; types don&#39;t convert to anyhow::Result nicely. Force them through stringification.
 </span><span class="kw">pub trait </span>AnyhowWrap {
@@ -232,6 +245,19 @@
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .event_format(format)
         .init();
+}
+
+<span class="kw">pub fn </span>print_git_version() {
+    <span class="macro">info!</span>(
+        <span class="string">&quot;version is {}[{}{}]&quot;</span>,
+        <span class="macro">env!</span>(<span class="string">&quot;VERGEN_GIT_SHA&quot;</span>),
+        <span class="macro">env!</span>(<span class="string">&quot;VERGEN_GIT_COMMIT_DATE&quot;</span>),
+        <span class="kw">if </span><span class="macro">env!</span>(<span class="string">&quot;VERGEN_GIT_DIRTY&quot;</span>) == <span class="string">&quot;true&quot; </span>{
+            <span class="string">&quot;-dirty&quot;
+        </span>} <span class="kw">else </span>{
+            <span class="string">&quot;&quot;
+        </span>}
+    );
 }
 
 <span class="kw">pub async fn </span>http_error_handling&lt;T: serde::de::DeserializeOwned&gt;(
