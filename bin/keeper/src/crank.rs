@@ -196,6 +196,10 @@ pub async fn loop_update_index_and_rate(
             .iter()
             .map(|token_index| client.context.token(*token_index).name.to_owned())
             .join(",");
+        let token_closed = token_indices_clone
+            .iter()
+            .map(|token_index| client.context.token(*token_index).closed.to_owned())
+            .join(",");
 
         let mut instructions = PreparedInstructions::new();
         for token_index in token_indices_clone.iter() {
@@ -262,16 +266,16 @@ pub async fn loop_update_index_and_rate(
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
             info!(
-                "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                token_names, duration_ms, e
+                "metricName=UpdateTokensV4Failure tokens={} closed={} durationMs={} error={}",
+                token_names, token_closed, duration_ms, e
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_TOKENS_SUCCESS.inc();
             METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
-                "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                token_names, duration_ms,
+                "metricName=UpdateTokensV4Success tokens={} closed = {} durationMs={}",
+                token_names, token_closed, duration_ms,
             );
             info!("{:?}", sig_result);
         }
