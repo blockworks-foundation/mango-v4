@@ -3,6 +3,7 @@ use solana_sdk::instruction::Instruction;
 
 use anchor_lang::prelude::{AccountMeta, Pubkey};
 use anyhow::Context;
+use tracing::info;
 
 /// Some Result<> types don't convert to anyhow::Result nicely. Force them through stringification.
 pub trait AnyhowWrap {
@@ -57,6 +58,19 @@ pub fn tracing_subscriber_init() {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .event_format(format)
         .init();
+}
+
+pub fn print_git_version() {
+    info!(
+        "version is {}[{}{}]",
+        env!("VERGEN_GIT_SHA"),
+        env!("VERGEN_GIT_COMMIT_DATE"),
+        if env!("VERGEN_GIT_DIRTY") == "true" {
+            "-dirty"
+        } else {
+            ""
+        }
+    );
 }
 
 pub async fn http_error_handling<T: serde::de::DeserializeOwned>(
