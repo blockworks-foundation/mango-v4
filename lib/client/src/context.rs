@@ -170,9 +170,10 @@ impl Default for ComputeEstimates {
             cu_per_perp_order_cancel: 7_000,
             // measured around 2k, see test_health_compute_tokens_fallback_oracles
             cu_per_oracle_fallback: 2000,
-            // the base cost is mostly the division
+            // the base cost is mostly the division. only one division happens
+            // because only the last collateral used has a division.
             cu_per_charge_collateral_fees: 20_000,
-            // per-chargable-token cost
+            // per-chargable-token cost. factors in the sorting by collateral_fee
             cu_per_charge_collateral_fees_token: 15_000,
             // measured around 8k, see test_basics
             cu_for_sequence_check: 10_000,

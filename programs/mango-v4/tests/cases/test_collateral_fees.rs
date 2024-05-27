@@ -9,7 +9,7 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
     let admin = TestKeypair::new();
     let owner = context.users[0].key;
     let payer = context.users[1].key;
-    let mints = &context.mints[0..2];
+    let mints = &context.mints[0..3];
 
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
@@ -27,7 +27,7 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
         owner,
         0,
         &context.users[1],
-        mints,
+        &context.mints[0..2],
         1_000_000,
         0,
     )
@@ -182,7 +182,7 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
         1500.0 * (1.0 - 0.1 * (9.0 / 24.0) * (600.0 / 1200.0)),
         0.01
     );
-    let last_balance = account_position_f64(solana, account, tokens[0].bank).await;
+    let mut last_balance = account_position_f64(solana, account, tokens[0].bank).await;
 
     //
     // TEST: More borrows
@@ -207,7 +207,53 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
     send_tx(solana, TokenChargeCollateralFeesInstruction { account })
         .await
         .unwrap();
-    //last_time = solana.clock_timestamp().await;
+    assert_eq_f64!(
+        account_position_f64(solana, account, tokens[0].bank).await,
+        last_balance * (1.0 - 0.1 * (7.0 / 24.0) * (720.0 / (last_balance * 0.8))),
+        0.01
+    );
+
+    //
+    // TEST: Add new collateral with worse rate. Should not cause an increase in fees paid.
+    //
+    send_tx(
+        solana,
+        TokenDepositInstruction {
+            amount: 1_000_000,
+            reduce_only: false,
+            account,
+            owner,
+            token_account: context.users[1].token_accounts[context.mints[2].index],
+            token_authority: context.users[1].key,
+            bank_index: 0,
+        },
+    )
+    .await
+    .unwrap();
+
+    send_tx(
+        solana,
+        TokenEdit {
+            group,
+            admin,
+            mint: mints[2].pubkey,
+            fallback_oracle: Pubkey::default(),
+            options: mango_v4::instruction::TokenEdit {
+                collateral_fee_per_day_opt: Some(0.5),
+                ..token_edit_instruction_default()
+            },
+        },
+    )
+    .await
+    .unwrap();
+
+    last_time = solana.clock_timestamp().await;
+    solana.set_clock_timestamp(last_time + 7 * hour).await;
+    last_balance = account_position_f64(solana, account, tokens[0].bank).await;
+
+    send_tx(solana, TokenChargeCollateralFeesInstruction { account })
+        .await
+        .unwrap();
     assert_eq_f64!(
         account_position_f64(solana, account, tokens[0].bank).await,
         last_balance * (1.0 - 0.1 * (7.0 / 24.0) * (720.0 / (last_balance * 0.8))),
