@@ -27,6 +27,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Obtain Latest Git
+        run: |
+          apt-get update
+          apt-get install -y git
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
