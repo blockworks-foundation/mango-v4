@@ -71,16 +71,23 @@ pub fn tracing_subscriber_init() {
 }
 
 pub fn print_git_version() {
-    info!(
-        "version is {}[{}{}]",
-        env!("VERGEN_GIT_SHA"),
-        env!("VERGEN_GIT_COMMIT_DATE"),
-        if env!("VERGEN_GIT_DIRTY") == "true" {
-            "-dirty"
-        } else {
-            ""
+    match option_env!("GITHUB_SHA") {
+        Some(sha) => {
+            info!("version is {}[github]", sha,);
         }
-    );
+        None => {
+            info!(
+                "version is {}[{}{}]",
+                env!("VERGEN_GIT_SHA"),
+                env!("VERGEN_GIT_COMMIT_DATE"),
+                if env!("VERGEN_GIT_DIRTY") == "true" {
+                    "-dirty"
+                } else {
+                    ""
+                }
+            );
+        }
+    }
 }
 
 pub async fn http_error_handling<T: serde::de::DeserializeOwned>(
