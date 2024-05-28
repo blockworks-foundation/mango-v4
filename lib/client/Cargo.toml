@@ -9,7 +9,7 @@ doctest = false
 
 [build-dependencies]
 anyhow = "1.0"
-vergen = { version = "8.3.1", features = ["git", "gitcl"] }
+vergen = { version = "8.3.1", features = ["git", "git2"] }
 
 [dependencies]
 anchor-client = { workspace = true }
