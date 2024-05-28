@@ -9,6 +9,8 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM base as build
+ARG GITHUB_SHA
+ENV GITHUB_SHA ${GITHUB_SHA}
 COPY --from=plan /app/recipe.json .
 RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .

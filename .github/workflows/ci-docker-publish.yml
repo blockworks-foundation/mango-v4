@@ -64,3 +64,5 @@ jobs:
             ${{ env.REGISTRY }}/blockworks-foundation/${{ env.IMAGE }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          build-args: |
+            "GITHUB_SHA=${{ github.sha }}"
