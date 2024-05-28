@@ -59,10 +59,10 @@
   dependencies:
     regenerator-runtime "^0.14.0"
 
-"@blockworks-foundation/mango-v4-settings@0.14.22":
-  version "0.14.22"
-  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mango-v4-settings/-/mango-v4-settings-0.14.22.tgz#7d7c9759b73d2c8166cf5f0871969e3764ea4139"
-  integrity sha512-YSJrCgeI6aC/RsL8dRyJmpKYB2CkY9YaiZ9PVjNWrQOcgQkp/DNaaI1CBFpZshtg6VtpFraQh6IrOmXzaAvglA==
+"@blockworks-foundation/mango-v4-settings@0.14.24":
+  version "0.14.24"
+  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mango-v4-settings/-/mango-v4-settings-0.14.24.tgz#646b0802fb6222654e247bea7966106af9b7a970"
+  integrity sha512-X3mY2x6XSZTySfB65b5DWuE7v/tffMlFGXQsgv+Zl+cgHdJn77vqdXvQFlR+544xsTjK+kWpWiHTHiSWRzG/4Q==
   dependencies:
     bn.js "^5.2.1"
     eslint-config-prettier "^9.0.0"
