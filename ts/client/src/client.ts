@@ -6160,15 +6160,15 @@ export class MangoClient {
     });
     for (const [openbookV2Market, openOrderPk] of openbookOpenOrdersForMarket) {
       const ooPositionExists =
-        serumPositionMarketIndices.findIndex(
+        openbookPositionMarketIndices.findIndex(
           (i) => i.marketIndex === openbookV2Market.marketIndex,
         ) > -1;
       if (!ooPositionExists) {
         // console.log('postion does not exist');
         const inactiveOpenbookPosition =
           openbookPositionMarketIndices.findIndex(
-            (serumPos) =>
-              serumPos.marketIndex ===
+            (openbookPos) =>
+            openbookPos.marketIndex ===
               OpenbookV2Orders.OpenbookV2MarketIndexUnset,
           );
         // console.log('new pos index', inactiveOpenbookPosition);
