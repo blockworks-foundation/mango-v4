@@ -1,5 +1,8 @@
 #![allow(unused_assignments)]
+
 use super::*;
+use anchor_spl::token::accessor::mint;
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_collateral_fees() -> Result<(), TransportError> {
@@ -10,11 +13,17 @@ async fn test_collateral_fees() -> Result<(), TransportError> {
     let owner = context.users[0].key;
     let payer = context.users[1].key;
     let mints = &context.mints[0..2];
+    let mut prices = HashMap::new();
+
+    // 1 unit = 1$
+    prices.insert(mints[0].pubkey, 1_000_000f64);
+    prices.insert(mints[1].pubkey, 1_000_000f64);
 
     let mango_setup::GroupWithTokens { group, tokens, .. } = mango_setup::GroupWithTokensConfig {
         admin,
         payer,
         mints: mints.to_vec(),
+        prices: prices,
         ..mango_setup::GroupWithTokensConfig::default()
     }
     .create(solana)
