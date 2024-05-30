@@ -32,6 +32,7 @@ export class OpenbookV2Market {
       registrationTime: BN;
       reduceOnly: number;
       forceClose: number;
+      oraclePriceBand: number;
     },
   ): OpenbookV2Market {
     return new OpenbookV2Market(
@@ -46,6 +47,7 @@ export class OpenbookV2Market {
       obj.registrationTime,
       obj.reduceOnly == 1,
       obj.forceClose == 1,
+      obj.oraclePriceBand,
     );
   }
 
@@ -61,6 +63,7 @@ export class OpenbookV2Market {
     public registrationTime: BN,
     public reduceOnly: boolean,
     public forceClose: boolean,
+    public oraclePriceBand: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
