@@ -6222,7 +6222,7 @@ export class MangoClient {
       }
     }
 
-    // debugHealthAccounts(group, mangoAccounts, healthRemainingAccounts);
+    debugHealthAccounts(group, mangoAccounts[0], healthRemainingAccounts);
 
     return healthRemainingAccounts;
   }
