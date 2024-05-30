@@ -4,8 +4,6 @@ import {
   BookSideAccount,
   MarketAccount,
   OpenBookV2Client,
-  baseLotsToUi,
-  priceLotsToUi,
 } from '@openbook-dex/openbook-v2';
 import { Keypair, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
@@ -16,6 +14,56 @@ import { TokenIndex } from './bank';
 import { Group } from './group';
 
 export type OpenbookV2MarketIndex = number & As<'market-index'>;
+
+export interface OpenbookV2ExternalMarket {
+  bump: number;
+  baseDecimals: number;
+  quoteDecimals: number;
+  marketAuthority: PublicKey;
+  timeExpiry: BN;
+  collectFeeAdmin: PublicKey;
+  openOrdersAdmin: {
+    key: PublicKey;
+  };
+  consumeEventsAdmin: {
+    key: PublicKey;
+  };
+  closeMarketAdmin: {
+    key: PublicKey;
+  };
+  name: number[];
+  bids: PublicKey;
+  asks: PublicKey;
+  eventHeap: PublicKey;
+  oracleA: {
+    key: PublicKey;
+  };
+  oracleB: {
+    key: PublicKey;
+  };
+  oracleConfig: {
+    confFilter: number;
+    maxStalenessSlots: BN;
+  };
+  quoteLotSize: BN;
+  baseLotSize: BN;
+  seqNum: BN;
+  registrationTime: BN;
+  makerFee: BN;
+  takerFee: BN;
+  feesAccrued: BN;
+  feesToReferrers: BN;
+  referrerRebatesAccrued: BN;
+  feesAvailable: BN;
+  makerVolume: BN;
+  takerVolumeWoOo: BN;
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  marketBaseVault: PublicKey;
+  baseDepositTotal: BN;
+  marketQuoteVault: PublicKey;
+  quoteDepositTotal: BN;
+}
 
 export class OpenbookV2Market {
   public name: string;
