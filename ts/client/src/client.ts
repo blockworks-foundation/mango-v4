@@ -94,6 +94,7 @@ import {
   OPENBOOK_V2_PROGRAM_ID,
   RUST_U64_MAX,
 } from './constants';
+import { debugHealthAccounts } from './development';
 import { Id } from './ids';
 import { IDL, MangoV4 } from './mango_v4';
 import { I80F48 } from './numbers/I80F48';
@@ -6221,6 +6222,8 @@ export class MangoClient {
         healthRemainingAccounts.push(fallback);
       }
     }
+
+    debugHealthAccounts(group, mangoAccounts, healthRemainingAccounts);
 
     return healthRemainingAccounts;
   }

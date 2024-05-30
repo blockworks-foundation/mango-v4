@@ -5,7 +5,11 @@
 import { AccountMeta, PublicKey } from '@solana/web3.js';
 import { Bank } from './accounts/bank';
 import { Group } from './accounts/group';
-import { MangoAccount, Serum3Orders } from './accounts/mangoAccount';
+import {
+  MangoAccount,
+  OpenbookV2Orders,
+  Serum3Orders,
+} from './accounts/mangoAccount';
 import { PerpMarket } from './accounts/perp';
 
 export function debugAccountMetas(ams: AccountMeta[]): void {
@@ -50,6 +54,19 @@ export function debugHealthAccounts(
       return [serum3.openOrders.toBase58(), `${serum3Market.name} spot oo`];
     }),
   );
+  const obv2 = new Map(
+    mangoAccount.openbookV2Active().map((obv2Orders: OpenbookV2Orders) => {
+      const obv2Market = Array.from(
+        group.openbookV2MarketsMapByExternal.values(),
+      ).find((obv2Market) => obv2Market.marketIndex === opbv2.marketIndex);
+      if (!obv2Market) {
+        throw new Error(
+          `obv2Orders for non existent market with market index ${obv2Orders.marketIndex}`,
+        );
+      }
+      return [obv2Orders.openOrders.toBase58(), `${obv2Market.name} spot oo`];
+    }),
+  );
   const perps = new Map(
     Array.from(group.perpMarketsMapByName.values()).map(
       (perpMarket: PerpMarket) => [
@@ -68,6 +85,9 @@ export function debugHealthAccounts(
     }
     if (serum3.get(pk.toBase58())) {
       console.log(serum3.get(pk.toBase58()));
+    }
+    if (obv2.get(pk.toBase58())) {
+      console.log(obv2.get(pk.toBase58()));
     }
     if (perps.get(pk.toBase58())) {
       console.log(perps.get(pk.toBase58()));
