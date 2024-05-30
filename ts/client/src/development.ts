@@ -58,7 +58,7 @@ export function debugHealthAccounts(
     mangoAccount.openbookV2Active().map((obv2Orders: OpenbookV2Orders) => {
       const obv2Market = Array.from(
         group.openbookV2MarketsMapByExternal.values(),
-      ).find((obv2Market) => obv2Market.marketIndex === opbv2.marketIndex);
+      ).find((obv2Market) => obv2Market.marketIndex === obv2Orders.marketIndex);
       if (!obv2Market) {
         throw new Error(
           `obv2Orders for non existent market with market index ${obv2Orders.marketIndex}`,
