@@ -47,6 +47,13 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         new_health_cache(&account.borrow(), &retriever, now_ts)?
     };
 
+    let (_, liabs) = health_cache.assets_and_liabs();
+    // Account with liabs below ~100$ should not be charged any collateral fees
+    if liabs < 100_000_000 {
+        msg!("liabs {}, below threshold to charge collateral fees", liabs);
+        return Ok(());
+    }
+
     // We want to find the total asset health and total liab health, but don't want
     // to treat borrows that moved into open orders accounts as realized. Hence we
     // pretend all spot orders are closed and settled and add their funds back to
