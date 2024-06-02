@@ -144,6 +144,7 @@ export class MangoClient {
   private fallbackOracleConfig: FallbackOracleConfig = 'never';
   private fixedFallbacks: Map<string, [PublicKey, PublicKey]> = new Map();
   multipleConnections: Connection[] = [];
+  turnOffPriceImpactLoading: boolean;
 
   constructor(
     public program: Program<MangoV4>,
