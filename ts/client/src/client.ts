@@ -124,6 +124,7 @@ export type MangoClientOptions = {
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
   multipleConnections?: Connection[];
   fallbackOracleConfig?: FallbackOracleConfig;
+  turnOffPriceImpactLoading?: boolean;
 };
 
 export type TxCallbackOptions = {
@@ -166,6 +167,7 @@ export class MangoClient {
     Error.stackTraceLimit = 1000;
     this.multipleConnections = opts?.multipleConnections ?? [];
     this.fallbackOracleConfig = opts?.fallbackOracleConfig ?? 'never';
+    this.turnOffPriceImpactLoading = opts?.turnOffPriceImpactLoading ?? false;
   }
 
   /// Convenience accessors

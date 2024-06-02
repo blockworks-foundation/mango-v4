@@ -139,10 +139,12 @@ export class Group {
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);
-
     // console.time('group.reload');
-    await Promise.all([
-      this.reloadPriceImpactData(),
+    const promises: Promise<void | [void, void, void]>[] = [];
+    if (!client.turnOffPriceImpactLoading) {
+      promises.push(this.reloadPriceImpactData());
+    }
+    promises.push(
       this.reloadAlts(client),
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
@@ -157,7 +159,8 @@ export class Group {
       this.reloadSerum3Markets(client, ids).then(() =>
         this.reloadSerum3ExternalMarkets(client, ids),
       ),
-    ]);
+    );
+    await Promise.all(promises);
     // console.timeEnd('group.reload');
   }
 
