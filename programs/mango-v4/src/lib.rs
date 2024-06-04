@@ -1843,6 +1843,16 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn openbook_v2_cancel_order_by_client_order_id(
+        ctx: Context<OpenbookV2CancelOrder>,
+        side: OpenbookV2Side,
+        client_order_id: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::openbook_v2_cancel_order_by_client_order_id(ctx, side.to_external(), client_order_id)?;
+        Ok(())
+    }
+
     pub fn openbook_v2_settle_funds(
         ctx: Context<OpenbookV2SettleFunds>,
         fees_to_dao: bool,

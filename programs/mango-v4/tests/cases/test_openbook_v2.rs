@@ -153,6 +153,32 @@ impl OpenbookV2OrderPlacer {
         .unwrap();
     }
 
+    async fn cancel_by_client_order_id(&self, client_order_id: u64) {
+        let side = {
+            let open_orders = self.openbook.load_open_orders(self.open_orders).await;
+            open_orders
+                .find_order_with_client_order_id(client_order_id)
+                .unwrap()
+                .side_and_tree()
+                .side()
+        };
+        send_tx(
+            &self.solana,
+            OpenbookV2CancelOrderByClientOrderIdInstruction {
+                side: match side {
+                    Side::Ask => OpenbookV2Side::Ask,
+                    Side::Bid => OpenbookV2Side::Bid,
+                },
+                client_order_id,
+                account: self.account,
+                payer: self.owner,
+                openbook_v2_market: self.openbook_market,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
     async fn cancel_all(&self) {
         send_tx(
             &self.solana,
@@ -384,6 +410,20 @@ async fn test_openbook_basics() -> Result<(), TransportError> {
     assert_eq!(base_bank.potential_openbook_tokens, 0);
     let quote_bank = solana.get_account::<Bank>(quote_token.bank).await;
     assert_eq!(quote_bank.potential_openbook_tokens, 0);
+
+    // Process events such that the OutEvent deactivates the closed order on open_orders
+    context
+        .openbook
+        .consume_spot_events(&openbook_market_cookie, 16)
+        .await;
+
+    //
+    // TEST: Do the same test but with cancelling by client order id.
+    //
+    let (_, _) = order_placer.bid_maker(0.9, 100).await.unwrap();
+    check_prev_instruction_post_health(&solana, account).await;
+    order_placer.cancel_by_client_order_id(order_placer.next_client_order_id - 1).await;
+    order_placer.settle(false).await;
 
     // Process events such that the OutEvent deactivates the closed order on open_orders
     context

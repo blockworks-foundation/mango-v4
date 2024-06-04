@@ -7051,6 +7051,80 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "openbookV2CancelOrderByClientOrderId",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "account",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "group"
+          ]
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "openOrders",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2Market",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "group",
+            "openbook_v2_program",
+            "openbook_v2_market_external"
+          ]
+        },
+        {
+          "name": "openbookV2Program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "openbookV2MarketExternal",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "bids",
+            "asks"
+          ]
+        },
+        {
+          "name": "bids",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "asks",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": "OpenbookV2Side"
+          }
+        },
+        {
+          "name": "clientOrderId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "openbookV2SettleFunds",
       "accounts": [
         {
