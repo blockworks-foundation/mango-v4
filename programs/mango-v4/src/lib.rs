@@ -1849,7 +1849,11 @@ pub mod mango_v4 {
         client_order_id: u64,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::openbook_v2_cancel_order_by_client_order_id(ctx, side.to_external(), client_order_id)?;
+        instructions::openbook_v2_cancel_order_by_client_order_id(
+            ctx,
+            side.to_external(),
+            client_order_id,
+        )?;
         Ok(())
     }
 

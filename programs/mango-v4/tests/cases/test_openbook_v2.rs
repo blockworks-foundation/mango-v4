@@ -422,7 +422,9 @@ async fn test_openbook_basics() -> Result<(), TransportError> {
     //
     let (_, _) = order_placer.bid_maker(0.9, 100).await.unwrap();
     check_prev_instruction_post_health(&solana, account).await;
-    order_placer.cancel_by_client_order_id(order_placer.next_client_order_id - 1).await;
+    order_placer
+        .cancel_by_client_order_id(order_placer.next_client_order_id - 1)
+        .await;
     order_placer.settle(false).await;
 
     // Process events such that the OutEvent deactivates the closed order on open_orders

@@ -82,7 +82,11 @@ pub fn openbook_v2_cancel_order_by_client_order_id(
     Ok(())
 }
 
-fn cpi_cancel_order_by_client_order_id(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], client_order_id: u64) -> Result<()> {
+fn cpi_cancel_order_by_client_order_id(
+    ctx: &OpenbookV2CancelOrder,
+    seeds: &[&[&[u8]]],
+    client_order_id: u64,
+) -> Result<()> {
     let cpi_accounts = CancelOrder {
         signer: ctx.account.to_account_info(),
         open_orders_account: ctx.open_orders.to_account_info(),
@@ -97,10 +101,8 @@ fn cpi_cancel_order_by_client_order_id(ctx: &OpenbookV2CancelOrder, seeds: &[&[&
         seeds,
     );
 
-    let _total_quantity_cancelled = openbook_v2::cpi::cancel_order_by_client_order_id(
-        cpi_ctx,
-        client_order_id
-    )?;
+    let _total_quantity_cancelled =
+        openbook_v2::cpi::cancel_order_by_client_order_id(cpi_ctx, client_order_id)?;
 
     Ok(())
 }
