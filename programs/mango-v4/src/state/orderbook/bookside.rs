@@ -238,6 +238,7 @@ impl BookSide {
 mod tests {
     use super::*;
     use bytemuck::Zeroable;
+    use std::collections::HashSet;
 
     fn new_order_tree(order_tree_type: OrderTreeType) -> OrderTreeNodes {
         let mut ot = OrderTreeNodes::zeroed();
@@ -281,8 +282,11 @@ mod tests {
             .insert_leaf(&mut root_pegged, &new_leaf(key))
             .unwrap();
 
+        let mut pegged_prices = vec![];
+
         while root_pegged.leaf_count < 100 {
-            let price_data: u64 = oracle_pegged_price_data(rng.gen_range(-20..20));
+            let price = rng.gen_range(-20..20);
+            let price_data: u64 = oracle_pegged_price_data(price);
             let seq_num: u64 = rng.gen_range(0..1000);
             let key = new_node_key(side, price_data, seq_num);
             if keys.contains(&key) {
@@ -292,6 +296,7 @@ mod tests {
             order_tree
                 .insert_leaf(&mut root_pegged, &new_leaf(key))
                 .unwrap();
+            pegged_prices.push(price);
         }
 
         while root_fixed.leaf_count < 100 {
@@ -332,6 +337,12 @@ mod tests {
                 total += 1;
             }
             assert!(total >= 101); // some oracle peg orders could be skipped
+
+            let skipped_pegged_orders = pegged_prices
+                .iter()
+                .filter(|x| oracle_price_lots + **x <= 0)
+                .count();
+            assert_eq!(total, 200 - skipped_pegged_orders);
             if oracle_price_lots > 20 {
                 assert_eq!(total, 200);
             }
@@ -340,15 +351,31 @@ mod tests {
 
     #[test]
     fn bookside_iteration_random() {
-        bookside_iteration_random_helper(Side::Bid);
-        bookside_iteration_random_helper(Side::Ask);
+        for i in 0..10 {
+            bookside_iteration_random_helper(Side::Bid);
+            bookside_iteration_random_helper(Side::Ask);
+        }
     }
 
     fn bookside_setup() -> BookSide {
+        bookside_setup_advanced(
+            &[(100, 0), (120, 5)],
+            &[(-10, 0, 100), (-15, 0, -1), (-20, 7, 95)],
+            Side::Bid,
+        )
+    }
+
+    fn bookside_setup_advanced(
+        fixed: &[(i64, u16)],
+        pegged: &[(i64, u16, i64)],
+        side: Side,
+    ) -> BookSide {
         use std::cell::RefCell;
 
-        let side = Side::Bid;
-        let order_tree_type = OrderTreeType::Bids;
+        let order_tree_type = match side {
+            Side::Bid => OrderTreeType::Bids,
+            Side::Ask => OrderTreeType::Asks,
+        };
 
         let order_tree = RefCell::new(new_order_tree(order_tree_type));
         let mut root_fixed = OrderTreeRoot::zeroed();
@@ -381,11 +408,12 @@ mod tests {
                 .unwrap();
         };
 
-        add_fixed(100, 0);
-        add_fixed(120, 5);
-        add_pegged(-10, 0, 100);
-        add_pegged(-15, 0, -1);
-        add_pegged(-20, 7, 95);
+        for (price, tif) in fixed {
+            add_fixed(*price, *tif);
+        }
+        for (price_offset, tif, limit) in pegged {
+            add_pegged(*price_offset, *tif, *limit);
+        }
 
         BookSide {
             roots: [root_fixed, root_pegged],
@@ -457,5 +485,27 @@ mod tests {
         let (_, p) = bookside.borrow_mut().remove_worst(0, 100).unwrap();
         assert_eq!(p, 120);
         assert_eq!(order_prices(0, 100), Vec::<i64>::new());
+    }
+
+    #[test]
+    fn bookside_iterate_when_first_peg_is_skipped() {
+        use std::cell::RefCell;
+
+        let bookside = RefCell::new(bookside_setup_advanced(
+            &[],
+            &[(-100, 0, 50), (-20, 0, 50), (-30, 0, 50)],
+            Side::Ask,
+        ));
+
+        let order_prices = |now_ts: u64, oracle: i64| -> Vec<i64> {
+            bookside
+                .borrow()
+                .iter_valid(now_ts, oracle)
+                .map(|it| it.price_lots)
+                .collect()
+        };
+
+        assert_eq!(order_prices(0, 200), vec![100, 170, 180]);
+        assert_eq!(order_prices(0, 100), vec![70, 80]);
     }
 }
