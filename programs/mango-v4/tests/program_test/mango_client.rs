@@ -5558,6 +5558,69 @@ impl ClientInstruction for OpenbookV2CancelOrderInstruction {
     }
 }
 
+pub struct OpenbookV2CancelOrderByClientOrderIdInstruction {
+    pub payer: TestKeypair,
+    pub account: Pubkey,
+
+    pub openbook_v2_market: Pubkey,
+
+    pub side: OpenbookV2Side,
+
+    pub client_order_id: u64,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for OpenbookV2CancelOrderByClientOrderIdInstruction {
+    type Accounts = mango_v4::accounts::OpenbookV2CancelOrder;
+    type Instruction = mango_v4::instruction::OpenbookV2CancelOrderByClientOrderId;
+    async fn to_instruction(
+        &self,
+        account_loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let openbook_program_id = openbook_v2::id();
+        let instruction = Self::Instruction {
+            side: self.side,
+            client_order_id: self.client_order_id,
+        };
+
+        let account = account_loader
+            .load_mango_account(&self.account)
+            .await
+            .unwrap();
+        let market: OpenbookV2Market = account_loader.load(&self.openbook_v2_market).await.unwrap();
+        let external_market: openbook_v2::state::Market = account_loader
+            .load(&market.openbook_v2_market_external)
+            .await
+            .unwrap();
+
+        let open_orders_account = account
+            .all_openbook_v2_orders()
+            .find(|o| o.is_active_for_market(market.market_index))
+            .unwrap()
+            .open_orders;
+
+        let accounts = Self::Accounts {
+            group: account.fixed.group,
+            account: self.account,
+            authority: self.payer.pubkey(),
+            open_orders: open_orders_account,
+            openbook_v2_program: openbook_program_id,
+            openbook_v2_market_external: market.openbook_v2_market_external,
+            openbook_v2_market: self.openbook_v2_market,
+            bids: external_market.bids,
+            asks: external_market.asks,
+        };
+
+        let instruction = make_instruction(program_id, &accounts, &instruction);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![self.payer]
+    }
+}
+
 pub struct OpenbookV2CancelAllOrdersInstruction {
     pub payer: TestKeypair,
     pub account: Pubkey,

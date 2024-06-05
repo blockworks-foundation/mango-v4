@@ -3525,6 +3525,62 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, ixs);
   }
 
+  public async openbookV2CancelOrderByClientOrderIdIx(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: OpenbookV2Side,
+    clientOrderId: BN,
+  ): Promise<TransactionInstruction> {
+    const openbookV2Market = group.openbookV2MarketsMapByExternal.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const openbookV2MarketExternal = group.openbookV2ExternalMarketsMap.get(
+      externalMarketPk.toBase58(),
+    )!;
+
+    const ix = await this.program.methods
+      .openbookV2CancelOrderByClientOrderId(side, clientOrderId)
+      .accounts({
+        group: group.publicKey,
+        account: mangoAccount.publicKey,
+        authority: (this.program.provider as AnchorProvider).wallet.publicKey,
+        openOrders: mangoAccount.getOpenbookV2Account(
+          openbookV2Market.marketIndex,
+        )?.openOrders,
+        openbookV2Market: openbookV2Market.publicKey,
+        openbookV2Program: openbookV2Market.openbookProgram,
+        openbookV2MarketExternal: openbookV2Market.openbookMarketExternal,
+        bids: openbookV2MarketExternal.bids,
+        asks: openbookV2MarketExternal.asks,
+      })
+      .instruction();
+
+    return ix;
+  }
+
+  public async openbookV2CancelOrderByClientOrderId(
+    group: Group,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: OpenbookV2Side,
+    clientOrderId: BN,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await Promise.all([
+      this.openbookV2CancelOrderByClientOrderIdIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        clientOrderId,
+      ),
+      this.openbookV2SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
+    ]);
+
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+  }
+
   /// perps
 
   public async perpCreateMarket(

@@ -26,6 +26,42 @@ pub fn openbook_v2_cancel_order(
 
     let openbook_market = ctx.accounts.openbook_v2_market.load()?;
 
+    validate_openbook_v2_cancel_order(&ctx, &openbook_market)?;
+
+    //
+    // Cancel cpi
+    //
+    let account = ctx.accounts.account.load()?;
+    let account_seeds = mango_account_seeds!(account);
+    cpi_cancel_order(ctx.accounts, &[account_seeds], order_id)?;
+
+    emit_openbook_v2_balance_log(&ctx, &openbook_market)?;
+
+    Ok(())
+}
+
+fn cpi_cancel_order(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], order_id: u128) -> Result<()> {
+    let cpi_accounts = CancelOrder {
+        signer: ctx.account.to_account_info(),
+        open_orders_account: ctx.open_orders.to_account_info(),
+        market: ctx.openbook_v2_market_external.to_account_info(),
+        bids: ctx.bids.to_account_info(),
+        asks: ctx.asks.to_account_info(),
+    };
+
+    let cpi_ctx = CpiContext::new_with_signer(
+        ctx.openbook_v2_program.to_account_info(),
+        cpi_accounts,
+        seeds,
+    );
+
+    openbook_v2::cpi::cancel_order(cpi_ctx, order_id)
+}
+
+pub fn validate_openbook_v2_cancel_order(
+    ctx: &Context<OpenbookV2CancelOrder>,
+    openbook_market: &OpenbookV2Market,
+) -> Result<()> {
     //
     // Validation
     //
@@ -48,14 +84,13 @@ pub fn openbook_v2_cancel_order(
             MangoError::SomeError
         );
     }
+    Ok(())
+}
 
-    //
-    // Cancel cpi
-    //
-    let account = ctx.accounts.account.load()?;
-    let account_seeds = mango_account_seeds!(account);
-    cpi_cancel_order(ctx.accounts, &[account_seeds], order_id)?;
-
+pub fn emit_openbook_v2_balance_log(
+    ctx: &Context<OpenbookV2CancelOrder>,
+    openbook_market: &OpenbookV2Market,
+) -> Result<()> {
     let open_orders = ctx.accounts.open_orders.load()?;
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let after_oo = OpenOrdersSlim::from_oo_v2(
@@ -76,24 +111,5 @@ pub fn openbook_v2_cancel_order(
         quote_free: after_oo.native_quote_free(),
         referrer_rebates_accrued: after_oo.native_rebates(),
     });
-
     Ok(())
-}
-
-fn cpi_cancel_order(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], order_id: u128) -> Result<()> {
-    let cpi_accounts = CancelOrder {
-        signer: ctx.account.to_account_info(),
-        open_orders_account: ctx.open_orders.to_account_info(),
-        market: ctx.openbook_v2_market_external.to_account_info(),
-        bids: ctx.bids.to_account_info(),
-        asks: ctx.asks.to_account_info(),
-    };
-
-    let cpi_ctx = CpiContext::new_with_signer(
-        ctx.openbook_v2_program.to_account_info(),
-        cpi_accounts,
-        seeds,
-    );
-
-    openbook_v2::cpi::cancel_order(cpi_ctx, order_id)
 }
