@@ -13,10 +13,7 @@ pub struct GroupChangeInsuranceFund<'info> {
     pub group: AccountLoader<'info, Group>,
     pub admin: Signer<'info>,
 
-    #[account(
-        mut,
-        close = payer,
-    )]
+    #[account(mut)]
     pub insurance_vault: Account<'info, TokenAccount>,
 
     #[account(mut)]
