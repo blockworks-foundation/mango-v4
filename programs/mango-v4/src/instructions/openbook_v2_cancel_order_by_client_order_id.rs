@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use openbook_v2::cpi::accounts::CancelOrder;
 
 use crate::error::*;
-use crate::instructions::{validate_openbook_v2_cancel_order, emit_openbook_v2_balance_log};
+use crate::instructions::{emit_openbook_v2_balance_log, validate_openbook_v2_cancel_order};
 use crate::state::*;
 
 use crate::accounts_ix::*;

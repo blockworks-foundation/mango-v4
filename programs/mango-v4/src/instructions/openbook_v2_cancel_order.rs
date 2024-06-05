@@ -60,8 +60,8 @@ fn cpi_cancel_order(ctx: &OpenbookV2CancelOrder, seeds: &[&[&[u8]]], order_id: u
 
 pub fn validate_openbook_v2_cancel_order(
     ctx: &Context<OpenbookV2CancelOrder>,
-    openbook_market: &OpenbookV2Market
-)  -> Result<()>  {
+    openbook_market: &OpenbookV2Market,
+) -> Result<()> {
     //
     // Validation
     //
@@ -89,8 +89,8 @@ pub fn validate_openbook_v2_cancel_order(
 
 pub fn emit_openbook_v2_balance_log(
     ctx: &Context<OpenbookV2CancelOrder>,
-    openbook_market: &OpenbookV2Market
-)  -> Result<()> {
+    openbook_market: &OpenbookV2Market,
+) -> Result<()> {
     let open_orders = ctx.accounts.open_orders.load()?;
     let openbook_market_external = ctx.accounts.openbook_v2_market_external.load()?;
     let after_oo = OpenOrdersSlim::from_oo_v2(
