@@ -191,6 +191,7 @@
 <a href="#191" id="191">191</a>
 <a href="#192" id="192">192</a>
 <a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">pub struct </span>BookSideIterItem&lt;<span class="lifetime">&#39;a</span>&gt; {
@@ -363,7 +364,8 @@
             <span class="kw">if </span>oracle_pegged_price(<span class="self">self</span>.oracle_price_lots, o_node, side).<span class="number">0 </span>!= OrderState::Skipped {
                 <span class="kw">break</span>;
             }
-            o_peek = <span class="self">self</span>.oracle_pegged_iter.next()
+            <span class="self">self</span>.oracle_pegged_iter.next();
+            o_peek = <span class="self">self</span>.oracle_pegged_iter.peek();
         }
 
         <span class="kw">let </span>f_peek = <span class="self">self</span>.fixed_iter.peek();
