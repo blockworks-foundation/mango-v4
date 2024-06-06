@@ -170,7 +170,8 @@ impl<'a> Iterator for BookSideIter<'a> {
             if oracle_pegged_price(self.oracle_price_lots, o_node, side).0 != OrderState::Skipped {
                 break;
             }
-            o_peek = self.oracle_pegged_iter.next()
+            self.oracle_pegged_iter.next();
+            o_peek = self.oracle_pegged_iter.peek();
         }
 
         let f_peek = self.fixed_iter.peek();
