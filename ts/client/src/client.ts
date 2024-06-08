@@ -441,8 +441,14 @@ export class MangoClient {
 
   public async getIds(groupPk: PublicKey): Promise<Id | undefined> {
     switch (this.idsSource) {
-      case 'api':
-        return await Id.fromApi(groupPk);
+      case 'api': {
+        try {
+          return await Id.fromApi(groupPk);
+        } catch (e) {
+          console.log(e);
+          return undefined;
+        }
+      }
       case 'get-program-accounts':
         return undefined;
       case 'static':
