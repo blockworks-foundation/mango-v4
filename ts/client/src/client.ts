@@ -3738,7 +3738,7 @@ export class MangoClient {
     // margin trade is a general function
     // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
     flashLoanType,
-    sequenceCheck = false,
+    sequenceCheck,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
