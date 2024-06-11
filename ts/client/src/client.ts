@@ -3305,9 +3305,9 @@ export class MangoClient {
             ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
         ),
       )
-      .instruction();
+      .simulate();
 
-    ixs.push(ix);
+    // ixs.push(ix);
 
     return ixs;
   }
@@ -6169,7 +6169,7 @@ export class MangoClient {
         const inactiveOpenbookPosition =
           openbookPositionMarketIndices.findIndex(
             (openbookPos) =>
-            openbookPos.marketIndex ===
+              openbookPos.marketIndex ===
               OpenbookV2Orders.OpenbookV2MarketIndexUnset,
           );
         // console.log('new pos index', inactiveOpenbookPosition);
@@ -6322,12 +6322,13 @@ export class MangoClient {
       transactionInstructions,
     );
   }
+
   public async modifySerum3Order(
     group: Group,
     orderId: BN,
     mangoAccount: MangoAccount,
     externalMarketPk: PublicKey,
-    side: OpenbookV2Side,
+    side: Serum3Side,
     price: number,
     size: number,
     selfTradeBehavior: Serum3SelfTradeBehavior,
@@ -6346,6 +6347,50 @@ export class MangoClient {
       ),
       this.serum3SettleFundsV2Ix(group, mangoAccount, externalMarketPk),
       this.serum3PlaceOrderV2Ix(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        price,
+        size,
+        selfTradeBehavior,
+        orderType,
+        clientOrderId,
+        limit,
+      ),
+    ]);
+    transactionInstructions.push(cancelOrderIx, settleIx, ...placeOrderIx);
+
+    return await this.sendAndConfirmTransactionForGroup(
+      group,
+      transactionInstructions,
+    );
+  }
+
+  public async modifyOpenbookV2Order(
+    group: Group,
+    orderId: BN,
+    mangoAccount: MangoAccount,
+    externalMarketPk: PublicKey,
+    side: OpenbookV2Side,
+    price: number,
+    size: number,
+    selfTradeBehavior: Serum3SelfTradeBehavior,
+    orderType: OpenbookV2OrderType,
+    clientOrderId: number,
+    limit: number,
+  ): Promise<MangoSignatureStatus> {
+    const transactionInstructions: TransactionInstruction[] = [];
+    const [cancelOrderIx, settleIx, placeOrderIx] = await Promise.all([
+      this.openbookV2CancelOrderIx(
+        group,
+        mangoAccount,
+        externalMarketPk,
+        side,
+        orderId,
+      ),
+      this.openbookV2SettleFundsIx(group, mangoAccount, externalMarketPk),
+      this.openbookV2PlaceOrderIx(
         group,
         mangoAccount,
         externalMarketPk,
