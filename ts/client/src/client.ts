@@ -3738,6 +3738,7 @@ export class MangoClient {
     // margin trade is a general function
     // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
     flashLoanType,
+    sequenceCheck = false,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
@@ -3747,6 +3748,7 @@ export class MangoClient {
     userDefinedInstructions: TransactionInstruction[];
     userDefinedAlts: AddressLookupTableAccount[];
     flashLoanType: FlashLoanType;
+    sequenceCheck: boolean;
   }): Promise<MangoSignatureStatus> {
     const isDelegate = (
       this.program.provider as AnchorProvider
@@ -3872,6 +3874,8 @@ export class MangoClient {
       ])
       .instruction();
 
+    const sequenceCheckIx = await this.sequenceCheckIx(group, mangoAccount);
+
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
         toNative(amountIn, inputBank.mintDecimals),
@@ -3899,6 +3903,7 @@ export class MangoClient {
       group,
       [
         ...preInstructions,
+        ...(sequenceCheck ? [sequenceCheckIx] : []),
         flashLoanBeginIx,
         ...userDefinedInstructions,
         flashLoanEndIx,
