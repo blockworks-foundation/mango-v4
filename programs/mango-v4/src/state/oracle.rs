@@ -201,6 +201,10 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
+    } else if acc_info.owner() == &switchboard_on_demand_devnet_oracle::ID
+        || acc_info.owner() == &switchboard_on_demand_mainnet_oracle::ID
+    {
+        return Ok(OracleType::SwitchboardOnDemand);
     } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
         return Ok(OracleType::OrcaCLMM);
     } else if acc_info.owner() == &raydium_mainnet::ID {
