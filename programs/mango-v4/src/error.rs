@@ -155,6 +155,8 @@ pub enum MangoError {
     NoFreeOpenbookV2OpenOrdersIndex,
     #[msg("openbook v2 open orders exist already")]
     OpenbookV2OpenOrdersExistAlready,
+    #[msg("derived oracle type is no longer supported")]
+    ObsoleteOracle,
 }
 
 impl MangoError {

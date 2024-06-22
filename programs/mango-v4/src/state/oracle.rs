@@ -4,13 +4,10 @@ use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
 use fixed::types::I80F48;
-
 use static_assertions::const_assert_eq;
-use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
-
+use switchboard_on_demand::PullFeedAccountData;
 use crate::accounts_zerocopy::*;
-
 use crate::error::*;
 use crate::state::load_orca_pool_state;
 
@@ -59,6 +56,15 @@ pub mod switchboard_v1_devnet_oracle {
 pub mod switchboard_v2_mainnet_oracle {
     use solana_program::declare_id;
     declare_id!("DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM");
+}
+
+pub mod switchboard_on_demand_devnet_oracle {
+    use solana_program::declare_id;
+    declare_id!("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv");
+}
+pub mod switchboard_on_demand_mainnet_oracle {
+    use solana_program::declare_id;
+    declare_id!("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv");
 }
 
 pub mod pyth_mainnet_usdc_oracle {
@@ -114,10 +120,11 @@ impl OracleConfigParams {
 pub enum OracleType {
     Pyth,
     Stub,
-    SwitchboardV1,
+    SwitchboardV1, // Obsolete
     SwitchboardV2,
     OrcaCLMM,
     RaydiumCLMM,
+    SwitchboardOnDemand,
 }
 
 pub struct OracleState {
@@ -388,23 +395,35 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::SwitchboardV1 => {
-            let result = FastRoundResultAccountData::deserialize(data).unwrap();
-            let ui_price = I80F48::from_num(result.result.result);
-
-            let ui_deviation =
-                I80F48::from_num(result.result.max_response - result.result.min_response);
-            let last_update_slot = result.result.round_open_slot;
-
+            return Err(MangoError::ObsoleteOracle.into());
+        }
+        OracleType::SwitchboardOnDemand => {
+            fn from_foreign_error(e: impl std::fmt::Display) -> Error {
+                error_msg!("{}", e)
+            }
+            let clock = Clock::get()?;
+            let feed = bytemuck::from_bytes::<PullFeedAccountData>(&data[8..]);
+            let max_staleness = 200;
+            let min_sample_size = 3;
+            let ui_price: f64 = feed.get_value(&clock, max_staleness, min_sample_size, true)
+                .map_err(from_foreign_error)?
+                .try_into()
+                .map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed
+                .std_deviation(&clock, max_staleness)
+                .map_err(from_foreign_error)?
+                .try_into()
+                .map_err(from_foreign_error)?;
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
-            let price = ui_price * decimal_adj;
-            let deviation = ui_deviation * decimal_adj;
+            let price = I80F48::from_num(ui_price) * decimal_adj;
+            let deviation = I80F48::from_num(ui_deviation) * decimal_adj;
             require_gte!(price, 0);
             OracleState {
                 price,
-                last_update_slot,
+                last_update_slot: max_staleness as u64,
                 deviation,
-                oracle_type: OracleType::SwitchboardV1,
+                oracle_type: OracleType::SwitchboardOnDemand,
             }
         }
         OracleType::OrcaCLMM => {
