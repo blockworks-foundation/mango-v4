@@ -51,7 +51,7 @@ static_assertions = "1.1"
 switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
 # switchboard-on-demand = { path = "/Users/mgild/projects/sbv3/rust/switchboard-on-demand" }
-switchboard-on-demand = { version = "0.1.10" }
+switchboard-on-demand = { version = "0.1.11" }
 
 
 openbook-v2 = { workspace = true, features = ["no-entrypoint", "cpi", "enable-gpl"] }

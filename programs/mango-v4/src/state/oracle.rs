@@ -407,17 +407,8 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
             let clock = Clock::get()?;
             let feed = bytemuck::from_bytes::<PullFeedAccountData>(&data[8..]);
-            let max_staleness = 200;
-            let min_sample_size = 3;
-            let ui_price: f64 = feed.get_value(&clock, max_staleness, min_sample_size, true)
-                .map_err(from_foreign_error)?
-                .try_into()
-                .map_err(from_foreign_error)?;
-            let ui_deviation: f64 = feed
-                .std_deviation(&clock, max_staleness)
-                .map_err(from_foreign_error)?
-                .try_into()
-                .map_err(from_foreign_error)?;
+            let ui_price: f64 = feed.value.try_into().map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed.std_dev().try_into().map_err(from_foreign_error)?;
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
             let price = I80F48::from_num(ui_price) * decimal_adj;
