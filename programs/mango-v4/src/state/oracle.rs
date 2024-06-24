@@ -5,6 +5,7 @@ use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
+use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
 use switchboard_on_demand::PullFeedAccountData;
 use crate::accounts_zerocopy::*;
@@ -399,7 +400,25 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::SwitchboardV1 => {
-            return Err(MangoError::ObsoleteOracle.into());
+            // return Err(MangoError::ObsoleteOracle.into());
+            let result = FastRoundResultAccountData::deserialize(data).unwrap();
+            let ui_price = I80F48::from_num(result.result.result);
+
+            let ui_deviation =
+                I80F48::from_num(result.result.max_response - result.result.min_response);
+            let last_update_slot = result.result.round_open_slot;
+
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
+            let decimal_adj = power_of_ten(decimals);
+            let price = ui_price * decimal_adj;
+            let deviation = ui_deviation * decimal_adj;
+            require_gte!(price, 0);
+            OracleState {
+                price,
+                last_update_slot,
+                deviation,
+                oracle_type: OracleType::SwitchboardV1,
+            }
         }
         OracleType::SwitchboardOnDemand => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
@@ -407,8 +426,10 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
             let clock = Clock::get()?;
             let feed = bytemuck::from_bytes::<PullFeedAccountData>(&data[8..]);
-            let ui_price: f64 = feed.value.try_into().map_err(from_foreign_error)?;
-            let ui_deviation: f64 = feed.std_dev().try_into().map_err(from_foreign_error)?;
+            let ui_price: f64 = feed.value().ok_or_else(|| error_msg!("missing price"))?.try_into().map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed.std_dev().ok_or_else(|| error_msg!("missing deviation"))?.try_into().map_err(from_foreign_error)?;
+            let last_update_slot = feed.result.slot; // TODO FAS Which slot should we use ?
+
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
             let price = I80F48::from_num(ui_price) * decimal_adj;
@@ -416,7 +437,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             require_gte!(price, 0);
             OracleState {
                 price,
-                last_update_slot: max_staleness as u64,
+                last_update_slot: last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardOnDemand,
             }
