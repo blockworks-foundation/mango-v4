@@ -64,11 +64,12 @@
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "0.14.15",
     "@blockworks-foundation/mangolana": "0.0.14",
-    "@coral-xyz/anchor": "^0.28.1-beta.2",
+    "@coral-xyz/anchor": "^0.30.1",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",
     "@solana/web3.js": "^1.78.2",
+    "@switchboard-xyz/on-demand": "^1.1.24",
     "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "big.js": "^6.1.1",
     "binance-api-node": "^0.12.0",
