@@ -162,7 +162,6 @@ export async function parseSwitchboardOracle(
         options,
       );
       const idl = await Program.fetchIdl(SB_ON_DEMAND_PID, provider);
-      // console.log(idl);
       sbOnDemandProgram = new Program(idl!, provider);
     }
     return parseSwitchboardOnDemandOracle(
