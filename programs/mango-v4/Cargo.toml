@@ -50,7 +50,6 @@ static_assertions = "1.1"
 # note: switchboard-common 0.8.19 is broken - use 0.8.18 instead
 switchboard-program = "0.2"
 switchboard-v2 = { package = "switchboard-solana", version = "0.28" }
-# switchboard-on-demand = { path = "/Users/mgild/projects/sbv3/rust/switchboard-on-demand" }
 switchboard-on-demand = { version = "0.1.11" }
 
 
