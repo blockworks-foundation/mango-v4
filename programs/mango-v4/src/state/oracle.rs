@@ -434,7 +434,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 .ok_or_else(|| error_msg!("missing deviation"))?
                 .try_into()
                 .map_err(from_foreign_error)?;
-            let last_update_slot = feed.result.slot; // TODO FAS Which slot should we use ?
+            let last_update_slot = feed.result.min_slot;
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
             let decimal_adj = power_of_ten(decimals);
