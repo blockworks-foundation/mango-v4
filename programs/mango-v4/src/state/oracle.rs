@@ -1,16 +1,16 @@
 use std::mem::size_of;
 
+use crate::accounts_zerocopy::*;
+use crate::error::*;
+use crate::state::load_orca_pool_state;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
 use fixed::types::I80F48;
 use static_assertions::const_assert_eq;
+use switchboard_on_demand::PullFeedAccountData;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
-use switchboard_on_demand::PullFeedAccountData;
-use crate::accounts_zerocopy::*;
-use crate::error::*;
-use crate::state::load_orca_pool_state;
 
 use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
@@ -424,10 +424,17 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
                 error_msg!("{}", e)
             }
-            let clock = Clock::get()?;
             let feed = bytemuck::from_bytes::<PullFeedAccountData>(&data[8..]);
-            let ui_price: f64 = feed.value().ok_or_else(|| error_msg!("missing price"))?.try_into().map_err(from_foreign_error)?;
-            let ui_deviation: f64 = feed.std_dev().ok_or_else(|| error_msg!("missing deviation"))?.try_into().map_err(from_foreign_error)?;
+            let ui_price: f64 = feed
+                .value()
+                .ok_or_else(|| error_msg!("missing price"))?
+                .try_into()
+                .map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed
+                .std_dev()
+                .ok_or_else(|| error_msg!("missing deviation"))?
+                .try_into()
+                .map_err(from_foreign_error)?;
             let last_update_slot = feed.result.slot; // TODO FAS Which slot should we use ?
 
             let decimals = QUOTE_DECIMALS - (base_decimals as i8);
@@ -519,6 +526,11 @@ mod tests {
                 OracleType::OrcaCLMM,
                 orca_mainnet_whirlpool::ID,
             ),
+            (
+                "EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf",
+                OracleType::SwitchboardOnDemand,
+                switchboard_on_demand_mainnet_oracle::ID,
+            ),
         ];
 
         for fixture in fixtures {
@@ -557,6 +569,49 @@ mod tests {
                 I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
+    }
+
+    #[test]
+    pub fn test_switchboard_on_demand_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![(
+            "EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf",
+            OracleType::SwitchboardOnDemand,
+            switchboard_on_demand_mainnet_oracle::ID,
+            6,
+        )];
+
+        for fixture in fixtures {
+            let file = format!("resources/test/{}.bin", fixture.0);
+            let mut data = read_file(find_file(&file).unwrap());
+            let data = RefCell::new(&mut data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+            let base_decimals = fixture.3;
+
+            let sw_ais = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usdc_opt: None,
+                sol_opt: None,
+            };
+            let sw = oracle_state_unchecked(&sw_ais, base_decimals).unwrap();
+
+            match fixture.1 {
+                OracleType::SwitchboardOnDemand => {
+                    assert_eq!(sw.price, I80F48::from_num(61200.109991665549598697))
+                }
+                _ => unimplemented!(),
+            }
+        }
+
+        Ok(())
     }
 
     #[test]
