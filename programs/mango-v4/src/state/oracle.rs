@@ -400,7 +400,6 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::SwitchboardV1 => {
-            // return Err(MangoError::ObsoleteOracle.into());
             let result = FastRoundResultAccountData::deserialize(data).unwrap();
             let ui_price = I80F48::from_num(result.result.result);
 
