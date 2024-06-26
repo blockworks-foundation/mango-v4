@@ -1925,6 +1925,14 @@
 <a href="#1925" id="1925">1925</a>
 <a href="#1926" id="1926">1926</a>
 <a href="#1927" id="1927">1927</a>
+<a href="#1928" id="1928">1928</a>
+<a href="#1929" id="1929">1929</a>
+<a href="#1930" id="1930">1930</a>
+<a href="#1931" id="1931">1931</a>
+<a href="#1932" id="1932">1932</a>
+<a href="#1933" id="1933">1933</a>
+<a href="#1934" id="1934">1934</a>
+<a href="#1935" id="1935">1935</a>
 </pre></div><pre class="rust"><code><span class="attr">#![allow(unused_variables)]
 
 </span><span class="kw">use </span>fixed::types::I80F48;
@@ -2257,7 +2265,15 @@
 
     <span class="kw">pub fn </span>token_update_index_and_rate(ctx: Context&lt;TokenUpdateIndexAndRate&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
-        </span>instructions::token_update_index_and_rate(ctx)<span class="question-mark">?</span>;
+        </span>instructions::token_update_index_and_rate(ctx, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>token_update_index_and_rate_resilient(
+        ctx: Context&lt;TokenUpdateIndexAndRate&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="attr">#[cfg(feature = <span class="string">&quot;enable-gpl&quot;</span>)]
+        </span>instructions::token_update_index_and_rate(ctx, <span class="bool-val">true</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())
     }
 
