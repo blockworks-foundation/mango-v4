@@ -105,9 +105,6 @@ pub async fn runner(
         .context
         .tokens
         .keys()
-        // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
-        // TokenUpdateIndexAndRate is known to take max 71k cu
-        // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
         .chunks(8)
         .into_iter()
@@ -211,7 +208,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token
@@ -232,18 +229,6 @@ pub async fn loop_update_index_and_rate(
                     .compute_estimates
                     .cu_token_update_index_and_rates,
             );
-            let sim_result = match client.simulate(pix.clone().to_instructions()).await {
-                Ok(response) => response.value,
-                Err(e) => {
-                    error!(token.name, "simulation request error: {e:?}");
-                    continue;
-                }
-            };
-
-            if let Some(e) = sim_result.err {
-                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
-                continue;
-            }
 
             instructions.append(pix);
         }
