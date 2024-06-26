@@ -324,7 +324,15 @@ pub mod mango_v4 {
 
     pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
-        instructions::token_update_index_and_rate(ctx)?;
+        instructions::token_update_index_and_rate(ctx, false)?;
+        Ok(())
+    }
+
+    pub fn token_update_index_and_rate_resilient(
+        ctx: Context<TokenUpdateIndexAndRate>,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::token_update_index_and_rate(ctx, true)?;
         Ok(())
     }
 

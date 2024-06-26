@@ -105,7 +105,6 @@ pub async fn runner(
         .context
         .tokens
         .keys()
-        // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
@@ -211,7 +210,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token
@@ -224,20 +223,6 @@ pub async fn loop_update_index_and_rate(
                 .collect::<Vec<_>>();
 
             ix.accounts.append(&mut banks);
-
-            let sim_result = match client.simulate(vec![ix.clone()]).await {
-                Ok(response) => response.value,
-                Err(e) => {
-                    error!(token.name, "simulation request error: {e:?}");
-                    continue;
-                }
-            };
-
-            if let Some(e) = sim_result.err {
-                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
-                continue;
-            }
-
             instructions.push(ix);
         }
         let pre = Instant::now();
@@ -466,7 +451,7 @@ pub async fn loop_charge_collateral_fees(
             collateral_fee_interval,
             max_cu_when_batching,
         )
-        .await
+            .await
         {
             Ok(()) => {}
             Err(err) => {
@@ -531,7 +516,7 @@ async fn charge_collateral_fees_inner(
         &ix_to_send,
         max_cu_when_batching,
     )
-    .await;
+        .await;
     info!("charge collateral fees: {:?}", txsigs);
 
     Ok(())

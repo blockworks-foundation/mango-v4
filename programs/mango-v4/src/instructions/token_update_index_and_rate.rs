@@ -18,7 +18,10 @@ pub mod compute_budget {
     declare_id!("ComputeBudget111111111111111111111111111111");
 }
 
-pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
+pub fn token_update_index_and_rate(
+    ctx: Context<TokenUpdateIndexAndRate>,
+    early_exit_on_invalid_oracle: bool,
+) -> Result<()> {
     {
         let ixs = ctx.accounts.instructions.as_ref();
 
@@ -71,6 +74,26 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
     {
         let mut some_bank = ctx.remaining_accounts[0].load_mut::<Bank>()?;
 
+        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
+        let price = some_bank.oracle_price(
+            &OracleAccountInfos::from_reader(oracle_ref),
+            Some(clock.slot),
+        );
+
+        // Early exit if oracle is invalid
+        // Warning: do not change any state before this check
+        let price = match price {
+            Ok(p) => p,
+            Err(e) => {
+                return if early_exit_on_invalid_oracle {
+                    msg!("Invalid oracle state: {}", e);
+                    Ok(())
+                } else {
+                    Err(e)
+                }
+            }
+        };
+
         // Limit the maximal time interval that interest is applied for. This means we won't use
         // a fixed interest rate for a very long time period in exceptional circumstances, like
         // when there is a solana downtime or the security council disables this instruction.
@@ -88,12 +111,6 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
             indexed_total_borrows,
             now_ts,
         );
-
-        let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-        let price = some_bank.oracle_price(
-            &OracleAccountInfos::from_reader(oracle_ref),
-            Some(clock.slot),
-        )?;
 
         some_bank
             .stable_price_model
