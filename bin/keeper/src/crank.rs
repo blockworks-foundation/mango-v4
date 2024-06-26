@@ -208,7 +208,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token

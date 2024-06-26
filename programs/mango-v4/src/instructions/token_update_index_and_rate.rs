@@ -18,7 +18,10 @@ pub mod compute_budget {
     declare_id!("ComputeBudget111111111111111111111111111111");
 }
 
-pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Result<()> {
+pub fn token_update_index_and_rate(
+    ctx: Context<TokenUpdateIndexAndRate>,
+    early_exit_on_invalid_oracle: bool,
+) -> Result<()> {
     {
         let ixs = ctx.accounts.instructions.as_ref();
 
@@ -82,8 +85,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
         let price = match price {
             Ok(p) => p,
             Err(e) => {
-                msg!("Invalid oracle state: {}", e);
-                return Ok(());
+                return if early_exit_on_invalid_oracle {
+                    msg!("Invalid oracle state: {}", e);
+                    Ok(())
+                } else {
+                    Err(e)
+                }
             }
         };
 
