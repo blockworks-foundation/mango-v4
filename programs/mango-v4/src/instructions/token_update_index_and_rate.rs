@@ -79,9 +79,12 @@ pub fn token_update_index_and_rate(ctx: Context<TokenUpdateIndexAndRate>) -> Res
 
         // Early exit if oracle is invalid
         // Warning: do not change any state before this check
-        let Ok(price) = price else {
-            msg!("Invalid oracle");
-            return Ok(());
+        let price = match price {
+            Ok(p) => p,
+            Err(e) => {
+                msg!("Invalid oracle state: {}", e);
+                return Ok(());
+            }
         };
 
         // Limit the maximal time interval that interest is applied for. This means we won't use
