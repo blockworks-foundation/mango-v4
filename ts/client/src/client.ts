@@ -5315,7 +5315,11 @@ export class MangoClient {
         const oracles: PublicKey[] = [];
         const fallbacks: PublicKey[] = [];
         Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
-          if ((this.fallbackOracleConfig as PublicKey[]).find((o) => o.toBase58() === b[0].oracle.toBase58())) {
+          if (
+            (this.fallbackOracleConfig as PublicKey[]).find(
+              (o) => o.toBase58() === b[0].oracle.toBase58(),
+            )
+          ) {
             oracles.push(b[0].oracle);
             fallbacks.push(b[0].fallbackOracle);
           }
