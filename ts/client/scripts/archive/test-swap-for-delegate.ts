@@ -84,6 +84,7 @@ async function x(): Promise<void> {
       userDefinedInstructions: ixs,
       userDefinedAlts: alts,
       flashLoanType: { swap: {} },
+      sequenceCheck: false,
     });
     console.log('hi');
     console.log(
