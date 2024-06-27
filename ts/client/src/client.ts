@@ -5312,10 +5312,11 @@ export class MangoClient {
     // fixed
     if (typeof this.fallbackOracleConfig !== 'string') {
       if (this.fixedFallbacks.size === 0) {
-        const oracles: PublicKey[] = this.fallbackOracleConfig;
+        const oracles: PublicKey[] = [];
         const fallbacks: PublicKey[] = [];
         Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
-          if (oracles.find((o) => o.toBase58() === b[0].oracle.toBase58())) {
+          if ((this.fallbackOracleConfig as PublicKey[]).find((o) => o.toBase58() === b[0].oracle.toBase58())) {
+            oracles.push(b[0].oracle);
             fallbacks.push(b[0].fallbackOracle);
           }
         });
