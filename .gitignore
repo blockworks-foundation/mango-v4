@@ -11,6 +11,7 @@ programs/mango-v4/src/lib-expanded.rs
 dist
 node_modules
 yarn-error.log
+.yarn
 
 .idea
 .vscode

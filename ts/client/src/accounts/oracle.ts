@@ -1,10 +1,12 @@
-import { AnchorProvider, Program, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
 import BN from 'bn.js';
+import { Program as Anchor30Program } from 'switchboard-anchor';
+
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
 const SBV1_DEVNET_PID = new PublicKey(
@@ -161,8 +163,8 @@ export async function parseSwitchboardOracle(
         new Wallet(new Keypair()),
         options,
       );
-      const idl = await Program.fetchIdl(SB_ON_DEMAND_PID, provider);
-      sbOnDemandProgram = new Program(idl!, provider);
+      const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, provider);
+      sbOnDemandProgram = new Anchor30Program(idl!, provider);
     }
     return parseSwitchboardOnDemandOracle(
       sbOnDemandProgram,

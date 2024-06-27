@@ -53,6 +53,7 @@
     "secp256k1": "5.0.0",
     "ts-mocha": "^10.0.0",
     "ts-node": "^10.9.1",
+    "tsx": "^4.15.7",
     "tweetnacl": "1.0.3",
     "typedoc": "^0.22.5",
     "typescript": "^4.8.4"
@@ -64,7 +65,7 @@
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "0.14.15",
     "@blockworks-foundation/mangolana": "0.0.14",
-    "@coral-xyz/anchor": "^0.30.1",
+    "@coral-xyz/anchor": "^0.28.1-beta.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",
@@ -78,13 +79,9 @@
     "dotenv": "^16.0.3",
     "fast-copy": "^3.0.1",
     "lodash": "^4.17.21",
-    "node-kraken-api": "^2.2.2"
+    "node-kraken-api": "^2.2.2",
+    "switchboard-anchor": "npm:@coral-xyz/anchor@0.30.0"
   },
-  "resolutions": {
-    "@coral-xyz/anchor": "^0.28.1-beta.2",
-    "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
-    "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
-    "**/@blockworks-foundation/mangolana/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11"
-  },
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "yarn@4.3.1"
 }

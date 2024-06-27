@@ -9,6 +9,14 @@
     "skipLibCheck": true,
     "strictNullChecks": true,
     "target": "esnext",
+    // "paths": {
+    //   "C-v1": [
+    //     "node_modules/C@1.0.0"
+    //   ],
+    //   "C-v2": [
+    //     "node_modules/C@2.0.0"
+    //   ]
+    // }
   },
   "ts-node": {
     // these options are overrides used only by ts-node
