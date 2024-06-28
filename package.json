@@ -80,7 +80,7 @@
     "fast-copy": "^3.0.1",
     "lodash": "^4.17.21",
     "node-kraken-api": "^2.2.2",
-    "switchboard-anchor": "npm:@coral-xyz/anchor@0.30.0"
+    "switchboard-anchor": "npm:@coral-xyz/anchor@0.30.1"
   },
   "license": "MIT",
   "packageManager": "yarn@4.3.1"

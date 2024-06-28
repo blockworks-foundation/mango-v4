@@ -1,3 +1,4 @@
+import { LISTING_PRESETS } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 import {
   Cluster,
   Commitment,
@@ -21,15 +22,15 @@ import {
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
-//basic configuration
+// basic configuration
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const SWAP_VALUE = '100';
-const TOKEN_MINT = 'SLCLww7nc1PD2gQPQdGayHviVVcpMthnqUz2iWKhNQV';
+const TOKEN_MINT = 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac';
 const FALLBACK_POOL_NAME: 'orcaPoolAddress' | 'raydiumPoolAddress' =
   'raydiumPoolAddress';
-const FALLBACK_POOL = '5hbCYGfGGenjeYzfWGFZ8zoXTo3fcHw5KkdsnXpXdbeX';
-const TOKEN_SYMBOL = 'SLCL';
-//basic configuration
+const FALLBACK_POOL = '34tFULRrRwh4bMcBLPtJaNqqe5pVgGZACi5sR8Xz95KC';
+const TOKEN_SYMBOL = 'MNGO';
+// basic configuration
 
 const pythUsdOracle = 'Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD';
 const switchboardUsdDaoOracle = 'FwYfsmj5x8YZXtQBNo2Cz8TE7WRCMFqA6UTffK4xQKMH';
@@ -73,6 +74,10 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
 }
 
 (async function main(): Promise<void> {
+  const tier = Object.values(LISTING_PRESETS).find(
+    (x) => x.preset_name === 'C',
+  );
+
   const { userProvider, connection, user } = await setupAnchor();
 
   const { sbOnDemandProgram, crossbarClient, queue } = await setupSwitchboard(
@@ -93,15 +98,14 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
     maxRetries: 0,
   };
 
-  // TODO @Adrian
   const conf = {
     name: `${TOKEN_SYMBOL}/USD`, // the feed name (max 32 bytes)
     queue, // the queue of oracles to bind to
-    maxVariance: 1.0, // allow 1% variance between submissions and jobs
-    minResponses: 2, // minimum number of responses of jobs to allow
-    numSignatures: 3, // number of signatures to fetch per update
+    maxVariance: 10, // allow 1% variance between submissions and jobs
+    minResponses: 1, // minimum number of responses of jobs to allow
+    numSignatures: 1, // number of signatures to fetch per update
     minSampleSize: 1, // minimum number of responses to sample
-    maxStaleness: 60, // maximum staleness of responses in seconds to sample
+    maxStaleness: tier!.maxStalenessSlots!, // maximum staleness of responses in seconds to sample
   };
 
   console.log('Initializing new data feed');

@@ -18,7 +18,7 @@ import {
 } from '@switchboard-xyz/on-demand';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
-import uniq from 'lodash/uniq';
+import uniqWith from 'lodash/uniqWith';
 import { Program as Anchor30Program } from 'switchboard-anchor';
 
 import { OracleConfig } from '../src/accounts/bank';
@@ -43,62 +43,72 @@ const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
     client,
   );
 
-  // TODO reload group once in a while
-  const filteredOracles = await prepareCandidateOracles(group, client);
-
   // eslint-disable-next-line no-constant-condition
   while (true) {
-    const slot = await client.connection.getSlot();
+    try {
+      const filteredOracles = await prepareCandidateOracles(group, client);
+      for (let i = 0; i < 10; i++) {
+        const slot = await client.connection.getSlot();
 
-    const staleOracles = await filterForStaleOracles(
-      filteredOracles,
-      client,
-      slot,
-    );
+        const staleOracles = await filterForStaleOracles(
+          filteredOracles,
+          client,
+          slot,
+        );
 
-    const varianceThresholdCrossedOracles =
-      await filterForVarianceThresholdOracles(
-        filteredOracles,
-        client,
-        sbOnDemandProgram,
-        crossbarClient,
-      );
+        const varianceThresholdCrossedOracles =
+          await filterForVarianceThresholdOracles(
+            filteredOracles,
+            client,
+            sbOnDemandProgram,
+            crossbarClient,
+          );
 
-    const oraclesToCrank = uniq(
-      [...staleOracles, ...varianceThresholdCrossedOracles],
-      function (item) {
-        return item.oracle.oraclePk.toString();
-      },
-    );
+        const oraclesToCrank = uniqWith(
+          [...staleOracles, ...varianceThresholdCrossedOracles],
+          function (item) {
+            return item.oracle.oraclePk.toString();
+          },
+        );
 
-    const pullIxs: TransactionInstruction[] = [];
-    const lutOwners: (PublicKey | Oracle)[] = [];
-    for (const oracle of oraclesToCrank) {
-      await preparePullIx(sbOnDemandProgram, oracle, queue, lutOwners, pullIxs);
+        const pullIxs: TransactionInstruction[] = [];
+        const lutOwners: (PublicKey | Oracle)[] = [];
+        for (const oracle of oraclesToCrank) {
+          await preparePullIx(
+            sbOnDemandProgram,
+            oracle,
+            queue,
+            lutOwners,
+            pullIxs,
+          );
+        }
+
+        for (const c of chunk(pullIxs, 5, false)) {
+          const tx = await asV0Tx({
+            connection,
+            ixs: [...c],
+            signers: [user],
+            computeUnitPrice: 200_000,
+            computeUnitLimitMultiple: 1.3,
+            lookupTables: await loadLookupTables(lutOwners),
+          });
+
+          const txOpts = {
+            commitment: 'processed' as Commitment,
+            skipPreflight: true,
+            maxRetries: 0,
+          };
+
+          const sim = await client.connection.simulateTransaction(tx, txOpts);
+          const sig = await client.connection.sendTransaction(tx, txOpts);
+          console.log(`updated in ${sig}`); // TODO add token names
+        }
+
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+    } catch (error) {
+      console.log(error);
     }
-
-    for (const c of chunk(pullIxs, 5)) {
-      const tx = await asV0Tx({
-        connection,
-        ixs: [...c],
-        signers: [user],
-        computeUnitPrice: 200_000,
-        computeUnitLimitMultiple: 1.3,
-        lookupTables: await loadLookupTables(lutOwners),
-      });
-
-      const txOpts = {
-        commitment: 'processed' as Commitment,
-        skipPreflight: true,
-        maxRetries: 0,
-      };
-
-      const sim = await client.connection.simulateTransaction(tx, txOpts);
-      const sig = await client.connection.sendTransaction(tx, txOpts);
-      console.log(`updated in ${sig}`); // TODO add token names
-    }
-
-    await new Promise((r) => setTimeout(r, 5000));
   }
 })();
 
@@ -123,11 +133,16 @@ async function preparePullIx(
     queue: queue,
     maxVariance: decodedPullFeed.maxVariance.toNumber(),
     minResponses: decodedPullFeed.minResponses,
-    numSignatures: 3, // TODO hardcoded
-    minSampleSize: decodedPullFeed.minSampleSize,
-    maxStaleness: decodedPullFeed.maxStaleness,
+    numSignatures: 1,
+    // TODO: I think these are not required
+    // minSampleSize: decodedPullFeed.minSampleSize,
+    // maxStaleness: decodedPullFeed.maxStaleness,
   };
   const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
+
+  if (pullIx === undefined) {
+    return;
+  }
 
   const lutOwners_ = [...responses.map((x) => x.oracle), pullFeed.pubkey];
   lutOwners.push(...lutOwners_);
@@ -171,7 +186,14 @@ async function filterForVarianceThresholdOracles(
       crossBarSim[0].results.length;
 
     if ((res.price - simPrice) / res.price > 0.01) {
+      console.log(
+        `- Variance threshold crossed oracles candidate ${item.oracle.name}`,
+      );
       varianceThresholdCrossedOracles.push(item);
+    } else {
+      console.log(
+        `- Variance threshold crossed oracles non candidate ${item.oracle.name}`,
+      );
     }
   }
   return varianceThresholdCrossedOracles;
@@ -200,12 +222,15 @@ async function filterForStaleOracles(
     );
 
     if (slot > res.lastUpdatedSlot) {
+      console.log(`- Stale oracle candidate ${item.oracle.name}`);
       if (
         slot - res.lastUpdatedSlot >
         item.oracle.oracleConfig.maxStalenessSlots.toNumber()
       ) {
         staleOracles.push(item);
       }
+    } else {
+      console.log(`- Stale oracle non candidate ${item.oracle.name}`);
     }
   }
   return staleOracles;
@@ -213,11 +238,23 @@ async function filterForStaleOracles(
 
 async function prepareCandidateOracles(group: Group, client: MangoClient) {
   const oracles = getOraclesForMangoGroup(group);
-  oracles.push(...extendOraclesManually());
+  oracles.push(...extendOraclesManually(CLUSTER));
 
-  const ais = await client.program.provider.connection.getMultipleAccountsInfo(
-    oracles.map((item) => item.oraclePk),
-  );
+  const ais = (
+    await Promise.all(
+      chunk(
+        oracles.map((item) => item.oraclePk),
+        50,
+        false,
+      ).map(
+        async (chunk) =>
+          await client.program.provider.connection.getMultipleAccountsInfo(
+            chunk,
+          ),
+      ),
+    )
+  ).flat();
+
   for (const [idx, ai] of ais.entries()) {
     if (ai == null || ai.data == null) {
       throw new Error(
@@ -239,15 +276,28 @@ async function prepareCandidateOracles(group: Group, client: MangoClient) {
   return filteredOracles;
 }
 
-function extendOraclesManually() {
+function extendOraclesManually(cluster: Cluster) {
+  if (cluster == 'devnet') {
+    return [
+      {
+        oraclePk: new PublicKey('EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf'),
+        oracleConfig: {
+          confFilter: I80F48.fromString('0.1'),
+          maxStalenessSlots: new BN(5),
+        },
+        name: 'BTC/USD',
+      },
+    ];
+  }
   return [
     {
-      oraclePk: new PublicKey('EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf'),
+      // https://ondemand.switchboard.xyz/solana/mainnet/user/8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt/
+      oraclePk: new PublicKey('EFSBitmy2LZexy6CqYVDAqzWN6wYHZmHkFZxmUjNgwpb'),
       oracleConfig: {
-        confFilter: I80F48.fromString('0.1'),
-        maxStalenessSlots: new BN(5),
+        confFilter: I80F48.fromString('1000'),
+        maxStalenessSlots: new BN(-1),
       },
-      name: 'BTC/USD',
+      name: 'MNGO/USD',
     },
   ];
 }
@@ -342,7 +392,7 @@ async function setupSwitchboard(client: MangoClient) {
   }
   const crossbarClient = new CrossbarClient(
     'https://crossbar.switchboard.xyz',
-    true,
+    false,
   );
   return { sbOnDemandProgram, crossbarClient, queue };
 }

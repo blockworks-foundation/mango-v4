@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
+import { SB_ON_DEMAND_PID, toFeedValue } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
 import BN from 'bn.js';
@@ -130,16 +130,19 @@ export function parseSwitchboardOnDemandOracle(
       accountInfo.data,
     );
 
-    // This code was used when decodedPullFeed.result used to be empty
-    // const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
-    // const price = new Big(feedValue?.value.toString()).div(1e18);
-    // const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
-    // const stdDeviation = 0; // TODO the 0
+    if (decodedPullFeed.result == undefined) {
+      const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
+      console.log(decodedPullFeed.submissions);
+      console.log(feedValue);
+      const price = new Big(feedValue?.value.toString()).div(1e18);
+      const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
+      const stdDeviation = 0; // TODO the 0
+      return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
+    }
 
     const price = new Big(decodedPullFeed.result.value.toString()).div(1e18);
     const lastUpdatedSlot = decodedPullFeed.result.slot.toNumber();
     const stdDeviation = decodedPullFeed.result.stdDev.toNumber();
-
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
   } catch (e) {
     console.log(
