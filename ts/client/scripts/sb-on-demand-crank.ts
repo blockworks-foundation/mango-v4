@@ -1,4 +1,4 @@
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
   AccountInfo,
   Cluster,
