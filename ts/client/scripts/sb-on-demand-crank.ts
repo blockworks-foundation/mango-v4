@@ -292,7 +292,7 @@ function extendOraclesManually(cluster: Cluster) {
   return [
     {
       // https://ondemand.switchboard.xyz/solana/mainnet/user/8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt/
-      oraclePk: new PublicKey('EFSBitmy2LZexy6CqYVDAqzWN6wYHZmHkFZxmUjNgwpb'),
+      oraclePk: new PublicKey('Hrp9Lq2zcSPAtuKCsukrVhawKMWVktfWKPVtLYwveAtu'),
       oracleConfig: {
         confFilter: I80F48.fromString('1000'),
         maxStalenessSlots: new BN(-1),
@@ -308,9 +308,7 @@ async function setupMango() {
   const user = Keypair.fromSecretKey(
     Buffer.from(
       JSON.parse(
-        fs.readFileSync(USER_KEYPAIR!, {
-          encoding: 'utf-8',
-        }),
+        process.env.KEYPAIR || fs.readFileSync(USER_KEYPAIR!, 'utf-8'),
       ),
     ),
   );

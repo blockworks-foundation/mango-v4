@@ -93,7 +93,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   }
 
   const txOpts = {
-    commitment: 'processed' as Commitment,
+    commitment: 'finalized' as Commitment,
     skipPreflight: true,
     maxRetries: 0,
   };
@@ -102,9 +102,9 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
     name: `${TOKEN_SYMBOL}/USD`, // the feed name (max 32 bytes)
     queue, // the queue of oracles to bind to
     maxVariance: 10, // allow 1% variance between submissions and jobs
-    minResponses: 1, // minimum number of responses of jobs to allow
-    numSignatures: 1, // number of signatures to fetch per update
-    minSampleSize: 1, // minimum number of responses to sample
+    minResponses: 2, // minimum number of responses of jobs to allow
+    numSignatures: 3, // number of signatures to fetch per update
+    minSampleSize: 2, // minimum number of responses to sample
     maxStaleness: tier!.maxStalenessSlots!, // maximum staleness of responses in seconds to sample
   };
 
