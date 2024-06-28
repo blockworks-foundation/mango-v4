@@ -10,6 +10,7 @@ import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
   CrossbarClient,
+  OracleJob,
   PullFeed,
   Queue,
   SB_ON_DEMAND_PID,
@@ -20,7 +21,18 @@ import {
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
+//basic configuration
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+const SWAP_VALUE = '100';
+const TOKEN_MINT = 'SLCLww7nc1PD2gQPQdGayHviVVcpMthnqUz2iWKhNQV';
+const FALLBACK_POOL_NAME: 'orcaPoolAddress' | 'raydiumPoolAddress' =
+  'raydiumPoolAddress';
+const FALLBACK_POOL = '5hbCYGfGGenjeYzfWGFZ8zoXTo3fcHw5KkdsnXpXdbeX';
+const TOKEN_SYMBOL = 'SLCL';
+//basic configuration
 
+const pythUsdOracle = 'Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD';
+const switchboardUsdDaoOracle = 'FwYfsmj5x8YZXtQBNo2Cz8TE7WRCMFqA6UTffK4xQKMH';
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 const CLUSTER_URL =
@@ -83,7 +95,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
 
   // TODO @Adrian
   const conf = {
-    name: 'BTC Price Feed', // the feed name (max 32 bytes)
+    name: `${TOKEN_SYMBOL}/USD`, // the feed name (max 32 bytes)
     queue, // the queue of oracles to bind to
     maxVariance: 1.0, // allow 1% variance between submissions and jobs
     minResponses: 1, // minimum number of responses of jobs to allow
@@ -96,12 +108,162 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   // Generate the feed keypair
   const [pullFeed, feedKp] = PullFeed.generate(sbOnDemandProgram);
   const jobs = [
-    // TODO @Adrian
-    // source https://github.com/switchboard-xyz/sb-on-demand-examples/blob/main/sb-on-demand-feeds/scripts/utils.ts#L23
-    // buildPythnetJob(
-    //   'e62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43',
-    // ),
-    // buildCoinbaseJob('BTC-USD'),
+    OracleJob.fromObject({
+      tasks: [
+        {
+          conditionalTask: {
+            attempt: [
+              {
+                valueTask: {
+                  big: SWAP_VALUE,
+                },
+              },
+              {
+                divideTask: {
+                  job: {
+                    tasks: [
+                      {
+                        jupiterSwapTask: {
+                          inTokenAddress: USDC_MINT,
+                          outTokenAddress: TOKEN_MINT,
+                          baseAmountString: SWAP_VALUE,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            onFailure: [
+              {
+                lpExchangeRateTask: {
+                  [FALLBACK_POOL_NAME]: FALLBACK_POOL,
+                },
+              },
+            ],
+          },
+        },
+        {
+          conditionalTask: {
+            attempt: [
+              {
+                multiplyTask: {
+                  job: {
+                    tasks: [
+                      {
+                        oracleTask: {
+                          pythAddress: pythUsdOracle,
+                          pythAllowedConfidenceInterval: 10,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            onFailure: [
+              {
+                multiplyTask: {
+                  job: {
+                    tasks: [
+                      {
+                        oracleTask: {
+                          switchboardAddress: switchboardUsdDaoOracle,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
+    OracleJob.fromObject({
+      tasks: [
+        {
+          conditionalTask: {
+            attempt: [
+              {
+                cacheTask: {
+                  cacheItems: [
+                    {
+                      variableName: 'QTY',
+                      job: {
+                        tasks: [
+                          {
+                            jupiterSwapTask: {
+                              inTokenAddress: USDC_MINT,
+                              outTokenAddress: TOKEN_MINT,
+                              baseAmountString: SWAP_VALUE,
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+              {
+                jupiterSwapTask: {
+                  inTokenAddress: TOKEN_MINT,
+                  outTokenAddress: USDC_MINT,
+                  baseAmountString: '${QTY}',
+                },
+              },
+              {
+                divideTask: {
+                  big: '${QTY}',
+                },
+              },
+            ],
+            onFailure: [
+              {
+                lpExchangeRateTask: {
+                  [FALLBACK_POOL_NAME]: FALLBACK_POOL,
+                },
+              },
+            ],
+          },
+        },
+        {
+          conditionalTask: {
+            attempt: [
+              {
+                multiplyTask: {
+                  job: {
+                    tasks: [
+                      {
+                        oracleTask: {
+                          pythAddress: pythUsdOracle,
+                          pythAllowedConfidenceInterval: 10,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            onFailure: [
+              {
+                multiplyTask: {
+                  job: {
+                    tasks: [
+                      {
+                        oracleTask: {
+                          switchboardAddress: switchboardUsdDaoOracle,
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ],
+    }),
   ];
   const decodedFeedHash = await crossbarClient
     .store(queue.toBase58(), jobs)
