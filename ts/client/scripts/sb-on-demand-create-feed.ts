@@ -98,7 +98,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
     name: `${TOKEN_SYMBOL}/USD`, // the feed name (max 32 bytes)
     queue, // the queue of oracles to bind to
     maxVariance: 1.0, // allow 1% variance between submissions and jobs
-    minResponses: 1, // minimum number of responses of jobs to allow
+    minResponses: 2, // minimum number of responses of jobs to allow
     numSignatures: 3, // number of signatures to fetch per update
     minSampleSize: 1, // minimum number of responses to sample
     maxStaleness: 60, // maximum staleness of responses in seconds to sample
