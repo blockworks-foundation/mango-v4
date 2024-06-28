@@ -180,6 +180,21 @@ pub struct TokenInfo {
     pub allow_asset_liquidation: bool,
 }
 
+#[derive(Clone, Debug)]
+pub struct SkippedTokenInfo {
+    pub token_index: TokenIndex,
+    pub missing_bank: bool,
+    pub oracle_stale_error: bool,
+    pub oracle_confidence_error: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct SkippedSpotInfo {
+    pub market_index: SpotMarketIndex,
+    pub base_token_error: Option<MangoError>,
+    pub quote_token_error: Option<MangoError>,
+}
+
 /// Temporary value used during health computations
 #[derive(Clone, Default)]
 pub struct TokenBalance {
@@ -632,6 +647,7 @@ impl PerpInfo {
 pub struct HealthCache {
     pub token_infos: Vec<TokenInfo>,
     pub(crate) spot_infos: Vec<SpotInfo>,
+    pub(crate) skipped_spot_infos: Vec<SkippedSpotInfo>,
     pub(crate) perp_infos: Vec<PerpInfo>,
     #[allow(unused)]
     pub(crate) being_liquidated: bool,
@@ -1304,26 +1320,94 @@ impl HealthCache {
         account: &MangoAccountRef,
         token_index: TokenIndex,
     ) -> Result<()> {
-        for serum3 in account.active_serum3_orders() {
-            if serum3.base_token_index == token_index || serum3.quote_token_index == token_index {
-                require_msg!(
-                    self.spot_infos.iter().any(|s| s.spot_market_index == SpotMarketIndex::Serum3(serum3.market_index)),
-                    "health cache is missing spot info for serum3 market {} involving receiver token {}; passed banks and oracles?",
-                    serum3.market_index, token_index
+        let serum_markets = account.active_serum3_orders().map(|x| {
+            (
+                SpotMarketIndex::Serum3(x.market_index),
+                x.base_token_index,
+                x.quote_token_index,
+            )
+        });
+        let obv2_markets = account.active_openbook_v2_orders().map(|x| {
+            (
+                SpotMarketIndex::OpenbookV2(x.market_index),
+                x.base_token_index,
+                x.quote_token_index,
+            )
+        });
+
+        for (market_index, market_base, market_quote) in serum_markets.chain(obv2_markets) {
+            if market_base == token_index || market_quote == token_index {
+                let has_market = self
+                    .spot_infos
+                    .iter()
+                    .any(|s| s.spot_market_index == market_index);
+                if has_market {
+                    continue;
+                }
+
+                if let Some(skipped_market) = self
+                    .skipped_spot_infos
+                    .iter()
+                    .find(|s3| s3.market_index == market_index)
+                {
+                    if let Some(error) = skipped_market.quote_token_error {
+                        return get_spot_bank_or_oracle_error(market_quote, error, market_index);
+                    }
+                    if let Some(error) = skipped_market.base_token_error {
+                        return get_spot_bank_or_oracle_error(market_base, error, market_index);
+                    }
+                }
+
+                require_msg_typed!(
+                    has_market,
+                    MangoError::InvalidHealthAccountCount,
+                    "health cache is missing spot market info for {:?} involving receiver token {}; passed banks and oracles?",
+                    market_index,
+                    token_index,
                 );
             }
         }
-        for oov2 in account.active_openbook_v2_orders() {
-            if oov2.base_token_index == token_index || oov2.quote_token_index == token_index {
-                require_msg!(
-                    self.spot_infos.iter().any(|s| s.spot_market_index == SpotMarketIndex::OpenbookV2(oov2.market_index)),
-                    "health cache is missing spot info for oov2 market {} involving receiver token {}; passed banks and oracles?",
-                    oov2.market_index, token_index
-                );
-            }
-        }
+
         Ok(())
     }
+}
+
+fn get_spot_bank_or_oracle_error(
+    token_index: TokenIndex,
+    error: MangoError,
+    market_index: SpotMarketIndex,
+) -> Result<()> {
+    if error.error_code() == MangoError::InvalidHealthAccountCount.error_code() {
+        return err!(MangoError::InvalidHealthAccountCount).with_context(|| {
+            format!(
+                "missing bank for token {} used by spot market {:?}",
+                token_index, market_index
+            )
+        });
+    }
+    if error.error_code() == MangoError::OracleStale.error_code() {
+        return err!(MangoError::OracleStale).with_context(|| {
+            format!(
+                "oracle stale for token {} used by spot market {:?}",
+                token_index, market_index
+            )
+        });
+    }
+    if error.error_code() == MangoError::OracleConfidence.error_code() {
+        return err!(MangoError::OracleConfidence).with_context(|| {
+            format!(
+                "oracle confidence issue for token {} used by spot market {:?}",
+                token_index, market_index
+            )
+        });
+    }
+
+    return err!(MangoError::SomeError).with_context(|| {
+        format!(
+            "health cache is missing spot info {:?} involving token {}; passed banks and oracles?",
+            market_index, token_index
+        )
+    });
 }
 
 pub(crate) fn find_token_info_index(infos: &[TokenInfo], token_index: TokenIndex) -> Result<usize> {
@@ -1373,6 +1457,7 @@ fn new_health_cache_impl(
 ) -> Result<HealthCache> {
     // token contribution from token accounts
     let mut token_infos = Vec::with_capacity(account.active_token_positions().count());
+    let mut skipped_token_infos = Vec::with_capacity(0);
 
     // As a CU optimization, don't call available_banks() unless necessary
     let available_banks_opt = if allow_skipping_banks {
@@ -1389,6 +1474,12 @@ fn new_health_cache_impl(
                 .unwrap()
                 .contains(&position.token_index);
             if !bank_is_available {
+                skipped_token_infos.push(SkippedTokenInfo {
+                    token_index: position.token_index,
+                    missing_bank: true,
+                    oracle_stale_error: false,
+                    oracle_confidence_error: false,
+                });
                 require_msg_typed!(
                     position.indexed_position >= 0,
                     MangoError::InvalidBank,
@@ -1408,6 +1499,14 @@ fn new_health_cache_impl(
             && position.indexed_position >= 0
         {
             // Ignore the asset because the oracle is bad, decreasing total health
+            skipped_token_infos.push(SkippedTokenInfo {
+                token_index: position.token_index,
+                missing_bank: false,
+                oracle_stale_error: bank_oracle_result
+                    .is_anchor_error_with_code(MangoError::OracleStale.error_code()),
+                oracle_confidence_error: bank_oracle_result
+                    .is_anchor_error_with_code(MangoError::OracleConfidence.error_code()),
+            });
             continue;
         }
         let (bank, oracle_price) = bank_oracle_result?;
@@ -1441,6 +1540,7 @@ fn new_health_cache_impl(
     let mut spot_infos = Vec::with_capacity(
         account.active_serum3_orders().count() + account.active_openbook_v2_orders().count(),
     );
+    let mut skipped_spot_infos = Vec::with_capacity(0);
     for (i, serum_account) in account.active_serum3_orders().enumerate() {
         let oo = retriever.serum_oo(i, &serum_account.open_orders)?;
 
@@ -1453,6 +1553,17 @@ fn new_health_cache_impl(
         let (base_info_index, quote_info_index) = match info_index_results {
             (Ok(base), Ok(quote)) => (base, quote),
             _ => {
+                skipped_spot_infos.push(SkippedSpotInfo {
+                    market_index: SpotMarketIndex::Serum3(serum_account.market_index),
+                    base_token_error: get_error(
+                        serum_account.base_token_index,
+                        &skipped_token_infos,
+                    ),
+                    quote_token_error: get_error(
+                        serum_account.quote_token_index,
+                        &skipped_token_infos,
+                    ),
+                });
                 require_msg_typed!(
                     allow_skipping_banks,
                     MangoError::InvalidBank,
@@ -1492,6 +1603,17 @@ fn new_health_cache_impl(
         let (base_info_index, quote_info_index) = match info_index_results {
             (Ok(base), Ok(quote)) => (base, quote),
             _ => {
+                skipped_spot_infos.push(SkippedSpotInfo {
+                    market_index: SpotMarketIndex::OpenbookV2(open_orders_account.market_index),
+                    base_token_error: get_error(
+                        open_orders_account.base_token_index,
+                        &skipped_token_infos,
+                    ),
+                    quote_token_error: get_error(
+                        open_orders_account.quote_token_index,
+                        &skipped_token_infos,
+                    ),
+                });
                 require_msg_typed!(
                     allow_skipping_banks,
                     MangoError::InvalidBank,
@@ -1547,9 +1669,30 @@ fn new_health_cache_impl(
     Ok(HealthCache {
         token_infos,
         spot_infos,
+        skipped_spot_infos,
         perp_infos,
         being_liquidated: account.fixed.being_liquidated(),
     })
+}
+
+fn get_error(token: TokenIndex, skipped_tokens: &Vec<SkippedTokenInfo>) -> Option<MangoError> {
+    if let Some(skip_reason) = skipped_tokens.iter().find(|t| t.token_index == token) {
+        if skip_reason.missing_bank {
+            return Some(MangoError::InvalidHealthAccountCount);
+        }
+
+        if skip_reason.oracle_confidence_error {
+            return Some(MangoError::OracleConfidence);
+        }
+
+        if skip_reason.oracle_stale_error {
+            return Some(MangoError::OracleStale);
+        }
+
+        return Some(MangoError::SomeError);
+    }
+
+    return None;
 }
 
 #[cfg(test)]

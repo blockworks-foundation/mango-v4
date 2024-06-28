@@ -741,6 +741,7 @@ mod tests {
                 },
             ],
             spot_infos: vec![],
+            skipped_spot_infos: vec![],
             perp_infos: vec![],
             being_liquidated: false,
         };
@@ -1166,6 +1167,7 @@ mod tests {
                 base_lot_size,
                 ..default_perp_info(0.3, 2.0)
             }],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
 
@@ -1450,6 +1452,7 @@ mod tests {
             ],
             spot_infos: vec![],
             perp_infos: vec![],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
 
@@ -1601,6 +1604,7 @@ mod tests {
                 settle_token_index: 0,
                 ..default_perp_info(0.3, 2.0)
             }],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
 
@@ -1650,6 +1654,7 @@ mod tests {
             ],
             spot_infos: vec![],
             perp_infos: vec![],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
         assert!(leverage_eq(&health_cache, 0.0));
@@ -1670,6 +1675,7 @@ mod tests {
             ],
             spot_infos: vec![],
             perp_infos: vec![],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
 
@@ -1696,6 +1702,7 @@ mod tests {
                 quote: I80F48::from_num(9.9),
                 ..default_perp_info(0.1, 1.1)
             }],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
         assert!(leverage_eq(&health_cache, 9.9));
@@ -1725,6 +1732,7 @@ mod tests {
                 has_zero_funds: true,
             }],
             perp_infos: vec![],
+            skipped_spot_infos: vec![],
             being_liquidated: false,
         };
 
