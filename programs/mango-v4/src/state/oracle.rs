@@ -443,7 +443,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             require_gte!(price, 0);
             OracleState {
                 price,
-                last_update_slot: last_update_slot,
+                last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardOnDemand,
             }
