@@ -40,6 +40,16 @@ const SLEEP_MS = Number(process.env.SLEEP_MS) || 5_000;
 
 // TODO use mangolana to send txs
 
+interface OracleInterface {
+  oracle: {
+    oraclePk: PublicKey;
+    oracleConfig: OracleConfig;
+    name: string;
+  };
+  decodedPullFeed: any;
+  ai: AccountInfo<Buffer> | null;
+}
+
 (async function main(): Promise<never> {
   const { group, client, connection, user } = await setupMango();
 
@@ -134,15 +144,9 @@ async function preparePullIx(
     new PublicKey(oracle.oracle.oraclePk),
   );
 
-  const decodedPullFeed = sbOnDemandProgram.coder.accounts.decode(
-    'pullFeedAccountData',
-    oracle.ai.data,
-  );
-
   const conf = {
-    queue: queue,
     numSignatures: 3,
-    feedHash: decodedPullFeed.feedHash,
+    feed: oracle.oraclePk,
   };
   // TODO use fetchUpdateMany
   const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
@@ -167,30 +171,11 @@ async function preparePullIx(
 }
 
 async function filterForVarianceThresholdOracles(
-  filteredOracles: {
-    oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
-    decodedPullFeed: any;
-    ai: AccountInfo<Buffer> | null;
-  }[],
+  filteredOracles: OracleInterface[],
   client: MangoClient,
   crossbarClient: CrossbarClient,
-): Promise<
-  {
-    oracle: {
-      oraclePk: PublicKey;
-      oracleConfig: OracleConfig;
-    };
-    ai: AccountInfo<Buffer> | null;
-  }[]
-> {
-  const varianceThresholdCrossedOracles = new Array<{
-    oracle: {
-      oraclePk: PublicKey;
-      oracleConfig: OracleConfig;
-    };
-    decodedPullFeed: any;
-    ai: AccountInfo<Buffer> | null;
-  }>();
+): Promise<OracleInterface[]> {
+  const varianceThresholdCrossedOracles = new Array<OracleInterface>();
   for (const item of filteredOracles) {
     const res = await parseSwitchboardOracle(
       item.oracle.oraclePk,
@@ -206,24 +191,16 @@ async function filterForVarianceThresholdOracles(
       crossBarSim[0].results.reduce((a, b) => a + b, 0) /
       crossBarSim[0].results.length;
 
-    if (Math.abs(res.price - simPrice) / res.price > 0.01) {
+    const changePct = (Math.abs(res.price - simPrice) * 100) / res.price;
+    const changeBps = changePct * 100;
+    if (changePct > item.decodedPullFeed.maxVariance) {
       console.log(
-        `- Variance threshold crossed oracle, candidate ${
-          item.oracle.name
-        } ${simPrice} ${res.price} ${(
-          (Math.abs(res.price - simPrice) * 10000) /
-          res.price
-        ).toFixed()} bps`,
+        `- ${item.oracle.name}, variance threshold, candidate ${simPrice} ${res.price} ${changeBps} bps`,
       );
       varianceThresholdCrossedOracles.push(item);
     } else {
       console.log(
-        `- Variance threshold crossed oracle, non candidate ${
-          item.oracle.name
-        } ${simPrice} ${res.price} ${(
-          (Math.abs(res.price - simPrice) * 10000) /
-          res.price
-        ).toFixed()} bps`,
+        `- ${item.oracle.name}, variance threshold, non-candidate ${simPrice} ${res.price} ${changeBps} bps`,
       );
     }
   }
@@ -231,11 +208,7 @@ async function filterForVarianceThresholdOracles(
 }
 
 async function filterForStaleOracles(
-  filteredOracles: {
-    oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
-    decodedPullFeed: any;
-    ai: AccountInfo<Buffer> | null;
-  }[],
+  filteredOracles: OracleInterface[],
   client: MangoClient,
   slot: number,
 ): Promise<
@@ -247,13 +220,7 @@ async function filterForStaleOracles(
     ai: AccountInfo<Buffer> | null;
   }[]
 > {
-  const staleOracles = new Array<{
-    oracle: {
-      oraclePk: PublicKey;
-      oracleConfig: OracleConfig;
-    };
-    ai: AccountInfo<Buffer> | null;
-  }>();
+  const staleOracles = new Array<OracleInterface>();
   for (const item of filteredOracles) {
     const res = await parseSwitchboardOracle(
       item.oracle.oraclePk,
@@ -261,21 +228,18 @@ async function filterForStaleOracles(
       client.connection,
     );
 
+    const diff = slot - res.lastUpdatedSlot;
     if (
       slot > res.lastUpdatedSlot &&
       slot - res.lastUpdatedSlot > item.decodedPullFeed.maxStaleness
     ) {
       console.log(
-        `- Stale oracle, candidate ${item.oracle.name} ${slot} ${
-          item.decodedPullFeed.maxStaleness
-        } ${res.lastUpdatedSlot} ${slot - res.lastUpdatedSlot}`,
+        `- ${item.oracle.name}, stale oracle, candidate ${item.decodedPullFeed.maxStaleness} ${slot} ${res.lastUpdatedSlot} ${diff}`,
       );
       staleOracles.push(item);
     } else {
       console.log(
-        `- Stale oracle, non candidate ${item.oracle.name} ${slot} ${
-          res.lastUpdatedSlot
-        } ${res.lastUpdatedSlot} ${slot - res.lastUpdatedSlot}`,
+        `- ${item.oracle.name}, stale oracle, non-candidate ${item.decodedPullFeed.maxStaleness} ${slot} ${res.lastUpdatedSlot} ${diff}`,
       );
     }
   }
@@ -285,13 +249,7 @@ async function filterForStaleOracles(
 async function prepareCandidateOracles(
   group: Group,
   client: MangoClient,
-): Promise<
-  {
-    oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
-    decodedPullFeed: any;
-    ai: AccountInfo<Buffer> | null;
-  }[]
-> {
+): Promise<OracleInterface[]> {
   const oracles = getOraclesForMangoGroup(group);
   oracles.push(...extendOraclesManually(CLUSTER));
 
@@ -325,14 +283,18 @@ async function prepareCandidateOracles(
 
   const filteredOracles = oracles
     .map((o, i) => {
-      return { oracle: o, ai: ais[i] };
+      return { oracle: o, ai: ais[i], decodedPullFeed: undefined };
     })
     .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
 
   return filteredOracles;
 }
 
-function extendOraclesManually(cluster: Cluster) {
+function extendOraclesManually(cluster: Cluster): {
+  oraclePk: PublicKey;
+  oracleConfig: { confFilter: I80F48; maxStalenessSlots: BN };
+  name: string;
+}[] {
   if (cluster == 'devnet') {
     return [
       {
@@ -389,7 +351,9 @@ async function setupMango(): Promise<{
   return { group, client, connection, user };
 }
 
-function getOraclesForMangoGroup(group: Group) {
+function getOraclesForMangoGroup(
+  group: Group,
+): { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string }[] {
   // oracles for tokens
   const oracles1 = Array.from(group.banksMapByName.values())
     .filter(
@@ -439,7 +403,11 @@ function getOraclesForMangoGroup(group: Group) {
   return oracles;
 }
 
-async function setupSwitchboard(client: MangoClient) {
+async function setupSwitchboard(client: MangoClient): Promise<{
+  sbOnDemandProgram: Anchor30Program<Idl>;
+  crossbarClient: CrossbarClient;
+  queue: PublicKey;
+}> {
   const idl = await Anchor30Program.fetchIdl(
     SB_ON_DEMAND_PID,
     client.program.provider,
@@ -459,11 +427,7 @@ async function setupSwitchboard(client: MangoClient) {
 async function updateFilteredOraclesAis(
   connection: Connection,
   sbOnDemandProgram: Anchor30Program<Idl>,
-  filteredOracles: {
-    decodedPullFeed: any;
-    oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
-    ai: AccountInfo<Buffer> | null;
-  }[],
+  filteredOracles: OracleInterface[],
 ): Promise<void> {
   const ais = (
     await Promise.all(

@@ -108,7 +108,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
     numSignatures: 3, // number of signatures to fetch per update
     minSampleSize: 2, // minimum number of responses to sample
     maxStaleness:
-      tier!.maxStalenessSlots == -1 ? 10000 : tier!.maxStalenessSlots, // maximum staleness of responses in seconds to sample
+      tier!.maxStalenessSlots == -1 ? 10000 : tier!.maxStalenessSlots!, // maximum staleness of responses in seconds to sample
   };
 
   console.log('Initializing new data feed');
