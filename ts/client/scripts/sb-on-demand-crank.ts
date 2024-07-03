@@ -18,7 +18,7 @@ import {
 import fs from 'fs';
 import chunk from 'lodash/chunk';
 import uniqWith from 'lodash/uniqWith';
-import { Program as Anchor30Program } from 'switchboard-anchor';
+import { Program as Anchor30Program, Idl } from 'switchboard-anchor';
 
 import BN from 'bn.js';
 import { AnchorProvider, Wallet } from 'switchboard-anchor';
@@ -56,7 +56,11 @@ const SLEEP_MS = Number(process.env.SLEEP_MS) || 5_000;
       for (let i = 0; i < 10; i++) {
         const slot = await client.connection.getSlot();
 
-        await updateFilteredOraclesAis(client.connection, filteredOracles);
+        await updateFilteredOraclesAis(
+          client.connection,
+          sbOnDemandProgram,
+          filteredOracles,
+        );
 
         const staleOracles = await filterForStaleOracles(
           filteredOracles,
@@ -68,7 +72,6 @@ const SLEEP_MS = Number(process.env.SLEEP_MS) || 5_000;
           await filterForVarianceThresholdOracles(
             filteredOracles,
             client,
-            sbOnDemandProgram,
             crossbarClient,
           );
 
@@ -138,31 +141,38 @@ async function preparePullIx(
 
   const conf = {
     queue: queue,
-    maxVariance: decodedPullFeed.maxVariance.toNumber(),
-    minResponses: decodedPullFeed.minResponses,
     numSignatures: 3,
-    minSampleSize: decodedPullFeed.minSampleSize,
-    maxStaleness: decodedPullFeed.maxStaleness,
     feedHash: decodedPullFeed.feedHash,
   };
+  // TODO use fetchUpdateMany
   const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
 
   if (pullIx === undefined) {
     return;
   }
 
+  // TODO
+  // > Mitch | Switchboard:
+  // there can be more oracles that join a queue over time
+  // all oracles and feeds carry their own LUT as im sure you noticed
+  // > Mitch | Switchboard:
+  // the feed ones are easy to predict though
+  // > Mitch | Switchboard:
+  // but you dont know which oracles the gateway will select for you so best you can do is pack all oracle accounts into 1lut
+
   const lutOwners_ = [...responses.map((x) => x.oracle), pullFeed.pubkey];
   lutOwners.push(...lutOwners_);
+
   pullIxs.push(pullIx!);
 }
 
 async function filterForVarianceThresholdOracles(
   filteredOracles: {
     oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
+    decodedPullFeed: any;
     ai: AccountInfo<Buffer> | null;
   }[],
   client: MangoClient,
-  sbOnDemandProgram,
   crossbarClient: CrossbarClient,
 ): Promise<
   {
@@ -178,6 +188,7 @@ async function filterForVarianceThresholdOracles(
       oraclePk: PublicKey;
       oracleConfig: OracleConfig;
     };
+    decodedPullFeed: any;
     ai: AccountInfo<Buffer> | null;
   }>();
   for (const item of filteredOracles) {
@@ -187,25 +198,20 @@ async function filterForVarianceThresholdOracles(
       client.connection,
     );
 
-    const decodedPullFeed = sbOnDemandProgram.coder.accounts.decode(
-      'pullFeedAccountData',
-      item.ai!.data,
-    );
-
     const crossBarSim = await crossbarClient.simulateFeeds([
-      new Buffer(decodedPullFeed.feedHash).toString('hex'),
+      new Buffer(item.decodedPullFeed.feedHash).toString('hex'),
     ]);
 
     const simPrice =
       crossBarSim[0].results.reduce((a, b) => a + b, 0) /
       crossBarSim[0].results.length;
 
-    if ((res.price - simPrice) / res.price > 0.01) {
+    if (Math.abs(res.price - simPrice) / res.price > 0.01) {
       console.log(
         `- Variance threshold crossed oracle, candidate ${
           item.oracle.name
         } ${simPrice} ${res.price} ${(
-          ((res.price - simPrice) * 10000) /
+          (Math.abs(res.price - simPrice) * 10000) /
           res.price
         ).toFixed()} bps`,
       );
@@ -215,7 +221,7 @@ async function filterForVarianceThresholdOracles(
         `- Variance threshold crossed oracle, non candidate ${
           item.oracle.name
         } ${simPrice} ${res.price} ${(
-          ((res.price - simPrice) * 10000) /
+          (Math.abs(res.price - simPrice) * 10000) /
           res.price
         ).toFixed()} bps`,
       );
@@ -227,6 +233,7 @@ async function filterForVarianceThresholdOracles(
 async function filterForStaleOracles(
   filteredOracles: {
     oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
+    decodedPullFeed: any;
     ai: AccountInfo<Buffer> | null;
   }[],
   client: MangoClient,
@@ -254,26 +261,37 @@ async function filterForStaleOracles(
       client.connection,
     );
 
-    if (slot > res.lastUpdatedSlot) {
+    if (
+      slot > res.lastUpdatedSlot &&
+      slot - res.lastUpdatedSlot > item.decodedPullFeed.maxStaleness
+    ) {
       console.log(
-        `- Stale oracle, candidate ${item.oracle.name} ${slot} ${res.lastUpdatedSlot}`,
+        `- Stale oracle, candidate ${item.oracle.name} ${slot} ${
+          item.decodedPullFeed.maxStaleness
+        } ${res.lastUpdatedSlot} ${slot - res.lastUpdatedSlot}`,
       );
-      if (
-        slot - res.lastUpdatedSlot >
-        item.oracle.oracleConfig.maxStalenessSlots.toNumber()
-      ) {
-        staleOracles.push(item);
-      }
+      staleOracles.push(item);
     } else {
       console.log(
-        `- Stale oracle, non candidate ${item.oracle.name} ${slot} ${res.lastUpdatedSlot}`,
+        `- Stale oracle, non candidate ${item.oracle.name} ${slot} ${
+          res.lastUpdatedSlot
+        } ${res.lastUpdatedSlot} ${slot - res.lastUpdatedSlot}`,
       );
     }
   }
   return staleOracles;
 }
 
-async function prepareCandidateOracles(group: Group, client: MangoClient) {
+async function prepareCandidateOracles(
+  group: Group,
+  client: MangoClient,
+): Promise<
+  {
+    oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
+    decodedPullFeed: any;
+    ai: AccountInfo<Buffer> | null;
+  }[]
+> {
   const oracles = getOraclesForMangoGroup(group);
   oracles.push(...extendOraclesManually(CLUSTER));
 
@@ -310,6 +328,7 @@ async function prepareCandidateOracles(group: Group, client: MangoClient) {
       return { oracle: o, ai: ais[i] };
     })
     .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
+
   return filteredOracles;
 }
 
@@ -339,7 +358,12 @@ function extendOraclesManually(cluster: Cluster) {
   ];
 }
 
-async function setupMango() {
+async function setupMango(): Promise<{
+  group: Group;
+  client: MangoClient;
+  connection: Connection;
+  user: Keypair;
+}> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
   const user = Keypair.fromSecretKey(
@@ -434,7 +458,9 @@ async function setupSwitchboard(client: MangoClient) {
 
 async function updateFilteredOraclesAis(
   connection: Connection,
+  sbOnDemandProgram: Anchor30Program<Idl>,
   filteredOracles: {
+    decodedPullFeed: any;
     oracle: { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string };
     ai: AccountInfo<Buffer> | null;
   }[],
@@ -449,5 +475,13 @@ async function updateFilteredOraclesAis(
     )
   ).flat();
 
-  filteredOracles.forEach((fo, idx) => (fo.ai = ais[idx]));
+  filteredOracles.forEach((fo, idx) => {
+    fo.ai = ais[idx];
+
+    const decodedPullFeed = sbOnDemandProgram.coder.accounts.decode(
+      'pullFeedAccountData',
+      fo.ai!.data,
+    );
+    fo.decodedPullFeed = decodedPullFeed;
+  });
 }
