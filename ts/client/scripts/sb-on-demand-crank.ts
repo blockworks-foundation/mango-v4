@@ -64,7 +64,7 @@ interface OracleInterface {
       const filteredOracles = await prepareCandidateOracles(group, client);
 
       for (let i = 0; i < 10; i++) {
-        const slot = await client.connection.getSlot();
+        const slot = await client.connection.getSlot('finalized');
 
         await updateFilteredOraclesAis(
           client.connection,
