@@ -98,14 +98,17 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
     maxRetries: 0,
   };
 
+  console.log(tier);
+
   const conf = {
     name: `${TOKEN_SYMBOL}/USD`, // the feed name (max 32 bytes)
     queue, // the queue of oracles to bind to
-    maxVariance: 10, // allow 1% variance between submissions and jobs
+    maxVariance: 1, // allow 1% variance between submissions and jobs
     minResponses: 2, // minimum number of responses of jobs to allow
     numSignatures: 3, // number of signatures to fetch per update
     minSampleSize: 2, // minimum number of responses to sample
-    maxStaleness: tier!.maxStalenessSlots!, // maximum staleness of responses in seconds to sample
+    maxStaleness:
+      tier!.maxStalenessSlots == -1 ? 10000 : tier!.maxStalenessSlots, // maximum staleness of responses in seconds to sample
   };
 
   console.log('Initializing new data feed');

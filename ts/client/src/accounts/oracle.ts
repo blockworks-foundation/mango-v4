@@ -130,6 +130,9 @@ export function parseSwitchboardOnDemandOracle(
       accountInfo.data,
     );
 
+    // console.log(decodedPullFeed.result);
+    // console.log(decodedPullFeed.submissions);
+
     if (decodedPullFeed.result == undefined) {
       const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
       const price = new Big(feedValue?.value.toString()).div(1e18);

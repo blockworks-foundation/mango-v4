@@ -70,7 +70,7 @@
     "@pythnetwork/client": "~2.14.0",
     "@solana/spl-token": "0.3.7",
     "@solana/web3.js": "^1.78.2",
-    "@switchboard-xyz/on-demand": "^1.1.24",
+    "@switchboard-xyz/on-demand": "^1.1.26",
     "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "big.js": "^6.1.1",
     "binance-api-node": "^0.12.0",
