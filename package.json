@@ -63,11 +63,13 @@
     "trailingComma": "all"
   },
   "dependencies": {
-    "@blockworks-foundation/mango-v4-settings": "0.14.15",
-    "@blockworks-foundation/mangolana": "0.0.14",
+    "@blockworks-foundation/mango-v4-settings": "0.14.24",
+    "@blockworks-foundation/mangolana": "0.0.17",
     "@coral-xyz/anchor": "^0.28.1-beta.2",
     "@project-serum/serum": "0.13.65",
     "@pythnetwork/client": "~2.14.0",
+    "@iarna/toml": "2.2.5",
+    "@raydium-io/raydium-sdk": "^1.3.1-beta.57",
     "@solana/spl-token": "0.3.7",
     "@solana/web3.js": "^1.78.2",
     "@switchboard-xyz/on-demand": "^1.1.26",
