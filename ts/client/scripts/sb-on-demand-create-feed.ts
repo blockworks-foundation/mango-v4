@@ -358,9 +358,9 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   ]);
 
   const FALLBACK_POOL_NAME: 'orcaPoolAddress' | 'raydiumPoolAddress' = `${
-    poolInfo!.poolSource
+    poolInfo?.poolSource || 'raydium'
   }PoolAddress`;
-  const FALLBACK_POOL = poolInfo!.pool;
+  const FALLBACK_POOL = poolInfo?.pool;
   const TOKEN_SYMBOL = tokeninfo!.symbol.toUpperCase();
 
   const queueAccount = new Queue(sbOnDemandProgram, queue);
