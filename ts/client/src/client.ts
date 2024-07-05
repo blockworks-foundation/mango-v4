@@ -29,6 +29,7 @@ import {
   Signer,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import copy from 'fast-copy';
@@ -130,6 +131,7 @@ export type MangoClientOptions = {
 export type TxCallbackOptions = {
   txid: string;
   txSignatureBlockHash: LatestBlockhash;
+  instructions?: VersionedTransaction;
 };
 
 export class MangoClient {
