@@ -7,7 +7,6 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import {
-  asV0Tx,
   CrossbarClient,
   loadLookupTables,
   Oracle,
@@ -103,19 +102,11 @@ interface OracleInterface {
         }
 
         for (const c of chunk(pullIxs, 5, false)) {
-          const tx = await asV0Tx({
-            connection,
-            ixs: [...c],
-            signers: [user],
-            computeUnitPrice: 200_000,
-            computeUnitLimitMultiple: 1.3,
-            lookupTables: await loadLookupTables(lutOwners),
-          });
-
           const ret = sendTransaction(
             userProvider,
             [...c],
             await loadLookupTables(lutOwners),
+            { prioritizationFee: 100 },
           );
           console.log(
             `submitted in in https://solscan.io/tx/${(await ret).signature}`,
