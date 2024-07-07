@@ -20,14 +20,13 @@ import chunk from 'lodash/chunk';
 import uniqWith from 'lodash/uniqWith';
 import { Program as Anchor30Program, Idl } from 'switchboard-anchor';
 
-import BN from 'bn.js';
 import { AnchorProvider, Wallet } from 'switchboard-anchor';
 import { OracleConfig } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
-import { I80F48, ZERO_I80F48 } from '../src/numbers/I80F48';
+import { ZERO_I80F48 } from '../src/numbers/I80F48';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -43,7 +42,6 @@ const SLEEP_MS = Number(process.env.SLEEP_MS) || 5_000;
 interface OracleInterface {
   oracle: {
     oraclePk: PublicKey;
-    oracleConfig: OracleConfig;
     name: string;
   };
   decodedPullFeed: any;
@@ -85,7 +83,7 @@ interface OracleInterface {
             crossbarClient,
           );
 
-        const oraclesToCrank = uniqWith(
+        const oraclesToCrank: OracleInterface[] = uniqWith(
           [...staleOracles, ...varianceThresholdCrossedOracles],
           function (item) {
             return item.oracle.oraclePk.toString();
@@ -134,7 +132,7 @@ interface OracleInterface {
 
 async function preparePullIx(
   sbOnDemandProgram,
-  oracle: any,
+  oracle: OracleInterface,
   queue: PublicKey,
   lutOwners: (PublicKey | Oracle)[],
   pullIxs: TransactionInstruction[],
@@ -146,7 +144,7 @@ async function preparePullIx(
 
   const conf = {
     numSignatures: 3,
-    feed: oracle.oraclePk,
+    feed: oracle.oracle.oraclePk,
   };
   // TODO use fetchUpdateMany
   const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
@@ -211,15 +209,7 @@ async function filterForStaleOracles(
   filteredOracles: OracleInterface[],
   client: MangoClient,
   slot: number,
-): Promise<
-  {
-    oracle: {
-      oraclePk: PublicKey;
-      oracleConfig: OracleConfig;
-    };
-    ai: AccountInfo<Buffer> | null;
-  }[]
-> {
+): Promise<OracleInterface[]> {
   const staleOracles = new Array<OracleInterface>();
   for (const item of filteredOracles) {
     const res = await parseSwitchboardOracle(
@@ -292,32 +282,30 @@ async function prepareCandidateOracles(
 
 function extendOraclesManually(cluster: Cluster): {
   oraclePk: PublicKey;
-  oracleConfig: { confFilter: I80F48; maxStalenessSlots: BN };
   name: string;
 }[] {
   if (cluster == 'devnet') {
     return [
       {
         oraclePk: new PublicKey('EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf'),
-        oracleConfig: {
-          confFilter: I80F48.fromString('0.1'),
-          maxStalenessSlots: new BN(5),
-        },
         name: 'BTC/USD',
       },
     ];
   }
   return [
-    {
-      // https://ondemand.switchboard.xyz/solana/mainnet/user/8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt/
-      oraclePk: new PublicKey('31VbxqvoswUh6iWwv92mXVdLz7vt2QGV1DZ1tBa64b8w'),
-      oracleConfig: {
-        confFilter: I80F48.fromString('1000'),
-        maxStalenessSlots: new BN(-1),
-      },
-      name: 'MNGO/USD',
-    },
-  ];
+    ['JUP', '2F9M59yYc28WMrAymNWceaBEk8ZmDAjUAKULp8seAJF3'],
+    ['RAY', 'AJkAFiXdbMonys8rTXZBrRnuUiLcDFdkyoPuvrVKXhex'],
+    ['ORCA', 'HYrGEJsApRqAc9Z1kL7yHCWtU2Gpa6hmxsGt7GybCpCo'],
+    ['GUAC', 'Ai2GsLRioGKwVgWX8dtbLF5rJJEZX17SteGEDqrpzBv3'],
+    ['INF', 'AZcoqpWhMJUaKEDUfKsfzCr3Y96gSQwv43KSQ6KpeyQ1'],
+    ['JLP', '65J9bVEMhNbtbsNgArNV1K4krzcsomjho4bgR51sZXoj'],
+    ['DIGITSOL', '2A7aqNLy26ZBSMWP2Ekxv926hj16tCA47W1sHWVqaLii'],
+  ].map((item) => {
+    return {
+      oraclePk: new PublicKey(item[0]),
+      name: item[1],
+    };
+  });
 }
 
 async function setupMango(): Promise<{
