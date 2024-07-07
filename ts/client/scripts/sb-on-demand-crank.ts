@@ -8,7 +8,6 @@ import {
 } from '@solana/web3.js';
 import {
   CrossbarClient,
-  loadLookupTables,
   Oracle,
   PullFeed,
   SB_ON_DEMAND_PID,
@@ -18,13 +17,15 @@ import chunk from 'lodash/chunk';
 import uniqWith from 'lodash/uniqWith';
 import { Program as Anchor30Program, Idl } from 'switchboard-anchor';
 
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
 import { AnchorProvider, Wallet } from 'switchboard-anchor';
 import { Group } from '../src/accounts/group';
 import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
 import { ZERO_I80F48 } from '../src/numbers/I80F48';
-import { sendTransaction } from '../src/utils/rpc';
+import { createComputeBudgetIx } from '../src/utils/rpc';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -113,23 +114,35 @@ interface OracleInterface {
           );
         }
 
-        await Promise.all(
-          chunk(pullIxs, 2, false).map(async (ixsChunk) => {
-            try {
-              const ret = sendTransaction(
-                userProvider,
-                [...ixsChunk],
-                await loadLookupTables(lutOwners),
-                { prioritizationFee: 100 },
-              );
-              console.log(
-                `submitted in https://solscan.io/tx/${(await ret).signature}`,
-              );
-            } catch (error) {
-              console.log(`Error in sending tx, ${error}`);
-            }
-          }),
-        );
+        const ixsChunks = chunk(pullIxs, 2, false);
+        try {
+          // use mangolana
+          await sendSignAndConfirmTransactions({
+            connection,
+            wallet: new Wallet(user),
+            transactionInstructions: ixsChunks.map((txChunk) => ({
+              instructionsSet: [
+                {
+                  signers: [],
+                  transactionInstruction: createComputeBudgetIx(80000),
+                },
+                ...txChunk.map((tx) => ({
+                  signers: [],
+                  transactionInstruction: tx,
+                })),
+              ],
+              sequenceType: SequenceType.Sequential,
+            })),
+            config: {
+              maxRetries: 5,
+              autoRetry: true,
+              maxTxesInBatch: 20,
+              logFlowInfo: false,
+            },
+          });
+        } catch (error) {
+          console.log(`Error in sending tx, ${error}`);
+        }
 
         await new Promise((r) => setTimeout(r, SLEEP_MS));
       }
