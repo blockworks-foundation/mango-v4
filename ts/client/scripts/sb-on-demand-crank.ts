@@ -97,9 +97,11 @@ interface OracleInterface {
         );
 
         console.log(
-          `- round candidates ${oraclesToCrank
+          `- round candidates stale ${staleOracles
             .map((o) => o.oracle.name)
-            .join(', ')}`,
+            .join(', ')}, variance ${varianceThresholdCrossedOracles
+            .map((o) => o.oracle.name)
+            .join(', ')}}`,
         );
 
         const pullIxs: TransactionInstruction[] = [];
