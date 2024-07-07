@@ -101,7 +101,7 @@ interface OracleInterface {
             .map((o) => o.oracle.name)
             .join(', ')}, variance ${varianceThresholdCrossedOracles
             .map((o) => o.oracle.name)
-            .join(', ')}}`,
+            .join(', ')}`,
         );
 
         const pullIxs: TransactionInstruction[] = [];
