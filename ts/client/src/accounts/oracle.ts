@@ -1,7 +1,7 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
-import { SB_ON_DEMAND_PID, toFeedValue } from '@switchboard-xyz/on-demand';
+import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
 import BN from 'bn.js';
@@ -131,12 +131,23 @@ export function parseSwitchboardOnDemandOracle(
     );
 
     // useful for development
-    // console.log(decodedPullFeed.result);
+    // console.log(decodedPullFeed);
     // console.log(decodedPullFeed.submissions);
 
-    const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
-    const price = new Big(feedValue?.value.toString()).div(1e18);
-    const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
+    // Use custom code instead of toFeedValue from sb on demand sdk
+    // Custom code which has uses min sample size
+    // const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
+    let values = decodedPullFeed.submissions.slice(
+      0,
+      decodedPullFeed.minSampleSize,
+    );
+    if (values.length === 0) {
+      return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+    }
+    values = values.sort((x, y) => (x.value.lt(y.value) ? -1 : 1));
+    const feedValue = values[Math.floor(values.length / 2)];
+    const price = new Big(feedValue.value.toString()).div(1e18);
+    const lastUpdatedSlot = feedValue.slot.toNumber();
     const stdDeviation = 0; // TODO the 0
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
 

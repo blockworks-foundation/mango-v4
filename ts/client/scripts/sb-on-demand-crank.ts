@@ -36,6 +36,9 @@ const USER_KEYPAIR =
 const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
 const SLEEP_MS = Number(process.env.SLEEP_MS) || 50_000; // 100s
 
+console.log(`Starting with ${SLEEP_MS}`);
+console.log(`${CLUSTER_URL}`);
+
 // TODO use mangolana to send txs
 
 interface OracleInterface {
@@ -104,6 +107,23 @@ interface OracleInterface {
             .join(', ')}`,
         );
 
+        // todo use chunk
+        // todo use luts
+
+        // const [pullIxs, luts] = await PullFeed.fetchUpdateManyIx(
+        //   sbOnDemandProgram,
+        //   {
+        //     feeds: oraclesToCrank.map((o) => new PublicKey(o.oracle.oraclePk)),
+        //     numSignatures: 3,
+        //   },
+        // );
+
+        // console.log(
+        //   oraclesToCrank
+        //     .map((o) => new PublicKey(o.oracle.oraclePk))
+        //     .toString(),
+        // );
+
         const pullIxs: TransactionInstruction[] = [];
         const lutOwners: (PublicKey | Oracle)[] = [];
         for (const oracle of oraclesToCrank) {
@@ -143,7 +163,7 @@ interface OracleInterface {
             },
           });
         } catch (error) {
-          console.log(`Error in sending tx, ${error}`);
+          console.log(`Error in sending tx, ${JSON.stringify(error)}`);
         }
 
         await new Promise((r) => setTimeout(r, SLEEP_MS));
@@ -167,7 +187,7 @@ async function preparePullIx(
   );
 
   const conf = {
-    numSignatures: 3,
+    numSignatures: 2,
     feed: oracle.oracle.oraclePk,
   };
   // TODO use fetchUpdateMany
@@ -214,14 +234,18 @@ async function filterForVarianceThresholdOracles(
 
     const changePct = (Math.abs(res.price - simPrice) * 100) / res.price;
     const changeBps = changePct * 100;
-    if (changePct > item.decodedPullFeed.maxVariance) {
+    if (changePct > item.decodedPullFeed.maxVariance / 1000000000) {
       console.log(
-        `- ${item.oracle.name}, variance threshold, candidate, simPrice ${simPrice}, res.price ${res.price}, change ${changeBps} bps`,
+        `- ${item.oracle.name}, candidate, ${
+          item.decodedPullFeed.maxVariance / 1000000000
+        }, ${simPrice}, ${res.price}, ${changePct}`,
       );
       varianceThresholdCrossedOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, variance threshold, non-candidate, simPrice ${simPrice}, res.price ${res.price}, change ${changeBps} bps`,
+        `- ${item.oracle.name}, non-candidate, ${
+          item.decodedPullFeed.maxVariance / 1000000000
+        }, ${simPrice}, ${res.price}, ${changePct}`,
       );
     }
   }
@@ -247,12 +271,12 @@ async function filterForStaleOracles(
       slot - res.lastUpdatedSlot > item.decodedPullFeed.maxStaleness
     ) {
       console.log(
-        `- ${item.oracle.name}, stale oracle, candidate, maxStaleness ${item.decodedPullFeed.maxStaleness}, slot ${slot}, res.lastUpdatedSlot ${res.lastUpdatedSlot}, diff ${diff}`,
+        `- ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
       );
       staleOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, stale oracle, non-candidate, maxStaleness ${item.decodedPullFeed.maxStaleness}, slot ${slot}, res.lastUpdatedSlot ${res.lastUpdatedSlot}, diff ${diff}`,
+        `- ${item.oracle.name}, non-candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
       );
     }
   }
