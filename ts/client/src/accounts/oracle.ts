@@ -130,21 +130,22 @@ export function parseSwitchboardOnDemandOracle(
       accountInfo.data,
     );
 
+    // useful for development
     // console.log(decodedPullFeed.result);
     // console.log(decodedPullFeed.submissions);
 
-    if (decodedPullFeed.result == undefined) {
-      const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
-      const price = new Big(feedValue?.value.toString()).div(1e18);
-      const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
-      const stdDeviation = 0; // TODO the 0
-      return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
-    }
-
-    const price = new Big(decodedPullFeed.result.value.toString()).div(1e18);
-    const lastUpdatedSlot = decodedPullFeed.result.slot.toNumber();
-    const stdDeviation = decodedPullFeed.result.stdDev.toNumber();
+    const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
+    console.log(feedValue);
+    const price = new Big(feedValue?.value.toString()).div(1e18);
+    const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
+    const stdDeviation = 0; // TODO the 0
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
+
+    // old block, we prefer above block since we want raw data, .result is often empty
+    // const price = new Big(decodedPullFeed.result.value.toString()).div(1e18);
+    // const lastUpdatedSlot = decodedPullFeed.result.slot.toNumber();
+    // const stdDeviation = decodedPullFeed.result.stdDev.toNumber();
+    // return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
   } catch (e) {
     console.log(
       `Unable to parse Switchboard On-Demand Oracle V2: ${oracle}`,

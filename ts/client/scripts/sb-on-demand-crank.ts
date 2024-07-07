@@ -189,6 +189,7 @@ async function filterForVarianceThresholdOracles(
       item.ai!,
       client.connection,
     );
+    // console.log(`${item.oracle.name} ${JSON.stringify(res)}`);
 
     const crossBarSim = crossBarSims[index];
 
