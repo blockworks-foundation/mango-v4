@@ -1,7 +1,6 @@
 import {
   AccountInfo,
   Cluster,
-  Commitment,
   Connection,
   Keypair,
   PublicKey,
@@ -27,6 +26,7 @@ import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
 import { ZERO_I80F48 } from '../src/numbers/I80F48';
+import { sendTransaction } from '../src/utils/rpc';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -49,7 +49,7 @@ interface OracleInterface {
 }
 
 (async function main(): Promise<never> {
-  const { group, client, connection, user } = await setupMango();
+  const { group, client, connection, user, userProvider } = await setupMango();
 
   const { sbOnDemandProgram, crossbarClient, queue } = await setupSwitchboard(
     client,
@@ -112,14 +112,14 @@ interface OracleInterface {
             lookupTables: await loadLookupTables(lutOwners),
           });
 
-          const txOpts = {
-            commitment: 'processed' as Commitment,
-            skipPreflight: true,
-            maxRetries: 0,
-          };
-
-          const sig = await client.connection.sendTransaction(tx, txOpts);
-          console.log(`submitted in in https://solscan.io/tx/${sig}`);
+          const ret = sendTransaction(
+            userProvider,
+            [...c],
+            await loadLookupTables(lutOwners),
+          );
+          console.log(
+            `submitted in in https://solscan.io/tx/${(await ret).signature}`,
+          );
         }
 
         await new Promise((r) => setTimeout(r, SLEEP_MS));
@@ -335,7 +335,7 @@ async function setupMango(): Promise<{
 
   const group = await client.getGroup(new PublicKey(GROUP));
   await group.reloadAll(client);
-  return { group, client, connection, user };
+  return { group, client, connection, user, userProvider };
 }
 
 function getOraclesForMangoGroup(
