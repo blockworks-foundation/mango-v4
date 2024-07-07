@@ -95,6 +95,12 @@ interface OracleInterface {
           },
         );
 
+        console.log(
+          `- round candidates ${oraclesToCrank
+            .map((o) => o.oracle.name)
+            .join(', ')}`,
+        );
+
         const pullIxs: TransactionInstruction[] = [];
         const lutOwners: (PublicKey | Oracle)[] = [];
         for (const oracle of oraclesToCrank) {
@@ -117,9 +123,7 @@ interface OracleInterface {
                 { prioritizationFee: 100 },
               );
               console.log(
-                `submitted in in https://solscan.io/tx/${
-                  (await ret).signature
-                }`,
+                `submitted in https://solscan.io/tx/${(await ret).signature}`,
               );
             } catch (error) {
               console.log(`Error in sending tx, ${error}`);
