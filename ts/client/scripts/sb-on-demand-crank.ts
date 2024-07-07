@@ -35,7 +35,7 @@ const CLUSTER_URL =
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
-const SLEEP_MS = Number(process.env.SLEEP_MS) || 5_000;
+const SLEEP_MS = Number(process.env.SLEEP_MS) || 100_000; // 100s
 
 // TODO use mangolana to send txs
 
