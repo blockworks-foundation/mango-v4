@@ -302,8 +302,8 @@ function extendOraclesManually(cluster: Cluster): {
     ['DIGITSOL', '2A7aqNLy26ZBSMWP2Ekxv926hj16tCA47W1sHWVqaLii'],
   ].map((item) => {
     return {
-      oraclePk: new PublicKey(item[0]),
-      name: item[1],
+      oraclePk: new PublicKey(item[1]),
+      name: item[0],
     };
   });
 }
