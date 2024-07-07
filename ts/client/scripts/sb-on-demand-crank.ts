@@ -109,15 +109,21 @@ interface OracleInterface {
 
         await Promise.all(
           chunk(pullIxs, 2, false).map(async (ixsChunk) => {
-            const ret = sendTransaction(
-              userProvider,
-              [...ixsChunk],
-              await loadLookupTables(lutOwners),
-              { prioritizationFee: 100 },
-            );
-            console.log(
-              `submitted in in https://solscan.io/tx/${(await ret).signature}`,
-            );
+            try {
+              const ret = sendTransaction(
+                userProvider,
+                [...ixsChunk],
+                await loadLookupTables(lutOwners),
+                { prioritizationFee: 100 },
+              );
+              console.log(
+                `submitted in in https://solscan.io/tx/${
+                  (await ret).signature
+                }`,
+              );
+            } catch (error) {
+              console.log(`Error in sending tx, ${error}`);
+            }
           }),
         );
 
