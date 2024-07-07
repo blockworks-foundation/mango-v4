@@ -19,7 +19,6 @@ import uniqWith from 'lodash/uniqWith';
 import { Program as Anchor30Program, Idl } from 'switchboard-anchor';
 
 import { AnchorProvider, Wallet } from 'switchboard-anchor';
-import { OracleConfig } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
@@ -75,17 +74,24 @@ interface OracleInterface {
           slot,
         );
 
+        const crossBarSims = await Promise.all(
+          filteredOracles.map(
+            async (fo) =>
+              await crossbarClient.simulateFeeds([
+                new Buffer(fo.decodedPullFeed.feedHash).toString('hex'),
+              ]),
+          ),
+        );
         const varianceThresholdCrossedOracles =
           await filterForVarianceThresholdOracles(
             filteredOracles,
             client,
-            crossbarClient,
+            crossBarSims,
           );
-
         const oraclesToCrank: OracleInterface[] = uniqWith(
           [...staleOracles, ...varianceThresholdCrossedOracles],
-          function (item) {
-            return item.oracle.oraclePk.toString();
+          function (a, b) {
+            return a.oracle.oraclePk.equals(b.oracle.oraclePk);
           },
         );
 
@@ -101,17 +107,19 @@ interface OracleInterface {
           );
         }
 
-        for (const c of chunk(pullIxs, 5, false)) {
-          const ret = sendTransaction(
-            userProvider,
-            [...c],
-            await loadLookupTables(lutOwners),
-            { prioritizationFee: 100 },
-          );
-          console.log(
-            `submitted in in https://solscan.io/tx/${(await ret).signature}`,
-          );
-        }
+        await Promise.all(
+          chunk(pullIxs, 2, false).map(async (ixsChunk) => {
+            const ret = sendTransaction(
+              userProvider,
+              [...ixsChunk],
+              await loadLookupTables(lutOwners),
+              { prioritizationFee: 100 },
+            );
+            console.log(
+              `submitted in in https://solscan.io/tx/${(await ret).signature}`,
+            );
+          }),
+        );
 
         await new Promise((r) => setTimeout(r, SLEEP_MS));
       }
@@ -162,19 +170,17 @@ async function preparePullIx(
 async function filterForVarianceThresholdOracles(
   filteredOracles: OracleInterface[],
   client: MangoClient,
-  crossbarClient: CrossbarClient,
+  crossBarSims,
 ): Promise<OracleInterface[]> {
   const varianceThresholdCrossedOracles = new Array<OracleInterface>();
-  for (const item of filteredOracles) {
+  for (const [index, item] of filteredOracles.entries()) {
     const res = await parseSwitchboardOracle(
       item.oracle.oraclePk,
       item.ai!,
       client.connection,
     );
 
-    const crossBarSim = await crossbarClient.simulateFeeds([
-      new Buffer(item.decodedPullFeed.feedHash).toString('hex'),
-    ]);
+    const crossBarSim = crossBarSims[index];
 
     const simPrice =
       crossBarSim[0].results.reduce((a, b) => a + b, 0) /
@@ -184,12 +190,12 @@ async function filterForVarianceThresholdOracles(
     const changeBps = changePct * 100;
     if (changePct > item.decodedPullFeed.maxVariance) {
       console.log(
-        `- ${item.oracle.name}, variance threshold, candidate ${simPrice} ${res.price} ${changeBps} bps`,
+        `- ${item.oracle.name}, variance threshold, candidate, simPrice ${simPrice}, res.price ${res.price}, change ${changeBps} bps`,
       );
       varianceThresholdCrossedOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, variance threshold, non-candidate ${simPrice} ${res.price} ${changeBps} bps`,
+        `- ${item.oracle.name}, variance threshold, non-candidate, simPrice ${simPrice}, res.price ${res.price}, change ${changeBps} bps`,
       );
     }
   }
@@ -215,12 +221,12 @@ async function filterForStaleOracles(
       slot - res.lastUpdatedSlot > item.decodedPullFeed.maxStaleness
     ) {
       console.log(
-        `- ${item.oracle.name}, stale oracle, candidate ${item.decodedPullFeed.maxStaleness} ${slot} ${res.lastUpdatedSlot} ${diff}`,
+        `- ${item.oracle.name}, stale oracle, candidate, maxStaleness ${item.decodedPullFeed.maxStaleness}, slot ${slot}, res.lastUpdatedSlot ${res.lastUpdatedSlot}, diff ${diff}`,
       );
       staleOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, stale oracle, non-candidate ${item.decodedPullFeed.maxStaleness} ${slot} ${res.lastUpdatedSlot} ${diff}`,
+        `- ${item.oracle.name}, stale oracle, non-candidate, maxStaleness ${item.decodedPullFeed.maxStaleness}, slot ${slot}, res.lastUpdatedSlot ${res.lastUpdatedSlot}, diff ${diff}`,
       );
     }
   }
@@ -303,6 +309,7 @@ async function setupMango(): Promise<{
   client: MangoClient;
   connection: Connection;
   user: Keypair;
+  userProvider: AnchorProvider;
 }> {
   const options = AnchorProvider.defaultOptions();
   const connection = new Connection(CLUSTER_URL!, options);
@@ -331,7 +338,7 @@ async function setupMango(): Promise<{
 
 function getOraclesForMangoGroup(
   group: Group,
-): { oraclePk: PublicKey; oracleConfig: OracleConfig; name: string }[] {
+): { oraclePk: PublicKey; name: string }[] {
   // oracles for tokens
   const oracles1 = Array.from(group.banksMapByName.values())
     .filter(
@@ -345,7 +352,7 @@ function getOraclesForMangoGroup(
     .map((b) => {
       return {
         oraclePk: b[0].oracle,
-        oracleConfig: b[0].oracleConfig,
+
         name: b[0].name,
       };
     });
@@ -354,7 +361,7 @@ function getOraclesForMangoGroup(
   const oracles2 = Array.from(group.perpMarketsMapByName.values()).map((pM) => {
     return {
       oraclePk: pM.oracle,
-      oracleConfig: pM.oracleConfig,
+
       name: pM.name,
     };
   });
@@ -372,7 +379,7 @@ function getOraclesForMangoGroup(
     .map((b) => {
       return {
         oraclePk: b[0].oracle,
-        oracleConfig: b[0].oracleConfig,
+
         name: b[0].name,
       };
     })
