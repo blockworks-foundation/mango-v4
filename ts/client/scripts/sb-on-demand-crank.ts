@@ -97,9 +97,9 @@ interface OracleInterface {
         );
 
         console.log(
-          `- round candidates stale ${staleOracles
+          `- round candidates | Stale: ${staleOracles
             .map((o) => o.oracle.name)
-            .join(', ')}, variance ${varianceThresholdCrossedOracles
+            .join(', ')} | Variance: ${varianceThresholdCrossedOracles
             .map((o) => o.oracle.name)
             .join(', ')}`,
         );
