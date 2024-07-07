@@ -135,7 +135,6 @@ export function parseSwitchboardOnDemandOracle(
     // console.log(decodedPullFeed.submissions);
 
     const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
-    console.log(feedValue);
     const price = new Big(feedValue?.value.toString()).div(1e18);
     const lastUpdatedSlot = feedValue!.slot!.toNumber(); // TODO the !
     const stdDeviation = 0; // TODO the 0
