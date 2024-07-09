@@ -451,7 +451,7 @@ pub async fn loop_charge_collateral_fees(
             collateral_fee_interval,
             max_cu_when_batching,
         )
-            .await
+        .await
         {
             Ok(()) => {}
             Err(err) => {
@@ -516,7 +516,7 @@ async fn charge_collateral_fees_inner(
         &ix_to_send,
         max_cu_when_batching,
     )
-        .await;
+    .await;
     info!("charge collateral fees: {:?}", txsigs);
 
     Ok(())

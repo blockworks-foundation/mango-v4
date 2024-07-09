@@ -4464,6 +4464,49 @@ impl ClientInstruction for TokenUpdateIndexAndRateInstruction {
     }
 }
 
+pub struct TokenUpdateIndexAndRateResilientInstruction {
+    pub mint_info: Pubkey,
+}
+#[async_trait::async_trait(?Send)]
+impl ClientInstruction for TokenUpdateIndexAndRateResilientInstruction {
+    type Accounts = mango_v4::accounts::TokenUpdateIndexAndRate;
+    type Instruction = mango_v4::instruction::TokenUpdateIndexAndRateResilient;
+    async fn to_instruction(
+        &self,
+        loader: &(impl ClientAccountLoader + 'async_trait),
+    ) -> (Self::Accounts, instruction::Instruction) {
+        let program_id = mango_v4::id();
+        let instruction = Self::Instruction {};
+
+        let mint_info: MintInfo = loader.load(&self.mint_info).await.unwrap();
+
+        let accounts = Self::Accounts {
+            group: mint_info.group,
+            mint_info: self.mint_info,
+            oracle: mint_info.oracle,
+            instructions: solana_program::sysvar::instructions::id(),
+        };
+
+        let mut instruction = make_instruction(program_id, &accounts, &instruction);
+        let mut bank_ams = mint_info
+            .banks()
+            .iter()
+            .map(|bank| AccountMeta {
+                pubkey: *bank,
+                is_signer: false,
+                is_writable: true,
+            })
+            .collect::<Vec<_>>();
+        instruction.accounts.append(&mut bank_ams);
+
+        (accounts, instruction)
+    }
+
+    fn signers(&self) -> Vec<TestKeypair> {
+        vec![]
+    }
+}
+
 pub struct ComputeAccountDataInstruction {
     pub account: Pubkey,
 }
