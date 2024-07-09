@@ -40,9 +40,11 @@ pub fn token_update_index_and_rate(
             // 2. we want to forbid cpi, since ix we would like to blacklist could just be called from cpi
             require!(
                 (ix.program_id == crate::id()
-                    && ix.data[0..8]
-                        == crate::instruction::TokenUpdateIndexAndRate::discriminator())
-                    || (ix.program_id == compute_budget::id()),
+                    && (ix.data[0..8]
+                        == crate::instruction::TokenUpdateIndexAndRate::discriminator()
+                        || ix.data[0..8]
+                            == crate::instruction::TokenUpdateIndexAndRateResilient::discriminator(
+                            ))) || (ix.program_id == compute_budget::id()),
                 MangoError::SomeError
             );
 
