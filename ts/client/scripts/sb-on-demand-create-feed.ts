@@ -12,6 +12,8 @@ import {
   PublicKey,
 } from '@solana/web3.js';
 
+import * as toml from '@iarna/toml';
+import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
@@ -27,8 +29,6 @@ import {
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
-import { struct, u8, publicKey, u64, option } from '@raydium-io/raydium-sdk';
-import * as toml from '@iarna/toml';
 import { toNative } from '../src/utils';
 
 // Configuration
