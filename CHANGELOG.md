@@ -4,7 +4,17 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
-### v0.24.0, 2024-4-
+
+### v0.24.1, 2024-7-
+
+- Support for switchboard on demand oracle (#974)
+
+- Sip bad oracle in token update index and rate (#975) 
+
+
+## mainnet
+
+### v0.24.0, 2024-4-18
 
 - Allow skipping banks and invalid oracles when computing health (#891)
 
@@ -25,8 +35,6 @@ Update this for each program release and mainnet deployment.
 - Add a sequence check instruction (#909)
 
   Assert that a transaction was emitted and run with a correct view of the current mango state.  
-
-## mainnet
 
 ### v0.23.0, 2024-3-8
 

@@ -109,7 +109,6 @@ pub async fn runner(
         .values()
         .filter(|t| !t.closed)
         .map(|t| &t.token_index)
-        // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
@@ -129,8 +128,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
@@ -146,8 +145,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
@@ -219,7 +218,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token
@@ -232,7 +231,6 @@ pub async fn loop_update_index_and_rate(
                 .collect::<Vec<_>>();
 
             ix.accounts.append(&mut banks);
-
             let pix = PreparedInstructions::from_single(
                 ix,
                 client
@@ -240,22 +238,8 @@ pub async fn loop_update_index_and_rate(
                     .compute_estimates
                     .cu_token_update_index_and_rates,
             );
-            let sim_result = match client.simulate(pix.clone().to_instructions()).await {
-                Ok(response) => response.value,
-                Err(e) => {
-                    error!(token.name, "simulation request error: {e:?}");
-                    continue;
-                }
-            };
-
-            if let Some(e) = sim_result.err {
-                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
-                continue;
-            }
-
             instructions.append(pix);
         }
-
         let pre = Instant::now();
         let sig_result = client
             .send_and_confirm_permissionless_tx(instructions.to_instructions())
@@ -378,10 +362,10 @@ pub async fn loop_consume_events(
             ix,
             client.context.compute_estimates.cu_perp_consume_events_base
                 + num_of_events
-                    * client
-                        .context
-                        .compute_estimates
-                        .cu_perp_consume_events_per_event,
+                * client
+                .context
+                .compute_estimates
+                .cu_perp_consume_events_per_event,
         );
         let sig_result = client
             .send_and_confirm_permissionless_tx(ixs.to_instructions())
@@ -438,6 +422,7 @@ pub async fn loop_update_funding(
             ),
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
         };
+
         let ixs = PreparedInstructions::from_single(
             ix,
             client.context.compute_estimates.cu_perp_update_funding,
@@ -506,7 +491,7 @@ pub async fn loop_charge_collateral_fees(
             collateral_fee_interval,
             max_cu_when_batching,
         )
-        .await
+            .await
         {
             Ok(()) => {}
             Err(err) => {
@@ -574,7 +559,7 @@ async fn charge_collateral_fees_inner(
         &ix_to_send,
         max_cu_when_batching,
     )
-    .await;
+        .await;
     info!("charge collateral fees: {:?}", txsigs);
 
     Ok(())

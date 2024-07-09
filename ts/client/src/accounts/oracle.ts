@@ -1,8 +1,12 @@
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Magic as PythMagic } from '@pythnetwork/client';
-import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
+import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
 import BN from 'bn.js';
+import { Program as Anchor30Program } from 'switchboard-anchor';
+
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 
 const SBV1_DEVNET_PID = new PublicKey(
@@ -33,6 +37,7 @@ export const SOL_MINT_MAINNET = new PublicKey(
 
 let sbv2DevnetProgram;
 let sbv2MainnetProgram;
+let sbOnDemandProgram;
 
 export enum OracleProvider {
   Pyth,
@@ -126,24 +131,83 @@ export function parseSwitchboardOracleV2(
     );
 
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
-    //if oracle is badly configured or didn't publish price at least once
-    //decodeLatestAggregatorValue can throw (0 switchboard rounds).
+    // if oracle is badly configured or didn't publish price at least once
+    // decodeLatestAggregatorValue can throw (0 switchboard rounds).
   } catch (e) {
     console.log(`Unable to parse Switchboard Oracle V2: ${oracle}`, e);
     return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
   }
 }
 
-/**
- *
- * @param accountInfo
- * @returns ui price
- */
+export function parseSwitchboardOnDemandOracle(
+  program: any,
+  accountInfo: AccountInfo<Buffer>,
+  oracle: PublicKey,
+): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
+  try {
+    const decodedPullFeed = program.coder.accounts.decode(
+      'pullFeedAccountData',
+      accountInfo.data,
+    );
+
+    // useful for development
+    // console.log(decodedPullFeed);
+    // console.log(decodedPullFeed.submissions);
+
+    // Use custom code instead of toFeedValue from sb on demand sdk
+    // Custom code which has uses min sample size
+    // const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
+    let values = decodedPullFeed.submissions.slice(
+      0,
+      decodedPullFeed.minSampleSize,
+    );
+    if (values.length === 0) {
+      return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+    }
+    values = values.sort((x, y) => (x.value.lt(y.value) ? -1 : 1));
+    const feedValue = values[Math.floor(values.length / 2)];
+    const price = new Big(feedValue.value.toString()).div(1e18);
+    const lastUpdatedSlot = feedValue.slot.toNumber();
+    const stdDeviation = 0; // TODO the 0
+    return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
+
+    // old block, we prefer above block since we want raw data, .result is often empty
+    // const price = new Big(decodedPullFeed.result.value.toString()).div(1e18);
+    // const lastUpdatedSlot = decodedPullFeed.result.slot.toNumber();
+    // const stdDeviation = decodedPullFeed.result.stdDev.toNumber();
+    // return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
+  } catch (e) {
+    console.log(
+      `Unable to parse Switchboard On-Demand Oracle V2: ${oracle}`,
+      e,
+    );
+    return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+  }
+}
+
 export async function parseSwitchboardOracle(
   oracle: PublicKey,
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
 ): Promise<{ price: number; lastUpdatedSlot: number; uiDeviation: number }> {
+  if (accountInfo.owner.equals(SB_ON_DEMAND_PID)) {
+    if (!sbOnDemandProgram) {
+      const options = AnchorProvider.defaultOptions();
+      const provider = new AnchorProvider(
+        connection,
+        new Wallet(new Keypair()),
+        options,
+      );
+      const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, provider);
+      sbOnDemandProgram = new Anchor30Program(idl!, provider);
+    }
+    return parseSwitchboardOnDemandOracle(
+      sbOnDemandProgram,
+      accountInfo,
+      oracle,
+    );
+  }
+
   if (accountInfo.owner.equals(SwitchboardProgram.devnetPid)) {
     if (!sbv2DevnetProgram) {
       sbv2DevnetProgram = await SwitchboardProgram.loadDevnet(connection);
@@ -173,7 +237,8 @@ export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {
     accountInfo.owner.equals(SBV1_DEVNET_PID) ||
     accountInfo.owner.equals(SBV1_MAINNET_PID) ||
     accountInfo.owner.equals(SwitchboardProgram.devnetPid) ||
-    accountInfo.owner.equals(SwitchboardProgram.mainnetPid)
+    accountInfo.owner.equals(SwitchboardProgram.mainnetPid) ||
+    accountInfo.owner.equals(SB_ON_DEMAND_PID)
   ) {
     return true;
   }

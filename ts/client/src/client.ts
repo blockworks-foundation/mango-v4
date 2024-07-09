@@ -4636,7 +4636,7 @@ export class MangoClient {
 
       if (buyTokenPriceImpact <= 0 || sellTokenPriceImpact <= 0) {
         throw new Error(
-          `Error compitong slippage/premium for token conditional swap!`,
+          `Error computing slippage/premium for token conditional swap!`,
         );
       }
 

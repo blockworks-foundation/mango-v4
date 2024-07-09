@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.24.0",
+  "version": "0.24.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -1249,6 +1249,36 @@ export type MangoV4 = {
     },
     {
       "name": "tokenUpdateIndexAndRate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mintInfo",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "oracle",
+            "group"
+          ]
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "tokenUpdateIndexAndRateResilient",
       "accounts": [
         {
           "name": "group",
@@ -11133,6 +11163,9 @@ export type MangoV4 = {
           },
           {
             "name": "RaydiumCLMM"
+          },
+          {
+            "name": "SwitchboardOnDemand"
           }
         ]
       }
@@ -14452,7 +14485,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.24.0",
+  "version": "0.24.1",
   "name": "mango_v4",
   "instructions": [
     {
@@ -15702,6 +15735,36 @@ export const IDL: MangoV4 = {
     },
     {
       "name": "tokenUpdateIndexAndRate",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "mintInfo",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "oracle",
+            "group"
+          ]
+        },
+        {
+          "name": "oracle",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "instructions",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "tokenUpdateIndexAndRateResilient",
       "accounts": [
         {
           "name": "group",
@@ -25586,6 +25649,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "RaydiumCLMM"
+          },
+          {
+            "name": "SwitchboardOnDemand"
           }
         ]
       }
