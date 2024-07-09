@@ -127,7 +127,7 @@ export async function buildFetch(): Promise<
 > {
   let fetch = globalThis?.fetch;
   if (!fetch && process?.versions?.node) {
-    fetch = (await import('node-fetch')).default;
+    fetch = (await import('node-fetch')).default as any;
   }
   return fetch;
 }

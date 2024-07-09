@@ -1,18 +1,16 @@
 use std::mem::size_of;
 
+use crate::accounts_zerocopy::*;
+use crate::error::*;
+use crate::state::load_orca_pool_state;
 use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
 use fixed::types::I80F48;
-
 use static_assertions::const_assert_eq;
+use switchboard_on_demand::PullFeedAccountData;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
-
-use crate::accounts_zerocopy::*;
-
-use crate::error::*;
-use crate::state::load_orca_pool_state;
 
 use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
@@ -59,6 +57,15 @@ pub mod switchboard_v1_devnet_oracle {
 pub mod switchboard_v2_mainnet_oracle {
     use solana_program::declare_id;
     declare_id!("DtmE9D2CSB4L5D6A15mraeEjrGMm6auWVzgaD8hK2tZM");
+}
+
+pub mod switchboard_on_demand_devnet_oracle {
+    use solana_program::declare_id;
+    declare_id!("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv");
+}
+pub mod switchboard_on_demand_mainnet_oracle {
+    use solana_program::declare_id;
+    declare_id!("SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv");
 }
 
 pub mod pyth_mainnet_usdc_oracle {
@@ -114,10 +121,11 @@ impl OracleConfigParams {
 pub enum OracleType {
     Pyth,
     Stub,
-    SwitchboardV1,
+    SwitchboardV1, // Obsolete
     SwitchboardV2,
     OrcaCLMM,
     RaydiumCLMM,
+    SwitchboardOnDemand,
 }
 
 pub struct OracleState {
@@ -194,6 +202,10 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         || acc_info.owner() == &switchboard_v2_mainnet_oracle::ID
     {
         return Ok(OracleType::SwitchboardV1);
+    } else if acc_info.owner() == &switchboard_on_demand_devnet_oracle::ID
+        || acc_info.owner() == &switchboard_on_demand_mainnet_oracle::ID
+    {
+        return Ok(OracleType::SwitchboardOnDemand);
     } else if acc_info.owner() == &orca_mainnet_whirlpool::ID {
         return Ok(OracleType::OrcaCLMM);
     } else if acc_info.owner() == &raydium_mainnet::ID {
@@ -407,6 +419,35 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 oracle_type: OracleType::SwitchboardV1,
             }
         }
+        OracleType::SwitchboardOnDemand => {
+            fn from_foreign_error(e: impl std::fmt::Display) -> Error {
+                error_msg!("{}", e)
+            }
+            let feed = bytemuck::from_bytes::<PullFeedAccountData>(&data[8..]);
+            let ui_price: f64 = feed
+                .value()
+                .ok_or_else(|| error_msg!("missing price"))?
+                .try_into()
+                .map_err(from_foreign_error)?;
+            let ui_deviation: f64 = feed
+                .std_dev()
+                .ok_or_else(|| error_msg!("missing deviation"))?
+                .try_into()
+                .map_err(from_foreign_error)?;
+            let last_update_slot = feed.result.min_slot;
+
+            let decimals = QUOTE_DECIMALS - (base_decimals as i8);
+            let decimal_adj = power_of_ten(decimals);
+            let price = I80F48::from_num(ui_price) * decimal_adj;
+            let deviation = I80F48::from_num(ui_deviation) * decimal_adj;
+            require_gte!(price, 0);
+            OracleState {
+                price,
+                last_update_slot,
+                deviation,
+                oracle_type: OracleType::SwitchboardOnDemand,
+            }
+        }
         OracleType::OrcaCLMM => {
             let whirlpool = load_orca_pool_state(oracle_info)?;
             let clmm_price = whirlpool.get_clmm_price();
@@ -484,6 +525,11 @@ mod tests {
                 OracleType::OrcaCLMM,
                 orca_mainnet_whirlpool::ID,
             ),
+            (
+                "EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf",
+                OracleType::SwitchboardOnDemand,
+                switchboard_on_demand_mainnet_oracle::ID,
+            ),
         ];
 
         for fixture in fixtures {
@@ -522,6 +568,49 @@ mod tests {
                 I80F48::from_str(&format!("1{}", str::repeat("0", idx.abs() as usize))).unwrap()
             )
         }
+    }
+
+    #[test]
+    pub fn test_switchboard_on_demand_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![(
+            "EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf",
+            OracleType::SwitchboardOnDemand,
+            switchboard_on_demand_mainnet_oracle::ID,
+            6,
+        )];
+
+        for fixture in fixtures {
+            let file = format!("resources/test/{}.bin", fixture.0);
+            let mut data = read_file(find_file(&file).unwrap());
+            let data = RefCell::new(&mut data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+            let base_decimals = fixture.3;
+
+            let sw_ais = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usdc_opt: None,
+                sol_opt: None,
+            };
+            let sw = oracle_state_unchecked(&sw_ais, base_decimals).unwrap();
+
+            match fixture.1 {
+                OracleType::SwitchboardOnDemand => {
+                    assert_eq!(sw.price, I80F48::from_num(61200.109991665549598697))
+                }
+                _ => unimplemented!(),
+            }
+        }
+
+        Ok(())
     }
 
     #[test]

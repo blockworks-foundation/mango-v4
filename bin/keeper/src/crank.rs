@@ -125,8 +125,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
@@ -142,8 +142,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
@@ -211,7 +211,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token
@@ -370,10 +370,10 @@ pub async fn loop_consume_events(
             ix,
             client.context.compute_estimates.cu_perp_consume_events_base
                 + num_of_events
-                    * client
-                        .context
-                        .compute_estimates
-                        .cu_perp_consume_events_per_event,
+                * client
+                .context
+                .compute_estimates
+                .cu_perp_consume_events_per_event,
         );
         let sig_result = client
             .send_and_confirm_permissionless_tx(ixs.to_instructions())
@@ -491,7 +491,7 @@ pub async fn loop_charge_collateral_fees(
             collateral_fee_interval,
             max_cu_when_batching,
         )
-        .await
+            .await
         {
             Ok(()) => {}
             Err(err) => {
@@ -556,7 +556,7 @@ async fn charge_collateral_fees_inner(
         &ix_to_send,
         max_cu_when_batching,
     )
-    .await;
+        .await;
     info!("charge collateral fees: {:?}", txsigs);
 
     Ok(())

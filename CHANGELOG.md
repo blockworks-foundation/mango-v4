@@ -12,6 +12,12 @@ Update this for each program release and mainnet deployment.
 
 - Allows the insurance fund to be any bank (#946)
 
+### v0.24.1, 2024-7-
+
+- Support for switchboard on demand oracle (#974)
+
+- Sip bad oracle in token update index and rate (#975) 
+
 ## mainnet
 
 ### v0.24.0, 2024-4-18
@@ -36,7 +42,11 @@ Deployment: Apr 18, 2024 at 14:53:24 Central European Summer Time, https://explo
 
 - Add a sequence check instruction (#909)
 
+<<<<<<< HEAD
   Assert that a transaction was emitted and run with a correct view of the current mango state.
+=======
+  Assert that a transaction was emitted and run with a correct view of the current mango state.  
+>>>>>>> release/program-v0.24.1
 
 ### v0.23.0, 2024-3-8
 
