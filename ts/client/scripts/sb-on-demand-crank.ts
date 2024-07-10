@@ -31,6 +31,7 @@ const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+const LITE_RPC_URL = process.env.MB_CLUSTER_URL;
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
@@ -111,17 +112,11 @@ interface OracleInterface {
         // todo use luts
 
         // const [pullIxs, luts] = await PullFeed.fetchUpdateManyIx(
-        //   sbOnDemandProgram,
+        //   sbOnDemandProgram as any,
         //   {
         //     feeds: oraclesToCrank.map((o) => new PublicKey(o.oracle.oraclePk)),
         //     numSignatures: 3,
         //   },
-        // );
-
-        // console.log(
-        //   oraclesToCrank
-        //     .map((o) => new PublicKey(o.oracle.oraclePk))
-        //     .toString(),
         // );
 
         const pullIxs: TransactionInstruction[] = [];
@@ -142,6 +137,7 @@ interface OracleInterface {
           await sendSignAndConfirmTransactions({
             connection,
             wallet: new Wallet(user),
+            backupConnections: [new Connection(LITE_RPC_URL!, 'recent')],
             transactionInstructions: ixsChunks.map((txChunk) => ({
               instructionsSet: [
                 {
