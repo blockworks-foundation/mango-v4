@@ -139,6 +139,14 @@ export function parseSwitchboardOracleV2(
   }
 }
 
+export function getStandardDeviation(array: number[]): number {
+  const n = array.length;
+  const mean = array.reduce((a, b) => a + b) / n;
+  return Math.sqrt(
+    array.map((x) => Math.pow(x - mean, 2)).reduce((a, b) => a + b) / n,
+  );
+}
+
 export function parseSwitchboardOnDemandOracle(
   program: any,
   accountInfo: AccountInfo<Buffer>,
@@ -168,7 +176,11 @@ export function parseSwitchboardOnDemandOracle(
     const feedValue = values[Math.floor(values.length / 2)];
     const price = new Big(feedValue.value.toString()).div(1e18);
     const lastUpdatedSlot = feedValue.slot.toNumber();
-    const stdDeviation = 0; // TODO the 0
+    const stdDeviation = getStandardDeviation(
+      values.map((val: any) =>
+        new Big(val.value.toString()).div(1e18).toNumber(),
+      ),
+    );
     return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
 
     // old block, we prefer above block since we want raw data, .result is often empty
