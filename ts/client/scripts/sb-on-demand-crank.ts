@@ -264,7 +264,7 @@ async function filterForStaleOracles(
     const diff = slot - res.lastUpdatedSlot;
     if (
       slot > res.lastUpdatedSlot &&
-      slot - res.lastUpdatedSlot > item.decodedPullFeed.maxStaleness
+      slot - res.lastUpdatedSlot > (item.decodedPullFeed.maxStaleness * 8) / 10
     ) {
       console.log(
         `- ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
