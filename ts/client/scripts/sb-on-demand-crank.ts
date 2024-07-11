@@ -157,6 +157,11 @@ interface OracleInterface {
               maxTxesInBatch: 20,
               logFlowInfo: false,
             },
+            callbacks: {
+              afterEveryTxSend: function (data) {
+                console.log(` - https://solscan.io/tx/${data['txid']}`);
+              },
+            },
           });
         } catch (error) {
           console.log(`Error in sending tx, ${JSON.stringify(error)}`);

@@ -39,10 +39,10 @@
     bn.js "^5.2.1"
     eslint-config-prettier "^9.0.0"
 
-"@blockworks-foundation/mangolana@0.0.17":
-  version "0.0.17"
-  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.0.17.tgz#9f9a227c61faa3fba8c99a645b1897c46d8edea7"
-  integrity sha512-k4YXV5DjzF3hUJS9NYJCtkPVYgLV/EuKv/XDLEmnWX66V3YopST7aHmdfzj1tb8QJDuE3t+aRC66WXOeGNTUpA==
+"@blockworks-foundation/mangolana@0.0.18":
+  version "0.0.18"
+  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.0.18.tgz#b393ef7b2b614e65a5d5b5ab1e94173f41497f10"
+  integrity sha512-R1phh3B3dgM7S1ePchbAgKEcJ0S6WVeHc6AD4AebOvCGgKjKbptdbTIUc5uWkYpkZTIuyxVx8t/oeC31ovvT5w==
   dependencies:
     "@solana/web3.js" "^1.91.6"
     bs58 "^5.0.0"

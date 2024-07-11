@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "0.14.24",
-    "@blockworks-foundation/mangolana": "0.0.17",
+    "@blockworks-foundation/mangolana": "0.0.18",
     "@coral-xyz/anchor": "^0.28.1-beta.2",
     "@iarna/toml": "2.2.5",
     "@project-serum/serum": "0.13.65",
