@@ -87,6 +87,8 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
 
     let scaling = asset_usage_scaling * time_scaling;
 
+    let mut total_collateral_fees_in_usd = I80F48::ZERO;
+
     let token_position_count = account.active_token_positions().count();
     for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
         let mut bank = bank_ai.load_mut::<Bank>()?;
@@ -94,8 +96,12 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             continue;
         }
 
-        let (token_position, raw_token_index) = account.token_position_mut(bank.token_index)?;
-        let token_balance = token_position.native(&bank);
+        let token_index_in_health_cache = health_cache
+            .token_infos
+            .iter()
+            .position(|x| x.token_index == bank.token_index)
+            .expect("missing token in health");
+        let token_balance = token_balances[token_index_in_health_cache].spot_and_perp;
         if token_balance <= 0 {
             continue;
         }
@@ -103,16 +109,11 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         let fee = token_balance * scaling * I80F48::from_num(bank.collateral_fee_per_day);
         assert!(fee <= token_balance);
 
-        let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
-        if !is_active {
-            account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
-        }
-
-        bank.collected_fees_native += fee;
-        bank.collected_collateral_fees += fee;
-
         let token_info = health_cache.token_info(bank.token_index)?;
-        let token_position = account.token_position(bank.token_index)?;
+
+        total_collateral_fees_in_usd += fee * token_info.prices.oracle;
+
+        bank.collected_collateral_fees += fee;
 
         emit_stack(TokenCollateralFeeLog {
             mango_group: ctx.accounts.group.key(),
@@ -122,6 +123,38 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
             asset_usage_fraction: asset_usage_scaling.to_bits(),
             price: token_info.prices.oracle.to_bits(),
         });
+    }
+
+    for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
+        let mut bank = bank_ai.load_mut::<Bank>()?;
+
+        let token_info = health_cache.token_info(bank.token_index)?;
+
+        let token_index_in_health_cache = health_cache
+            .token_infos
+            .iter()
+            .position(|x| x.token_index == bank.token_index)
+            .expect("missing token in health");
+
+        let token_balance = token_balances[token_index_in_health_cache].spot_and_perp;
+        let health = token_info.health_contribution(HealthType::Maint, token_balance);
+
+        if health >= 0 {
+            continue;
+        }
+
+        let (token_position, raw_token_index) = account.token_position_mut(bank.token_index)?;
+
+        let borrow_scaling = (health / total_liab_health).abs();
+        let fee = borrow_scaling * total_collateral_fees_in_usd / token_info.prices.oracle;
+
+        let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
+        if !is_active {
+            account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
+        }
+
+        bank.collected_fees_native += fee;
+        let token_position = account.token_position(bank.token_index)?;
 
         emit_stack(TokenBalanceLog {
             mango_group: ctx.accounts.group.key(),
