@@ -165,10 +165,15 @@ export function parseSwitchboardOnDemandOracle(
     // Use custom code instead of toFeedValue from sb on demand sdk
     // Custom code which has uses min sample size
     // const feedValue = toFeedValue(decodedPullFeed.submissions, new BN(0));
-    let values = decodedPullFeed.submissions.slice(
-      0,
-      decodedPullFeed.minSampleSize,
-    );
+
+    // filter empty and sort by slot to get latest submissions in slice later
+    const submissions = decodedPullFeed.submissions
+      .filter((s) => s.slot != 0)
+      .sort((x, y) => y.slot - x.slot);
+
+    // submissions.map((s) => console.log(`- ${s.slot}`));
+
+    let values = submissions.slice(0, decodedPullFeed.minSampleSize);
     if (values.length === 0) {
       return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
     }

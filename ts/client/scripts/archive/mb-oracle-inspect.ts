@@ -23,10 +23,15 @@ async function decodePrice(conn, ai, pk): Promise<void> {
     lastUpdatedSlot = priceData.lastUpdatedSlot;
     type = 'sb';
   }
+
+  const currentSlot = await conn.getSlot();
+
   console.log(`type ${type}`);
   console.log(`uiPrice ${uiPrice}`);
   console.log(`price ${price}`);
+  console.log(`currentSlot ${currentSlot}`);
   console.log(`lastUpdatedSlot ${lastUpdatedSlot}`);
+  console.log(`Slot diff ${currentSlot - lastUpdatedSlot}`);
 }
 
 async function main(): Promise<void> {
@@ -49,11 +54,11 @@ async function main(): Promise<void> {
     {
       // https://ondemand.switchboard.xyz/solana/devnet/feed/23QLa7R2hDhcXDVKyUSt2rvBPtuAAbY44TrqMVoPpk1C
       const oraclePk3 = new PublicKey(
-        'EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf',
+        'AZcoqpWhMJUaKEDUfKsfzCr3Y96gSQwv43KSQ6KpeyQ1',
       );
-      const devnetConn = new Connection(process.env.DEVNET_CLUSTER_URL!);
-      const ai = await devnetConn.getAccountInfo(oraclePk3);
-      decodePrice(devnetConn, ai, oraclePk3);
+      const conn = new Connection(MB_CLUSTER_URL!);
+      const ai = await conn.getAccountInfo(oraclePk3);
+      decodePrice(conn, ai, oraclePk3);
     }
   } catch (error) {
     console.log(error);
