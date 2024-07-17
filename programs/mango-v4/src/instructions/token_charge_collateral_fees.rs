@@ -4,14 +4,40 @@ use crate::state::*;
 use crate::util::clock_now;
 use anchor_lang::prelude::*;
 use fixed::types::I80F48;
+use std::collections::HashMap;
+use std::ops::{Deref, Div};
 
 use crate::accounts_ix::*;
 use crate::logs::{emit_stack, TokenBalanceLog, TokenCollateralFeeLog};
 
 pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> Result<()> {
-    let group = ctx.accounts.group.load()?;
-    let mut account = ctx.accounts.account.load_full_mut()?;
-    let (now_ts, now_slot) = clock_now();
+    token_charge_collateral_fees_internal(
+        ctx.accounts.account.load_full_mut()?,
+        ctx.accounts.group.load()?.deref(),
+        &ctx.remaining_accounts,
+        ctx.accounts.group.key(),
+        ctx.accounts.account.key(),
+        clock_now(),
+        None,
+    )
+}
+
+pub fn token_charge_collateral_fees_internal<Header, Fixed, Dynamic>(
+    mut account: DynamicAccount<Header, Fixed, Dynamic>,
+    group: &Group,
+    remaining_accounts: &[AccountInfo],
+    group_key: Pubkey,
+    account_key: Pubkey,
+    now: (u64, u64),
+    mut out_fees: Option<&mut HashMap<TokenIndex, (I80F48, I80F48)>>,
+) -> Result<()>
+where
+    Header: DerefOrBorrowMut<MangoAccountDynamicHeader> + DerefOrBorrow<MangoAccountDynamicHeader>,
+    Fixed: DerefOrBorrowMut<MangoAccountFixed> + DerefOrBorrow<MangoAccountFixed>,
+    Dynamic: DerefOrBorrowMut<[u8]> + DerefOrBorrow<[u8]>,
+{
+    let mut account = account.borrow_mut();
+    let (now_ts, now_slot) = now;
 
     if group.collateral_fee_interval == 0 {
         // By resetting, a new enabling of collateral fees will not immediately create a charge
@@ -43,14 +69,14 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
 
     let health_cache = {
         let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
+            new_fixed_order_account_retriever(remaining_accounts, &account.borrow(), now_slot)?;
         new_health_cache(&account.borrow(), &retriever, now_ts)?
     };
 
     let (_, liabs) = health_cache.assets_and_liabs();
     // Account with liabs below ~100$ should not be charged any collateral fees
     if liabs < 100_000_000 {
-        msg!("liabs {}, below threshold to charge collateral fees", liabs);
+        // msg!("liabs {}, below threshold to charge collateral fees", liabs);
         return Ok(());
     }
 
@@ -87,15 +113,21 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
 
     let scaling = asset_usage_scaling * time_scaling;
 
+    let mut total_collateral_fees_in_usd = I80F48::ZERO;
+
     let token_position_count = account.active_token_positions().count();
-    for bank_ai in &ctx.remaining_accounts[0..token_position_count] {
+    for bank_ai in &remaining_accounts[0..token_position_count] {
         let mut bank = bank_ai.load_mut::<Bank>()?;
         if bank.collateral_fee_per_day <= 0.0 || bank.maint_asset_weight.is_zero() {
             continue;
         }
 
-        let (token_position, raw_token_index) = account.token_position_mut(bank.token_index)?;
-        let token_balance = token_position.native(&bank);
+        let token_index_in_health_cache = health_cache
+            .token_infos
+            .iter()
+            .position(|x| x.token_index == bank.token_index)
+            .expect("missing token in health");
+        let token_balance = token_balances[token_index_in_health_cache].spot_and_perp;
         if token_balance <= 0 {
             continue;
         }
@@ -103,29 +135,66 @@ pub fn token_charge_collateral_fees(ctx: Context<TokenChargeCollateralFees>) -> 
         let fee = token_balance * scaling * I80F48::from_num(bank.collateral_fee_per_day);
         assert!(fee <= token_balance);
 
-        let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
-        if !is_active {
-            account.deactivate_token_position_and_log(raw_token_index, ctx.accounts.account.key());
-        }
+        let token_info = health_cache.token_info(bank.token_index)?;
 
-        bank.collected_fees_native += fee;
+        total_collateral_fees_in_usd += fee * token_info.prices.oracle;
+
         bank.collected_collateral_fees += fee;
 
-        let token_info = health_cache.token_info(bank.token_index)?;
-        let token_position = account.token_position(bank.token_index)?;
-
         emit_stack(TokenCollateralFeeLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
+            mango_group: group_key,
+            mango_account: account_key,
             token_index: bank.token_index,
             fee: fee.to_bits(),
             asset_usage_fraction: asset_usage_scaling.to_bits(),
             price: token_info.prices.oracle.to_bits(),
         });
+    }
+
+    for bank_ai in &remaining_accounts[0..token_position_count] {
+        let mut bank = bank_ai.load_mut::<Bank>()?;
+
+        let token_info = health_cache.token_info(bank.token_index)?;
+
+        let token_index_in_health_cache = health_cache
+            .token_infos
+            .iter()
+            .position(|x| x.token_index == bank.token_index)
+            .expect("missing token in health");
+
+        let token_balance = token_balances[token_index_in_health_cache].spot_and_perp;
+        let health = token_info.health_contribution(HealthType::Maint, token_balance);
+
+        if health >= 0 {
+            continue;
+        }
+
+        let (token_position, raw_token_index) = account.token_position_mut(bank.token_index)?;
+
+        let borrow_scaling = (health / total_liab_health).abs();
+        let fee = borrow_scaling * total_collateral_fees_in_usd / token_info.prices.oracle;
+
+        if let Some(ref mut output) = out_fees {
+            output.insert(
+                token_info.token_index,
+                (
+                    fee,
+                    (fee * token_info.prices.oracle).div(I80F48::from_num(1_000_000)),
+                ),
+            );
+        }
+
+        let is_active = bank.withdraw_without_fee(token_position, fee, now_ts)?;
+        if !is_active {
+            account.deactivate_token_position_and_log(raw_token_index, account_key);
+        }
+
+        bank.collected_fees_native += fee;
+        let token_position = account.token_position(bank.token_index)?;
 
         emit_stack(TokenBalanceLog {
-            mango_group: ctx.accounts.group.key(),
-            mango_account: ctx.accounts.account.key(),
+            mango_group: group_key,
+            mango_account: account_key,
             token_index: bank.token_index,
             indexed_position: token_position.indexed_position.to_bits(),
             deposit_index: bank.deposit_index.to_bits(),
