@@ -11,6 +11,7 @@ anchor-lang = "0.28.0"
 anchor-spl = "0.28.0"
 fixed = { git = "https://github.com/blockworks-foundation/fixed.git", branch = "v1.11.0-borsh0_10-mango" }
 pyth-sdk-solana = "0.8.0"
+pyth-solana-receiver-sdk = "0.3.0"
 # commit c85e56d (0.5.10 plus dependency updates)
 serum_dex = { git = "https://github.com/openbook-dex/program.git", default-features=false }
 mango-feeds-connector = "0.2.1"

@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::{AnchorDeserialize, Discriminator};
 use derivative::Derivative;
 use fixed::types::I80F48;
+use pyth_solana_receiver_sdk::price_update::VerificationLevel;
 use static_assertions::const_assert_eq;
 use switchboard_on_demand::PullFeedAccountData;
 use switchboard_program::FastRoundResultAccountData;
@@ -126,6 +127,7 @@ pub enum OracleType {
     OrcaCLMM,
     RaydiumCLMM,
     SwitchboardOnDemand,
+    PythV2,
 }
 
 pub struct OracleState {
@@ -210,6 +212,8 @@ pub fn determine_oracle_type(acc_info: &impl KeyedAccountReader) -> Result<Oracl
         return Ok(OracleType::OrcaCLMM);
     } else if acc_info.owner() == &raydium_mainnet::ID {
         return Ok(OracleType::RaydiumCLMM);
+    } else if acc_info.owner() == &pyth_solana_receiver_sdk::ID {
+        return Ok(OracleType::PythV2);
     }
 
     Err(MangoError::UnknownOracleType.into())
@@ -287,6 +291,34 @@ pub fn get_pyth_state(
         last_update_slot,
         deviation,
         oracle_type: OracleType::Pyth,
+    })
+}
+
+pub fn get_pyth_on_demand_state(
+    acc_info: &(impl KeyedAccountReader + ?Sized),
+    base_decimals: u8,
+) -> Result<OracleState> {
+    let mut data = acc_info.data();
+    data = &data[8..];
+    let price_account =
+        pyth_solana_receiver_sdk::price_update::PriceUpdateV2::deserialize(&mut data).unwrap();
+    if price_account.verification_level != VerificationLevel::Full {
+        return Err(MangoError::OracleConfidence.into());
+    }
+
+    let decimals =
+        (price_account.price_message.exponent as i8) + QUOTE_DECIMALS - (base_decimals as i8);
+    let decimal_adj = power_of_ten(decimals);
+    let price = I80F48::from_num(price_account.price_message.price) * decimal_adj;
+    let deviation = I80F48::from_num(price_account.price_message.conf) * decimal_adj;
+    let last_update_slot = price_account.posted_slot;
+
+    require_gte!(price, 0);
+    Ok(OracleState {
+        price,
+        last_update_slot,
+        deviation,
+        oracle_type: OracleType::PythV2,
     })
 }
 
@@ -369,6 +401,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
             }
         }
         OracleType::Pyth => get_pyth_state(oracle_info, base_decimals)?,
+        OracleType::PythV2 => get_pyth_on_demand_state(oracle_info, base_decimals)?,
         OracleType::SwitchboardV2 => {
             fn from_foreign_error(e: impl std::fmt::Display) -> Error {
                 error_msg!("{}", e)
@@ -530,6 +563,11 @@ mod tests {
                 OracleType::SwitchboardOnDemand,
                 switchboard_on_demand_mainnet_oracle::ID,
             ),
+            (
+                "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+                OracleType::PythV2,
+                pyth_solana_receiver_sdk::ID,
+            ),
         ];
 
         for fixture in fixtures {
@@ -605,6 +643,49 @@ mod tests {
             match fixture.1 {
                 OracleType::SwitchboardOnDemand => {
                     assert_eq!(sw.price, I80F48::from_num(61200.109991665549598697))
+                }
+                _ => unimplemented!(),
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_pyth_on_demand_price() -> Result<()> {
+        // add ability to find fixtures
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push("resources/test");
+
+        let fixtures = vec![(
+            "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+            OracleType::PythV2,
+            pyth_solana_receiver_sdk::ID,
+            6,
+        )];
+
+        for fixture in fixtures {
+            let file = format!("resources/test/{}.bin", fixture.0);
+            let mut data = read_file(find_file(&file).unwrap());
+            let data = RefCell::new(&mut data[..]);
+            let ai = &AccountInfoRef {
+                key: &Pubkey::from_str(fixture.0).unwrap(),
+                owner: &fixture.2,
+                data: data.borrow(),
+            };
+            let base_decimals = fixture.3;
+
+            let sw_ais = OracleAccountInfos {
+                oracle: ai,
+                fallback_opt: None,
+                usdc_opt: None,
+                sol_opt: None,
+            };
+            let state = oracle_state_unchecked(&sw_ais, base_decimals).unwrap();
+
+            match fixture.1 {
+                OracleType::PythV2 => {
+                    assert_eq!(state.price, I80F48::from_num(140.615948634614796))
                 }
                 _ => unimplemented!(),
             }
