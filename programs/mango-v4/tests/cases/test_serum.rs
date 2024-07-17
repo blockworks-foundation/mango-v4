@@ -6,14 +6,14 @@ use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side
 use mango_v4::serum3_cpi::{load_open_orders_bytes, OpenOrdersSlim};
 use std::sync::Arc;
 
-struct SerumOrderPlacer {
-    solana: Arc<SolanaCookie>,
-    serum: Arc<SerumCookie>,
-    account: Pubkey,
-    owner: TestKeypair,
-    serum_market: Pubkey,
-    open_orders: Pubkey,
-    next_client_order_id: u64,
+pub struct SerumOrderPlacer {
+    pub solana: Arc<SolanaCookie>,
+    pub serum: Arc<SerumCookie>,
+    pub account: Pubkey,
+    pub owner: TestKeypair,
+    pub serum_market: Pubkey,
+    pub open_orders: Pubkey,
+    pub next_client_order_id: u64,
 }
 
 impl SerumOrderPlacer {
@@ -71,7 +71,7 @@ impl SerumOrderPlacer {
         send_tx(&self.solana, ix).await
     }
 
-    async fn bid_maker(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+    pub async fn bid_maker(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
         self.try_bid(limit_price, max_base, false).await.unwrap();
         self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
             .await
@@ -108,7 +108,7 @@ impl SerumOrderPlacer {
         .await
     }
 
-    async fn ask(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
+    pub async fn ask(&mut self, limit_price: f64, max_base: u64) -> Option<(u128, u64)> {
         self.try_ask(limit_price, max_base).await.unwrap();
         self.find_order_id_for_client_order_id(self.next_client_order_id - 1)
             .await

@@ -1,16 +1,18 @@
 #![allow(dead_code)]
 
 use anchor_lang::prelude::*;
+use std::collections::HashMap;
 
 use super::mango_client::*;
 use super::solana::SolanaCookie;
-use super::{send_tx, MintCookie, TestKeypair, UserCookie};
+use super::{MintCookie, TestKeypair, UserCookie};
 
 #[derive(Default)]
 pub struct GroupWithTokensConfig {
     pub admin: TestKeypair,
     pub payer: TestKeypair,
     pub mints: Vec<MintCookie>,
+    pub prices: HashMap<Pubkey, f64>,
     pub zero_token_is_quote: bool,
 }
 
@@ -38,6 +40,7 @@ impl<'a> GroupWithTokensConfig {
             admin,
             payer,
             mints,
+            prices,
             zero_token_is_quote,
         } = self;
         let create_group_accounts = send_tx(
@@ -74,7 +77,7 @@ impl<'a> GroupWithTokensConfig {
                     group,
                     admin,
                     mint: mint.pubkey,
-                    price: 1.0,
+                    price: prices.get(&mint.pubkey).copied().unwrap_or(1.0f64),
                     oracle,
                 },
             )
