@@ -1,5 +1,5 @@
 {
-  "version": "0.24.1",
+  "version": "0.24.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -11166,6 +11166,9 @@
           },
           {
             "name": "SwitchboardOnDemand"
+          },
+          {
+            "name": "PythV2"
           }
         ]
       }
