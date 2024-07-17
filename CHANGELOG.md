@@ -4,17 +4,29 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.24.2, 2024-7-
 
-### v0.24.1, 2024-7-
+- Program: charge collateral fee directly on borrowed tokens (#973)
 
-- Support for switchboard on demand oracle (#974)
+- Program: fix TokenUpdateIndexAndRateResilient IX (#979)
 
-- Sip bad oracle in token update index and rate (#975) 
-
+- Program: add support for pyth v2 account (#980)
 
 ## mainnet
 
+### v0.24.1, 2024-7-9
+
+Deployment: Jul 9, 2024 at 15:46:15 Central European Summer Time,
+https://explorer.solana.com/tx/5KYBSXV4uRCUK6vaQoZjipNFhTqEY1b1DHJeSh5jo87UUVGBBJj2xSkzTqGHZ8aTb4M88jwsTUi4KXjVWv71sxE5
+
+- Support for switchboard on demand oracle (#974)
+
+- Sip bad oracle in token update index and rate (#975)
+
 ### v0.24.0, 2024-4-18
+
+Deployment: Apr 18, 2024 at 14:53:24 Central European Summer Time, 
+https://explorer.solana.com/tx/2TFCGXQkUjRvkuuojxmiKefUtHPp6q6rM1frYvALByWMGfpWbiGH5hGq5suWEH7TUKoz4jb4KCGxu9DRw7YcXNdh
 
 - Allow skipping banks and invalid oracles when computing health (#891)
 
