@@ -683,9 +683,15 @@ export class Group {
   public getPriceImpactByTokenIndex(
     tokenIndex: TokenIndex,
     usdcAmountUi: number,
+    side: 'bid' | 'ask' | undefined = undefined,
   ): number {
     const bank = this.getFirstBankByTokenIndex(tokenIndex);
-    const pisBps = computePriceImpactOnJup(this.pis, usdcAmountUi, bank.name);
+    const pisBps = computePriceImpactOnJup(
+      this.pis,
+      usdcAmountUi,
+      bank.name,
+      side,
+    );
     return (pisBps * 100) / 10000;
   }
 

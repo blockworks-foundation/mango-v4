@@ -70,6 +70,7 @@ export function computePriceImpactOnJup(
   pis: PriceImpact[],
   usdcAmount: number,
   tokenName: string,
+  side: 'bid' | 'ask' | undefined = undefined,
 ): number {
   try {
     const closestTo = [
@@ -85,7 +86,10 @@ export function computePriceImpactOnJup(
       tokenName = '$WIF';
     }
     const filteredPis: PriceImpact[] = pis.filter(
-      (pi) => pi.symbol == tokenName && pi.target_amount == closestTo,
+      (pi) =>
+        pi.symbol == tokenName &&
+        pi.target_amount == closestTo &&
+        (side !== undefined ? pi.side == side : true),
     );
     if (filteredPis.length > 0) {
       return (filteredPis[0].p90 * 10000) / 100;
