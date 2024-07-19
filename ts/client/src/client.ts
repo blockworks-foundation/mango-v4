@@ -5512,18 +5512,32 @@ export class MangoClient {
 
     // TODO: The max premium should likely be computed differently
     if (!maxPricePremiumPercent) {
-      const buyTokenPriceImpact = group.getPriceImpactByTokenIndex(
-        buyBank.tokenIndex,
-        liqorTcsChunkSizeInUsd,
-      );
-      const sellTokenPriceImpact = group.getPriceImpactByTokenIndex(
-        sellBank.tokenIndex,
-        liqorTcsChunkSizeInUsd,
-      );
+      const buyTokenPriceImpact =
+        buyBank.tokenIndex == 0
+          ? group.getPriceImpactByTokenIndex(
+              sellBank.tokenIndex,
+              liqorTcsChunkSizeInUsd,
+              'ask',
+            )
+          : group.getPriceImpactByTokenIndex(
+              buyBank.tokenIndex,
+              liqorTcsChunkSizeInUsd,
+            );
+      const sellTokenPriceImpact =
+        sellBank.tokenIndex == 0
+          ? group.getPriceImpactByTokenIndex(
+              buyBank.tokenIndex,
+              liqorTcsChunkSizeInUsd,
+              'bid',
+            )
+          : group.getPriceImpactByTokenIndex(
+              buyBank.tokenIndex,
+              liqorTcsChunkSizeInUsd,
+            );
 
       if (buyTokenPriceImpact <= 0 || sellTokenPriceImpact <= 0) {
         throw new Error(
-          `Error compitong slippage/premium for token conditional swap!`,
+          `Error computing slippage/premium for token conditional swap!`,
         );
       }
 
