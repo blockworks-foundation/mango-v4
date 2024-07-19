@@ -81,6 +81,9 @@ export function computePriceImpactOnJup(
     if (tokenName == 'ETH (Portal)') {
       tokenName = 'ETH';
     }
+    if (tokenName == 'WIF') {
+      tokenName = '$WIF';
+    }
     const filteredPis: PriceImpact[] = pis.filter(
       (pi) => pi.symbol == tokenName && pi.target_amount == closestTo,
     );
