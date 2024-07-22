@@ -43,7 +43,7 @@ pub async fn new(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
-        staleness_slot: None,
+        now: None,
         begin_fallback_oracles: metas.len(),
         usdc_oracle_index: metas
             .iter()
@@ -88,7 +88,7 @@ pub fn new_sync(
         n_perps: active_perp_len,
         begin_perp: active_token_len * 2,
         begin_serum3: active_token_len * 2 + active_perp_len * 2,
-        staleness_slot: None,
+        now: None,
         begin_fallback_oracles: metas.len(),
         usdc_oracle_index: None,
         sol_oracle_index: None,

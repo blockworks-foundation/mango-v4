@@ -74,6 +74,7 @@ mod tests {
                         price: Default::default(),
                         deviation: Default::default(),
                         last_update_slot: 0,
+                        last_update_time: None,
                         oracle_type: OracleType::Pyth,
                     },
                     &OracleConfig {

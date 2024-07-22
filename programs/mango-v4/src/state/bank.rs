@@ -1184,45 +1184,30 @@ impl Bank {
     pub fn oracle_price<T: KeyedAccountReader>(
         &self,
         oracle_acc_infos: &OracleAccountInfos<T>,
-        staleness_slot: Option<u64>,
+        now: Option<(u64, u64)>, // (now_ts, now_slot)
     ) -> Result<I80F48> {
         require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
         let primary_state = oracle::oracle_state_unchecked(oracle_acc_infos, self.mint_decimals)?;
         let primary_ok =
-            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            primary_state.check_confidence_and_maybe_staleness(&self.oracle_config, now);
         if primary_ok.is_oracle_error() && oracle_acc_infos.fallback_opt.is_some() {
             let fallback_oracle_acc = oracle_acc_infos.fallback_opt.unwrap();
             require_keys_eq!(self.fallback_oracle, *fallback_oracle_acc.key());
             let fallback_state =
                 oracle::fallback_oracle_state_unchecked(&oracle_acc_infos, self.mint_decimals)?;
-            let fallback_ok = fallback_state
-                .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot);
+            let fallback_ok =
+                fallback_state.check_confidence_and_maybe_staleness(&self.oracle_config, now);
             fallback_ok.with_context(|| {
                 format!(
                     "{} {}",
-                    oracle_log_context(
-                        self.name(),
-                        &primary_state,
-                        &self.oracle_config,
-                        staleness_slot
-                    ),
-                    oracle_log_context(
-                        self.name(),
-                        &fallback_state,
-                        &self.oracle_config,
-                        staleness_slot
-                    )
+                    oracle_log_context(self.name(), &primary_state, &self.oracle_config, now),
+                    oracle_log_context(self.name(), &fallback_state, &self.oracle_config, now)
                 )
             })?;
             Ok(fallback_state.price)
         } else {
             primary_ok.with_context(|| {
-                oracle_log_context(
-                    self.name(),
-                    &primary_state,
-                    &self.oracle_config,
-                    staleness_slot,
-                )
+                oracle_log_context(self.name(), &primary_state, &self.oracle_config, now)
             })?;
             Ok(primary_state.price)
         }

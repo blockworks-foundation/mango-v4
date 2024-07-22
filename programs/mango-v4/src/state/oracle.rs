@@ -1,5 +1,6 @@
 use std::mem::size_of;
 
+use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 use crate::accounts_zerocopy::*;
 use crate::error::*;
 use crate::state::load_orca_pool_state;
@@ -12,8 +13,6 @@ use static_assertions::const_assert_eq;
 use switchboard_on_demand::PullFeedAccountData;
 use switchboard_program::FastRoundResultAccountData;
 use switchboard_v2::AggregatorAccountData;
-
-use super::{load_raydium_pool_state, orca_mainnet_whirlpool, raydium_mainnet};
 
 const DECIMAL_CONSTANT_ZERO_INDEX: i8 = 12;
 const DECIMAL_CONSTANTS: [I80F48; 25] = [
@@ -134,6 +133,7 @@ pub struct OracleState {
     pub price: I80F48,
     pub deviation: I80F48,
     pub last_update_slot: u64,
+    pub last_update_time: Option<u64>,
     pub oracle_type: OracleType,
 }
 
@@ -142,23 +142,41 @@ impl OracleState {
     pub fn check_confidence_and_maybe_staleness(
         &self,
         config: &OracleConfig,
-        staleness_slot: Option<u64>,
+        now: Option<(u64, u64)>, // (now_ts, now_slot)
     ) -> Result<()> {
-        if let Some(now_slot) = staleness_slot {
-            self.check_staleness(config, now_slot)?;
+        if let Some((now_ts, now_slot)) = now {
+            self.check_staleness(config, now_slot, now_ts)?;
         }
         self.check_confidence(config)
     }
 
-    pub fn check_staleness(&self, config: &OracleConfig, now_slot: u64) -> Result<()> {
-        if config.max_staleness_slots >= 0
-            && self
-                .last_update_slot
-                .saturating_add(config.max_staleness_slots as u64)
-                < now_slot
+    pub fn check_staleness(&self, config: &OracleConfig, now_slot: u64, now_ts: u64) -> Result<()> {
+        if config.max_staleness_slots < 0 {
+            return Ok(());
+        }
+
+        if self
+            .last_update_slot
+            .saturating_add(config.max_staleness_slots as u64)
+            < now_slot
         {
             return Err(MangoError::OracleStale.into());
         }
+
+        if self.last_update_time.is_some() {
+            let current_time_in_msecs = now_ts * 1000;
+            let last_update_time_in_msecs = self.last_update_time.unwrap() * 1000;
+            let max_acceptable_update_age_in_ms = (config.max_staleness_slots as u64) * 450;
+
+            let oldest_acceptable_time =
+                current_time_in_msecs.saturating_sub(max_acceptable_update_age_in_ms);
+
+            if last_update_time_in_msecs < oldest_acceptable_time {
+                msg!("Oracle stale (using time fallback method: current time: {} vs published time: {})", current_time_in_msecs, last_update_time_in_msecs);
+                return Err(MangoError::OracleStale.into());
+            }
+        }
+
         Ok(())
     }
 
@@ -291,6 +309,7 @@ pub fn get_pyth_state(
         last_update_slot,
         deviation,
         oracle_type: OracleType::Pyth,
+        last_update_time: None,
     })
 }
 
@@ -313,12 +332,15 @@ pub fn get_pyth_on_demand_state(
     let deviation = I80F48::from_num(price_account.price_message.conf) * decimal_adj;
     let last_update_slot = price_account.posted_slot;
 
+    let price_timestamp = price_account.price_message.publish_time;
+
     require_gte!(price, 0);
     Ok(OracleState {
         price,
         last_update_slot,
         deviation,
         oracle_type: OracleType::PythV2,
+        last_update_time: Some(price_timestamp as u64),
     })
 }
 
@@ -398,6 +420,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::Stub,
+                last_update_time: None,
             }
         }
         OracleType::Pyth => get_pyth_state(oracle_info, base_decimals)?,
@@ -430,6 +453,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardV2,
+                last_update_time: None,
             }
         }
         OracleType::SwitchboardV1 => {
@@ -450,6 +474,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardV1,
+                last_update_time: None,
             }
         }
         OracleType::SwitchboardOnDemand => {
@@ -479,6 +504,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot,
                 deviation,
                 oracle_type: OracleType::SwitchboardOnDemand,
+                last_update_time: None,
             }
         }
         OracleType::OrcaCLMM => {
@@ -491,6 +517,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot: quote_oracle_state.last_update_slot,
                 deviation: quote_oracle_state.deviation,
                 oracle_type: OracleType::OrcaCLMM,
+                last_update_time: None,
             }
         }
         OracleType::RaydiumCLMM => {
@@ -503,6 +530,7 @@ fn oracle_state_unchecked_inner<T: KeyedAccountReader>(
                 last_update_slot: quote_oracle_state.last_update_slot,
                 deviation: quote_oracle_state.deviation,
                 oracle_type: OracleType::RaydiumCLMM,
+                last_update_time: None,
             }
         }
     })
@@ -512,15 +540,15 @@ pub fn oracle_log_context(
     name: &str,
     state: &OracleState,
     oracle_config: &OracleConfig,
-    staleness_slot: Option<u64>,
+    now: Option<(u64, u64)>,
 ) -> String {
     format!(
-        "name: {}, price: {}, deviation: {}, last_update_slot: {}, now_slot: {}, conf_filter: {:#?}",
+        "name: {}, price: {}, deviation: {}, last_update_slot: {}, now: {:?}, conf_filter: {:#?}",
         name,
         state.price.to_num::<f64>(),
         state.deviation.to_num::<f64>(),
         state.last_update_slot,
-        staleness_slot.unwrap_or_else(|| u64::MAX),
+        now.unwrap_or_else(|| (u64::MAX, u64::MAX)),
         oracle_config.conf_filter.to_num::<f32>(),
     )
 }
@@ -860,5 +888,41 @@ mod tests {
             check_is_valid_fallback_oracle(ai)?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn use_time_for_max_staleness_check() {
+        let fixtures = vec![
+            (100_000, 100_000, false),
+            (100_000, 50_000, true),
+            (100_000, 150_000, false),
+            (100_000, 100_000 - 44, false),
+            (100_000, 100_000 - 46, true),
+            (100_000, 100_000 + 45, false),
+            (100_000, 100_000 + 300, false),
+        ];
+
+        let config = OracleConfig {
+            conf_filter: Default::default(),
+            max_staleness_slots: 100,
+            reserved: [0; 72],
+        };
+        for (now_ts, publish_ts, expect_error) in fixtures {
+            let now_slot = 0;
+
+            let state = OracleState {
+                price: Default::default(),
+                deviation: Default::default(),
+                last_update_slot: now_slot,
+                last_update_time: Some(publish_ts),
+                oracle_type: OracleType::Pyth,
+            };
+
+            println!("test case: {}, {} => {}", now_ts, publish_ts, expect_error);
+            assert_eq!(
+                expect_error,
+                state.check_staleness(&config, now_slot, now_ts).is_err()
+            );
+        }
     }
 }

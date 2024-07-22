@@ -394,7 +394,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let retriever = new_fixed_order_account_retriever_with_optional_banks(
         health_ais,
         &account.borrow(),
-        now_slot,
+        (now_ts, now_slot),
     )?;
     let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
@@ -523,7 +523,7 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
     let retriever = new_fixed_order_account_retriever_with_optional_banks(
         health_ais,
         &account.borrow(),
-        now_slot,
+        (now_ts, now_slot),
     )?;
     let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
