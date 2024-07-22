@@ -153,9 +153,9 @@ interface OracleInterface {
               sequenceType: SequenceType.Sequential,
             })),
             config: {
+              maxTxesInBatch: 1,
               maxRetries: 5,
               autoRetry: true,
-              maxTxesInBatch: 20,
               logFlowInfo: false,
             },
             callbacks: {
