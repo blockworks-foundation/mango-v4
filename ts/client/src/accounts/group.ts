@@ -1,6 +1,5 @@
 import { BorshAccountsCoder } from '@coral-xyz/anchor';
 import { Market, Orderbook } from '@project-serum/serum';
-import { parsePriceData } from '@pythnetwork/client';
 import { TOKEN_PROGRAM_ID, unpackAccount } from '@solana/spl-token';
 import {
   AccountInfo,
@@ -26,6 +25,7 @@ import {
   OracleProvider,
   isPythOracle,
   isSwitchboardOracle,
+  parsePythOracle,
   parseSwitchboardOracle,
 } from './oracle';
 import { BookSide, PerpMarket, PerpMarketIndex } from './perp';
@@ -490,15 +490,14 @@ export class Group {
       provider = OracleProvider.Stub;
       deviation = stubOracle.deviation;
     } else if (isPythOracle(ai)) {
-      const priceData = parsePriceData(ai.data);
-      uiPrice = priceData.previousPrice;
+      const priceData = parsePythOracle(ai, client.program.provider.connection);
+      uiPrice = priceData.price;
       price = this.toNativePrice(uiPrice, baseDecimals);
-      lastUpdatedSlot = parseInt(priceData.lastSlot.toString());
+      lastUpdatedSlot = priceData.lastUpdatedSlot;
       deviation =
-        priceData.previousConfidence !== undefined
-          ? this.toNativePrice(priceData.previousConfidence, baseDecimals)
+        priceData.uiDeviation !== undefined
+          ? this.toNativePrice(priceData.uiDeviation, baseDecimals)
           : undefined;
-
       provider = OracleProvider.Pyth;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
