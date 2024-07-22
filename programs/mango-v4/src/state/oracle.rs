@@ -170,12 +170,8 @@ impl OracleState {
 
             let oldest_acceptable_time =
                 current_time_in_msecs.saturating_sub(max_acceptable_update_age_in_ms);
-            let newest_acceptable_time =
-                current_time_in_msecs.saturating_add(max_acceptable_update_age_in_ms * 3);
 
-            if last_update_time_in_msecs < oldest_acceptable_time
-                || last_update_time_in_msecs > newest_acceptable_time
-            {
+            if last_update_time_in_msecs < oldest_acceptable_time {
                 msg!("Oracle stale (using time fallback method: current time: {} vs published time: {})", current_time_in_msecs, last_update_time_in_msecs);
                 return Err(MangoError::OracleStale.into());
             }
@@ -899,11 +895,11 @@ mod tests {
         let fixtures = vec![
             (100_000, 100_000, false),
             (100_000, 50_000, true),
-            (100_000, 150_000, true),
+            (100_000, 150_000, false),
             (100_000, 100_000 - 44, false),
             (100_000, 100_000 - 46, true),
             (100_000, 100_000 + 45, false),
-            (100_000, 100_000 + 300, true),
+            (100_000, 100_000 + 300, false),
         ];
 
         let config = OracleConfig {
