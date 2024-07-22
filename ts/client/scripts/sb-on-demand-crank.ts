@@ -14,6 +14,7 @@ import {
 } from '@switchboard-xyz/on-demand';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
+import shuffle from 'lodash/shuffle';
 import uniqWith from 'lodash/uniqWith';
 import { Program as Anchor30Program, Idl } from 'switchboard-anchor';
 
@@ -131,7 +132,7 @@ interface OracleInterface {
           );
         }
 
-        const ixsChunks = chunk(pullIxs, 2, false);
+        const ixsChunks = chunk(shuffle(pullIxs), 2, false);
         try {
           // use mangolana
           await sendSignAndConfirmTransactions({
