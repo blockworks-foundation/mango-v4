@@ -68,8 +68,11 @@ where
     let time_scaling = I80F48::from(charge_seconds) * inv_seconds_per_day;
 
     let health_cache = {
-        let retriever =
-            new_fixed_order_account_retriever(remaining_accounts, &account.borrow(), now_slot)?;
+        let retriever = new_fixed_order_account_retriever(
+            remaining_accounts,
+            &account.borrow(),
+            (now_ts, now_slot),
+        )?;
         new_health_cache(&account.borrow(), &retriever, now_ts)?
     };
 

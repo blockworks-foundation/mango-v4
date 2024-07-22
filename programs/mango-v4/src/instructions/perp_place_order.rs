@@ -70,7 +70,7 @@ pub fn perp_place_order(
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             ctx.remaining_accounts,
             &account.borrow(),
-            now_slot,
+            (now_ts, now_slot),
         )?;
         let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
             &account.borrow(),

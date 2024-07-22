@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
 use anchor_client::ClientError;
+use std::collections::HashMap;
+use std::time::SystemTime;
 
 use anchor_lang::__private::bytemuck;
 
@@ -669,6 +669,10 @@ impl MangoGroupContext {
                     .fetch_multiple_accounts(&oracle_keys)
                     .await?;
                 let now_slot = account_fetcher.get_slot().await?;
+                let now_ts = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("system time after epoch start")
+                    .as_secs();
 
                 let mut stale_oracles_with_fallbacks = vec![];
                 for (key, acc) in oracle_accounts {
@@ -677,8 +681,10 @@ impl MangoGroupContext {
                         &OracleAccountInfos::from_reader(&KeyedAccountSharedData::new(key, acc)),
                         token.decimals,
                     )?;
-                    let oracle_is_valid = state
-                        .check_confidence_and_maybe_staleness(&token.oracle_config, Some(now_slot));
+                    let oracle_is_valid = state.check_confidence_and_maybe_staleness(
+                        &token.oracle_config,
+                        Some((now_ts, now_slot)),
+                    );
                     if oracle_is_valid.is_err() && token.fallback_context.key != Pubkey::default() {
                         stale_oracles_with_fallbacks
                             .push((token.oracle, token.fallback_context.clone()));

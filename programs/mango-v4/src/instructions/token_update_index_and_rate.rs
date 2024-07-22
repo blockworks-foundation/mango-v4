@@ -79,7 +79,7 @@ pub fn token_update_index_and_rate(
         let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
         let price = some_bank.oracle_price(
             &OracleAccountInfos::from_reader(oracle_ref),
-            Some(clock.slot),
+            Some((clock.unix_timestamp as u64, clock.slot)),
         );
 
         // Early exit if oracle is invalid

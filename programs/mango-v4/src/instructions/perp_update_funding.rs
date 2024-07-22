@@ -15,8 +15,10 @@ pub fn perp_update_funding(ctx: Context<PerpUpdateFunding>) -> Result<()> {
 
     let now_slot = Clock::get()?.slot;
     let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-    let oracle_state =
-        perp_market.oracle_state(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot))?;
+    let oracle_state = perp_market.oracle_state(
+        &OracleAccountInfos::from_reader(oracle_ref),
+        Some((now_ts, now_slot)),
+    )?;
 
     perp_market.update_funding_and_stable_price(&book, &oracle_state, now_ts)?;
 

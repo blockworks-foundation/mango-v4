@@ -124,7 +124,7 @@ impl<'a, 'info> DepositCommon<'a, 'info> {
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             remaining_accounts,
             &account.borrow(),
-            now_slot,
+            (now_ts, now_slot),
         )?;
 
         // We only compute health to check if the account leaves the being_liquidated state.
@@ -208,12 +208,15 @@ pub fn token_deposit(ctx: Context<TokenDeposit>, amount: u64, reduce_only: bool)
         // Activating a new token position requires that the oracle is in a good state.
         // Otherwise users could abuse oracle staleness to delay liquidation.
         if !token_position_exists {
-            let now_slot = Clock::get()?.slot;
+            let (now_ts, now_slot) =
+                Clock::get().map(|c| (c.unix_timestamp as u64, c.slot as u64))?;
             let bank = ctx.accounts.bank.load()?;
 
             let oracle_ref = &AccountInfoRef::borrow(ctx.accounts.oracle.as_ref())?;
-            let oracle_result =
-                bank.oracle_price(&OracleAccountInfos::from_reader(oracle_ref), Some(now_slot));
+            let oracle_result = bank.oracle_price(
+                &OracleAccountInfos::from_reader(oracle_ref),
+                Some((now_ts, now_slot)),
+            );
             if let Err(e) = oracle_result {
                 msg!("oracle must be valid when creating a new token position");
                 return Err(e);
