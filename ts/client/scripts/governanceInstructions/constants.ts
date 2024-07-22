@@ -32,3 +32,12 @@ export const MAINNET_PYTH_PROGRAM = new PublicKey(
 export const DEVNET_PYTH_PROGRAM = new PublicKey(
   'gSbePebfvPy7tRqimPoVecS2UsBvYv46ynrzWocc92s',
 );
+
+export const SB_ON_DEMAND_TESTING_ORACLES = [
+  ['DIGITSOL', '2A7aqNLy26ZBSMWP2Ekxv926hj16tCA47W1sHWVqaLii'],
+  ['JLP', '65J9bVEMhNbtbsNgArNV1K4krzcsomjho4bgR51sZXoj'],
+  ['INF', 'AZcoqpWhMJUaKEDUfKsfzCr3Y96gSQwv43KSQ6KpeyQ1'],
+  ['GUAC', 'Ai2GsLRioGKwVgWX8dtbLF5rJJEZX17SteGEDqrpzBv3'],
+  ['RAY', 'AJkAFiXdbMonys8rTXZBrRnuUiLcDFdkyoPuvrVKXhex'],
+  ['JUP', '2F9M59yYc28WMrAymNWceaBEk8ZmDAjUAKULp8seAJF3'],
+];
