@@ -272,12 +272,13 @@ export function parsePythOracle(
         decoded.priceMessage.price.toNumber(),
         -decoded.priceMessage.exponent,
       ),
+      publishedTime: decoded.priceMessage.publishTime.toNumber(),
       lastUpdatedSlot: decoded.postedSlot.toNumber(),
       uiDeviation: toUiDecimals(
         decoded.priceMessage.conf.toNumber(),
         -decoded.priceMessage.exponent,
       ),
-    };
+    } as any;
   }
 
   if (accountInfo.data.readUInt32LE(0) === PythMagic) {
