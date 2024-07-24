@@ -60,6 +60,30 @@ const {
   DRY_RUN,
 } = process.env;
 
+function wrapWithForwarder(
+  ix: TransactionInstruction,
+  signer: PublicKey,
+  timeout: BN,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    keys: [
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+      {
+        pubkey: ix.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      ...ix.keys,
+    ],
+    programId: new PublicKey('ixFPGCPYEp5GzhoahhHFVL8VVzkq1kc2eeFZh3qpYca'),
+    data: Buffer.concat([timeout.toArrayLike(Buffer, 'le', 8), ix.data]),
+  });
+}
+
 const getApiTokenName = (bankName: string): string => {
   if (bankName === 'ETH (Portal)') {
     return 'ETH';
@@ -371,7 +395,7 @@ async function updateTokenParams(): Promise<void> {
           `${bank.name}, ${params.disableAssetLiquidation} ${params.oracleConfig?.maxStalenessSlots} ${params.oracleConfig?.confFilter}`,
         );
 
-        const ix = await client.program.methods
+        let ix = await client.program.methods
           .tokenEdit(
             params.oracle,
             params.oracleConfig,
@@ -435,6 +459,12 @@ async function updateTokenParams(): Promise<void> {
             } as AccountMeta,
           ])
           .instruction();
+
+        ix = wrapWithForwarder(
+          ix,
+          new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
+          new BN((new Date().getTime() / 1000) * 60 * 60 * 24 * 2 * 7), // 2 weeks
+        );
 
         const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
         const simulated = await client.connection.simulateTransaction(tx);
