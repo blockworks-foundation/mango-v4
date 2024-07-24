@@ -223,22 +223,22 @@ async function updateTokenParams(): Promise<void> {
               bank?.initLiabWeight.toNumber().toFixed(1),
         );
 
-        // eslint-disable-next-line no-constant-condition
-        if (true) {
-          if (
-            bank.uiBorrows() == 0 &&
-            bank.reduceOnly == 2 &&
-            bank.initAssetWeight.toNumber() == 0 &&
-            bank.maintAssetWeight.toNumber() == 0
-          ) {
-            builder.disableAssetLiquidation(true);
-            builder.oracleConfig({
-              confFilter: 1000,
-              maxStalenessSlots: -1,
-            });
-            change = true;
-          }
-        }
+        // // eslint-disable-next-line no-constant-condition
+        // if (true) {
+        //   if (
+        //     bank.uiBorrows() == 0 &&
+        //     bank.reduceOnly == 2 &&
+        //     bank.initAssetWeight.toNumber() == 0 &&
+        //     bank.maintAssetWeight.toNumber() == 0
+        //   ) {
+        //     builder.disableAssetLiquidation(true);
+        //     builder.oracleConfig({
+        //       confFilter: 1000,
+        //       maxStalenessSlots: -1,
+        //     });
+        //     change = true;
+        //   }
+        // }
 
         // // eslint-disable-next-line no-constant-condition
         // if (true) {
