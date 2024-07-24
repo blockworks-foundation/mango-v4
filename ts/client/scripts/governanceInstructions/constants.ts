@@ -42,6 +42,14 @@ export const SB_ON_DEMAND_TESTING_ORACLES = [
   ['JUP', '2F9M59yYc28WMrAymNWceaBEk8ZmDAjUAKULp8seAJF3'],
 ];
 
+export const SB_ORACLES = [
+  ['RENDER', '94rcvEktGTwCr2uZ6UGq7GPwwkb5BXWox942pGqJPMW3'],
+  ['MNGO', '9AhK6J5bNWBkBEqC9ix5K4bVSgwh9uMEoJvq8Ad2mKZZ'],
+  ['BLZE', 'p8WhggEpj4bTQJpGqPANiqG2CWUxooxWBWzi5qhrdzy'],
+  ['DAI', 'GXRCfroqu9k4ZoS5MyjUSiuoRb1bhps7nacEQLkLBVgr'],
+  ['CHAI', 'GXRCfroqu9k4ZoS5MyjUSiuoRb1bhps7nacEQLkLBVgr'],
+];
+
 export const PYTH_SPONSORED_ORACLES = [
   ['SOL/USD', '7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'],
   ['JITOSOL/USD', 'AxaxyeDT8JnWERSaTKvFXvPKkEdxnamKSqpWbsSjYg1g'],
