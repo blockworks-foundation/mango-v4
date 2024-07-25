@@ -50,6 +50,15 @@ export const SB_ORACLES = [
   ['CHAI', 'GXRCfroqu9k4ZoS5MyjUSiuoRb1bhps7nacEQLkLBVgr'],
 ];
 
+export const SB_LST_ORACLES = [
+  ['JSOL', '91yrNSV8mofYcP6NCsHNi2YgNxwukBenv5MCRFD92Rgp'],
+  ['HUBSOL', '318uRUE2RuYpvv1VwxC4eJwViDrRrxUTTqoUBV1cgUYi'],
+  ['DUALSOL', '6zBkSKhAqLT2SNRbzTbrom2siKhVZ6SLQcFPnvyexdTE'],
+  ['DIGITSOL', 'Am5rswhcxQhqviDXuaiZnLvkpmB4iJEdxmhqMMZDV3KJ'],
+  ['MANGOSOL', 'FLroEBBA4Fa8ENqfBmqyypq8U6ai2mD7c5k6Vfb2PWzv'],
+  ['COMPASSSOL', '9gFehBozPdWafFfPiZRbub2yUmwYJrGMvguKHii7cMTA'],
+];
+
 export const PYTH_SPONSORED_ORACLES = [
   ['SOL/USD', '7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE'],
   ['JITOSOL/USD', 'AxaxyeDT8JnWERSaTKvFXvPKkEdxnamKSqpWbsSjYg1g'],

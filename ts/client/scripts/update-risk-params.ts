@@ -23,7 +23,6 @@ import fs from 'fs';
 import { Bank } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
 import { MangoAccount } from '../src/accounts/mangoAccount';
-import { OracleProvider } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
@@ -38,7 +37,7 @@ import {
   MANGO_GOVERNANCE_PROGRAM,
   MANGO_MINT,
   MANGO_REALM_PK,
-  PYTH_SPONSORED_ORACLES,
+  SB_LST_ORACLES,
 } from './governanceInstructions/constants';
 import { createProposal } from './governanceInstructions/createProposal';
 import {
@@ -207,15 +206,6 @@ async function updateTokenParams(): Promise<void> {
     .map((banks) => banks[0])
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(async (bank) => {
-      if (bank.oracleProvider != OracleProvider.Pyth) {
-        console.log(`Skipping ${bank.name}, since not pyth`);
-        return;
-      }
-      if (bank.reduceOnly == 1) {
-        console.log(`Skipping ${bank.name}, since reduceOnly`);
-        return;
-      }
-
       const builder = Builder(NullTokenEditParams);
       let change = false;
 
@@ -229,34 +219,51 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      const maybePythV2Feed = PYTH_SPONSORED_ORACLES.filter(
-        (x) =>
-          x[0].replace('/USD', '') ==
-          (bank.name.includes('BTC')
-            ? 'BTC'
-            : bank.name.includes('ETH')
-            ? 'ETH'
-            : bank.name.toUpperCase()),
+      const maybeSbOracle = SB_LST_ORACLES.filter(
+        (x) => x[0] === bank.name.toLocaleUpperCase(),
       );
-
-      if (maybePythV2Feed.length > 0) {
-        console.log(` - ${bank.name} ${bank.oracle} ${maybePythV2Feed[0][0]}`);
-        builder.oracle(new PublicKey(maybePythV2Feed[0][1]));
+      if (maybeSbOracle.length > 0) {
+        console.log(` - ${bank.name} ${bank.oracle} ${maybeSbOracle[0][0]}`);
+        builder.oracle(new PublicKey(maybeSbOracle[0][1]));
         change = true;
       } else {
-        console.log(`Skipping ${bank.name}, cant find pyth feed`);
+        return;
       }
 
-      if (
-        bank.reduceOnly != 1 &&
-        maybePythV2Feed.length == 0 &&
-        bank.oracleProvider == OracleProvider.Pyth &&
-        !['CHAI', 'DAI', 'BLZE', 'MNGO', 'RENDER'].some(
-          (item) => item == bank.name,
-        )
-      ) {
-        throw new Error(`No pyth feed for ${bank.name}`);
-      }
+      // if (bank.oracleProvider != OracleProvider.Pyth) {
+      //   console.log(`Skipping ${bank.name}, since not pyth`);
+      //   return;
+      // }
+      // if (bank.reduceOnly == 1) {
+      //   console.log(`Skipping ${bank.name}, since reduceOnly`);
+      //   return;
+      // }
+      // const maybePythV2Feed = PYTH_SPONSORED_ORACLES.filter(
+      //   (x) =>
+      //     x[0].replace('/USD', '') ==
+      //     (bank.name.includes('BTC')
+      //       ? 'BTC'
+      //       : bank.name.includes('ETH')
+      //       ? 'ETH'
+      //       : bank.name.toUpperCase()),
+      // );
+      // if (maybePythV2Feed.length > 0) {
+      //   console.log(` - ${bank.name} ${bank.oracle} ${maybePythV2Feed[0][0]}`);
+      //   builder.oracle(new PublicKey(maybePythV2Feed[0][1]));
+      //   change = true;
+      // } else {
+      //   console.log(`Skipping ${bank.name}, cant find pyth feed`);
+      // }
+      // if (
+      //   bank.reduceOnly != 1 &&
+      //   maybePythV2Feed.length == 0 &&
+      //   bank.oracleProvider == OracleProvider.Pyth &&
+      //   !['CHAI', 'DAI', 'BLZE', 'MNGO', 'RENDER'].some(
+      //     (item) => item == bank.name,
+      //   )
+      // ) {
+      //   throw new Error(`No pyth feed for ${bank.name}`);
+      // }
 
       // // eslint-disable-next-line no-constant-condition
       // if (true) {
@@ -547,7 +554,9 @@ async function updateTokenParams(): Promise<void> {
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Switch feeds from Pyth V1 to Pyth V2',
+      PROPOSAL_TITLE
+        ? PROPOSAL_TITLE
+        : 'Switch switchboard oracles for LSTs in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
