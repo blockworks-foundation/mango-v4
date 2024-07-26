@@ -17,4 +17,4 @@ retry_connection_sleep_secs = 30
 
 [source.snapshot]
 rpc_http_url = "http://mango.rpcpool.com/<token>"
-program_id = "4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg"
+program_id = "zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25"
