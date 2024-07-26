@@ -37,7 +37,7 @@ import {
   MANGO_GOVERNANCE_PROGRAM,
   MANGO_MINT,
   MANGO_REALM_PK,
-  SB_LST_ORACLES,
+  SB_FEEDS_TO_MIGRATE,
 } from './governanceInstructions/constants';
 import { createProposal } from './governanceInstructions/createProposal';
 import {
@@ -219,12 +219,12 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      const maybeSbOracle = SB_LST_ORACLES.filter(
-        (x) => x[0] === bank.name.toLocaleUpperCase(),
+      const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
+        (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
       );
       if (maybeSbOracle.length > 0) {
-        console.log(` - ${bank.name} ${bank.oracle} ${maybeSbOracle[0][0]}`);
-        builder.oracle(new PublicKey(maybeSbOracle[0][1]));
+        console.log(` - ${bank.name} ${maybeSbOracle[0].name}`);
+        builder.oracle(new PublicKey(maybeSbOracle[0].newPk));
         change = true;
       } else {
         return;
@@ -556,7 +556,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Switch switchboard oracles for LSTs in mango-v4',
+        : 'Switch remaining switchboard oracles mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
