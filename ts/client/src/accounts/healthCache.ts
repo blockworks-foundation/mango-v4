@@ -17,7 +17,7 @@ import {
   PerpPosition,
   Serum3Orders,
 } from './mangoAccount';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
+import { PerpMarket, PerpMarketIndex, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 
 //               ░░░░
@@ -1401,7 +1401,10 @@ export class HealthCache {
 }
 
 export class Prices {
-  constructor(public oracle: I80F48, public stable: I80F48) {}
+  constructor(
+    public oracle: I80F48,
+    public stable: I80F48,
+  ) {}
 
   public liab(healthType: HealthType | undefined): I80F48 {
     if (
@@ -1797,8 +1800,8 @@ export class PerpInfo {
         healthType == HealthType.init
           ? settleToken.initScaledAssetWeight
           : healthType == HealthType.liquidationEnd
-          ? settleToken.initAssetWeight
-          : settleToken.maintLiabWeight
+            ? settleToken.initAssetWeight
+            : settleToken.maintLiabWeight
       )
         .mul(unweighted)
         .mul(settleToken.prices.asset(healthType));
@@ -1807,8 +1810,8 @@ export class PerpInfo {
       healthType == HealthType.init
         ? settleToken.initScaledLiabWeight
         : healthType == HealthType.liquidationEnd
-        ? settleToken.initLiabWeight
-        : settleToken.maintLiabWeight
+          ? settleToken.initLiabWeight
+          : settleToken.maintLiabWeight
     )
       .mul(unweighted)
       .mul(settleToken.prices.liab(healthType));

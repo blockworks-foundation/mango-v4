@@ -637,7 +637,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
     const ix = await this.program.methods
       .tokenForceCloseBorrowsWithToken(
@@ -758,9 +758,8 @@ export class MangoClient {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
 
     const dustVaultPk = await getAssociatedTokenAddress(bank.mint, adminPk);
-    const ai = await this.program.provider.connection.getAccountInfo(
-      dustVaultPk,
-    );
+    const ai =
+      await this.program.provider.connection.getAccountInfo(dustVaultPk);
     const preInstructions: TransactionInstruction[] = [];
     if (!ai) {
       preInstructions.push(
@@ -786,7 +785,7 @@ export class MangoClient {
       .remainingAccounts(
         [bank.publicKey, bank.vault].map(
           (pk) =>
-            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1109,7 +1108,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1608,7 +1607,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1760,7 +1759,7 @@ export class MangoClient {
               pubkey: pk,
               isWritable: false,
               isSigner: false,
-            } as AccountMeta),
+            }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2103,7 +2102,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2251,7 +2250,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2388,7 +2387,7 @@ export class MangoClient {
               pubkey: pk,
               isWritable: receiverBank.publicKey.equals(pk) ? true : false,
               isSigner: false,
-            } as AccountMeta),
+            }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2951,7 +2950,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3106,7 +3105,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3164,7 +3163,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3258,7 +3257,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3319,7 +3318,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3588,7 +3587,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3640,7 +3639,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3674,7 +3673,7 @@ export class MangoClient {
       .remainingAccounts(
         accounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3775,7 +3774,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     /*
@@ -3978,7 +3977,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     const ix = await this.program.methods
@@ -4972,7 +4971,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return this.program.methods
@@ -5047,7 +5046,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return await this.program.methods
@@ -5080,7 +5079,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return await this.program.methods

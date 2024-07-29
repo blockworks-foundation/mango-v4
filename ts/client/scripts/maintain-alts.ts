@@ -41,9 +41,8 @@ async function extendTable(
 
   let addressesAlreadyIndexed: PublicKey[] = [];
   for (const altAddr of altAddresses) {
-    const alt = await client.program.provider.connection.getAddressLookupTable(
-      altAddr,
-    );
+    const alt =
+      await client.program.provider.connection.getAddressLookupTable(altAddr);
     if (alt.value?.state.addresses) {
       addressesAlreadyIndexed = addressesAlreadyIndexed.concat(
         alt.value?.state.addresses,
@@ -106,9 +105,8 @@ async function extendTable(
     if (DRY_RUN) {
       continue;
     }
-    const sig = await client.program.provider.connection.sendTransaction(
-      extendTx,
-    );
+    const sig =
+      await client.program.provider.connection.sendTransaction(extendTx);
     console.log(`https://explorer.solana.com/tx/${sig}`);
   }
 }

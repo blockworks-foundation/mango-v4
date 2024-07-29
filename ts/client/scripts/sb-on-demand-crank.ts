@@ -55,9 +55,8 @@ interface OracleInterface {
 (async function main(): Promise<never> {
   const { group, client, connection, user, userProvider } = await setupMango();
 
-  const { sbOnDemandProgram, crossbarClient, queue } = await setupSwitchboard(
-    client,
-  );
+  const { sbOnDemandProgram, crossbarClient, queue } =
+    await setupSwitchboard(client);
 
   // eslint-disable-next-line no-constant-condition
   while (true) {

@@ -284,9 +284,8 @@ async function createAndPopulateAlt() {
         client.program.provider as AnchorProvider,
         [extendIx],
       );
-      const sig = await client.program.provider.connection.sendTransaction(
-        extendTx,
-      );
+      const sig =
+        await client.program.provider.connection.sendTransaction(extendTx);
       console.log(`https://explorer.solana.com/tx/${sig}`);
     }
 

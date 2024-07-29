@@ -23,9 +23,10 @@ async function main(): Promise<void> {
     );
 
   const oraclePublicKeys = allOracles.map((item) => item[1] as PublicKey);
-  const ais = await client.program.provider.connection.getMultipleAccountsInfo(
-    oraclePublicKeys,
-  );
+  const ais =
+    await client.program.provider.connection.getMultipleAccountsInfo(
+      oraclePublicKeys,
+    );
 
   const result = ais
     .map((ai, idx) => {

@@ -38,9 +38,8 @@ async function main(): Promise<void> {
   );
   const oracles = oracles1.concat(oracles2);
 
-  const ais = await client.program.provider.connection.getMultipleAccountsInfo(
-    oracles,
-  );
+  const ais =
+    await client.program.provider.connection.getMultipleAccountsInfo(oracles);
 
   const switcboardOracles: PublicKey[] = ais
     .map((ai, i) => [isSwitchboardOracle(ai!), oracles[i]])

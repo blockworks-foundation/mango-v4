@@ -238,8 +238,8 @@ const confirmTransaction = async (
             stringifiedError
               ? stringifiedError
               : individualError
-              ? individualError
-              : 'Unknown error'
+                ? individualError
+                : 'Unknown error'
           }`,
         });
       }

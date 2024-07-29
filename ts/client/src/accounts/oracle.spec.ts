@@ -71,9 +71,8 @@ describe.only('Oracle', () => {
       },
     ); // SOL
 
-    const groupAccount = await client.program.account.group.fetch(
-      MANGO_V4_MAIN_GROUP,
-    );
+    const groupAccount =
+      await client.program.account.group.fetch(MANGO_V4_MAIN_GROUP);
     const GROUP = Group.from(MANGO_V4_MAIN_GROUP, groupAccount);
     await GROUP.reloadBanks(client);
     const fbs = await client.deriveFallbackOracleContexts(GROUP);
@@ -89,9 +88,8 @@ describe.only('Oracle', () => {
       { fallbackOracleConfig: 'all' },
     );
 
-    const groupAccount = await client.program.account.group.fetch(
-      MANGO_V4_MAIN_GROUP,
-    );
+    const groupAccount =
+      await client.program.account.group.fetch(MANGO_V4_MAIN_GROUP);
     const GROUP = Group.from(MANGO_V4_MAIN_GROUP, groupAccount);
     await GROUP.reloadBanks(client);
     const fbs = await client.deriveFallbackOracleContexts(GROUP);
@@ -107,9 +105,8 @@ describe.only('Oracle', () => {
       { fallbackOracleConfig: 'dynamic' },
     );
 
-    const groupAccount = await client.program.account.group.fetch(
-      MANGO_V4_MAIN_GROUP,
-    );
+    const groupAccount =
+      await client.program.account.group.fetch(MANGO_V4_MAIN_GROUP);
     const GROUP = Group.from(MANGO_V4_MAIN_GROUP, groupAccount);
     await GROUP.reloadBanks(client);
     const fbs = await client.deriveFallbackOracleContexts(GROUP);
