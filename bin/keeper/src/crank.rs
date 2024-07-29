@@ -362,10 +362,10 @@ pub async fn loop_consume_events(
             ix,
             client.context.compute_estimates.cu_perp_consume_events_base
                 + num_of_events
-                * client
-                .context
-                .compute_estimates
-                .cu_perp_consume_events_per_event,
+                    * client
+                        .context
+                        .compute_estimates
+                        .cu_perp_consume_events_per_event,
         );
         let sig_result = client
             .send_and_confirm_permissionless_tx(ixs.to_instructions())
