@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod save_snapshot;
-mod test_collateral_fees;
 mod test_oracles;
 
 #[derive(Parser, Debug, Clone)]
@@ -215,13 +214,6 @@ enum Command {
         #[clap(flatten)]
         rpc: Rpc,
     },
-    TestCollateralFees {
-        #[clap(short, long)]
-        group: String,
-
-        #[clap(flatten)]
-        rpc: Rpc,
-    },
     SaveSnapshot {
         #[clap(short, long)]
         group: String,
@@ -343,11 +335,6 @@ async fn main() -> Result<(), anyhow::Error> {
             let client = rpc.client(None)?;
             let group = pubkey_from_cli(&group);
             test_oracles::run(&client, group).await?;
-        }
-        Command::TestCollateralFees { group, rpc } => {
-            let client = rpc.client(None)?;
-            let group = pubkey_from_cli(&group);
-            test_collateral_fees::run(&client, group).await?;
         }
         Command::SaveSnapshot { group, rpc, output } => {
             let mango_group = pubkey_from_cli(&group);
