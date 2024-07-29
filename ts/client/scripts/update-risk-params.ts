@@ -37,7 +37,6 @@ import {
   MANGO_GOVERNANCE_PROGRAM,
   MANGO_MINT,
   MANGO_REALM_PK,
-  SB_FEEDS_TO_MIGRATE,
 } from './governanceInstructions/constants';
 import { createProposal } from './governanceInstructions/createProposal';
 import {
@@ -219,16 +218,16 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
-        (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
-      );
-      if (maybeSbOracle.length > 0) {
-        console.log(` - ${bank.name} ${maybeSbOracle[0].name}`);
-        builder.oracle(new PublicKey(maybeSbOracle[0].newPk));
-        change = true;
-      } else {
-        return;
-      }
+      // const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
+      //   (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
+      // );
+      // if (maybeSbOracle.length > 0) {
+      //   console.log(` - ${bank.name} ${maybeSbOracle[0].name}`);
+      //   builder.oracle(new PublicKey(maybeSbOracle[0].newPk));
+      //   change = true;
+      // } else {
+      //   return;
+      // }
 
       // if (bank.oracleProvider != OracleProvider.Pyth) {
       //   console.log(`Skipping ${bank.name}, since not pyth`);
@@ -265,22 +264,27 @@ async function updateTokenParams(): Promise<void> {
       //   throw new Error(`No pyth feed for ${bank.name}`);
       // }
 
-      // // eslint-disable-next-line no-constant-condition
-      // if (true) {
-      //   if (
-      //     bank.uiBorrows() == 0 &&
-      //     bank.reduceOnly == 2 &&
-      //     bank.initAssetWeight.toNumber() == 0 &&
-      //     bank.maintAssetWeight.toNumber() == 0
-      //   ) {
-      //     builder.disableAssetLiquidation(true);
-      //     builder.oracleConfig({
-      //       confFilter: 1000,
-      //       maxStalenessSlots: -1,
-      //     });
-      //     change = true;
-      //   }
-      // }
+      // eslint-disable-next-line no-constant-condition
+      if (true) {
+        if (
+          bank.uiBorrows() == 0 &&
+          bank.reduceOnly == 2 &&
+          bank.initAssetWeight.toNumber() == 0 &&
+          bank.maintAssetWeight.toNumber() == 0
+        ) {
+          builder.disableAssetLiquidation(true);
+          builder.oracleConfig({
+            confFilter: 1000,
+            maxStalenessSlots: -1,
+          });
+          change = true;
+          console.log(
+            ` - ${bank.name}, ${(
+              bank.uiDeposits() * bank.uiPrice
+            ).toLocaleString()} disabled asset liquidation`,
+          );
+        }
+      }
 
       // // eslint-disable-next-line no-constant-condition
       // if (true) {
