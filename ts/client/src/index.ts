@@ -14,10 +14,10 @@ export {
   Serum3Side,
 } from './accounts/serum3';
 export {
+  buildIxGate,
   NullPerpEditParams,
   NullTokenEditParams,
   TrueIxGateParams,
-  buildIxGate,
 } from './clientIxParamBuilder';
 export * from './constants';
 export * from './error';

@@ -6,14 +6,14 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
 import BN from 'bn.js';
 import { Program as Anchor30Program } from 'switchboard-anchor';
+import { DEFAULT_RECEIVER_PROGRAM_ID } from '../constants';
 
-import {
-  DEFAULT_RECEIVER_PROGRAM_ID,
-  PythSolanaReceiverProgram,
-} from '@pythnetwork/pyth-solana-receiver';
-import { IDL } from '@pythnetwork/pyth-solana-receiver/lib/idl/pyth_solana_receiver';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
 import { toUiDecimals } from '../utils';
+import {
+  IDL,
+  PythSolanaReceiver as PythSolanaReceiverProgram,
+} from './pyth_solana_receiver';
 
 const SBV1_DEVNET_PID = new PublicKey(
   '7azgmy1pFXHikv36q1zZASvFq5vFa39TT9NweVugKKTU',
