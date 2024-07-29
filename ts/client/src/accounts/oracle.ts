@@ -1,6 +1,6 @@
-import { AnchorProvider, Program, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Program } from '@coral-xyz/anchor';
 import { parsePriceData, Magic as PythMagic } from '@pythnetwork/client';
-import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { AccountInfo, Connection, PublicKey } from '@solana/web3.js';
 import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import Big from 'big.js';
@@ -217,11 +217,7 @@ export async function parseSwitchboardOracle(
   if (accountInfo.owner.equals(SB_ON_DEMAND_PID)) {
     if (!sbOnDemandProgram) {
       const options = AnchorProvider.defaultOptions();
-      const provider = new AnchorProvider(
-        connection,
-        new Wallet(new Keypair()),
-        options,
-      );
+      const provider = new AnchorProvider(connection, null as any, options);
       const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, provider);
       sbOnDemandProgram = new Anchor30Program(idl!, provider);
     }
@@ -317,11 +313,7 @@ export function parsePythOracle(
   if (accountInfo.owner.equals(DEFAULT_RECEIVER_PROGRAM_ID)) {
     if (!pythSolanaReceiverProgram) {
       const options = AnchorProvider.defaultOptions();
-      const provider = new AnchorProvider(
-        connection,
-        new Wallet(new Keypair()),
-        options,
-      );
+      const provider = new AnchorProvider(connection, null as any, options);
       pythSolanaReceiverProgram = new Program<PythSolanaReceiverProgram>(
         IDL as PythSolanaReceiverProgram,
         DEFAULT_RECEIVER_PROGRAM_ID,
