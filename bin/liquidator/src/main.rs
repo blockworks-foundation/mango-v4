@@ -16,6 +16,7 @@ use mango_v4_client::{
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::program_stubs::{set_syscall_stubs, SyscallStubs};
 use solana_sdk::pubkey::Pubkey;
 use tracing::*;
 
@@ -41,10 +42,27 @@ pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
 }
 
+struct NoLogSyscallStubs;
+impl SyscallStubs for NoLogSyscallStubs {
+    fn sol_log(&self, _message: &str) {
+        // do nothing
+        // TODO: optionally print it?
+    }
+
+    fn sol_log_data(&self, _fields: &[&[u8]]) {
+        // do nothing
+    }
+}
+
+pub fn deactivate_program_logs() {
+    set_syscall_stubs(Box::new(NoLogSyscallStubs {}));
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
     mango_v4_client::print_git_version();
+    deactivate_program_logs();
 
     let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
