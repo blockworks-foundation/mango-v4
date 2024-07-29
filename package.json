@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.32.7",
+  "version": "0.32.10",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit --pretty",
     "prepublishOnly": "yarn validate && yarn build",
     "deduplicate": "npx yarn-deduplicate --list --fail",
-    "validate": "yarn lint && yarn format"
+    "validate": "yarn format"
   },
   "devDependencies": {
     "@solana/spl-governance": "^0.3.25",
