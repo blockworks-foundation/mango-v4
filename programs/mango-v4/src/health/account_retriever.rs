@@ -61,7 +61,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
     pub n_perps: usize,
     pub begin_perp: usize,
     pub begin_serum3: usize,
-    pub staleness_slot: Option<u64>,
+    pub now: Option<(u64, u64)>,
     pub begin_fallback_oracles: usize,
     pub usdc_oracle_index: Option<usize>,
     pub sol_oracle_index: Option<usize>,
@@ -74,7 +74,7 @@ pub struct FixedOrderAccountRetriever<T: KeyedAccountReader> {
 pub fn new_fixed_order_account_retriever<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
-    now_slot: u64,
+    now: (u64, u64),
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_token_len = account.active_token_positions().count();
 
@@ -83,7 +83,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
         ai.load::<Bank>()?;
     }
 
-    new_fixed_order_account_retriever_inner(ais, account, now_slot, active_token_len)
+    new_fixed_order_account_retriever_inner(ais, account, now, active_token_len)
 }
 
 /// A FixedOrderAccountRetriever with n_banks <= active_token_positions().count(),
@@ -94,7 +94,7 @@ pub fn new_fixed_order_account_retriever<'a, 'info>(
 pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
-    now_slot: u64,
+    now: (u64, u64),
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     // Scan for the number of banks provided
     let mut n_banks = 0;
@@ -110,13 +110,13 @@ pub fn new_fixed_order_account_retriever_with_optional_banks<'a, 'info>(
     let active_token_len = account.active_token_positions().count();
     require_gte!(active_token_len, n_banks);
 
-    new_fixed_order_account_retriever_inner(ais, account, now_slot, n_banks)
+    new_fixed_order_account_retriever_inner(ais, account, now, n_banks)
 }
 
 pub fn new_fixed_order_account_retriever_inner<'a, 'info>(
     ais: &'a [AccountInfo<'info>],
     account: &MangoAccountRef,
-    now_slot: u64,
+    now: (u64, u64),
     n_banks: usize,
 ) -> Result<FixedOrderAccountRetriever<AccountInfoRef<'a, 'info>>> {
     let active_serum3_len = account.active_serum3_orders().count();
@@ -142,7 +142,7 @@ pub fn new_fixed_order_account_retriever_inner<'a, 'info>(
         n_perps: active_perp_len,
         begin_perp: n_banks * 2,
         begin_serum3: n_banks * 2 + active_perp_len * 2,
-        staleness_slot: Some(now_slot),
+        now: Some(now),
         begin_fallback_oracles: expected_ais,
         usdc_oracle_index,
         sol_oracle_index,
@@ -190,7 +190,7 @@ impl<T: KeyedAccountReader> FixedOrderAccountRetriever<T> {
     fn oracle_price_perp(&self, account_index: usize, perp_market: &PerpMarket) -> Result<I80F48> {
         let oracle = &self.ais[account_index];
         let oracle_acc_infos = OracleAccountInfos::from_reader(oracle);
-        perp_market.oracle_price(&oracle_acc_infos, self.staleness_slot)
+        perp_market.oracle_price(&oracle_acc_infos, self.now)
     }
 
     #[inline(always)]
@@ -234,7 +234,7 @@ impl<T: KeyedAccountReader> AccountRetriever for FixedOrderAccountRetriever<T> {
 
         let oracle_index = self.n_banks + bank_account_index;
         let oracle_acc_infos = &self.create_oracle_infos(oracle_index, &bank.fallback_oracle);
-        let oracle_price_result = bank.oracle_price(oracle_acc_infos, self.staleness_slot);
+        let oracle_price_result = bank.oracle_price(oracle_acc_infos, self.now);
         let oracle_price = oracle_price_result.with_context(|| {
             format!(
                 "getting oracle for bank with health account index {} and token index {}, passed account {}",
@@ -299,7 +299,7 @@ pub struct ScannedBanksAndOracles<'a, 'info> {
     oracles: Vec<AccountInfoRef<'a, 'info>>,
     fallback_oracles: Vec<AccountInfoRef<'a, 'info>>,
     index_map: HashMap<TokenIndex, usize>,
-    staleness_slot: Option<u64>,
+    staleness_slot: Option<(u64, u64)>,
     /// index in fallback_oracles
     usd_oracle_index: Option<usize>,
     /// index in fallback_oracles
@@ -432,13 +432,17 @@ fn can_load_as<'a, T: ZeroCopy + Owner>(
 
 impl<'a, 'info> ScanningAccountRetriever<'a, 'info> {
     pub fn new(ais: &'a [AccountInfo<'info>], group: &Pubkey) -> Result<Self> {
-        Self::new_with_staleness(ais, group, Some(Clock::get()?.slot))
+        Self::new_with_staleness(
+            ais,
+            group,
+            Some(Clock::get().map(|c| (c.unix_timestamp as u64, c.slot as u64))?),
+        )
     }
 
     pub fn new_with_staleness(
         ais: &'a [AccountInfo<'info>],
         group: &Pubkey,
-        staleness_slot: Option<u64>,
+        staleness_slot: Option<(u64, u64)>,
     ) -> Result<Self> {
         // find all Bank accounts
         let mut token_index_map = HashMap::with_capacity(ais.len() / 2);
@@ -755,9 +759,12 @@ mod tests {
                 perp1.as_account_info(),
                 oracle2_clone.as_account_info(),
             ];
-            let retriever =
-                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
-                    .unwrap();
+            let retriever = new_fixed_order_account_retriever_with_optional_banks(
+                &ais,
+                &account.borrow(),
+                (0, 0),
+            )
+            .unwrap();
             assert_eq!(retriever.available_banks(), Ok(vec![10, 20, 30]));
 
             let (i, bank) = retriever.bank(&group, 0, 10).unwrap();
@@ -785,9 +792,12 @@ mod tests {
                 perp1.as_account_info(),
                 oracle2_clone.as_account_info(),
             ];
-            let retriever =
-                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
-                    .unwrap();
+            let retriever = new_fixed_order_account_retriever_with_optional_banks(
+                &ais,
+                &account.borrow(),
+                (0, 0),
+            )
+            .unwrap();
             assert_eq!(retriever.available_banks(), Ok(vec![10, 30]));
 
             let (i, bank) = retriever.bank(&group, 0, 10).unwrap();
@@ -806,9 +816,12 @@ mod tests {
         // skip all
         {
             let ais = vec![perp1.as_account_info(), oracle2_clone.as_account_info()];
-            let retriever =
-                new_fixed_order_account_retriever_with_optional_banks(&ais, &account.borrow(), 0)
-                    .unwrap();
+            let retriever = new_fixed_order_account_retriever_with_optional_banks(
+                &ais,
+                &account.borrow(),
+                (0, 0),
+            )
+            .unwrap();
             assert_eq!(retriever.available_banks(), Ok(vec![]));
 
             assert!(retriever.bank(&group, 0, 10).is_err());

@@ -18,7 +18,7 @@
 
 - Run the tests to double check there are no failures
 
-- Tag (`git tag program-v0.xy.z HEAD`) and push it (`git push <tag>`)
+- Tag (`git tag program-v0.xy.z HEAD`) and push it (`git push origin <tag>`)
 
 - Do a verifiable build
 

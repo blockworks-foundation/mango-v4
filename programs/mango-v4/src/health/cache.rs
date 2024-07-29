@@ -96,7 +96,11 @@ pub fn compute_health_from_fixed_accounts(
     ais: &[AccountInfo],
     now_ts: u64,
 ) -> Result<I80F48> {
-    let retriever = new_fixed_order_account_retriever(ais, account, Clock::get()?.slot)?;
+    let retriever = new_fixed_order_account_retriever(
+        ais,
+        account,
+        Clock::get().map(|c| (c.unix_timestamp as u64, c.slot as u64))?,
+    )?;
     Ok(new_health_cache(account, &retriever, now_ts)?.health(health_type))
 }
 
@@ -2007,7 +2011,7 @@ mod tests {
                 let retriever = new_fixed_order_account_retriever_with_optional_banks(
                     &ais,
                     &account.borrow(),
-                    0,
+                    (0, 0),
                 )
                 .unwrap();
                 new_health_cache_skipping_missing_banks_and_bad_oracles(

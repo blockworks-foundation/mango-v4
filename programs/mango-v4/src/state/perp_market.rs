@@ -277,23 +277,21 @@ impl PerpMarket {
     pub fn oracle_price<T: KeyedAccountReader>(
         &self,
         oracle_acc_infos: &OracleAccountInfos<T>,
-        staleness_slot: Option<u64>,
+        now: Option<(u64, u64)>,
     ) -> Result<I80F48> {
-        Ok(self.oracle_state(oracle_acc_infos, staleness_slot)?.price)
+        Ok(self.oracle_state(oracle_acc_infos, now)?.price)
     }
 
     pub fn oracle_state<T: KeyedAccountReader>(
         &self,
         oracle_acc_infos: &OracleAccountInfos<T>,
-        staleness_slot: Option<u64>,
+        now: Option<(u64, u64)>,
     ) -> Result<OracleState> {
         require_keys_eq!(self.oracle, *oracle_acc_infos.oracle.key());
         let state = oracle::oracle_state_unchecked(oracle_acc_infos, self.base_decimals)?;
         state
-            .check_confidence_and_maybe_staleness(&self.oracle_config, staleness_slot)
-            .with_context(|| {
-                oracle_log_context(self.name(), &state, &self.oracle_config, staleness_slot)
-            })?;
+            .check_confidence_and_maybe_staleness(&self.oracle_config, now)
+            .with_context(|| oracle_log_context(self.name(), &state, &self.oracle_config, now))?;
         Ok(state)
     }
 

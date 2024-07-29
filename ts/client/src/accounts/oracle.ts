@@ -1,5 +1,5 @@
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Magic as PythMagic } from '@pythnetwork/client';
+import { AnchorProvider, Program, Wallet } from '@coral-xyz/anchor';
+import { parsePriceData, Magic as PythMagic } from '@pythnetwork/client';
 import { AccountInfo, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
 import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
@@ -7,7 +7,13 @@ import Big from 'big.js';
 import BN from 'bn.js';
 import { Program as Anchor30Program } from 'switchboard-anchor';
 
+import {
+  DEFAULT_RECEIVER_PROGRAM_ID,
+  PythSolanaReceiverProgram,
+} from '@pythnetwork/pyth-solana-receiver';
+import { IDL } from '@pythnetwork/pyth-solana-receiver/lib/idl/pyth_solana_receiver';
 import { I80F48, I80F48Dto } from '../numbers/I80F48';
+import { toUiDecimals } from '../utils';
 
 const SBV1_DEVNET_PID = new PublicKey(
   '7azgmy1pFXHikv36q1zZASvFq5vFa39TT9NweVugKKTU',
@@ -38,6 +44,7 @@ export const SOL_MINT_MAINNET = new PublicKey(
 let sbv2DevnetProgram;
 let sbv2MainnetProgram;
 let sbOnDemandProgram;
+let pythSolanaReceiverProgram;
 
 export enum OracleProvider {
   Pyth,
@@ -263,6 +270,9 @@ export function isSwitchboardOracle(accountInfo: AccountInfo<Buffer>): boolean {
 }
 
 export function isPythOracle(accountInfo: AccountInfo<Buffer>): boolean {
+  if (accountInfo.owner.equals(DEFAULT_RECEIVER_PROGRAM_ID)) {
+    return true;
+  }
   return accountInfo.data.readUInt32LE(0) === PythMagic;
 }
 
@@ -294,6 +304,60 @@ export function isRaydiumOracle(accountInfo: AccountInfo<Buffer>): boolean {
 
 export function isClmmOracle(accountInfo: AccountInfo<Buffer>): boolean {
   return isOrcaOracle(accountInfo) || isRaydiumOracle(accountInfo);
+}
+
+export function parsePythOracle(
+  accountInfo: AccountInfo<Buffer>,
+  connection: Connection,
+): {
+  price: number;
+  lastUpdatedSlot: number;
+  uiDeviation: number;
+} {
+  if (accountInfo.owner.equals(DEFAULT_RECEIVER_PROGRAM_ID)) {
+    if (!pythSolanaReceiverProgram) {
+      const options = AnchorProvider.defaultOptions();
+      const provider = new AnchorProvider(
+        connection,
+        new Wallet(new Keypair()),
+        options,
+      );
+      pythSolanaReceiverProgram = new Program<PythSolanaReceiverProgram>(
+        IDL as PythSolanaReceiverProgram,
+        DEFAULT_RECEIVER_PROGRAM_ID,
+        provider,
+      );
+    }
+
+    const decoded = pythSolanaReceiverProgram.coder.accounts.decode(
+      'priceUpdateV2',
+      accountInfo.data,
+    );
+
+    return {
+      price: toUiDecimals(
+        decoded.priceMessage.price.toNumber(),
+        -decoded.priceMessage.exponent,
+      ),
+      publishedTime: decoded.priceMessage.publishTime.toNumber(),
+      lastUpdatedSlot: decoded.postedSlot.toNumber(),
+      uiDeviation: toUiDecimals(
+        decoded.priceMessage.conf.toNumber(),
+        -decoded.priceMessage.exponent,
+      ),
+    } as any;
+  }
+
+  if (accountInfo.data.readUInt32LE(0) === PythMagic) {
+    const priceData = parsePriceData(accountInfo.data);
+    return {
+      price: priceData.previousPrice,
+      lastUpdatedSlot: parseInt(priceData.lastSlot.toString()),
+      uiDeviation: priceData.previousConfidence,
+    };
+  }
+
+  throw new Error('Unknown Pyth oracle!');
 }
 
 export function isOracleStaleOrUnconfident(

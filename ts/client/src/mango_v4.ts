@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.24.1",
+  "version": "0.24.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -11166,6 +11166,9 @@ export type MangoV4 = {
           },
           {
             "name": "SwitchboardOnDemand"
+          },
+          {
+            "name": "PythV2"
           }
         ]
       }
@@ -14485,7 +14488,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.24.1",
+  "version": "0.24.2",
   "name": "mango_v4",
   "instructions": [
     {
@@ -25652,6 +25655,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "SwitchboardOnDemand"
+          },
+          {
+            "name": "PythV2"
           }
         ]
       }

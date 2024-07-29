@@ -45,6 +45,17 @@ async function forceWithdrawTokens(): Promise<void> {
   ).filter((a) => a.getTokenBalanceUi(forceWithdrawBank) > 0);
 
   for (const mangoAccount of mangoAccountsWithDeposits) {
+<<<<<<< HEAD
+=======
+
+    const sig = await client.serum3LiqForceCancelOrders(group,mangoAccount)
+
+    const sig = await client.tokenForceWithdraw(
+      group,
+      mangoAccount,
+      TOKEN_INDEX,
+    );
+>>>>>>> main
     console.log(
       `Withdrawing ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
         mangoAccount.publicKey

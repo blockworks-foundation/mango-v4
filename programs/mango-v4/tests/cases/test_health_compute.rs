@@ -335,7 +335,7 @@ async fn test_health_compute_tokens_fallback_oracles() -> Result<(), TransportEr
     println!("average success increase: {avg_success_increase}");
     println!("average failure increase: {avg_failure_increase}");
     assert!(avg_success_increase < 2_050);
-    assert!(avg_failure_increase < 19_500);
+    assert!(avg_failure_increase < 19_900);
 
     Ok(())
 }

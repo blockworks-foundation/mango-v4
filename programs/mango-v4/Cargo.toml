@@ -1,6 +1,6 @@
 [package]
 name = "mango-v4"
-version = "0.24.1"
+version = "0.24.2"
 description = "Created with Anchor"
 edition = "2021"
 
@@ -39,6 +39,7 @@ fixed = { workspace = true, features = [
 ] }
 num_enum = "0.5.1"
 pyth-sdk-solana = { workspace = true }
+pyth-solana-receiver-sdk = { workspace = true }
 serde = "^1.0"
 serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 solana-address-lookup-table-program = { workspace = true }

@@ -14,8 +14,11 @@ pub fn perp_liq_force_cancel_orders(
 
     let (now_ts, now_slot) = clock_now();
     let mut health_cache = {
-        let retriever =
-            new_fixed_order_account_retriever(ctx.remaining_accounts, &account.borrow(), now_slot)?;
+        let retriever = new_fixed_order_account_retriever(
+            ctx.remaining_accounts,
+            &account.borrow(),
+            (now_ts, now_slot),
+        )?;
         new_health_cache(&account.borrow(), &retriever, now_ts).context("create health cache")?
     };
 

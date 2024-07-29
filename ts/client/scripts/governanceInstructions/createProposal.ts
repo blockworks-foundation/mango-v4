@@ -1,3 +1,5 @@
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
 import {
   getGovernanceProgramVersion,
   getInstructionDataFromBase64,
@@ -12,18 +14,11 @@ import {
   withInsertTransaction,
   withSignOffProposal,
 } from '@solana/spl-governance';
-import {
-  Connection,
-  PublicKey,
-  Transaction,
-  TransactionInstruction,
-} from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction } from '@solana/web3.js';
 import { chunk } from 'lodash';
+import { createComputeBudgetIx } from '../../src/utils/rpc';
 import { updateVoterWeightRecord } from './updateVoteWeightRecord';
 import { VsrClient } from './voteStakeRegistryClient';
-import { createComputeBudgetIx } from '../../src/utils/rpc';
-import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
-import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 
 export const MANGO_MINT = 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac';
 export const MANGO_REALM_PK = new PublicKey(
@@ -142,8 +137,32 @@ export const createProposal = async (
     );
   }
 
-  const txChunks = chunk([...instructions, ...insertInstructions], 2);
+  let txChunks = chunk([...instructions], 2);
+  await sendSignAndConfirmTransactions({
+    connection,
+    wallet,
+    transactionInstructions: txChunks.map((txChunk) => ({
+      instructionsSet: [
+        {
+          signers: [],
+          transactionInstruction: createComputeBudgetIx(80000),
+        },
+        ...txChunk.map((tx) => ({
+          signers: [],
+          transactionInstruction: tx,
+        })),
+      ],
+      sequenceType: SequenceType.Sequential,
+    })),
+    config: {
+      maxRetries: 5,
+      autoRetry: true,
+      maxTxesInBatch: 20,
+      logFlowInfo: true,
+    },
+  });
 
+  txChunks = chunk([...insertInstructions], 1);
   await sendSignAndConfirmTransactions({
     connection,
     wallet,

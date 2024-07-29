@@ -1,7 +1,6 @@
 import {
   LISTING_PRESETS,
   MidPriceImpact,
-  getMidPriceImpacts,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { BN } from '@project-serum/anchor';
@@ -27,11 +26,7 @@ import { MangoAccount } from '../src/accounts/mangoAccount';
 import { MangoClient } from '../src/client';
 import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import {
-  LiqorPriceImpact,
-  buildGroupGrid,
-  getEquityForMangoAccounts,
-} from '../src/risk';
+import { getEquityForMangoAccounts } from '../src/risk';
 import {
   buildFetch,
   toNativeI80F48ForQuote,
@@ -57,6 +52,30 @@ const {
   VSR_DELEGATE_FROM_PK,
   DRY_RUN,
 } = process.env;
+
+function wrapWithForwarder(
+  ix: TransactionInstruction,
+  signer: PublicKey,
+  timeout: BN,
+): TransactionInstruction {
+  return new TransactionInstruction({
+    keys: [
+      {
+        pubkey: signer,
+        isSigner: true,
+        isWritable: false,
+      },
+      {
+        pubkey: ix.programId,
+        isSigner: false,
+        isWritable: false,
+      },
+      ...ix.keys,
+    ],
+    programId: new PublicKey('ixFPGCPYEp5GzhoahhHFVL8VVzkq1kc2eeFZh3qpYca'),
+    data: Buffer.concat([timeout.toArrayLike(Buffer, 'le', 8), ix.data]),
+  });
+}
 
 const getApiTokenName = (bankName: string): string => {
   if (bankName === 'ETH (Portal)') {
@@ -142,27 +161,27 @@ async function updateTokenParams(): Promise<void> {
 
   const instructions: TransactionInstruction[] = [];
 
-  const allMangoAccounts = await client.getAllMangoAccounts(group, true);
+  // const allMangoAccounts = await client.getAllMangoAccounts(group, true);
 
-  const stepSize = 1;
+  // const stepSize = 1;
 
-  const ttlLiqorEquityUi = await getTotalLiqorEquity(
-    client,
-    group,
-    allMangoAccounts,
-  );
+  // const ttlLiqorEquityUi = await getTotalLiqorEquity(
+  //   client,
+  //   group,
+  //   allMangoAccounts,
+  // );
 
-  const midPriceImpacts = getMidPriceImpacts(group.pis);
+  // const midPriceImpacts = getMidPriceImpacts(group.pis);
 
-  const pisForLiqor: LiqorPriceImpact[][] = [];
-  // eslint-disable-next-line no-constant-condition
-  if (false) {
-    const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
-      group,
-      allMangoAccounts,
-      stepSize,
-    );
-  }
+  // const pisForLiqor: LiqorPriceImpact[][] = [];
+  // // eslint-disable-next-line no-constant-condition
+  // if (false) {
+  //   const pisForLiqor: LiqorPriceImpact[][] = await buildGroupGrid(
+  //     group,
+  //     allMangoAccounts,
+  //     stepSize,
+  //   );
+  // }
 
   // eslint-disable-next-line no-constant-condition
   // if (false) {
@@ -180,6 +199,8 @@ async function updateTokenParams(): Promise<void> {
   //   );
   // }
 
+  console.log(Array.from(group.banksMapByTokenIndex.values()).length);
+
   Array.from(group.banksMapByTokenIndex.values())
     .map((banks) => banks[0])
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -187,6 +208,7 @@ async function updateTokenParams(): Promise<void> {
       const builder = Builder(NullTokenEditParams);
       let change = false;
 
+      // try {
       const tier = Object.values(LISTING_PRESETS).find((x) =>
         x.initLiabWeight.toFixed(1) === '1.8'
           ? x.initLiabWeight.toFixed(1) ===
@@ -196,27 +218,73 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      if (!tier) {
-        console.log(`Cant estimate tier for ${bank.name}!`);
-        return;
-      }
+      // const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
+      //   (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
+      // );
+      // if (maybeSbOracle.length > 0) {
+      //   console.log(` - ${bank.name} ${maybeSbOracle[0].name}`);
+      //   builder.oracle(new PublicKey(maybeSbOracle[0].newPk));
+      //   change = true;
+      // } else {
+      //   return;
+      // }
+
+      // if (bank.oracleProvider != OracleProvider.Pyth) {
+      //   console.log(`Skipping ${bank.name}, since not pyth`);
+      //   return;
+      // }
+      // if (bank.reduceOnly == 1) {
+      //   console.log(`Skipping ${bank.name}, since reduceOnly`);
+      //   return;
+      // }
+      // const maybePythV2Feed = PYTH_SPONSORED_ORACLES.filter(
+      //   (x) =>
+      //     x[0].replace('/USD', '') ==
+      //     (bank.name.includes('BTC')
+      //       ? 'BTC'
+      //       : bank.name.includes('ETH')
+      //       ? 'ETH'
+      //       : bank.name.toUpperCase()),
+      // );
+      // if (maybePythV2Feed.length > 0) {
+      //   console.log(` - ${bank.name} ${bank.oracle} ${maybePythV2Feed[0][0]}`);
+      //   builder.oracle(new PublicKey(maybePythV2Feed[0][1]));
+      //   change = true;
+      // } else {
+      //   console.log(`Skipping ${bank.name}, cant find pyth feed`);
+      // }
+      // if (
+      //   bank.reduceOnly != 1 &&
+      //   maybePythV2Feed.length == 0 &&
+      //   bank.oracleProvider == OracleProvider.Pyth &&
+      //   !['CHAI', 'DAI', 'BLZE', 'MNGO', 'RENDER'].some(
+      //     (item) => item == bank.name,
+      //   )
+      // ) {
+      //   throw new Error(`No pyth feed for ${bank.name}`);
+      // }
 
       // eslint-disable-next-line no-constant-condition
-      // if (true) {
-      //   if (
-      //     bank.uiBorrows() == 0 &&
-      //     bank.reduceOnly == 2 &&
-      //     bank.initAssetWeight.toNumber() == 0 &&
-      //     bank.maintAssetWeight.toNumber() == 0
-      //   ) {
-      //     builder.disableAssetLiquidation(true);
-      //     builder.oracleConfig({
-      //       confFilter: 1000,
-      //       maxStalenessSlots: -1,
-      //     });
-      //     change = true;
-      //   }
-      // }
+      if (true) {
+        if (
+          bank.uiBorrows() == 0 &&
+          bank.reduceOnly == 2 &&
+          bank.initAssetWeight.toNumber() == 0 &&
+          bank.maintAssetWeight.toNumber() == 0
+        ) {
+          builder.disableAssetLiquidation(true);
+          builder.oracleConfig({
+            confFilter: 1000,
+            maxStalenessSlots: -1,
+          });
+          change = true;
+          console.log(
+            ` - ${bank.name}, ${(
+              bank.uiDeposits() * bank.uiPrice
+            ).toLocaleString()} disabled asset liquidation`,
+          );
+        }
+      }
 
       // // eslint-disable-next-line no-constant-condition
       // if (true) {
@@ -279,15 +347,13 @@ async function updateTokenParams(): Promise<void> {
       // );
 
       // eslint-disable-next-line no-constant-condition
-      if (!bank.areBorrowsReduceOnly()) {
+      if (false) {
         // Net borrow limits
-        let netBorrowLimitPerWindowQuote = Math.max(
-          toUiDecimalsForQuote(tier!.netBorrowLimitPerWindowQuote),
+        const netBorrowLimitPerWindowQuote = Math.max(
+          10_000,
           Math.min(bank.uiDeposits() * bank.uiPrice, 300_000) / 3 +
             Math.max(0, bank.uiDeposits() * bank.uiPrice - 300_000) / 5,
         );
-        netBorrowLimitPerWindowQuote =
-          Math.round(netBorrowLimitPerWindowQuote / 10_000) * 10_000;
         builder.netBorrowLimitPerWindowQuote(
           toNativeI80F48ForQuote(netBorrowLimitPerWindowQuote).toNumber(),
         );
@@ -297,21 +363,17 @@ async function updateTokenParams(): Promise<void> {
           toUiDecimalsForQuote(bank.netBorrowLimitPerWindowQuote)
         ) {
           console.log(
-            `${bank.name}, ${bank.uiDeposits() * bank.uiPrice}$ (${
-              Math.min(bank.uiDeposits() * bank.uiPrice, 300_000) / 3
-            }, ${
-              Math.max(0, bank.uiDeposits() * bank.uiPrice - 300_000) / 5
-            }), ${
-              tier?.netBorrowLimitPerWindowQuote
-            } , new - ${netBorrowLimitPerWindowQuote}, old - ${toUiDecimalsForQuote(
+            `${
+              bank.name
+            } new - ${netBorrowLimitPerWindowQuote.toLocaleString()}, old - ${toUiDecimalsForQuote(
               bank.netBorrowLimitPerWindowQuote,
-            )}`,
+            ).toLocaleString()}`,
           );
         }
       }
 
-      // Deposit limits
-      // eslint-disable-next-line no-constant-condition
+      // // Deposit limits
+      // // eslint-disable-next-line no-constant-condition
       // if (false) {
       //   if (bank.maintAssetWeight.toNumber() > 0) {
       //     {
@@ -375,8 +437,14 @@ async function updateTokenParams(): Promise<void> {
       // }
 
       const params = builder.build();
+      if (change) {
+        // console.log(
+        //   `${bank.name}, ${params.disableAssetLiquidation} ${params.oracleConfig?.maxStalenessSlots} ${params.oracleConfig?.confFilter}`,
+        // );
+        // console.log(`${bank.name}, ${bank.oracle} ${params.oracle}`);
+      }
 
-      const ix = await client.program.methods
+      let ix = await client.program.methods
         .tokenEdit(
           params.oracle,
           params.oracleConfig,
@@ -441,6 +509,12 @@ async function updateTokenParams(): Promise<void> {
         ])
         .instruction();
 
+      ix = wrapWithForwarder(
+        ix,
+        new PublicKey('8SSLjXBEVk9nesbhi9UMCA32uijbVBUqWoKPPQPTekzt'),
+        new BN(new Date().getTime() / 1000 + 60 * 60 * 24 * 2 * 7), // 2 weeks
+      );
+
       const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
       const simulated = await client.connection.simulateTransaction(tx);
 
@@ -452,6 +526,10 @@ async function updateTokenParams(): Promise<void> {
       if (change) {
         instructions.push(ix);
       }
+      // } catch (error) {
+      //   // console.log(error.stack);
+      //   console.log(`....Skipping ${bank.name}, ${error}`);
+      // }
     });
 
   const tokenOwnerRecordPk = await getTokenOwnerRecordAddress(
@@ -480,7 +558,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Update net borrow limits for tokens in mango-v4',
+        : 'Switch remaining switchboard oracles mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,

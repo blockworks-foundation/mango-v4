@@ -31,7 +31,7 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         let retriever = new_fixed_order_account_retriever_with_optional_banks(
             ctx.remaining_accounts,
             &account.borrow(),
-            now_slot,
+            (now_ts, now_slot),
         )?;
         let health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
             &account.borrow(),
@@ -217,15 +217,15 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
 
         // When borrowing the price has be trustworthy, so we can do a reasonable
         // net borrow check.
-        let slot_opt = Some(Clock::get()?.slot);
+        let now_opt = Some(Clock::get().map(|c| (c.unix_timestamp as u64, c.slot as u64))?);
         unsafe_oracle_state
-            .check_confidence_and_maybe_staleness(&bank.oracle_config, slot_opt)
+            .check_confidence_and_maybe_staleness(&bank.oracle_config, now_opt)
             .with_context(|| {
                 oracle_log_context(
                     bank.name(),
                     &unsafe_oracle_state,
                     &bank.oracle_config,
-                    slot_opt,
+                    now_opt,
                 )
             })?;
         bank.check_net_borrows(unsafe_oracle_state.price)?;

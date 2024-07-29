@@ -82,7 +82,7 @@ pub fn serum3_place_order(
     let retriever = new_fixed_order_account_retriever_with_optional_banks(
         ctx.remaining_accounts,
         &account.borrow(),
-        now_slot,
+        (now_ts, now_slot),
     )?;
     let mut health_cache = new_health_cache_skipping_missing_banks_and_bad_oracles(
         &account.borrow(),
@@ -610,7 +610,7 @@ pub fn apply_settle_changes(
             let quote_oracle_ref = &AccountInfoRef::borrow(quote_oracle_ai)?;
             let quote_oracle_price = quote_bank.oracle_price(
                 &OracleAccountInfos::from_reader(quote_oracle_ref),
-                Some(clock.slot),
+                Some((now_ts, clock.slot)),
             )?;
             let quote_asset_price = quote_oracle_price.min(quote_bank.stable_price());
             account
