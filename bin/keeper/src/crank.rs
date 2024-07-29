@@ -109,7 +109,6 @@ pub async fn runner(
         .values()
         .filter(|t| !t.closed)
         .map(|t| &t.token_index)
-        // TODO: grouping tokens whose oracle might have less confidencen e.g. ORCA with the rest, fails whole ix
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
@@ -219,7 +218,7 @@ pub async fn loop_update_index_and_rate(
                     None,
                 ),
                 data: anchor_lang::InstructionData::data(
-                    &mango_v4::instruction::TokenUpdateIndexAndRate {},
+                    &mango_v4::instruction::TokenUpdateIndexAndRateResilient {},
                 ),
             };
             let mut banks = banks_for_a_token
@@ -232,20 +231,6 @@ pub async fn loop_update_index_and_rate(
                 .collect::<Vec<_>>();
 
             ix.accounts.append(&mut banks);
-
-            let sim_result = match client.simulate(vec![ix.clone()]).await {
-                Ok(response) => response.value,
-                Err(e) => {
-                    error!(token.name, "simulation request error: {e:?}");
-                    continue;
-                }
-            };
-
-            if let Some(e) = sim_result.err {
-                error!(token.name, "simulation error: {e:?} {:?}", sim_result.logs);
-                continue;
-            }
-
             let pix = PreparedInstructions::from_single(
                 ix,
                 client
