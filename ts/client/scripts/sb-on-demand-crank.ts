@@ -8,7 +8,6 @@ import {
 } from '@solana/web3.js';
 import {
   CrossbarClient,
-  Oracle,
   PullFeed,
   SB_ON_DEMAND_PID,
 } from '@switchboard-xyz/on-demand';
@@ -134,21 +133,23 @@ interface OracleInterface {
         //   },
         // );
 
-        const pullIxs: TransactionInstruction[] = [];
-        const lutOwners: (PublicKey | Oracle)[] = [];
-        for (const oracle of oraclesToCrank) {
-          await preparePullIx(
-            sbOnDemandProgram,
-            oracle,
-            queue,
-            lutOwners,
-            pullIxs,
-          );
-        }
+        const pullIxs = (
+          await Promise.all(
+            oraclesToCrank.map(async (oracle) => {
+              const pullIx = await preparePullIx(sbOnDemandProgram, oracle);
+              return pullIx !== undefined ? pullIx : null;
+            }),
+          )
+        ).filter((pullIx) => pullIx !== null);
 
         const ixsChunks = chunk(shuffle(pullIxs), 2, false);
+        const lamportsPerCu_ = Math.min(
+          Math.max(lamportsPerCu ?? 150_000, 150_000),
+          500_000,
+        );
         try {
           // dont await, fire and forget
+          // TODO use our own ALTs
           sendSignAndConfirmTransactions({
             connection,
             wallet: new Wallet(user),
@@ -164,12 +165,7 @@ interface OracleInterface {
               instructionsSet: [
                 {
                   signers: [],
-                  transactionInstruction: createComputeBudgetIx(
-                    Math.min(
-                      Math.max(lamportsPerCu ?? 150_000, 150_000),
-                      400_000,
-                    ),
-                  ),
+                  transactionInstruction: createComputeBudgetIx(lamportsPerCu_),
                 },
                 ...txChunk.map((tx) => ({
                   signers: [],
@@ -187,14 +183,14 @@ interface OracleInterface {
             callbacks: {
               afterEveryTxSend: function (data) {
                 console.log(
-                  ` - https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu ${lamportsPerCu}`,
+                  ` - https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
                 );
               },
             },
           });
         } catch (error) {
           console.log(
-            `Error in sending tx, ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu ${lamportsPerCu}`,
+            `Error in sending tx, ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
           );
         }
 
@@ -209,10 +205,7 @@ interface OracleInterface {
 async function preparePullIx(
   sbOnDemandProgram,
   oracle: OracleInterface,
-  queue: PublicKey,
-  lutOwners: (PublicKey | Oracle)[],
-  pullIxs: TransactionInstruction[],
-): Promise<void> {
+): Promise<TransactionInstruction | undefined> {
   const pullFeed = new PullFeed(
     sbOnDemandProgram as any,
     new PublicKey(oracle.oracle.oraclePk),
@@ -225,23 +218,7 @@ async function preparePullIx(
   // TODO use fetchUpdateMany
   const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
 
-  if (pullIx === undefined) {
-    return;
-  }
-
-  // TODO
-  // > Mitch | Switchboard:
-  // there can be more oracles that join a queue over time
-  // all oracles and feeds carry their own LUT as im sure you noticed
-  // > Mitch | Switchboard:
-  // the feed ones are easy to predict though
-  // > Mitch | Switchboard:
-  // but you dont know which oracles the gateway will select for you so best you can do is pack all oracle accounts into 1lut
-
-  const lutOwners_ = [...responses.map((x) => x.oracle), pullFeed.pubkey];
-  lutOwners.push(...lutOwners_);
-
-  pullIxs.push(pullIx!);
+  return pullIx;
 }
 
 async function filterForVarianceThresholdOracles(
