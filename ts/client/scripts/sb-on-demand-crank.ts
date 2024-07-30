@@ -149,7 +149,7 @@ interface OracleInterface {
                   transactionInstruction: tx,
                 })),
               ],
-              sequenceType: SequenceType.Sequential,
+              sequenceType: SequenceType.Parallel,
             })),
             config: {
               maxTxesInBatch: 1,
