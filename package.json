@@ -75,7 +75,7 @@
     "@solana/spl-token": "0.3.7",
     "@solana/web3.js": "^1.78.2",
     "@switchboard-xyz/common": "^2.4.2",
-    "@switchboard-xyz/on-demand": "^1.1.34",
+    "@switchboard-xyz/on-demand": "^1.2.15",
     "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "@switchboard-xyz/solana.js": "^2.5.4",
     "big.js": "^6.1.1",
@@ -86,7 +86,7 @@
     "fast-copy": "^3.0.1",
     "lodash": "^4.17.21",
     "node-kraken-api": "^2.2.2",
-    "switchboard-anchor": "npm:@coral-xyz/anchor@0.30.0"
+    "switchboard-anchor": "npm:@coral-xyz/anchor@0.30.1"
   },
   "resolutions": {
     "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",

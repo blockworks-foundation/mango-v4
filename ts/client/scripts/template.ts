@@ -1,6 +1,4 @@
 import { PublicKey } from '@solana/web3.js';
-import { SB_ON_DEMAND_PID } from '@switchboard-xyz/on-demand';
-import { isSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
 
 async function main(): Promise<void> {
@@ -20,9 +18,15 @@ async function main(): Promise<void> {
           (item) =>
             item[1] instanceof PublicKey && !item[1].equals(PublicKey.default),
         ),
+    )
+    .concat(
+      Array.from(group.perpMarketsMapByName.values())
+        .flat()
+        .map((pm) => [pm.name, pm.oracle]),
     );
 
   const oraclePublicKeys = allOracles.map((item) => item[1] as PublicKey);
+
   const ais =
     await client.program.provider.connection.getMultipleAccountsInfo(
       oraclePublicKeys,
@@ -30,13 +34,10 @@ async function main(): Promise<void> {
 
   const result = ais
     .map((ai, idx) => {
-      return [
-        isSwitchboardOracle(ai!) && !ai?.owner.equals(SB_ON_DEMAND_PID),
-        allOracles[idx],
-      ];
+      return [ai!.data.readUInt32LE(0) === 2712847316, allOracles[idx]];
     })
     .filter((item) => item[0])
-    .map((item) => item[1]);
+    .map((item) => item[1].toString());
 
   console.log(result);
 }

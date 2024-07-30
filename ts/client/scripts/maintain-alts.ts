@@ -11,11 +11,19 @@ import {
   Connection,
   Keypair,
   PublicKey,
-  SYSVAR_INSTRUCTIONS_PUBKEY,
   SystemProgram,
+  SYSVAR_INSTRUCTIONS_PUBKEY,
 } from '@solana/web3.js';
+import {
+  fetchAllLutKeys,
+  ON_DEMAND_MAINNET_QUEUE,
+  PullFeed,
+  Queue,
+  SB_ON_DEMAND_PID,
+} from '@switchboard-xyz/on-demand';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
+import { Program as Anchor30Program } from 'switchboard-anchor';
 import { Group } from '../src/accounts/group';
 import { MangoClient } from '../src/client';
 import {
@@ -27,6 +35,29 @@ import { buildVersionedTx } from '../src/utils';
 
 const { MB_CLUSTER_URL, MB_PAYER3_KEYPAIR, DRY_RUN } = process.env;
 const CLUSTER: Cluster = (process.env.CLUSTER as Cluster) || 'mainnet-beta';
+
+async function buildSbOnDemandAccountsForAlts(
+  connection: Connection,
+): Promise<PublicKey[]> {
+  const userProvider = new AnchorProvider(
+    connection,
+    new Wallet(Keypair.generate()),
+    AnchorProvider.defaultOptions(),
+  );
+  const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, userProvider);
+  const sbOnDemandProgram = new Anchor30Program(idl!, userProvider);
+
+  return await fetchAllLutKeys(
+    new Queue(sbOnDemandProgram, new PublicKey(ON_DEMAND_MAINNET_QUEUE)),
+    // TODO replace with oracles which are derived from the group
+    [
+      '2A7aqNLy26ZBSMWP2Ekxv926hj16tCA47W1sHWVqaLii', // digitSOL
+      'AZcoqpWhMJUaKEDUfKsfzCr3Y96gSQwv43KSQ6KpeyQ1', // INF
+    ].map((oracle) => {
+      return new PullFeed(sbOnDemandProgram, new PublicKey(oracle));
+    }),
+  );
+}
 
 // eslint-disable-next-line no-inner-declarations
 async function extendTable(
@@ -72,7 +103,7 @@ async function extendTable(
       } else {
         if (altIndex == altAddresses.length - 1) {
           console.log(
-            `...need to create a new alt, all existing ones are full`,
+            `...need to create a new alt, all existing ones are full, ${nick}`,
           );
           process.exit(-1);
         }
@@ -105,8 +136,10 @@ async function extendTable(
     if (DRY_RUN) {
       continue;
     }
-    const sig =
-      await client.program.provider.connection.sendTransaction(extendTx);
+    const sig = await client.program.provider.connection.sendTransaction(
+      extendTx,
+      { skipPreflight: true },
+    );
     console.log(`https://explorer.solana.com/tx/${sig}`);
   }
 }
@@ -124,7 +157,7 @@ async function createANewAlt() {
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
     {
-      idsSource: 'get-program-accounts',
+      idsSource: 'api',
     },
   );
 
@@ -137,7 +170,9 @@ async function createANewAlt() {
     client.program.provider as AnchorProvider,
     [createIx[0]],
   );
-  const sig = await connection.sendTransaction(createTx);
+  const sig = await connection.sendTransaction(createTx, {
+    skipPreflight: true,
+  });
   console.log(
     `...created ALT ${createIx[1]} https://explorer.solana.com/tx/${sig}`,
   );
@@ -157,7 +192,7 @@ async function populateExistingAlts(): Promise<void> {
       CLUSTER,
       MANGO_V4_ID[CLUSTER],
       {
-        idsSource: 'get-program-accounts',
+        idsSource: 'api',
       },
     );
     const group = await client.getGroup(MANGO_V4_MAIN_GROUP);
@@ -169,13 +204,16 @@ async function populateExistingAlts(): Promise<void> {
     const altAddress0 = new PublicKey(
       'AgCBUZ6UMWqPLftTxeAqpQxtrfiCyL2HgRfmmM6QTfCj',
     );
+    const altAddress11 = new PublicKey(
+      '5iCJfe8RqQ3DFeP8uHXYe8Q6hFPYVh8PfBX7rU9ydC99',
+    );
     // group and insurance vault
     await extendTable(
       client,
       group,
       payer,
       'group',
-      [altAddress0],
+      [altAddress0, altAddress11],
       [group.publicKey, group.insuranceVault],
     );
     // Banks + vaults + oracles
@@ -185,7 +223,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'token banks',
-      [altAddress0],
+      [altAddress0, altAddress11],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.publicKey),
@@ -195,7 +233,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'token bank oracles',
-      [altAddress0],
+      [altAddress0, altAddress11],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.oracle),
@@ -205,7 +243,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'token bank vaults',
-      [altAddress0],
+      [altAddress0, altAddress11],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => bank.vault),
@@ -216,7 +254,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'perp markets and perp oracles',
-      [altAddress0],
+      [altAddress0, altAddress11],
       Array.from(group.perpMarketsMapByMarketIndex.values())
         .flat()
         .map((perpMarket) => [perpMarket.publicKey, perpMarket.oracle])
@@ -228,7 +266,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'well known addresses',
-      [altAddress0],
+      [altAddress0, altAddress11],
       [
         // Solana specific
         SystemProgram.programId,
@@ -255,13 +293,16 @@ async function populateExistingAlts(): Promise<void> {
     const altAddress3 = new PublicKey(
       '2JAg3Rm6TmQ3gSYgUCCyZ9bCQKThD9jxHCN6U2ByTPMb',
     );
+    const altAddress4 = new PublicKey(
+      'BaoRgLAykJovr2Y7BgtPg7rDmkvyp6sG59uJx5wzXTZE',
+    );
     // bank mints
     await extendTable(
       client,
       group,
       payer,
       'token mints',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.banksMapByMint.values())
         .flat()
         .map((bank) => [bank.mint])
@@ -273,7 +314,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'mint infos',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.mintInfosMapByMint.values())
         .flat()
         .map((mintInto) => [mintInto.publicKey])
@@ -286,7 +327,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'serum3 markets',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.serum3MarketsMapByMarketIndex.values())
         .flat()
         .map((serum3Market) => serum3Market.publicKey),
@@ -296,7 +337,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'serum3 external markets',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.publicKey),
@@ -306,7 +347,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'serum3 external markets bids',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.bidsAddress),
@@ -316,7 +357,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'serum3 external markets asks',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.serum3ExternalMarketsMap.values())
         .flat()
         .map((serum3ExternalMarket) => serum3ExternalMarket.asksAddress),
@@ -326,7 +367,7 @@ async function populateExistingAlts(): Promise<void> {
       group,
       payer,
       'perp market event queues, bids, and asks',
-      [altAddress1, altAddress2, altAddress3],
+      [altAddress1, altAddress2, altAddress3, altAddress4],
       Array.from(group.perpMarketsMapByMarketIndex.values())
         .flat()
         .map((perpMarket) => [
@@ -335,6 +376,18 @@ async function populateExistingAlts(): Promise<void> {
           perpMarket.asks,
         ])
         .flat(),
+    );
+
+    const altAddress21 = new PublicKey(
+      'BeJQmG5CC4XFc24StGjrE5tD7xbU1mYaofvXu2NiPxaT',
+    );
+    await extendTable(
+      client,
+      group,
+      payer,
+      'sb on demand oracles',
+      [altAddress21],
+      await buildSbOnDemandAccountsForAlts(connection),
     );
   } catch (error) {
     console.log(error);

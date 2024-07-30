@@ -1,7 +1,12 @@
 import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import {
+  AccountInfo,
+  PublicKey,
+  TransactionInstruction,
+} from '@solana/web3.js';
+import { PullFeed } from '@switchboard-xyz/on-demand';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -24,6 +29,7 @@ import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
+import { sbOnDemandProgram } from './oracle';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
@@ -1204,6 +1210,40 @@ export class MangoAccount {
 
   public getMaxFeesBuybackUi(group: Group): number {
     return toUiDecimalsForQuote(this.getMaxFeesBuyback(group));
+  }
+
+  public async buildIxsForStaleOrUnconfidentOracles(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionInstruction[]> {
+    return await this.buildIxsForStaleOrUnconfidentOraclesInternal(
+      group,
+      await client.buildHealthRemainingAccounts(group, [this]),
+    );
+  }
+
+  public async buildIxsForStaleOrUnconfidentOraclesInternal(
+    group: Group,
+    relevantOraclesToAUserAction: PublicKey[],
+  ): Promise<TransactionInstruction[]> {
+    const promises: Promise<any>[] = [];
+    for (const oracle of relevantOraclesToAUserAction) {
+      const bank = group.getFirstBankByOracle(oracle);
+      if (!bank.isOracleStaleOrUnconfident(group.groupLastUpdatedSlot)) {
+        continue;
+      }
+      const pullFeed = new PullFeed(
+        sbOnDemandProgram as any,
+        new PublicKey(oracle),
+      );
+      promises.push(
+        pullFeed.fetchUpdateIx({
+          numSignatures: 2 /* TODO: This needs to be computed dynamically */,
+        }),
+      );
+    }
+
+    return (await Promise.all(promises)).map((item) => item[0]);
   }
 
   toString(group?: Group, onlyTokens = false): string {

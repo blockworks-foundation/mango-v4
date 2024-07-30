@@ -43,7 +43,7 @@ export const SOL_MINT_MAINNET = new PublicKey(
 
 let sbv2DevnetProgram;
 let sbv2MainnetProgram;
-let sbOnDemandProgram;
+export let sbOnDemandProgram;
 let pythSolanaReceiverProgram;
 
 export enum OracleProvider {
