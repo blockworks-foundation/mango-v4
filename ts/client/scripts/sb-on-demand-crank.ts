@@ -27,24 +27,35 @@ import { MangoClient } from '../src/client';
 import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
 import { ZERO_I80F48 } from '../src/numbers/I80F48';
 import { createComputeBudgetIx } from '../src/utils/rpc';
+import { manageFeeWebSocket } from './manageFeeWs';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
-const CLUSTER_URL_2 =
-  process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL_2;
-const LITE_RPC_URL = process.env.MB_CLUSTER_URL;
+const CLUSTER_URL_2 = process.env.MB_CLUSTER_URL_2;
+const LITE_RPC_URL = process.env.LITE_RPC_URL;
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
-const SLEEP_MS = Number(process.env.SLEEP_MS) || 50_000; //
-const COMPUTE_UNIT_PRICE = Number(process.env.COMPUTE_UNIT_PRICE) || 150_000; //
+const SLEEP_MS = Number(process.env.SLEEP_MS) || 50_000;
 
-console.log(`Starting with ${SLEEP_MS}`);
-console.log(`${CLUSTER_URL}`);
+console.log(
+  `Starting with sleep ${SLEEP_MS}ms, cluster ${CLUSTER_URL}, cluster2 ${CLUSTER_URL_2}, liteRpcUrl ${LITE_RPC_URL}`,
+);
 
-// TODO use mangolana to send txs
+let lamportsPerCu: number | null = null;
+try {
+  const wsUrl = new URL(
+    process.env.LITE_RPC_URL!.replace('https', 'wss'),
+  ).toString();
+
+  manageFeeWebSocket(wsUrl, 10, (mean) => {
+    lamportsPerCu = mean;
+  });
+} catch (error) {
+  console.error('Error in main execution:', error);
+}
 
 interface OracleInterface {
   oracle: {
@@ -137,20 +148,25 @@ interface OracleInterface {
 
         const ixsChunks = chunk(shuffle(pullIxs), 2, false);
         try {
-          // use dont await, fire and forget
+          // dont await, fire and forget
           sendSignAndConfirmTransactions({
             connection,
             wallet: new Wallet(user),
             backupConnections: [
-              new Connection(LITE_RPC_URL!, 'recent'),
-              new Connection(CLUSTER_URL_2!, 'recent'),
+              ...(CLUSTER_URL_2
+                ? [new Connection(LITE_RPC_URL!, 'recent')]
+                : []),
+              ...(CLUSTER_URL_2
+                ? [new Connection(CLUSTER_URL_2!, 'recent')]
+                : []),
             ],
             transactionInstructions: ixsChunks.map((txChunk) => ({
               instructionsSet: [
                 {
                   signers: [],
-                  transactionInstruction:
-                    createComputeBudgetIx(COMPUTE_UNIT_PRICE),
+                  transactionInstruction: createComputeBudgetIx(
+                    Math.max(lamportsPerCu ?? 150_000, 150_000),
+                  ),
                 },
                 ...txChunk.map((tx) => ({
                   signers: [],
@@ -168,14 +184,14 @@ interface OracleInterface {
             callbacks: {
               afterEveryTxSend: function (data) {
                 console.log(
-                  ` - https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s`,
+                  ` - https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu ${lamportsPerCu}`,
                 );
               },
             },
           });
         } catch (error) {
           console.log(
-            `Error in sending tx, ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s`,
+            `Error in sending tx, ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu ${lamportsPerCu}`,
           );
         }
 

@@ -226,7 +226,7 @@ async function updateTokenParams(): Promise<void> {
       );
       if (maybeSbOracle.length > 0) {
         console.log(` - ${bank.name} ${maybeSbOracle[0][0]}`);
-        builder.fallbackOracle(new PublicKey(maybeSbOracle[0][1]));
+        builder.fallbackOracle(PublicKey.default);
         change = true;
       } else {
         return;
@@ -572,7 +572,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Set sb on demand oracles as fallback oracles in mango-v4',
+        : 'Reset sb on demand oracles as fallback oracles in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
