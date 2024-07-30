@@ -37,6 +37,7 @@ import {
   MANGO_GOVERNANCE_PROGRAM,
   MANGO_MINT,
   MANGO_REALM_PK,
+  SB_ON_DEMAND_LST_FALLBACK_ORACLES,
 } from './governanceInstructions/constants';
 import { createProposal } from './governanceInstructions/createProposal';
 import {
@@ -218,6 +219,19 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
+      const maybeSbOracle = SB_ON_DEMAND_LST_FALLBACK_ORACLES.filter(
+        (x) =>
+          x[0].replace('/USD', '').toLocaleUpperCase() ==
+          bank.name.toLocaleUpperCase(),
+      );
+      if (maybeSbOracle.length > 0) {
+        console.log(` - ${bank.name} ${maybeSbOracle[0][0]}`);
+        builder.fallbackOracle(new PublicKey(maybeSbOracle[0][1]));
+        change = true;
+      } else {
+        return;
+      }
+
       // const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
       //   (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
       // );
@@ -265,26 +279,26 @@ async function updateTokenParams(): Promise<void> {
       // }
 
       // eslint-disable-next-line no-constant-condition
-      if (true) {
-        if (
-          bank.uiBorrows() == 0 &&
-          bank.reduceOnly == 2 &&
-          bank.initAssetWeight.toNumber() == 0 &&
-          bank.maintAssetWeight.toNumber() == 0
-        ) {
-          builder.disableAssetLiquidation(true);
-          builder.oracleConfig({
-            confFilter: 1000,
-            maxStalenessSlots: -1,
-          });
-          change = true;
-          console.log(
-            ` - ${bank.name}, ${(
-              bank.uiDeposits() * bank.uiPrice
-            ).toLocaleString()} disabled asset liquidation`,
-          );
-        }
-      }
+      // if (true) {
+      //   if (
+      //     bank.uiBorrows() == 0 &&
+      //     bank.reduceOnly == 2 &&
+      //     bank.initAssetWeight.toNumber() == 0 &&
+      //     bank.maintAssetWeight.toNumber() == 0
+      //   ) {
+      //     builder.disableAssetLiquidation(true);
+      //     builder.oracleConfig({
+      //       confFilter: 1000,
+      //       maxStalenessSlots: -1,
+      //     });
+      //     change = true;
+      //     console.log(
+      //       ` - ${bank.name}, ${(
+      //         bank.uiDeposits() * bank.uiPrice
+      //       ).toLocaleString()} disabled asset liquidation`,
+      //     );
+      //   }
+      // }
 
       // // eslint-disable-next-line no-constant-condition
       // if (true) {
@@ -558,7 +572,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Switch remaining switchboard oracles mango-v4',
+        : 'Set sb on demand oracles as fallback oracles in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
