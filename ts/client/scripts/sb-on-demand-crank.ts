@@ -165,7 +165,10 @@ interface OracleInterface {
                 {
                   signers: [],
                   transactionInstruction: createComputeBudgetIx(
-                    Math.max(lamportsPerCu ?? 150_000, 150_000),
+                    Math.min(
+                      Math.max(lamportsPerCu ?? 150_000, 150_000),
+                      400_000,
+                    ),
                   ),
                 },
                 ...txChunk.map((tx) => ({
