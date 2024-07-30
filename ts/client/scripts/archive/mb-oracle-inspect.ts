@@ -12,7 +12,7 @@ import {
 } from '../../src/accounts/oracle';
 import {
   PYTH_SPONSORED_ORACLES,
-  SB_ON_DEMAND_TESTING_ORACLES,
+  SB_ON_DEMAND_LST_FALLBACK_ORACLES,
 } from '../governanceInstructions/constants';
 const { MB_CLUSTER_URL } = process.env;
 
@@ -39,13 +39,13 @@ async function decodePrice(
     lastUpdatedSlot = priceData.lastUpdatedSlot;
     type = 'sb';
   }
-  // console.log(
-  //   `${name.toString().padStart(10)}, ${type.padStart(4)}, ${uiPrice
-  //     .toString()
-  //     .padStart(10)}, ${(slot - lastUpdatedSlot) / 2}s  ${uiDeviation
-  //     .toString()
-  //     .padStart(10)}`,
-  // );
+  console.log(
+    `${name.toString().padStart(10)}, ${type.padStart(4)}, ${uiPrice
+      .toString()
+      .padStart(10)}, ${(slot - lastUpdatedSlot) / 2}s  ${uiDeviation
+      .toString()
+      .padStart(10)}`,
+  );
 
   const localUnixTime = Math.floor(Date.now() / 1000);
 
@@ -66,10 +66,10 @@ async function main(): Promise<void> {
     const conn = new Connection(MB_CLUSTER_URL!);
 
     // eslint-disable-next-line no-constant-condition
-    if (false) {
+    if (true) {
       // https://ondemand.switchboard.xyz/solana/mainnet/user/DrnFiKkbyC5ga7LJDfDF8FzVcj6aoSUhsgirLjDMrBHH
 
-      for (const item of SB_ON_DEMAND_TESTING_ORACLES) {
+      for (const item of SB_ON_DEMAND_LST_FALLBACK_ORACLES) {
         const oraclePk = new PublicKey(item[1]);
         const slot = await conn.getSlot();
         const ai = await conn.getAccountInfo(oraclePk);

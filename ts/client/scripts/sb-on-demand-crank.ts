@@ -200,7 +200,7 @@ async function preparePullIx(
   );
 
   const conf = {
-    numSignatures: 2,
+    numSignatures: oracle.decodedPullFeed.minResponses,
     feed: oracle.oracle.oraclePk,
   };
   // TODO use fetchUpdateMany
