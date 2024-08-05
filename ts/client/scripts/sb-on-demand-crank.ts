@@ -187,7 +187,7 @@ interface OracleInterface {
                 );
               },
               onError: function (e, notProcessedTransactions, originalProps) {
-
+                console.error("[tx send] num transactions:", notProcessedTransactions.length, e);
               },
             },
           });
