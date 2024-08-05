@@ -504,7 +504,10 @@ fn scan_right_until_less_than(
         if value <= target {
             return Ok(current);
         }
-        current = current.max(I80F48::ONE) * I80F48::from(2);
+        let Some(new_current) = current.max(I80F48::ONE).checked_mul(I80F48::from(2)) else {
+           break;
+        };
+        current = new_current;
     }
     Err(error_msg!(
         "could not find amount that lead to health ratio <= 0"
