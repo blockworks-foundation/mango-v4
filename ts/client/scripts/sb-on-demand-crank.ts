@@ -78,7 +78,7 @@ interface OracleInterface {
       const filteredOracles = await prepareCandidateOracles(group, client);
 
       for (let i = 0; i < 10; i++) {
-        const start = Date.now();
+        const startedAt = Date.now();
         const slot = await client.connection.getSlot('finalized');
 
         await updateFilteredOraclesAis(
@@ -87,11 +87,15 @@ interface OracleInterface {
           filteredOracles,
         );
 
+        const aisUpdatedAt = Date.now();
+
         const staleOracles = await filterForStaleOracles(
           filteredOracles,
           client,
           slot,
         );
+
+        const staleFilteredAt = Date.now();
 
         const crossBarSims = await Promise.all(
           filteredOracles.map(
@@ -101,12 +105,18 @@ interface OracleInterface {
               ]),
           ),
         );
+
+        const simulatedAt = Date.now();
+
         const varianceThresholdCrossedOracles =
           await filterForVarianceThresholdOracles(
             filteredOracles,
             client,
             crossBarSims,
           );
+
+        const varianceFilteredAt = Date.now();
+
         const oraclesToCrank: OracleInterface[] = uniqWith(
           [...staleOracles, ...varianceThresholdCrossedOracles],
           function (a, b) {
@@ -141,6 +151,9 @@ interface OracleInterface {
             }),
           )
         ).filter((pullIx) => pullIx !== null);
+
+        const ixPreparedAt = Date.now();
+
 
         const ixsChunks = chunk(shuffle(pullIxs), 2, false);
         const lamportsPerCu_ = Math.min(
@@ -182,8 +195,17 @@ interface OracleInterface {
             },
             callbacks: {
               afterEveryTxSend: function (data) {
+                const sentAt = Date.now();
+                const total = (sentAt - startedAt) / 1000;
+                const aiUpdate = (aisUpdatedAt - startedAt) / 1000;
+                const staleFilter = (staleFilteredAt - aisUpdatedAt) / 1000;
+                const simulate = (simulatedAt - staleFilteredAt) / 1000;
+                const varianceFilter = (varianceFilteredAt - simulatedAt) / 1000;
+                const ixPrepare = (ixPreparedAt - varianceFilteredAt) / 1000;
+                const timing = { aiUpdate, staleFilter, simulate, varianceFilter, ixPrepare };
+
                 console.log(
-                  `[tx send] https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
+                  `[tx send] https://solscan.io/tx/${data['txid']}, in ${total}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}, timiming ${JSON.stringify(timing)}`,
                 );
               },
               onError: function (e, notProcessedTransactions, originalProps) {
@@ -193,7 +215,7 @@ interface OracleInterface {
           });
         } catch (error) {
           console.error(
-            `[tx send] ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
+            `[tx send] ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - startedAt) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
           );
         }
 
