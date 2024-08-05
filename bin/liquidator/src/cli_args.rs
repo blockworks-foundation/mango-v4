@@ -136,6 +136,9 @@ pub struct Cli {
     #[clap(long, env, default_value = "30")]
     pub(crate) rebalance_refresh_timeout_secs: u64,
 
+    #[clap(long, env, default_value = "30")]
+    pub(crate) rebalance_interval_secs: u64,
+
     #[clap(long, env, value_enum, default_value = "false")]
     pub(crate) rebalance_using_limit_order: BoolArg,
 

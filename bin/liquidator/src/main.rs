@@ -434,8 +434,12 @@ async fn main() -> anyhow::Result<()> {
     // Could be refactored to only start the below jobs when the first snapshot is done.
     // But need to take care to abort if the above job aborts beforehand.
     if cli.rebalance == BoolArg::True {
-        let rebalance_job =
-            spawn_rebalance_job(shared_state.clone(), rebalance_trigger_receiver, rebalancer);
+        let rebalance_job = spawn_rebalance_job(
+            shared_state.clone(),
+            rebalance_trigger_receiver,
+            rebalancer,
+            &cli,
+        );
         optional_jobs.push(rebalance_job);
     }
 
@@ -554,8 +558,10 @@ fn spawn_rebalance_job(
     shared_state: Arc<RwLock<SharedState>>,
     rebalance_trigger_receiver: async_channel::Receiver<()>,
     rebalancer: Arc<Rebalancer>,
+    cli: &Cli,
 ) -> JoinHandle<()> {
-    let mut rebalance_interval = tokio::time::interval(Duration::from_secs(30));
+    let mut rebalance_interval =
+        tokio::time::interval(Duration::from_secs(cli.rebalance_interval_secs));
 
     tokio::spawn({
         async move {
