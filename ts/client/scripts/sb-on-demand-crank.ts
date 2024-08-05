@@ -66,12 +66,12 @@ interface OracleInterface {
 }
 
 (async function main(): Promise<never> {
-  const { group, client, connection, user, userProvider } = await setupMango();
+  const { group, client, connection, user } = await setupMango();
 
-  const { sbOnDemandProgram, crossbarClient, queue } =
+  const { sbOnDemandProgram, crossbarClient } =
     await setupSwitchboard(client);
 
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
     try {
       // periodically check if we have new candidates on the group
@@ -154,7 +154,6 @@ interface OracleInterface {
 
         const ixPreparedAt = Date.now();
 
-
         const ixsChunks = chunk(shuffle(pullIxs), 2, false);
         const lamportsPerCu_ = Math.min(
           Math.max(lamportsPerCu ?? 150_000, 150_000),
@@ -200,16 +199,27 @@ interface OracleInterface {
                 const aiUpdate = (aisUpdatedAt - startedAt) / 1000;
                 const staleFilter = (staleFilteredAt - aisUpdatedAt) / 1000;
                 const simulate = (simulatedAt - staleFilteredAt) / 1000;
-                const varianceFilter = (varianceFilteredAt - simulatedAt) / 1000;
+                const varianceFilter =
+                  (varianceFilteredAt - simulatedAt) / 1000;
                 const ixPrepare = (ixPreparedAt - varianceFilteredAt) / 1000;
-                const timing = { aiUpdate, staleFilter, simulate, varianceFilter, ixPrepare };
+                const timing = {
+                  aiUpdate,
+                  staleFilter,
+                  simulate,
+                  varianceFilter,
+                  ixPrepare,
+                };
 
                 console.log(
                   `[tx send] https://solscan.io/tx/${data['txid']}, in ${total}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}, timiming ${JSON.stringify(timing)}`,
                 );
               },
-              onError: function (e, notProcessedTransactions, originalProps) {
-                console.error("[tx send] num transactions:", notProcessedTransactions.length, e);
+              onError: function (e, notProcessedTransactions, _originalProps) {
+                console.error(
+                  '[tx send] num transactions:',
+                  notProcessedTransactions.length,
+                  e,
+                );
               },
             },
           });
@@ -222,7 +232,7 @@ interface OracleInterface {
         await new Promise((r) => setTimeout(r, SLEEP_MS));
       }
     } catch (error) {
-      console.error("[main]", error);
+      console.error('[main]', error);
     }
   }
 })();
@@ -241,7 +251,7 @@ async function preparePullIx(
     feed: oracle.oracle.oraclePk,
   };
   // TODO use fetchUpdateMany
-  const [pullIx, responses, success] = await pullFeed.fetchUpdateIx(conf);
+  const [pullIx, _responses, _success] = await pullFeed.fetchUpdateIx(conf);
 
   return pullIx;
 }
@@ -267,7 +277,6 @@ async function filterForVarianceThresholdOracles(
       crossBarSim[0].results.length;
 
     const changePct = (Math.abs(res.price - simPrice) * 100) / res.price;
-    const changeBps = changePct * 100;
     if (changePct > item.decodedPullFeed.maxVariance / 1000000000) {
       console.log(
         `[filter variance] ${item.oracle.name}, candidate, ${
