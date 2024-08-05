@@ -136,6 +136,12 @@ pub struct Cli {
     #[clap(long, env, default_value = "30")]
     pub(crate) rebalance_refresh_timeout_secs: u64,
 
+    #[clap(long, env, default_value = "5")]
+    pub(crate) rebalance_perp_twap_interval_secs: u64,
+
+    #[clap(long, env, default_value = "100_000")]
+    pub(crate) rebalance_perp_twap_max_quote: u64,
+
     /// if taking tcs orders is enabled
     ///
     /// typically only disabled for tests where swaps are unavailable

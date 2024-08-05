@@ -256,8 +256,8 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_default(),
         use_sanctum: cli.sanctum_enabled == BoolArg::True,
         allow_withdraws: true,
-        perp_twap_interval: Duration::from_secs(5),
-        perp_twap_max_quote: 100_000_000_000, // $100k
+        perp_twap_interval: Duration::from_secs(cli.rebalance_perp_twap_interval_secs),
+        perp_twap_max_quote: (cli.rebalance_perp_twap_max_quote * 1_000_000.0).floor() as u64,
     };
     rebalance_config.validate(&mango_client.context);
 
