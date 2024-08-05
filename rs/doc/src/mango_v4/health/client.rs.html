@@ -1731,6 +1731,9 @@
 <a href="#1731" id="1731">1731</a>
 <a href="#1732" id="1732">1732</a>
 <a href="#1733" id="1733">1733</a>
+<a href="#1734" id="1734">1734</a>
+<a href="#1735" id="1735">1735</a>
+<a href="#1736" id="1736">1736</a>
 </pre></div><pre class="rust"><code><span class="attr">#![cfg(feature = <span class="string">&quot;client&quot;</span>)]
 
 </span><span class="kw">use </span>anchor_lang::prelude::<span class="kw-2">*</span>;
@@ -2237,7 +2240,10 @@
         <span class="kw">if </span>value &lt;= target {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(current);
         }
-        current = current.max(I80F48::ONE) * I80F48::from(<span class="number">2</span>);
+        <span class="kw">let </span><span class="prelude-val">Some</span>(new_current) = current.max(I80F48::ONE).checked_mul(I80F48::from(<span class="number">2</span>)) <span class="kw">else </span>{
+           <span class="kw">break</span>;
+        };
+        current = new_current;
     }
     <span class="prelude-val">Err</span>(<span class="macro">error_msg!</span>(
         <span class="string">&quot;could not find amount that lead to health ratio &lt;= 0&quot;
