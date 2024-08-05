@@ -140,7 +140,7 @@ pub struct Cli {
     pub(crate) rebalance_perp_twap_interval_secs: u64,
 
     #[clap(long, env, default_value = "100_000")]
-    pub(crate) rebalance_perp_twap_max_quote: u64,
+    pub(crate) rebalance_perp_twap_max_quote: f64,
 
     /// if taking tcs orders is enabled
     ///
