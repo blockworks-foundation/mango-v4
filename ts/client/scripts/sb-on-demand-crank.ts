@@ -40,7 +40,7 @@ const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
 const SLEEP_MS = Number(process.env.SLEEP_MS) || 50_000;
 
 console.log(
-  `Starting with sleep ${SLEEP_MS}ms, cluster ${CLUSTER_URL}, cluster2 ${CLUSTER_URL_2}, liteRpcUrl ${LITE_RPC_URL}`,
+  `[start] config: sleep ${SLEEP_MS}ms, cluster ${CLUSTER_URL}, cluster2 ${CLUSTER_URL_2}, liteRpcUrl ${LITE_RPC_URL}`,
 );
 
 let lamportsPerCu: number | null = null;
@@ -53,7 +53,7 @@ try {
     lamportsPerCu = mean;
   });
 } catch (error) {
-  console.error('Error in main execution:', error);
+  console.error('[start]', error);
 }
 
 interface OracleInterface {
@@ -115,7 +115,7 @@ interface OracleInterface {
         );
 
         console.log(
-          `- round candidates | Stale: ${staleOracles
+          `[main] round candidates | Stale: ${staleOracles
             .map((o) => o.oracle.name)
             .join(', ')} | Variance: ${varianceThresholdCrossedOracles
             .map((o) => o.oracle.name)
@@ -183,21 +183,24 @@ interface OracleInterface {
             callbacks: {
               afterEveryTxSend: function (data) {
                 console.log(
-                  ` - https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
+                  `[tx send] https://solscan.io/tx/${data['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
                 );
+              },
+              onError: function (e, notProcessedTransactions, originalProps) {
+
               },
             },
           });
         } catch (error) {
-          console.log(
-            `Error in sending tx, ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
+          console.error(
+            `[tx send] ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - start) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
           );
         }
 
         await new Promise((r) => setTimeout(r, SLEEP_MS));
       }
     } catch (error) {
-      console.log(error);
+      console.error("[main]", error);
     }
   }
 })();
@@ -245,14 +248,14 @@ async function filterForVarianceThresholdOracles(
     const changeBps = changePct * 100;
     if (changePct > item.decodedPullFeed.maxVariance / 1000000000) {
       console.log(
-        `- ${item.oracle.name}, candidate, ${
+        `[filter variance] ${item.oracle.name}, candidate, ${
           item.decodedPullFeed.maxVariance / 1000000000
         }, ${simPrice}, ${res.price}, ${changePct}`,
       );
       varianceThresholdCrossedOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, non-candidate, ${
+        `[filter variance] ${item.oracle.name}, non-candidate, ${
           item.decodedPullFeed.maxVariance / 1000000000
         }, ${simPrice}, ${res.price}, ${changePct}`,
       );
@@ -280,12 +283,12 @@ async function filterForStaleOracles(
       slot - res.lastUpdatedSlot > (item.decodedPullFeed.maxStaleness * 1) / 2
     ) {
       console.log(
-        `- ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
+        `[filter stale] ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
       );
       staleOracles.push(item);
     } else {
       console.log(
-        `- ${item.oracle.name}, non-candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
+        `[filter stale] ${item.oracle.name}, non-candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
       );
     }
   }
