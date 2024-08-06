@@ -79,7 +79,10 @@ interface OracleInterface {
 
       for (let i = 0; i < 10; i++) {
         const startedAt = Date.now();
-        const slot = await client.connection.getSlot('finalized');
+        const [block, slot] = await Promise.all([
+          client.connection.getLatestBlockhash('finalized'),
+          client.connection.getSlot('finalized')
+        ]);
 
         await updateFilteredOraclesAis(
           client.connection,
@@ -173,6 +176,9 @@ interface OracleInterface {
                 ? [new Connection(CLUSTER_URL_2!, 'recent')]
                 : []),
             ],
+            // fail rather quickly and retry submission from scratch
+            // timeout using finalized to stay below switchboard oracle staleness limit
+            timeoutStrategy: { block, startBlockCheckAfterSecs: 20 },
             transactionInstructions: ixsChunks.map((txChunk) => ({
               instructionsSet: [
                 {
@@ -187,9 +193,8 @@ interface OracleInterface {
               sequenceType: SequenceType.Parallel,
             })),
             config: {
-              maxTxesInBatch: 1,
-              maxRetries: 5,
-              autoRetry: true,
+              maxTxesInBatch: 10,
+              autoRetry: false,
               logFlowInfo: false,
             },
             callbacks: {
