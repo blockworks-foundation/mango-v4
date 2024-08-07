@@ -40,7 +40,7 @@ const LITE_RPC_URL = process.env.LITE_RPC_URL;
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 const GROUP = process.env.GROUP_OVERRIDE || MANGO_V4_MAIN_GROUP.toBase58();
-const SLEEP_MS = Number(process.env.SLEEP_MS) || 50_000;
+const SLEEP_MS = Number(process.env.SLEEP_MS) || 20_000;
 
 console.log(
   `[start] config: sleep ${SLEEP_MS}ms, cluster ${CLUSTER_URL}, cluster2 ${CLUSTER_URL_2}, liteRpcUrl ${LITE_RPC_URL}`,
@@ -178,8 +178,8 @@ async function setupBackgroundRefresh(
         `[main] round candidates | Stale: ${staleOracles
           .map((o) => o.oracle.name)
           .join(', ')} | Variance: ${varianceThresholdCrossedOracles
-            .map((o) => o.oracle.name)
-            .join(', ')}`,
+          .map((o) => o.oracle.name)
+          .join(', ')}`,
       );
 
       // todo use chunk
@@ -217,74 +217,69 @@ async function setupBackgroundRefresh(
         Math.max(lamportsPerCu ?? 150_000, 150_000),
         500_000,
       );
-      try {
-        // dont await, fire and forget
-        // TODO use our own ALTs
-        sendSignAndConfirmTransactions({
-          connection,
-          wallet: new Wallet(user),
-          backupConnections: [
-            ...(CLUSTER_URL_2 ? [new Connection(LITE_RPC_URL!, 'recent')] : []),
-            ...(CLUSTER_URL_2
-              ? [new Connection(CLUSTER_URL_2!, 'recent')]
-              : []),
-          ],
-          // fail rather quickly and retry submission from scratch
-          // timeout using finalized to stay below switchboard oracle staleness limit
-          timeoutStrategy: { block, startBlockCheckAfterSecs: 20 },
-          transactionInstructions: ixsChunks.map((txChunk) => ({
-            instructionsSet: [
-              {
-                signers: [],
-                transactionInstruction: createComputeBudgetIx(lamportsPerCu_),
-              },
-              ...txChunk.map((tx) => ({
-                signers: [],
-                transactionInstruction: tx,
-              })),
-            ],
-            sequenceType: SequenceType.Parallel,
-          })),
-          config: {
-            maxTxesInBatch: 10,
-            autoRetry: false,
-            logFlowInfo: false,
-          },
-          callbacks: {
-            afterEveryTxSend: function (data) {
-              const sentAt = Date.now();
-              const total = (sentAt - startedAt) / 1000;
-              const aiUpdate = (aisUpdatedAt - startedAt) / 1000;
-              const staleFilter = (staleFilteredAt - aisUpdatedAt) / 1000;
-              const simulate = (simulatedAt - staleFilteredAt) / 1000;
-              const varianceFilter = (varianceFilteredAt - simulatedAt) / 1000;
-              const ixPrepare = (ixPreparedAt - varianceFilteredAt) / 1000;
-              const timing = {
-                aiUpdate,
-                staleFilter,
-                simulate,
-                varianceFilter,
-                ixPrepare,
-              };
 
-              console.log(
-                `[tx send] https://solscan.io/tx/${data['txid']}, in ${total}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}, timiming ${JSON.stringify(timing)}`,
-              );
+      // dont await, fire and forget
+      // TODO use our own ALTs
+      sendSignAndConfirmTransactions({
+        connection,
+        wallet: new Wallet(user),
+        backupConnections: [
+          ...(CLUSTER_URL_2 ? [new Connection(LITE_RPC_URL!, 'recent')] : []),
+          ...(CLUSTER_URL_2 ? [new Connection(CLUSTER_URL_2!, 'recent')] : []),
+        ],
+        // fail rather quickly and retry submission from scratch
+        // timeout using finalized to stay below switchboard oracle staleness limit
+        timeoutStrategy: { block, startBlockCheckAfterSecs: 20 },
+        transactionInstructions: ixsChunks.map((txChunk) => ({
+          instructionsSet: [
+            {
+              signers: [],
+              transactionInstruction: createComputeBudgetIx(lamportsPerCu_),
             },
-            onError: function (e, notProcessedTransactions, _originalProps) {
-              console.error(
-                '[tx send] num transactions:',
-                notProcessedTransactions.length,
-                e,
-              );
-            },
+            ...txChunk.map((tx) => ({
+              signers: [],
+              transactionInstruction: tx,
+            })),
+          ],
+          sequenceType: SequenceType.Parallel,
+        })),
+        config: {
+          maxTxesInBatch: 10,
+          autoRetry: false,
+          logFlowInfo: false,
+        },
+        callbacks: {
+          afterEveryTxSend: function (data) {
+            const sentAt = Date.now();
+            const total = (sentAt - startedAt) / 1000;
+            const aiUpdate = (aisUpdatedAt - startedAt) / 1000;
+            const staleFilter = (staleFilteredAt - aisUpdatedAt) / 1000;
+            const simulate = (simulatedAt - staleFilteredAt) / 1000;
+            const varianceFilter = (varianceFilteredAt - simulatedAt) / 1000;
+            const ixPrepare = (ixPreparedAt - varianceFilteredAt) / 1000;
+            const timing = {
+              aiUpdate,
+              staleFilter,
+              simulate,
+              varianceFilter,
+              ixPrepare,
+            };
+
+            console.log(
+              `[tx send] https://solscan.io/tx/${data['txid']}, in ${total}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}, timiming ${JSON.stringify(timing)}`,
+            );
           },
-        });
-      } catch (error) {
+          onError: function (e, notProcessedTransactions, _originalProps) {
+            console.error(
+              `[tx send] ${notProcessedTransactions.length} error(s) after ${(Date.now() - ixPreparedAt) / 1000}s ${JSON.stringify(e)}`,
+            );
+          },
+        },
+      }).catch((reason) =>
         console.error(
-          `[tx send] ${JSON.stringify(error.message)}, https://solscan.io/tx/${error['txid']}, in ${(Date.now() - startedAt) / 1000}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}`,
-        );
-      }
+          `[tx send] promise rejected after ${(Date.now() - ixPreparedAt) / 1000}s ${JSON.stringify(reason)}`,
+        ),
+      );
 
       await new Promise((r) => setTimeout(r, SLEEP_MS));
     } catch (error) {
@@ -375,8 +370,11 @@ async function filterForStaleOracles(
 
     const diff = slot - res.lastUpdatedSlot;
     if (
-      slot > res.lastUpdatedSlot &&
-      slot - res.lastUpdatedSlot > (item.decodedPullFeed.maxStaleness * 1) / 2
+      // maxStaleness will usually be 250 (=100s)
+      // one iteration takes 10s, retry is every 20s
+      // this allows for 2 retries until the oracle becomes stale
+      slot - res.lastUpdatedSlot >
+      item.decodedPullFeed.maxStaleness * 0.3
     ) {
       console.log(
         `[filter stale] ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
@@ -468,7 +466,9 @@ async function prepareCandidateOracles(
   );
 
   const gateways = await Promise.all(
-    parsedOracles.map((o) => new Queue(sbOnDemandProgram, o.parsedConfigs.queue).fetchAllGateways())
+    parsedOracles.map((o) =>
+      new Queue(sbOnDemandProgram, o.parsedConfigs.queue).fetchAllGateways(),
+    ),
   );
 
   // assemble all data together
