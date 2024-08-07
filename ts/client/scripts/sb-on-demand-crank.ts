@@ -56,7 +56,7 @@ try {
     lamportsPerCu = mean;
   });
 } catch (error) {
-  console.error('[start]', error);
+  console.error('[start]', JSON.stringify(error));
 }
 
 interface OracleInterface {
@@ -99,6 +99,7 @@ async function setupBackgroundRefresh(
   const GROUP_REFRESH_INTERVAL = 60_000;
   const refreshGroup = async function (): Promise<void> {
     try {
+      const startedAt = Date.now();
       await group.reloadAll(client);
       result.oracles = await prepareCandidateOracles(
         client,
@@ -106,8 +107,9 @@ async function setupBackgroundRefresh(
         sbOnDemandProgram,
         crossbarClient,
       );
+      console.log(`[group] refresh in ${(Date.now() - startedAt) / 1000}s`);
     } catch (e) {
-      console.error('[group]', e);
+      console.error('[group] error', JSON.stringify(e));
     }
     setTimeout(refreshGroup, GROUP_REFRESH_INTERVAL);
   };
@@ -202,12 +204,17 @@ async function setupBackgroundRefresh(
       const pullIxs = (
         await Promise.all(
           oraclesToCrank.map(async (oracle) => {
-            const pullIx = await preparePullIx(
-              sbOnDemandProgram,
-              oracle,
-              recentSlothashes,
-            );
-            return pullIx !== undefined ? pullIx : null;
+            try {
+              const pullIx = await preparePullIx(
+                sbOnDemandProgram,
+                oracle,
+                recentSlothashes,
+              );
+              return pullIx !== undefined ? pullIx : null;
+            } catch (e) {
+              console.error(`[prepare] ${oracle.oracle.name} error ignored`, JSON.stringify(e));
+              return null;
+            }
           }),
         )
       ).filter((pullIx) => pullIx !== null);
@@ -246,7 +253,7 @@ async function setupBackgroundRefresh(
           sequenceType: SequenceType.Parallel,
         })),
         config: {
-          maxTxesInBatch: 10,
+          maxTxesInBatch: 5,
           autoRetry: false,
           logFlowInfo: false,
         },
@@ -285,7 +292,7 @@ async function setupBackgroundRefresh(
 
       await new Promise((r) => setTimeout(r, SLEEP_MS));
     } catch (error) {
-      console.error('[main]', error);
+      console.error('[main] error', JSON.stringify(error));
     }
   }
 })();
@@ -310,10 +317,7 @@ async function preparePullIx(
     gateway: oracle.gatewayUrl,
   };
   // TODO use fetchUpdateMany
-  const [pullIx] = await pullFeed.fetchUpdateIx(
-    conf,
-    recentSlothashes,
-  );
+  const [pullIx] = await pullFeed.fetchUpdateIx(conf, recentSlothashes);
 
   return pullIx;
 }
@@ -495,6 +499,7 @@ function extendOraclesManually(cluster: Cluster): {
     ];
   }
   return [
+    ['JSOL/USD-new', 'AFWtJYKSiSZtbXeuxjX1e1XpEPXtk4wvrksXj34Y2DVs'],
     ['JSOL/USD', 'Dnn9fKeB3rA2bor6Fys7FBPqXneAK8brxNfsBfZ32939'],
     ['compassSOL/USD', 'GzBpasKMSTLkytXpyo6NesDGpe2mLjPSovECWsebQpu5'],
     ['dualSOL/USD', 'D6UqFgtVC1yADBxw2EZFmUCTNuoqFoUXD3NW4NqRn8v3'],
@@ -502,6 +507,18 @@ function extendOraclesManually(cluster: Cluster): {
     ['hubSOL/USD', '137fd2LnDEPVAALhPFjRyvh2MD9DxSHPFaod7a5tmMox'],
     ['digitSOL/USD', '7skmP8qLf8KKJ61cpPiw91GXYfoGvGWekzSDQ78T3z1f'],
     ['mangoSOL/USD', '7pD4Y1hCsU4M6rfoJvL8fAmmrB2LwrJYxvWz4S6Cc24T'],
+    ['USDC', '83bWsztvsKTQpo9ZrkAb2b1SPJ6HDyUMKhaJMgVptaRo'],
+    ['SOL', 'BSzfJs4d1tAkSDqkepnfzEVcx2WtDVnwwXa2giy9PLeP'],
+    ['MNDE/USD', 'EdYMhKNusybqwRjTee3TXf4AJLAXxN8By24i5MuFRWF8'],
+    ['BSOL/USD', '3hnFi7CGVAaEuS2aCdnB7y6dWRmHggDTPM9qCrhdKvZu'],
+    ['WIF/USD', 'HHNwxYniGWKaSgfMPu2QRoX8XrBHXUiUMMhYK62bLBB9'],
+    ['BONK/USD', '7GCiue6chgGuk6BvaurQNWD1Ervho8zEdcNWt5ZCYQhu'],
+    ['MSOL/USD', '9qn8DGdGscm3rZ6APvL9Yrk4DASBdhD6DGqXcBLSVtGi'],
+    ['JITOSOL/USD', '9UqtQcVmRi3PQL3oX9B7Qa7ARc76q4qyDPMqJ1fkfBFe'],
+    ['BLZE/USD', '4PEq5cSiRqqgoyGfggNyjK6iqNfbb5vkZWu4WRNqT2PA'],
+    ['ELON/USD', '73pJPicicyLxj32JtmZBJh1dgFC2bTZoK9qpbuZjCsj'],
+    ['RENDER/USD', 'B6xHth4K3fj3KK1TASXtHfbAReShYW3EihgwSKvhsugz'],
+    ['MNGO/USD', '8TGNkr8yZR5mBRiGNnoxiaYr6agwQxARSqFh6VuJxt23'],
   ].map((item) => {
     return {
       oraclePk: new PublicKey(item[1]),
