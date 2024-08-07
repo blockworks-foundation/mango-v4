@@ -136,7 +136,9 @@ async function setupBackgroundRefresh(
 
       const startedAt = Date.now();
       const [block, slot] = await Promise.all([
+        // use finalized blockhash for faster timeouts on transactions
         client.connection.getLatestBlockhash('finalized'),
+        // use processed slot for accurate staleness measurement
         client.connection.getSlot('processed'),
       ]);
 
@@ -269,7 +271,7 @@ async function setupBackgroundRefresh(
               `[tx send] https://solscan.io/tx/${data['txid']}, in ${total}s, lamportsPerCu_ ${lamportsPerCu_}, lamportsPerCu ${lamportsPerCu}, timiming ${JSON.stringify(timing)}`,
             );
           },
-          onError: function (e, notProcessedTransactions, _originalProps) {
+          onError: function (e, notProcessedTransactions) {
             console.error(
               `[tx send] ${notProcessedTransactions.length} error(s) after ${(Date.now() - ixPreparedAt) / 1000}s ${JSON.stringify(e)}`,
             );
@@ -308,7 +310,7 @@ async function preparePullIx(
     gateway: oracle.gatewayUrl,
   };
   // TODO use fetchUpdateMany
-  const [pullIx, _responses, _success] = await pullFeed.fetchUpdateIx(
+  const [pullIx] = await pullFeed.fetchUpdateIx(
     conf,
     recentSlothashes,
   );
@@ -373,7 +375,8 @@ async function filterForStaleOracles(
       // maxStaleness will usually be 250 (=100s)
       // one iteration takes 10s, retry is every 20s
       // this allows for 2 retries until the oracle becomes stale
-      diff > item.decodedPullFeed.maxStaleness * 0.3
+      diff >
+      item.decodedPullFeed.maxStaleness * 0.3
     ) {
       console.log(
         `[filter stale] ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
