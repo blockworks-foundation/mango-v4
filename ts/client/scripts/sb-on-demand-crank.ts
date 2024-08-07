@@ -137,7 +137,7 @@ async function setupBackgroundRefresh(
       const startedAt = Date.now();
       const [block, slot] = await Promise.all([
         client.connection.getLatestBlockhash('finalized'),
-        client.connection.getSlot('finalized'),
+        client.connection.getSlot('processed'),
       ]);
 
       await updateFilteredOraclesAis(
@@ -373,8 +373,7 @@ async function filterForStaleOracles(
       // maxStaleness will usually be 250 (=100s)
       // one iteration takes 10s, retry is every 20s
       // this allows for 2 retries until the oracle becomes stale
-      slot - res.lastUpdatedSlot >
-      item.decodedPullFeed.maxStaleness * 0.3
+      diff > item.decodedPullFeed.maxStaleness * 0.3
     ) {
       console.log(
         `[filter stale] ${item.oracle.name}, candidate, ${item.decodedPullFeed.maxStaleness}, ${slot}, ${res.lastUpdatedSlot}, ${diff}`,
