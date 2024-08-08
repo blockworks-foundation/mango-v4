@@ -47,5 +47,4 @@ export const DEFAULT_RECEIVER_PROGRAM_ID = new PublicKey(
 
 export const SBOD_ORACLE_LUTS = [
   '3DdohDpFiXjLNqCzFyU8CP3rtGwkn9VbkxFYGrNiqcyR',
-  '7uRdMQCXedJ1SiVtwJJazEjsW9vmYiPZGj2ft99XnVu4',
 ];
