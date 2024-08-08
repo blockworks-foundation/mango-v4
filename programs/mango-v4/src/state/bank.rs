@@ -164,8 +164,8 @@ pub struct Bank {
 
     pub force_withdraw: u8,
 
-    #[derivative(Debug = "ignore")]
-    pub padding: [u8; 4],
+    #[derivative(Debug(format_with = "util::format_zero_terminated_utf8_bytes"))]
+    pub tier: [u8; 4],
 
     // Do separate bookkeping for how many tokens were withdrawn
     // This ensures that collected_fees_native is strictly increasing for stats gathering purposes
@@ -364,7 +364,7 @@ impl Bank {
             force_close: existing_bank.force_close,
             disable_asset_liquidation: existing_bank.disable_asset_liquidation,
             force_withdraw: existing_bank.force_withdraw,
-            padding: [0; 4],
+            tier: existing_bank.tier,
             token_conditional_swap_taker_fee_rate: existing_bank
                 .token_conditional_swap_taker_fee_rate,
             token_conditional_swap_maker_fee_rate: existing_bank
@@ -436,6 +436,12 @@ impl Bank {
 
     pub fn name(&self) -> &str {
         std::str::from_utf8(&self.name)
+            .unwrap()
+            .trim_matches(char::from(0))
+    }
+
+    pub fn tier(&self) -> &str {
+        std::str::from_utf8(&self.tier)
             .unwrap()
             .trim_matches(char::from(0))
     }
