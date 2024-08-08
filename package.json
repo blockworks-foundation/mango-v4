@@ -93,7 +93,7 @@
     "**/@solana/web3.js/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
     "**/cross-fetch/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
     "**/@blockworks-foundation/mangolana/node-fetch": "npm:@blockworks-foundation/node-fetch@2.6.11",
-    "strip-ansi": "6.0.1"
+    "strip-ansi": "7.0.1"
   },
   "license": "MIT"
 }
