@@ -24,16 +24,16 @@
     bn.js "^5.2.1"
     eslint-config-prettier "^9.0.0"
 
-"@blockworks-foundation/mangolana@0.1.0":
-  version "0.1.0"
-  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.1.0.tgz#9dd02720291175cf79210f2a8ad7254e49532a0f"
-  integrity sha512-8rzSq3Ocj8qoiDxd6K84Of0ZcHl9jrmqIjBcfVEU6p8Lp1ABz2zSe+VVZNBnZtbFn35iZvkKHXK1aOJQfcIYgg==
+"@blockworks-foundation/mangolana@0.0.18":
+  version "0.0.18"
+  resolved "https://registry.yarnpkg.com/@blockworks-foundation/mangolana/-/mangolana-0.0.18.tgz#b393ef7b2b614e65a5d5b5ab1e94173f41497f10"
+  integrity sha512-R1phh3B3dgM7S1ePchbAgKEcJ0S6WVeHc6AD4AebOvCGgKjKbptdbTIUc5uWkYpkZTIuyxVx8t/oeC31ovvT5w==
   dependencies:
-    "@solana/web3.js" "^1.95.2"
+    "@solana/web3.js" "^1.91.6"
     bs58 "^5.0.0"
     isomorphic-ws "^5.0.0"
     node-fetch "3.3.2"
-    ws "^8.18.0"
+    ws "^8.16.0"
 
 "@colors/colors@1.5.0":
   version "1.5.0"
@@ -684,7 +684,7 @@
   dependencies:
     buffer "^6.0.3"
 
-"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.22.0", "@solana/web3.js@^1.32.0", "@solana/web3.js@^1.36.0", "@solana/web3.js@^1.54.0", "@solana/web3.js@^1.68.0", "@solana/web3.js@^1.78.2", "@solana/web3.js@^1.78.3", "@solana/web3.js@^1.93.0":
+"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.22.0", "@solana/web3.js@^1.32.0", "@solana/web3.js@^1.36.0", "@solana/web3.js@^1.54.0", "@solana/web3.js@^1.68.0", "@solana/web3.js@^1.78.2", "@solana/web3.js@^1.78.3", "@solana/web3.js@^1.91.6", "@solana/web3.js@^1.93.0":
   version "1.95.0"
   resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.95.0.tgz#9cf08383e7dcba212a73d78349cf9b25bc34764f"
   integrity sha512-iHwJ/HcWrF9qbnI1ctwI1UXHJ0vZXRpnt+lI5UcQIk8WvJNuQ5gV06icxzM6B7ojUES85Q1/FM4jZ49UQ8yZZQ==
@@ -705,7 +705,7 @@
     rpc-websockets "^9.0.2"
     superstruct "^2.0.2"
 
-"@solana/web3.js@^1.95.0", "@solana/web3.js@^1.95.2":
+"@solana/web3.js@^1.95.0":
   version "1.95.2"
   resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.95.2.tgz#6f8a0362fa75886a21550dbec49aad54481463a6"
   integrity sha512-SjlHp0G4qhuhkQQc+YXdGkI8EerCqwxvgytMgBpzMUQTafrkNant3e7pgilBGgjy/iM40ICvWBLgASTPMrQU7w==
@@ -3027,7 +3027,7 @@ ws@^7.2.0, ws@^7.5.10:
   resolved "https://registry.yarnpkg.com/ws/-/ws-7.5.10.tgz#58b5c20dc281633f6c19113f39b349bd8bd558d9"
   integrity sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ==
 
-ws@^8.18.0, ws@^8.5.0:
+ws@^8.16.0, ws@^8.5.0:
   version "8.18.0"
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.0.tgz#0d7505a6eafe2b0e712d232b42279f53bc289bbc"
   integrity sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==
