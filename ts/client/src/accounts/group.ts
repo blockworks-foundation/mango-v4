@@ -155,6 +155,7 @@ export class Group {
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
           this.reloadBankOraclePrices(client),
+          // TODO: load fallback oracles
           this.reloadVaults(client),
           this.reloadPerpMarkets(client, ids).then(() =>
             this.reloadPerpMarketOraclePrices(client),
@@ -521,7 +522,7 @@ export class Group {
         priceData.uiDeviation !== undefined
           ? this.toNativePrice(priceData.uiDeviation, baseDecimals)
           : undefined;
-      provider = OracleProvider.Pyth;
+      provider = priceData.provider;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
         oracle,
@@ -532,7 +533,7 @@ export class Group {
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
       deviation = this.toNativePrice(priceData.uiDeviation, baseDecimals);
-      provider = OracleProvider.Switchboard;
+      provider = priceData.provider;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,

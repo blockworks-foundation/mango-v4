@@ -47,8 +47,10 @@ export let sbOnDemandProgram;
 let pythSolanaReceiverProgram;
 
 export enum OracleProvider {
-  Pyth,
-  Switchboard,
+  Pyth, // V1
+  PythV2, // V2
+  Switchboard, // V1+V2
+  SwitchboardOnDemand, // On Demand
   Stub,
 }
 
@@ -97,6 +99,7 @@ export function parseSwitchboardOracleV1(accountInfo: AccountInfo<Buffer>): {
   price: number;
   lastUpdatedSlot: number;
   uiDeviation: number;
+  provider: OracleProvider;
 } {
   const price = accountInfo.data.readDoubleLE(1 + 32 + 4 + 4);
   const lastUpdatedSlot = parseInt(
@@ -106,7 +109,12 @@ export function parseSwitchboardOracleV1(accountInfo: AccountInfo<Buffer>): {
   const maxResponse = accountInfo.data.readDoubleLE(
     1 + 32 + 4 + 4 + 8 + 8 + 8 + 8,
   );
-  return { price, lastUpdatedSlot, uiDeviation: maxResponse - minResponse };
+  return {
+    price,
+    lastUpdatedSlot,
+    uiDeviation: maxResponse - minResponse,
+    provider: OracleProvider.Switchboard,
+  };
 }
 
 export function switchboardDecimalToBig(sbDecimal: {
@@ -126,7 +134,12 @@ export function parseSwitchboardOracleV2(
   program: SwitchboardProgram,
   accountInfo: AccountInfo<Buffer>,
   oracle: PublicKey,
-): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
+): {
+  price: number;
+  lastUpdatedSlot: number;
+  uiDeviation: number;
+  provider: OracleProvider;
+} {
   try {
     //
     const price = program.decodeLatestAggregatorValue(accountInfo)!.toNumber();
@@ -137,12 +150,22 @@ export function parseSwitchboardOracleV2(
       program.decodeAggregator(accountInfo).latestConfirmedRound.stdDeviation,
     );
 
-    return { price, lastUpdatedSlot, uiDeviation: stdDeviation.toNumber() };
+    return {
+      price,
+      lastUpdatedSlot,
+      uiDeviation: stdDeviation.toNumber(),
+      provider: OracleProvider.Switchboard,
+    };
     // if oracle is badly configured or didn't publish price at least once
     // decodeLatestAggregatorValue can throw (0 switchboard rounds).
   } catch (e) {
     console.log(`Unable to parse Switchboard Oracle V2: ${oracle}`, e);
-    return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+    return {
+      price: 0,
+      lastUpdatedSlot: 0,
+      uiDeviation: 0,
+      provider: OracleProvider.Switchboard,
+    };
   }
 }
 
@@ -158,7 +181,12 @@ export function parseSwitchboardOnDemandOracle(
   program: any,
   accountInfo: AccountInfo<Buffer>,
   oracle: PublicKey,
-): { price: number; lastUpdatedSlot: number; uiDeviation: number } {
+): {
+  price: number;
+  lastUpdatedSlot: number;
+  uiDeviation: number;
+  provider: OracleProvider;
+} {
   try {
     const decodedPullFeed = program.coder.accounts.decode(
       'pullFeedAccountData',
@@ -182,7 +210,12 @@ export function parseSwitchboardOnDemandOracle(
 
     let values = submissions.slice(0, decodedPullFeed.minSampleSize);
     if (values.length === 0) {
-      return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+      return {
+        price: 0,
+        lastUpdatedSlot: 0,
+        uiDeviation: 0,
+        provider: OracleProvider.SwitchboardOnDemand,
+      };
     }
     values = values.sort((x, y) => (x.value.lt(y.value) ? -1 : 1));
     const feedValue = values[Math.floor(values.length / 2)];
@@ -193,7 +226,12 @@ export function parseSwitchboardOnDemandOracle(
         new Big(val.value.toString()).div(1e18).toNumber(),
       ),
     );
-    return { price, lastUpdatedSlot, uiDeviation: stdDeviation };
+    return {
+      price,
+      lastUpdatedSlot,
+      uiDeviation: stdDeviation,
+      provider: OracleProvider.SwitchboardOnDemand,
+    };
 
     // old block, we prefer above block since we want raw data, .result is often empty
     // const price = new Big(decodedPullFeed.result.value.toString()).div(1e18);
@@ -205,7 +243,12 @@ export function parseSwitchboardOnDemandOracle(
       `Unable to parse Switchboard On-Demand Oracle V2: ${oracle}`,
       e,
     );
-    return { price: 0, lastUpdatedSlot: 0, uiDeviation: 0 };
+    return {
+      price: 0,
+      lastUpdatedSlot: 0,
+      uiDeviation: 0,
+      provider: OracleProvider.SwitchboardOnDemand,
+    };
   }
 }
 
@@ -213,7 +256,12 @@ export async function parseSwitchboardOracle(
   oracle: PublicKey,
   accountInfo: AccountInfo<Buffer>,
   connection: Connection,
-): Promise<{ price: number; lastUpdatedSlot: number; uiDeviation: number }> {
+): Promise<{
+  price: number;
+  lastUpdatedSlot: number;
+  uiDeviation: number;
+  provider: OracleProvider;
+}> {
   if (accountInfo.owner.equals(SB_ON_DEMAND_PID)) {
     if (!sbOnDemandProgram) {
       const options = AnchorProvider.defaultOptions();
@@ -309,6 +357,7 @@ export function parsePythOracle(
   price: number;
   lastUpdatedSlot: number;
   uiDeviation: number;
+  provider: OracleProvider;
 } {
   if (accountInfo.owner.equals(DEFAULT_RECEIVER_PROGRAM_ID)) {
     if (!pythSolanaReceiverProgram) {
@@ -337,6 +386,7 @@ export function parsePythOracle(
         decoded.priceMessage.conf.toNumber(),
         -decoded.priceMessage.exponent,
       ),
+      provider: OracleProvider.PythV2,
     } as any;
   }
 
@@ -346,6 +396,7 @@ export function parsePythOracle(
       price: priceData.previousPrice,
       lastUpdatedSlot: parseInt(priceData.lastSlot.toString()),
       uiDeviation: priceData.previousConfidence,
+      provider: OracleProvider.Pyth,
     };
   }
 
