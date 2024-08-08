@@ -14,7 +14,7 @@ import {
 import fs from 'fs';
 import * as toml from '@iarna/toml';
 import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
-import { bs58, decodeString } from '@switchboard-xyz/common';
+import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
   CrossbarClient,
@@ -60,7 +60,7 @@ const PYTH_USDC_ORACLE =
 const SWITCHBOARD_USDC_ORACLE = 'FwYfsmj5x8YZXtQBNo2Cz8TE7WRCMFqA6UTffK4xQKMH';
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
-  const CLUSTER_URL =
+const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
 
 const USER_KEYPAIR =
@@ -71,12 +71,12 @@ async function setupAnchor() {
   const connection = new Connection(CLUSTER_URL!, options);
   const user = Keypair.fromSecretKey(
     Buffer.from(
-        JSON.parse(
-          fs.readFileSync(USER_KEYPAIR!, {
-            encoding: 'utf-8',
-          }),
-        ),
-  
+      JSON.parse(
+        fs.readFileSync(USER_KEYPAIR!, {
+          encoding: 'utf-8',
+        }),
+      ),
+    ),
   );
   //@ts-ignore
   const userWallet = new Wallet(user);
