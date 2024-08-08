@@ -30,6 +30,7 @@ import {
   MANGO_V4_ID,
   MANGO_V4_MAIN_GROUP,
   OPENBOOK_PROGRAM_ID,
+  SBOD_ORACLE_LUTS,
 } from '../src/constants';
 import { buildVersionedTx } from '../src/utils';
 import { getOraclesForMangoGroup } from './sb-on-demand-crank-utils';
@@ -428,22 +429,16 @@ async function populateAltsForSbodOracles(): Promise<void> {
     );
     const group = await client.getGroup(MANGO_V4_MAIN_GROUP);
 
-    /// SBOD alts
-    const altAddress21 = new PublicKey(
-      '3DdohDpFiXjLNqCzFyU8CP3rtGwkn9VbkxFYGrNiqcyR',
-    );
-    await extendTable(
-      client,
-      group,
-      payer,
-      'sb on demand oracles',
-      [altAddress21],
-      await buildSbOnDemandAccountsForAlts(connection, group),
-    );
-    // unused
-    const altAddress22 = new PublicKey(
-      '7uRdMQCXedJ1SiVtwJJazEjsW9vmYiPZGj2ft99XnVu4',
-    );
+    SBOD_ORACLE_LUTS.forEach(async (altAddress) => {
+      await extendTable(
+        client,
+        group,
+        payer,
+        'sb on demand oracles',
+        [new PublicKey(altAddress)],
+        await buildSbOnDemandAccountsForAlts(connection, group),
+      );
+    });
   } catch (error) {
     console.log(error);
   }
