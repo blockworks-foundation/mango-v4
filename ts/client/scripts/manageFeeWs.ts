@@ -47,25 +47,28 @@ export function manageFeeWebSocket(
         ws?.close();
       });
 
-      ws.addEventListener('message', (event: MessageEvent): void => {
-        try {
-          const parsedData = JSON.parse(event.data as string);
-          const value = parsedData?.params?.result?.value.by_tx[15];
+      ws.addEventListener(
+        'message',
+        (event: { data: any; type: string; target: WebSocket }): void => {
+          try {
+            const parsedData = JSON.parse(event.data as string);
+            const value = parsedData?.params?.result?.value.by_tx[15];
 
-          if (value !== undefined && typeof value === 'number') {
-            recentValues.push(value);
-            if (recentValues.length > rollingWindowSize) {
-              recentValues.shift();
+            if (value !== undefined && typeof value === 'number') {
+              recentValues.push(value);
+              if (recentValues.length > rollingWindowSize) {
+                recentValues.shift();
+              }
+
+              const rollingMean = calculateRollingMean(recentValues);
+              onMeanCalculated(rollingMean);
             }
-
-            const rollingMean = calculateRollingMean(recentValues);
-            onMeanCalculated(rollingMean);
+          } catch (error) {
+            console.error('Error processing message:', error);
+            onMeanCalculated(-1);
           }
-        } catch (error) {
-          console.error('Error processing message:', error);
-          onMeanCalculated(-1);
-        }
-      });
+        },
+      );
     } catch (error) {
       console.error('Error in connectWebSocket:', error);
       onMeanCalculated(-1);

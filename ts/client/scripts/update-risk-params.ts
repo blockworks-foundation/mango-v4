@@ -37,7 +37,6 @@ import {
   MANGO_GOVERNANCE_PROGRAM,
   MANGO_MINT,
   MANGO_REALM_PK,
-  SB_ON_DEMAND_LST_FALLBACK_ORACLES,
 } from './governanceInstructions/constants';
 import { createProposal } from './governanceInstructions/createProposal';
 import {
@@ -219,18 +218,29 @@ async function updateTokenParams(): Promise<void> {
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      const maybeSbOracle = SB_ON_DEMAND_LST_FALLBACK_ORACLES.filter(
-        (x) =>
-          x[0].replace('/USD', '').toLocaleUpperCase() ==
-          bank.name.toLocaleUpperCase(),
-      );
-      if (maybeSbOracle.length > 0) {
-        console.log(` - ${bank.name} ${maybeSbOracle[0][0]}`);
-        builder.fallbackOracle(PublicKey.default);
-        change = true;
-      } else {
-        return;
+      // eslint-disable-next-line no-constant-condition
+      if (true) {
+        if (bank.uiBorrows() == 0 && bank.reduceOnly == 1) {
+          console.log(` - ${bank.name}`);
+          builder.forceWithdraw(true);
+
+          // builder.disableAssetLiquidation(true);
+          change = true;
+        }
       }
+
+      // const maybeSbOracle = SB_ON_DEMAND_LST_FALLBACK_ORACLES.filter(
+      //   (x) =>
+      //     x[0].replace('/USD', '').toLocaleUpperCase() ==
+      //     bank.name.toLocaleUpperCase(),
+      // );
+      // if (maybeSbOracle.length > 0) {
+      //   console.log(` - ${bank.name} ${maybeSbOracle[0][0]}`);
+      //   builder.fallbackOracle(PublicKey.default);
+      //   change = true;
+      // } else {
+      //   return;
+      // }
 
       // const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
       //   (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
@@ -297,15 +307,6 @@ async function updateTokenParams(): Promise<void> {
       //         bank.uiDeposits() * bank.uiPrice
       //       ).toLocaleString()} disabled asset liquidation`,
       //     );
-      //   }
-      // }
-
-      // // eslint-disable-next-line no-constant-condition
-      // if (true) {
-      //   if (bank.uiBorrows() == 0 && bank.reduceOnly == 1) {
-      //     builder.disableAssetLiquidation(true);
-      //     builder.forceWithdraw(true);
-      //     change = true;
       //   }
       // }
 

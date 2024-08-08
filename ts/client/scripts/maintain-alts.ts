@@ -32,12 +32,14 @@ import {
   OPENBOOK_PROGRAM_ID,
 } from '../src/constants';
 import { buildVersionedTx } from '../src/utils';
+import { getOraclesForMangoGroup } from './sb-on-demand-crank-utils';
 
 const { MB_CLUSTER_URL, MB_PAYER3_KEYPAIR, DRY_RUN } = process.env;
 const CLUSTER: Cluster = (process.env.CLUSTER as Cluster) || 'mainnet-beta';
 
 async function buildSbOnDemandAccountsForAlts(
   connection: Connection,
+  group: Group,
 ): Promise<PublicKey[]> {
   const userProvider = new AnchorProvider(
     connection,
@@ -47,14 +49,27 @@ async function buildSbOnDemandAccountsForAlts(
   const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, userProvider);
   const sbOnDemandProgram = new Anchor30Program(idl!, userProvider);
 
+  // all sbod oracles on mango group
+  const oracles = getOraclesForMangoGroup(group);
+  const ais = (
+    await Promise.all(
+      chunk(
+        oracles.map((item) => item.oraclePk),
+        50,
+        false,
+      ).map(async (chunk) => await connection.getMultipleAccountsInfo(chunk)),
+    )
+  ).flat();
+  const sbodOracles = oracles
+    .map((o, i) => {
+      return { oracle: o, ai: ais[i] };
+    })
+    .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
+
   return await fetchAllLutKeys(
     new Queue(sbOnDemandProgram, new PublicKey(ON_DEMAND_MAINNET_QUEUE)),
-    // TODO replace with oracles which are derived from the group
-    [
-      '2A7aqNLy26ZBSMWP2Ekxv926hj16tCA47W1sHWVqaLii', // digitSOL
-      'AZcoqpWhMJUaKEDUfKsfzCr3Y96gSQwv43KSQ6KpeyQ1', // INF
-    ].map((oracle) => {
-      return new PullFeed(sbOnDemandProgram, new PublicKey(oracle));
+    sbodOracles.map((oracle) => {
+      return new PullFeed(sbOnDemandProgram, oracle.oracle.oraclePk);
     }),
   );
 }
@@ -178,7 +193,7 @@ async function createANewAlt() {
   );
 }
 
-async function populateExistingAlts(): Promise<void> {
+async function populateExistingAltsWithMangoGroupAccounts(): Promise<void> {
   try {
     const options = AnchorProvider.defaultOptions();
     const connection = new Connection(MB_CLUSTER_URL!, options);
@@ -387,12 +402,56 @@ async function populateExistingAlts(): Promise<void> {
       payer,
       'sb on demand oracles',
       [altAddress21],
-      await buildSbOnDemandAccountsForAlts(connection),
+      await buildSbOnDemandAccountsForAlts(connection, group),
     );
   } catch (error) {
     console.log(error);
   }
 }
 
+async function populateAltsForSbodOracles(): Promise<void> {
+  try {
+    const options = AnchorProvider.defaultOptions();
+    const connection = new Connection(MB_CLUSTER_URL!, options);
+    const payer = Keypair.fromSecretKey(
+      Buffer.from(JSON.parse(fs.readFileSync(MB_PAYER3_KEYPAIR!, 'utf-8'))),
+    );
+    const payerWallet = new Wallet(payer);
+    const userProvider = new AnchorProvider(connection, payerWallet, options);
+    const client = await MangoClient.connect(
+      userProvider,
+      CLUSTER,
+      MANGO_V4_ID[CLUSTER],
+      {
+        idsSource: 'api',
+      },
+    );
+    const group = await client.getGroup(MANGO_V4_MAIN_GROUP);
+
+    /// SBOD alts
+    const altAddress21 = new PublicKey(
+      '3DdohDpFiXjLNqCzFyU8CP3rtGwkn9VbkxFYGrNiqcyR',
+    );
+    await extendTable(
+      client,
+      group,
+      payer,
+      'sb on demand oracles',
+      [altAddress21],
+      await buildSbOnDemandAccountsForAlts(connection, group),
+    );
+    // unused
+    const altAddress22 = new PublicKey(
+      '7uRdMQCXedJ1SiVtwJJazEjsW9vmYiPZGj2ft99XnVu4',
+    );
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+// uncomment to create a new alt, paste this pubkey in the populate methods, go...
 // createANewAlt();
-populateExistingAlts();
+
+// run the script to populate existing alts
+// populateExistingAltsWithMangoGroupAccounts();
+populateAltsForSbodOracles();
