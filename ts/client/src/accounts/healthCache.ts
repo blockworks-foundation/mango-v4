@@ -949,7 +949,6 @@ export class HealthCache {
     // - be careful about finding the minFnValue: the function isn't convex
 
     const initialRatio = this.healthRatio(HealthType.init);
-     
 
     const healthCacheClone: HealthCache = deepClone<HealthCache>(this);
     const sourceIndex = healthCacheClone.getOrCreateTokenInfoIndex(sourceBank);
