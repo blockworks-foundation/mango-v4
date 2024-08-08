@@ -732,7 +732,7 @@
   dependencies:
     buffer "^6.0.3"
 
-"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.22.0", "@solana/web3.js@^1.32.0", "@solana/web3.js@^1.36.0", "@solana/web3.js@^1.54.0", "@solana/web3.js@^1.68.0", "@solana/web3.js@^1.89.1", "@solana/web3.js@^1.93.0", "@solana/web3.js@^1.95.0", "@solana/web3.js@^1.95.2", "@solana/web3.js@npm:@solana/web3.js@1.95.2":
+"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.22.0", "@solana/web3.js@^1.32.0", "@solana/web3.js@^1.36.0", "@solana/web3.js@^1.54.0", "@solana/web3.js@^1.68.0", "@solana/web3.js@^1.89.1", "@solana/web3.js@^1.93.0", "@solana/web3.js@^1.95.0", "@solana/web3.js@^1.95.2":
   version "1.95.2"
   resolved "https://registry.yarnpkg.com/@solana/web3.js/-/web3.js-1.95.2.tgz#6f8a0362fa75886a21550dbec49aad54481463a6"
   integrity sha512-SjlHp0G4qhuhkQQc+YXdGkI8EerCqwxvgytMgBpzMUQTafrkNant3e7pgilBGgjy/iM40ICvWBLgASTPMrQU7w==
