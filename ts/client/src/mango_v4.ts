@@ -725,6 +725,10 @@ export type MangoV4 = {
         {
           "name": "collateralFeePerDay",
           "type": "f32"
+        },
+        {
+          "name": "tier",
+          "type": "string"
         }
       ]
     },
@@ -1152,6 +1156,12 @@ export type MangoV4 = {
           "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tierOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -7664,7 +7674,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "tier",
             "type": {
               "array": [
                 "u8",
@@ -15301,6 +15311,10 @@ export const IDL: MangoV4 = {
         {
           "name": "collateralFeePerDay",
           "type": "f32"
+        },
+        {
+          "name": "tier",
+          "type": "string"
         }
       ]
     },
@@ -15728,6 +15742,12 @@ export const IDL: MangoV4 = {
           "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tierOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -22240,7 +22260,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "tier",
             "type": {
               "array": [
                 "u8",

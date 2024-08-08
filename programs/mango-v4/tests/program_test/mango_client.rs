@@ -1074,6 +1074,7 @@ impl ClientInstruction for TokenRegisterInstruction {
             platform_liquidation_fee: self.platform_liquidation_fee,
             disable_asset_liquidation: false,
             collateral_fee_per_day: 0.0,
+            tier: "A".to_string(),
         };
 
         let bank = Pubkey::find_program_address(
@@ -1324,6 +1325,7 @@ pub fn token_edit_instruction_default() -> mango_v4::instruction::TokenEdit {
         disable_asset_liquidation_opt: None,
         collateral_fee_per_day_opt: None,
         force_withdraw_opt: None,
+        tier_opt: None,
     }
 }
 
