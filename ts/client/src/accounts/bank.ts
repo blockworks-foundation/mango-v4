@@ -83,6 +83,7 @@ export class Bank implements BankForHealth {
   public platformLiquidationFee: I80F48;
   public collectedLiquidationFees: I80F48;
   public collectedCollateralFees: I80F48;
+  public tier: string;
 
   static from(
     publicKey: PublicKey,
@@ -151,6 +152,7 @@ export class Bank implements BankForHealth {
       collectedLiquidationFees: I80F48Dto;
       collectedCollateralFees: I80F48Dto;
       collateralFeePerDay: number;
+      tier: number[];
     },
   ): Bank {
     return new Bank(
@@ -218,6 +220,7 @@ export class Bank implements BankForHealth {
       obj.disableAssetLiquidation == 0,
       obj.collectedCollateralFees,
       obj.collateralFeePerDay,
+      obj.tier,
       obj.forceWithdraw == 1,
     );
   }
@@ -287,6 +290,7 @@ export class Bank implements BankForHealth {
     public allowAssetLiquidation: boolean,
     collectedCollateralFees: I80F48Dto,
     public collateralFeePerDay: number,
+    tier: number[],
     public forceWithdraw: boolean,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
@@ -325,6 +329,7 @@ export class Bank implements BankForHealth {
     this._uiPrice = undefined;
     this._oracleLastUpdatedSlot = undefined;
     this._oracleProvider = undefined;
+    this.tier = utf8.decode(new Uint8Array(tier)).split('\x00')[0];
   }
 
   toString(): string {

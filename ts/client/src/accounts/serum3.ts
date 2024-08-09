@@ -133,7 +133,7 @@ export class Serum3Market {
       this.serumMarketExternal,
     );
     return await serum3MarketExternal.loadBids(
-      client.program.provider.connection,
+      client.program.provider.connection as any,
     );
   }
 
@@ -142,7 +142,7 @@ export class Serum3Market {
       this.serumMarketExternal,
     );
     return await serum3MarketExternal.loadAsks(
-      client.program.provider.connection,
+      client.program.provider.connection as any,
     );
   }
 
