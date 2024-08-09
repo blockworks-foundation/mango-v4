@@ -1,8 +1,9 @@
 use itertools::Itertools;
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
+use mango_v4::i80f48::ClampToInt;
 use mango_v4::state::{
-    Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpPosition,
-    PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
+    Bank, BookSide, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
+    PerpPosition, PlaceOrderType, Side, TokenIndex, QUOTE_TOKEN_INDEX,
 };
 use mango_v4_client::{
     chain_data, perp_pnl, swap, MangoClient, MangoGroupContext, PerpMarketContext, TokenContext,
@@ -15,8 +16,8 @@ use {fixed::types::I80F48, solana_sdk::pubkey::Pubkey};
 use solana_sdk::signature::Signature;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 use tracing::*;
 
 #[derive(Clone)]
@@ -35,6 +36,8 @@ pub struct Config {
     pub alternate_sanctum_route_tokens: Vec<TokenIndex>,
     pub allow_withdraws: bool,
     pub use_sanctum: bool,
+    pub perp_twap_interval: Duration,
+    pub perp_twap_max_quote: u64,
 }
 
 impl Config {
@@ -56,12 +59,47 @@ fn token_bank(
     account_fetcher.fetch::<Bank>(&token.first_bank())
 }
 
+struct PerpTwapState {
+    start: Instant,
+    used_quote: u64,
+}
+
+#[derive(Default)]
+pub struct RebalancerState {
+    perp_twap: HashMap<PerpMarketIndex, PerpTwapState>,
+}
+
+impl RebalancerState {
+    fn expire_old_perp_twaps(&mut self, interval: Duration) {
+        self.perp_twap
+            .retain(|_, twap| twap.start.elapsed() <= interval);
+    }
+
+    fn used_perp_twap(&self, perp_market_index: PerpMarketIndex) -> u64 {
+        self.perp_twap
+            .get(&perp_market_index)
+            .map(|twap| twap.used_quote)
+            .unwrap_or(0)
+    }
+
+    fn add_perp_twap(&mut self, perp_market_index: PerpMarketIndex, quote: u64) {
+        self.perp_twap
+            .entry(perp_market_index)
+            .or_insert_with(|| PerpTwapState {
+                start: Instant::now(),
+                used_quote: 0,
+            })
+            .used_quote += quote;
+    }
+}
+
 pub struct Rebalancer {
     pub mango_client: Arc<MangoClient>,
     pub account_fetcher: Arc<chain_data::AccountFetcher>,
     pub mango_account_address: Pubkey,
     pub config: Config,
     pub sanctum_supported_mints: HashSet<Pubkey>,
+    pub state: Arc<RwLock<RebalancerState>>,
 }
 
 impl Rebalancer {
@@ -574,6 +612,14 @@ impl Rebalancer {
             .duration_since(std::time::UNIX_EPOCH)?
             .as_secs();
 
+        let allowed_quote = {
+            let mut state = self.state.write().unwrap();
+            state.expire_old_perp_twaps(self.config.perp_twap_interval);
+            self.config
+                .perp_twap_max_quote
+                .saturating_sub(state.used_perp_twap(perp.perp_market_index))
+        };
+
         let base_lots = perp_position.base_position_lots();
         let effective_lots = perp_position.effective_base_position_lots();
         let quote_native = perp_position.quote_position_native();
@@ -599,8 +645,11 @@ impl Rebalancer {
                     perp_position.bids_base_lots,
                 )
             };
+            let allowed_base_lots =
+                (I80F48::from(allowed_quote) / order_price / I80F48::from(perp.base_lot_size))
+                    .clamp_to_i64();
             let price_lots = perp_market.native_price_to_lot(order_price);
-            let max_base_lots = effective_lots.abs() - oo_lots;
+            let max_base_lots = (effective_lots.abs() - oo_lots).min(allowed_base_lots);
             if max_base_lots <= 0 {
                 warn!(?side, oo_lots, "cannot place reduce-only order",);
                 return Ok(true);
@@ -660,6 +709,21 @@ impl Rebalancer {
             if !self.refresh_mango_account_after_tx(txsig).await? {
                 return Ok(false);
             }
+
+            // Update the twap amount limits
+            let after_base_lots = self
+                .mango_account()?
+                .perp_position(perp.perp_market_index)
+                .map(|position| position.base_position_lots())
+                .unwrap_or(0);
+            let base_reduction_lots = (base_lots.abs() - after_base_lots.abs()).max(0);
+            let quote_reduction = (I80F48::from(base_reduction_lots * perp.base_lot_size)
+                * order_price)
+                .clamp_to_u64();
+            self.state
+                .write()
+                .unwrap()
+                .add_perp_twap(perp.perp_market_index, quote_reduction);
         } else if base_lots == 0 && quote_native != 0 {
             // settle pnl
             let direction = if quote_native > 0 {
