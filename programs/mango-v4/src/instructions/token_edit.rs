@@ -56,6 +56,7 @@ pub fn token_edit(
     disable_asset_liquidation_opt: Option<bool>,
     collateral_fee_per_day: Option<f32>,
     force_withdraw_opt: Option<bool>,
+    tier_opt: Option<String>,
 ) -> Result<()> {
     let group = ctx.accounts.group.load()?;
 
@@ -320,6 +321,12 @@ pub fn token_edit(
         if let Some(name) = name_opt.as_ref() {
             msg!("Name: old - {:?}, new - {:?}", bank.name, name);
             bank.name = fill_from_str(&name)?;
+            require_group_admin = true;
+        };
+
+        if let Some(tier) = tier_opt.as_ref() {
+            msg!("Tier: old - {:?}, new - {:?}", bank.tier, tier);
+            bank.tier = fill_from_str(&tier)?;
             require_group_admin = true;
         };
 

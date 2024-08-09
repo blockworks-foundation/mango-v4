@@ -359,7 +359,7 @@ export class Group {
         Array.from(this.serum3MarketsMapByExternal.values()).map(
           (serum3Market) =>
             Market.load(
-              client.program.provider.connection,
+              client.program.provider.connection as any,
               serum3Market.serumMarketExternal,
               { commitment: client.program.provider.connection.commitment },
               OPENBOOK_PROGRAM_ID[client.cluster],
