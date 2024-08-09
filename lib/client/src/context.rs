@@ -128,6 +128,7 @@ pub struct ComputeEstimates {
     pub cu_perp_consume_events_base: u32,
     pub cu_perp_consume_events_per_event: u32,
     pub cu_token_update_index_and_rates: u32,
+    pub cu_for_sequence_check: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -156,6 +157,8 @@ impl Default for ComputeEstimates {
             cu_perp_consume_events_base: 10_000,
             cu_perp_consume_events_per_event: 18_000,
             cu_token_update_index_and_rates: 90_000,
+            // measured around 8k, see test_basics
+            cu_for_sequence_check: 10_000,
         }
     }
 }

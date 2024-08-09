@@ -21,16 +21,26 @@ impl<T, E: std::fmt::Debug> AnyhowWrap for Result<T, E> {
 /// Push to an async_channel::Sender and ignore if the channel is full
 pub trait AsyncChannelSendUnlessFull<T> {
     /// Send a message if the channel isn't full
-    fn send_unless_full(&self, msg: T) -> Result<(), async_channel::SendError<T>>;
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()>;
 }
 
 impl<T> AsyncChannelSendUnlessFull<T> for async_channel::Sender<T> {
-    fn send_unless_full(&self, msg: T) -> Result<(), async_channel::SendError<T>> {
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()> {
         use async_channel::*;
         match self.try_send(msg) {
             Ok(()) => Ok(()),
-            Err(TrySendError::Closed(msg)) => Err(async_channel::SendError(msg)),
+            Err(TrySendError::Closed(_)) => Err(anyhow::format_err!("channel is closed")),
             Err(TrySendError::Full(_)) => Ok(()),
+        }
+    }
+}
+impl<T> AsyncChannelSendUnlessFull<T> for tokio::sync::mpsc::Sender<T> {
+    fn send_unless_full(&self, msg: T) -> anyhow::Result<()> {
+        use tokio::sync::mpsc::*;
+        match self.try_send(msg) {
+            Ok(()) => Ok(()),
+            Err(error::TrySendError::Closed(_)) => Err(anyhow::format_err!("channel is closed")),
+            Err(error::TrySendError::Full(_)) => Ok(()),
         }
     }
 }

@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::time::Duration;
 
 use anchor_lang::prelude::Pubkey;
 use serde::{Deserialize, Serialize};
@@ -133,6 +134,7 @@ impl TryFrom<&AccountMeta> for solana_sdk::instruction::AccountMeta {
 
 pub struct JupiterV6<'a> {
     pub mango_client: &'a MangoClient,
+    pub timeout_duration: Duration,
 }
 
 impl<'a> JupiterV6<'a> {
@@ -198,6 +200,7 @@ impl<'a> JupiterV6<'a> {
             .http_client
             .get(format!("{}/quote", config.jupiter_v6_url))
             .query(&query_args)
+            .timeout(self.timeout_duration)
             .send()
             .await
             .context("quote request to jupiter")?;
@@ -284,6 +287,7 @@ impl<'a> JupiterV6<'a> {
                 destination_token_account: None, // default to user ata
                 quote_response: quote.clone(),
             })
+            .timeout(self.timeout_duration)
             .send()
             .await
             .context("swap transaction request to jupiter")?;
