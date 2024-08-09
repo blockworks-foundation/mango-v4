@@ -23,7 +23,9 @@ use mango_v4_client::{
     RpcAccountFetcher, TransactionBuilder,
 };
 use prometheus::{register_histogram, Encoder, Histogram, IntCounter, Registry};
+use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{
+    commitment_config::CommitmentConfig,
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
     signature::Signature,
@@ -104,7 +106,9 @@ pub async fn runner(
     let handles1 = mango_client
         .context
         .tokens
-        .keys()
+        .values()
+        .filter(|t| !t.closed)
+        .map(|t| &t.token_index)
         // TokenUpdateIndexAndRate is known to take max 71k cu
         // from cargo test-bpf local tests
         // chunk size of 8 seems to be max before encountering "VersionedTransaction too large" issues
@@ -124,8 +128,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_consume_events(
                 mango_client.clone(),
@@ -141,8 +145,8 @@ pub async fn runner(
         .perp_markets
         .values()
         .filter(|perp|
-            // MNGO-PERP-OLD
-            perp.perp_market_index != 1)
+        // MNGO-PERP-OLD
+        perp.perp_market_index != 1)
         .map(|perp| {
             loop_update_funding(
                 mango_client.clone(),
@@ -191,8 +195,12 @@ pub async fn loop_update_index_and_rate(
             .iter()
             .map(|token_index| client.context.token(*token_index).name.to_owned())
             .join(",");
+        let token_closed = token_indices_clone
+            .iter()
+            .map(|token_index| client.context.token(*token_index).closed.to_owned())
+            .join(",");
 
-        let mut instructions = vec![];
+        let mut instructions = PreparedInstructions::new();
         for token_index in token_indices_clone.iter() {
             let token = client.context.token(*token_index);
             let banks_for_a_token = token.banks();
@@ -223,28 +231,35 @@ pub async fn loop_update_index_and_rate(
                 .collect::<Vec<_>>();
 
             ix.accounts.append(&mut banks);
-            instructions.push(ix);
+            let pix = PreparedInstructions::from_single(
+                ix,
+                client
+                    .context
+                    .compute_estimates
+                    .cu_token_update_index_and_rates,
+            );
+            instructions.append(pix);
         }
         let pre = Instant::now();
         let sig_result = client
-            .send_and_confirm_permissionless_tx(instructions)
+            .send_and_confirm_permissionless_tx(instructions.to_instructions())
             .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_TOKENS_FAILURE.inc();
             info!(
-                "metricName=UpdateTokensV4Failure tokens={} durationMs={} error={}",
-                token_names, confirmation_time, e
+                "metricName=UpdateTokensV4Failure tokens={} closed={} durationMs={} error={}",
+                token_names, token_closed, duration_ms, e
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_TOKENS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
-                "metricName=UpdateTokensV4Success tokens={} durationMs={}",
-                token_names, confirmation_time,
+                "metricName=UpdateTokensV4Success tokens={} closed = {} durationMs={}",
+                token_names, token_closed, duration_ms,
             );
             info!("{:?}", sig_result);
         }
@@ -343,26 +358,37 @@ pub async fn loop_consume_events(
             }),
         };
 
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_consume_events_base
+                + num_of_events
+                    * client
+                        .context
+                        .compute_estimates
+                        .cu_perp_consume_events_per_event,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_CONSUME_EVENTS_FAILURE.inc();
             info!(
                 "metricName=ConsumeEventsV4Failure market={} durationMs={} consumed={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 num_of_events,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_CONSUME_EVENTS_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=ConsumeEventsV4Success market={} durationMs={} consumed={}",
-                perp_market.name, confirmation_time, num_of_events,
+                perp_market.name, duration_ms, num_of_events,
             );
             info!("{:?}", sig_result);
         }
@@ -396,25 +422,32 @@ pub async fn loop_update_funding(
             ),
             data: anchor_lang::InstructionData::data(&mango_v4::instruction::PerpUpdateFunding {}),
         };
-        let sig_result = client.send_and_confirm_permissionless_tx(vec![ix]).await;
 
-        let confirmation_time = pre.elapsed().as_millis();
-        METRIC_CONFIRMATION_TIMES.observe(confirmation_time as f64);
+        let ixs = PreparedInstructions::from_single(
+            ix,
+            client.context.compute_estimates.cu_perp_update_funding,
+        );
+        let sig_result = client
+            .send_and_confirm_permissionless_tx(ixs.to_instructions())
+            .await;
+
+        let duration_ms = pre.elapsed().as_millis();
 
         if let Err(e) = sig_result {
             METRIC_UPDATE_FUNDING_FAILURE.inc();
             error!(
                 "metricName=UpdateFundingV4Error market={} durationMs={} error={}",
                 perp_market.name,
-                confirmation_time,
+                duration_ms,
                 e.to_string()
             );
             error!("{:?}", e)
         } else {
             METRIC_UPDATE_FUNDING_SUCCESS.inc();
+            METRIC_CONFIRMATION_TIMES.observe(duration_ms as f64);
             info!(
                 "metricName=UpdateFundingV4Success market={} durationMs={}",
-                perp_market.name, confirmation_time,
+                perp_market.name, duration_ms,
             );
             info!("{:?}", sig_result);
         }
@@ -431,9 +464,16 @@ pub async fn loop_charge_collateral_fees(
     }
 
     // Make a new one separate from the mango_client.account_fetcher,
-    // because we don't want cached responses
-    let fetcher = RpcAccountFetcher {
-        rpc: mango_client.client.new_rpc_async(),
+    // because we don't want cached responses and we need a longer timeout
+    let fetcher = {
+        let config = mango_client.client.config();
+        RpcAccountFetcher {
+            rpc: RpcClient::new_with_timeout_and_commitment(
+                config.cluster.url().to_string(),
+                Duration::from_secs(120),
+                CommitmentConfig::confirmed(),
+            ),
+        }
     };
 
     let group: Group = account_fetcher_fetch_anchor_account(&fetcher, &mango_client.context.group)
@@ -488,6 +528,9 @@ async fn charge_collateral_fees_inner(
         .unwrap()
         .as_secs() as u64;
     for (pk, account) in mango_accounts {
+        if account.fixed.group != client.group() {
+            continue;
+        }
         let should_reset =
             collateral_fee_interval == 0 && account.fixed.last_collateral_fee_charge > 0;
         let should_charge = collateral_fee_interval > 0

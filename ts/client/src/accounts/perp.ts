@@ -675,8 +675,8 @@ export class BookSide {
       return a.priceLots.eq(b.priceLots)
         ? a.seqNum.lt(b.seqNum) // if prices are equal prefer perp orders in the order they are placed
         : type === BookSideType.bids // else compare the actual prices
-        ? a.priceLots.gt(b.priceLots)
-        : b.priceLots.gt(a.priceLots);
+          ? a.priceLots.gt(b.priceLots)
+          : b.priceLots.gt(a.priceLots);
     }
 
     const fGen = this.fixedItems();

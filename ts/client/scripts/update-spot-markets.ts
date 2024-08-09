@@ -1,16 +1,12 @@
-import {
-  MidPriceImpact,
-  getMidPriceImpacts,
-} from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
+import { LISTING_PRESETS } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { BN } from '@project-serum/anchor';
 import {
   getAllProposals,
   getTokenOwnerRecord,
   getTokenOwnerRecordAddress,
 } from '@solana/spl-governance';
+
 import {
-  AccountMeta,
   Connection,
   Keypair,
   PublicKey,
@@ -18,15 +14,9 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import fs from 'fs';
-import { Bank } from '../src/accounts/bank';
-import { Group } from '../src/accounts/group';
-import { MangoAccount } from '../src/accounts/mangoAccount';
-import { Builder } from '../src/builder';
+import { Serum3Market } from '../src/accounts/serum3';
 import { MangoClient } from '../src/client';
-import { NullTokenEditParams } from '../src/clientIxParamBuilder';
 import { MANGO_V4_MAIN_GROUP as MANGO_V4_PRIMARY_GROUP } from '../src/constants';
-import { getEquityForMangoAccounts } from '../src/risk';
-import { buildFetch } from '../src/utils';
 import {
   MANGO_DAO_WALLET_GOVERNANCE,
   MANGO_GOVERNANCE_PROGRAM,
@@ -57,7 +47,6 @@ async function setupWallet(): Promise<Wallet> {
     Buffer.from(JSON.parse(fs.readFileSync(VSR_DELEGATE_KEYPAIR!, 'utf-8'))),
   );
   const clientWallet = new Wallet(clientKeypair);
-
   return clientWallet;
 }
 
@@ -71,7 +60,7 @@ async function setupVsr(
   return vsrClient;
 }
 
-async function updateSerumMarketParams(): Promise<void> {
+async function updateSpotMarkets(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
   const vsrClient = await setupVsr(client.connection, wallet);
 
@@ -79,29 +68,65 @@ async function updateSerumMarketParams(): Promise<void> {
 
   const instructions: TransactionInstruction[] = [];
 
-  Array.from(group.serum3MarketsMapByMarketIndex.values()).forEach(
-    async (sm) => {
-      const ix = await client.serum3EditMarketIx(
-        group,
-        sm.marketIndex,
-        group.admin,
-        null,
-        null,
-        null,
-        0.5,
+  Array.from(group.banksMapByTokenIndex.values())
+    .map((banks) => banks[0])
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(async (bank) => {
+      let change = false;
+
+      const tier = Object.values(LISTING_PRESETS).find((x) =>
+        x.initLiabWeight.toFixed(1) === '1.8'
+          ? x.initLiabWeight.toFixed(1) ===
+              bank?.initLiabWeight.toNumber().toFixed(1) &&
+            x.reduceOnly === bank.reduceOnly
+          : x.initLiabWeight.toFixed(1) ===
+            bank?.initLiabWeight.toNumber().toFixed(1),
       );
 
-      const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
-      const simulated = await client.connection.simulateTransaction(tx);
+      let reduceOnly: boolean | null = null;
+      let forceClose: boolean | null = null;
+      const name = null;
+      const oraclePriceBand = null;
 
-      if (simulated.value.err) {
-        console.log('error', simulated.value.logs);
-        throw simulated.value.logs;
+      let markets: Serum3Market[] = [];
+
+      if (bank.reduceOnly == 1 && bank.forceClose && bank.forceWithdraw) {
+        markets = Array.from(
+          group.serum3MarketsMapByMarketIndex.values(),
+        ).filter(
+          (m) => m.baseTokenIndex == bank.tokenIndex || m.quoteTokenIndex == 1,
+        );
+
+        change = true;
+        reduceOnly = true;
+        forceClose = true;
+
+        console.log(`${bank.name} ${markets.map((m) => m.name).join(',')}`);
       }
 
-      instructions.push(ix);
-    },
-  );
+      for (const market of markets) {
+        const ix = await client.program.methods
+          .serum3EditMarket(reduceOnly, forceClose, name, oraclePriceBand)
+          .accounts({
+            group: group.publicKey,
+            admin: group.admin,
+            market: market.publicKey,
+          })
+          .instruction();
+
+        const tx = new Transaction({ feePayer: wallet.publicKey }).add(ix);
+        const simulated = await client.connection.simulateTransaction(tx);
+
+        if (simulated.value.err) {
+          console.log('sim error', simulated.value.logs);
+          throw simulated.value.logs;
+        }
+
+        if (change) {
+          instructions.push(ix);
+        }
+      }
+    });
 
   const tokenOwnerRecordPk = await getTokenOwnerRecordAddress(
     MANGO_GOVERNANCE_PROGRAM,
@@ -127,7 +152,7 @@ async function updateSerumMarketParams(): Promise<void> {
       walletSigner,
       MANGO_DAO_WALLET_GOVERNANCE,
       tokenOwnerRecord,
-      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update risk parameters for tokens',
+      PROPOSAL_TITLE ? PROPOSAL_TITLE : 'Update spot markets in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
@@ -140,7 +165,7 @@ async function updateSerumMarketParams(): Promise<void> {
 
 async function main(): Promise<void> {
   try {
-    await updateSerumMarketParams();
+    await updateSpotMarkets();
   } catch (error) {
     console.log(error);
   }

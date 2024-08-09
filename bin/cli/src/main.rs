@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 mod save_snapshot;
-mod test_collateral_fees;
 mod test_oracles;
 
 #[derive(Parser, Debug, Clone)]
@@ -88,6 +87,31 @@ struct JupiterSwap {
 
     #[clap(short, long)]
     slippage_bps: u64,
+
+    #[clap(flatten)]
+    rpc: Rpc,
+}
+
+#[derive(Args, Debug, Clone)]
+struct SanctumSwap {
+    #[clap(long)]
+    account: String,
+
+    /// also pays for everything
+    #[clap(short, long)]
+    owner: String,
+
+    #[clap(long)]
+    input_mint: String,
+
+    #[clap(long)]
+    output_mint: String,
+
+    #[clap(short, long)]
+    amount: u64,
+
+    #[clap(short, long, default_value = "50")]
+    max_slippage_bps: u64,
 
     #[clap(flatten)]
     rpc: Rpc,
@@ -190,6 +214,7 @@ enum Command {
     CreateAccount(CreateAccount),
     Deposit(Deposit),
     JupiterSwap(JupiterSwap),
+    SanctumSwap(SanctumSwap),
     GroupAddress {
         #[clap(short, long)]
         creator: String,
@@ -209,13 +234,6 @@ enum Command {
     },
     /// Regularly fetches all oracles and prints their prices
     TestOracles {
-        #[clap(short, long)]
-        group: String,
-
-        #[clap(flatten)]
-        rpc: Rpc,
-    },
-    TestCollateralFees {
         #[clap(short, long)]
         group: String,
 
@@ -320,6 +338,19 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await?;
             println!("{}", txsig);
         }
+        Command::SanctumSwap(cmd) => {
+            let client = cmd.rpc.client(Some(&cmd.owner))?;
+            let account = pubkey_from_cli(&cmd.account);
+            let owner = Arc::new(keypair_from_cli(&cmd.owner));
+            let input_mint = pubkey_from_cli(&cmd.input_mint);
+            let output_mint = pubkey_from_cli(&cmd.output_mint);
+            let client = MangoClient::new_for_existing_account(client, account, owner).await?;
+            let txsig = client
+                .sanctum()
+                .swap(input_mint, output_mint, cmd.max_slippage_bps, cmd.amount)
+                .await?;
+            println!("{}", txsig);
+        }
         Command::GroupAddress { creator, num } => {
             let creator = pubkey_from_cli(&creator);
             println!("{}", MangoClient::group_for_admin(creator, num));
@@ -343,11 +374,6 @@ async fn main() -> Result<(), anyhow::Error> {
             let client = rpc.client(None)?;
             let group = pubkey_from_cli(&group);
             test_oracles::run(&client, group).await?;
-        }
-        Command::TestCollateralFees { group, rpc } => {
-            let client = rpc.client(None)?;
-            let group = pubkey_from_cli(&group);
-            test_collateral_fees::run(&client, group).await?;
         }
         Command::SaveSnapshot { group, rpc, output } => {
             let mango_group = pubkey_from_cli(&group);

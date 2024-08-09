@@ -72,13 +72,7 @@ pub struct SwapRequest {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct SwapResponse {
-    pub swap_transaction: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct SwapInstructionsResponse {
+pub struct JupiterSwapInstructionsResponse {
     pub token_ledger_instruction: Option<InstructionResponse>,
     pub compute_budget_instructions: Option<Vec<InstructionResponse>>,
     pub setup_instructions: Option<Vec<InstructionResponse>>,
@@ -236,14 +230,14 @@ impl<'a> JupiterV6<'a> {
             .map(util::to_writable_account_meta)
             .collect::<Vec<_>>();
 
-        let owner = self.mango_client.owner();
+        let authority = self.mango_client.authority();
         let account = &self.mango_client.mango_account().await?;
 
         let token_ams = [source_token.mint, target_token.mint]
             .into_iter()
             .map(|mint| {
                 util::to_writable_account_meta(
-                    anchor_spl::associated_token::get_associated_token_address(&owner, &mint),
+                    anchor_spl::associated_token::get_associated_token_address(&authority, &mint),
                 )
             })
             .collect::<Vec<_>>();
@@ -280,7 +274,7 @@ impl<'a> JupiterV6<'a> {
             .post(format!("{}/swap-instructions", config.jupiter_v6_url))
             .query(&query_args)
             .json(&SwapRequest {
-                user_public_key: owner.to_string(),
+                user_public_key: authority.to_string(),
                 wrap_and_unwrap_sol: false,
                 use_shared_accounts: true,
                 fee_account: None,
@@ -294,7 +288,7 @@ impl<'a> JupiterV6<'a> {
             .await
             .context("swap transaction request to jupiter")?;
 
-        let swap: SwapInstructionsResponse = util::http_error_handling(swap_response)
+        let swap: JupiterSwapInstructionsResponse = util::http_error_handling(swap_response)
             .await
             .context("error requesting jupiter swap")?;
 
@@ -310,8 +304,8 @@ impl<'a> JupiterV6<'a> {
         // Ensure the source token account is created (jupiter takes care of the output account)
         instructions.push(
             spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                &owner,
-                &owner,
+                &authority,
+                &authority,
                 &source_token.mint,
                 &Token::id(),
             ),
@@ -323,7 +317,7 @@ impl<'a> JupiterV6<'a> {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanBegin {
                         account: self.mango_client.mango_account_address,
-                        owner,
+                        owner: authority,
                         token_program: Token::id(),
                         instructions: solana_sdk::sysvar::instructions::id(),
                     },
@@ -346,7 +340,7 @@ impl<'a> JupiterV6<'a> {
                 let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
                     &mango_v4::accounts::FlashLoanEnd {
                         account: self.mango_client.mango_account_address,
-                        owner,
+                        owner: authority,
                         token_program: Token::id(),
                     },
                     None,
@@ -381,13 +375,13 @@ impl<'a> JupiterV6<'a> {
             .await?;
         address_lookup_tables.extend(jup_alts.into_iter());
 
-        let payer = owner; // maybe use fee_payer? but usually it's the same
+        let payer = authority; // maybe use fee_payer? but usually it's the same
 
         Ok(TransactionBuilder {
             instructions,
             address_lookup_tables,
             payer,
-            signers: vec![self.mango_client.owner.clone()],
+            signers: vec![self.mango_client.authority.clone()],
             config: self
                 .mango_client
                 .client

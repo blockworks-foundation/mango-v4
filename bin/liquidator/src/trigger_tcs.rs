@@ -12,7 +12,7 @@ use mango_v4::{
     i80f48::ClampToInt,
     state::{Bank, MangoAccountValue, TokenConditionalSwap, TokenIndex},
 };
-use mango_v4_client::{chain_data, jupiter, MangoClient, TransactionBuilder};
+use mango_v4_client::{chain_data, swap, MangoClient, TransactionBuilder};
 
 use anyhow::Context as AnyhowContext;
 use solana_sdk::signature::Signature;
@@ -70,7 +70,7 @@ pub struct Config {
     /// Can be set to 0 to allow executions of any size.
     pub min_buy_fraction: f64,
 
-    pub jupiter_version: jupiter::Version,
+    pub jupiter_version: swap::Version,
     pub jupiter_slippage_bps: u64,
     pub mode: Mode,
 
@@ -121,9 +121,9 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
+        version: swap::Version,
         max_in_per_out_price: f64,
-    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, jupiter::Quote)>> {
+    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, swap::Quote)>> {
         let cache_entry = self.cache_entry(input_mint, output_mint);
 
         let held_lock = {
@@ -181,10 +181,10 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
-    ) -> anyhow::Result<(f64, jupiter::Quote)> {
+        version: swap::Version,
+    ) -> anyhow::Result<(f64, swap::Quote)> {
         let quote = client
-            .jupiter()
+            .swap()
             .quote(
                 input_mint,
                 output_mint,
@@ -205,8 +205,8 @@ impl JupiterQuoteCache {
         output_mint: Pubkey,
         input_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
-    ) -> anyhow::Result<(f64, jupiter::Quote)> {
+        version: swap::Version,
+    ) -> anyhow::Result<(f64, swap::Quote)> {
         match self
             .quote(
                 client,
@@ -252,11 +252,10 @@ impl JupiterQuoteCache {
         collateral_amount: u64,
         sell_amount: u64,
         slippage_bps: u64,
-        version: jupiter::Version,
+        version: swap::Version,
         max_sell_per_buy_price: f64,
-    ) -> anyhow::Result<
-        JupiterQuoteCacheResult<(f64, Option<jupiter::Quote>, Option<jupiter::Quote>)>,
-    > {
+    ) -> anyhow::Result<JupiterQuoteCacheResult<(f64, Option<swap::Quote>, Option<swap::Quote>)>>
+    {
         // First check if we have cached prices for both legs and
         // if those break the specified limit
         let cached_collateral_to_buy = self.cached_price(collateral_mint, buy_mint).await;
@@ -335,7 +334,7 @@ struct PreparedExecution {
     max_sell_token_to_liqor: u64,
     min_buy_token: u64,
     min_taker_price: f32,
-    jupiter_quote: Option<jupiter::Quote>,
+    jupiter_quote: Option<swap::Quote>,
 }
 
 struct PreparationResult {
@@ -1191,7 +1190,7 @@ impl Context {
         // Jupiter quote is provided only for triggers, not close-expired
         let mut tx_builder = if let Some(jupiter_quote) = pending.jupiter_quote {
             self.mango_client
-                .jupiter()
+                .swap()
                 .prepare_swap_transaction(&jupiter_quote)
                 .await?
         } else {
@@ -1203,7 +1202,7 @@ impl Context {
             let fee_payer = self.mango_client.client.fee_payer();
             TransactionBuilder {
                 instructions: vec![compute_ix],
-                signers: vec![self.mango_client.owner.clone(), fee_payer],
+                signers: vec![self.mango_client.authority.clone(), fee_payer],
                 ..self.mango_client.transaction_builder().await?
             }
         };

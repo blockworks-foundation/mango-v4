@@ -38,16 +38,6 @@ async function forceWithdrawTokens(): Promise<void> {
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const forceWithdrawBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
-  if (forceWithdrawBank.reduceOnly != 2) {
-    throw new Error(
-      `Unexpected reduce only state ${forceWithdrawBank.reduceOnly}`,
-    );
-  }
-  if (!forceWithdrawBank.forceWithdraw) {
-    throw new Error(
-      `Unexpected force withdraw state ${forceWithdrawBank.forceWithdraw}`,
-    );
-  }
 
   // Get all mango accounts with deposits for given token
   const mangoAccountsWithDeposits = (
@@ -55,8 +45,7 @@ async function forceWithdrawTokens(): Promise<void> {
   ).filter((a) => a.getTokenBalanceUi(forceWithdrawBank) > 0);
 
   for (const mangoAccount of mangoAccountsWithDeposits) {
-
-    const sig = await client.serum3LiqForceCancelOrders(group,mangoAccount)
+    // const sig = await client.serum3LiqForceCancelOrders(group, mangoAccount);
 
     const sig = await client.tokenForceWithdraw(
       group,
@@ -64,12 +53,20 @@ async function forceWithdrawTokens(): Promise<void> {
       TOKEN_INDEX,
     );
     console.log(
-      ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
-        mangoAccount.owner
-      }, sig https://explorer.solana.com/tx/${sig}?cluster=${
-        CLUSTER == 'devnet' ? 'devnet' : ''
+      `Withdrawing ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
+        mangoAccount.publicKey
       }`,
     );
+
+    client.tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX).then((sig) => {
+      console.log(
+        ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
+          mangoAccount.owner
+        }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+          CLUSTER == 'devnet' ? 'devnet' : ''
+        }`,
+      );
+    });
   }
 }
 

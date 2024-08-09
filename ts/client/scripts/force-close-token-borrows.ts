@@ -131,6 +131,7 @@ async function forceCloseTokenBorrows(): Promise<void> {
       userDefinedInstructions: ixs,
       userDefinedAlts: alts,
       flashLoanType: { swap: {} },
+      sequenceCheck: false,
     });
     console.log(
       ` - marginTrade, sig https://explorer.solana.com/tx/${sig}?cluster=${

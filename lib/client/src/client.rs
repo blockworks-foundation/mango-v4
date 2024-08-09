@@ -17,7 +17,9 @@ use futures::{stream, StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use tracing::*;
 
-use mango_v4::accounts_ix::{Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side};
+use mango_v4::accounts_ix::{
+    HealthCheckKind, Serum3OrderType, Serum3SelfTradeBehavior, Serum3Side,
+};
 use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthCache;
 use mango_v4::state::{
@@ -25,14 +27,14 @@ use mango_v4::state::{
     PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
 };
 
-use crate::account_fetcher::*;
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
 use crate::health_cache;
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
+use crate::util;
 use crate::util::PreparedInstructions;
-use crate::{jupiter, util};
+use crate::{account_fetcher::*, swap};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
@@ -80,6 +82,12 @@ pub struct ClientConfig {
     #[builder(default = "Duration::from_secs(60)")]
     pub timeout: Duration,
 
+    /// Jupiter Timeout, defaults to 30s
+    ///
+    /// This timeout applies to jupiter requests.
+    #[builder(default = "Duration::from_secs(30)")]
+    pub jupiter_timeout: Duration,
+
     #[builder(default)]
     pub transaction_builder_config: TransactionBuilderConfig,
 
@@ -96,6 +104,15 @@ pub struct ClientConfig {
 
     #[builder(default = "\"\".into()")]
     pub jupiter_token: String,
+
+    #[builder(default = "\"https://api.sanctum.so/v1\".into()")]
+    pub sanctum_url: String,
+
+    /// Sanctum Timeout, defaults to 30s
+    ///
+    /// This timeout applies to jupiter requests.
+    #[builder(default = "Duration::from_secs(30)")]
+    pub sanctum_timeout: Duration,
 
     /// Determines how fallback oracle accounts are provided to instructions. Defaults to Dynamic.
     #[builder(default = "FallbackOracleConfig::Dynamic")]
@@ -256,7 +273,7 @@ pub struct MangoClient {
     // call to refresh banks etc -- if it's backed by websockets, these could just do nothing
     pub account_fetcher: Arc<dyn AccountFetcher>,
 
-    pub owner: Arc<Keypair>,
+    pub authority: Arc<Keypair>,
     pub mango_account_address: Pubkey,
 
     pub context: MangoGroupContext,
@@ -389,7 +406,7 @@ impl MangoClient {
     pub async fn new_for_existing_account(
         client: Client,
         account: Pubkey,
-        owner: Arc<Keypair>,
+        authority: Arc<Keypair>,
     ) -> anyhow::Result<Self> {
         let rpc = client.new_rpc_async();
         let account_fetcher = Arc::new(CachedAccountFetcher::new(Arc::new(RpcAccountFetcher {
@@ -398,25 +415,25 @@ impl MangoClient {
         let mango_account =
             account_fetcher_fetch_mango_account(&*account_fetcher, &account).await?;
         let group = mango_account.fixed.group;
-        if mango_account.fixed.owner != owner.pubkey() {
+        if mango_account.fixed.owner != authority.pubkey() {
             anyhow::bail!(
                 "bad owner for account: expected {} got {}",
                 mango_account.fixed.owner,
-                owner.pubkey()
+                authority.pubkey()
             );
         }
 
         let rpc = client.rpc_async();
         let group_context = MangoGroupContext::new_from_rpc(&rpc, group).await?;
 
-        Self::new_detail(client, account, owner, group_context, account_fetcher)
+        Self::new_detail(client, account, authority, group_context, account_fetcher)
     }
 
     /// Allows control of AccountFetcher and externally created MangoGroupContext
     pub fn new_detail(
         client: Client,
         account: Pubkey,
-        owner: Arc<Keypair>,
+        authority: Arc<Keypair>,
         // future: maybe pass Arc<MangoGroupContext>, so it can be extenally updated?
         group_context: MangoGroupContext,
         account_fetcher: Arc<dyn AccountFetcher>,
@@ -424,15 +441,15 @@ impl MangoClient {
         Ok(Self {
             client,
             account_fetcher,
-            owner,
+            authority,
             mango_account_address: account,
             context: group_context,
             http_client: reqwest::Client::new(),
         })
     }
 
-    pub fn owner(&self) -> Pubkey {
-        self.owner.pubkey()
+    pub fn authority(&self) -> Pubkey {
+        self.authority.pubkey()
     }
 
     pub fn group(&self) -> Pubkey {
@@ -537,12 +554,15 @@ impl MangoClient {
                         &mango_v4::accounts::TokenDeposit {
                             group: self.group(),
                             account: self.mango_account_address,
-                            owner: self.owner(),
+                            owner: self.authority(),
                             bank: token.first_bank(),
                             vault: token.first_vault(),
                             oracle: token.oracle,
-                            token_account: get_associated_token_address(&self.owner(), &token.mint),
-                            token_authority: self.owner(),
+                            token_account: get_associated_token_address(
+                                &self.authority(),
+                                &token.mint,
+                            ),
+                            token_authority: self.authority(),
                             token_program: Token::id(),
                         },
                         None,
@@ -557,7 +577,50 @@ impl MangoClient {
             },
             self.instruction_cu(health_cu),
         );
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        self.send_and_confirm_authority_tx(ixs.to_instructions())
+            .await
+    }
+
+    /// Assert that health of account is > N
+    pub async fn health_check_instruction(
+        &self,
+        account: &MangoAccountValue,
+        min_health_value: f64,
+        affected_tokens: Vec<TokenIndex>,
+        affected_perp_markets: Vec<PerpMarketIndex>,
+        check_kind: HealthCheckKind,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let (health_check_metas, health_cu) = self
+            .derive_health_check_remaining_account_metas(
+                account,
+                affected_tokens,
+                vec![],
+                affected_perp_markets,
+            )
+            .await?;
+
+        let ixs = PreparedInstructions::from_vec(
+            vec![Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    let mut ams = anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::HealthCheck {
+                            group: self.group(),
+                            account: self.mango_account_address,
+                        },
+                        None,
+                    );
+                    ams.extend(health_check_metas.into_iter());
+                    ams
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::HealthCheck {
+                    min_health_value,
+                    check_kind,
+                }),
+            }],
+            self.instruction_cu(health_cu),
+        );
+        Ok(ixs)
     }
 
     /// Creates token withdraw instructions for the MangoClient's account/owner.
@@ -580,8 +643,8 @@ impl MangoClient {
         let ixs = PreparedInstructions::from_vec(
             vec![
                 spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                    &self.owner(),
-                    &self.owner(),
+                    &self.authority(),
+                    &account.fixed.owner,
                     &mint,
                     &Token::id(),
                 ),
@@ -592,12 +655,12 @@ impl MangoClient {
                             &mango_v4::accounts::TokenWithdraw {
                                 group: self.group(),
                                 account: self.mango_account_address,
-                                owner: self.owner(),
+                                owner: self.authority(),
                                 bank: token.first_bank(),
                                 vault: token.first_vault(),
                                 oracle: token.oracle,
                                 token_account: get_associated_token_address(
-                                    &self.owner(),
+                                    &account.fixed.owner,
                                     &token.mint,
                                 ),
                                 token_program: Token::id(),
@@ -613,7 +676,7 @@ impl MangoClient {
                     }),
                 },
             ],
-            self.instruction_cu(health_cu),
+            self.instruction_cu(health_cu) + self.context.compute_estimates.cu_per_associated_token_account_creation,
         );
         Ok(ixs)
     }
@@ -628,7 +691,8 @@ impl MangoClient {
         let ixs = self
             .token_withdraw_instructions(&account, mint, amount, allow_borrow)
             .await?;
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        self.send_and_confirm_authority_tx(ixs.to_instructions())
+            .await
     }
 
     pub async fn bank_oracle_price(&self, token_index: TokenIndex) -> anyhow::Result<I80F48> {
@@ -680,8 +744,8 @@ impl MangoClient {
                         serum_program: s3.serum_program,
                         serum_market_external: s3.serum_market_external,
                         open_orders,
-                        owner: self.owner(),
-                        sol_destination: self.owner(),
+                        owner: self.authority(),
+                        sol_destination: self.authority(),
                     },
                     None,
                 ),
@@ -696,7 +760,8 @@ impl MangoClient {
     pub async fn serum3_close_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
         let market_index = self.context.serum3_market_index(name);
         let ix = self.serum3_close_open_orders_instruction(market_index);
-        self.send_and_confirm_owner_tx(ix.to_instructions()).await
+        self.send_and_confirm_authority_tx(ix.to_instructions())
+            .await
     }
 
     pub fn serum3_create_open_orders_instruction(
@@ -718,8 +783,8 @@ impl MangoClient {
                     serum_program: s3.serum_program,
                     serum_market_external: s3.serum_market_external,
                     open_orders,
-                    owner: self.owner(),
-                    payer: self.owner(),
+                    owner: self.authority(),
+                    payer: self.authority(),
                     system_program: System::id(),
                     rent: sysvar::rent::id(),
                 },
@@ -751,7 +816,7 @@ impl MangoClient {
     pub async fn serum3_create_open_orders(&self, name: &str) -> anyhow::Result<Signature> {
         let market_index = self.context.serum3_market_index(name);
         let ix = self.serum3_create_open_orders_instruction(market_index);
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        self.send_and_confirm_authority_tx(vec![ix]).await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -809,7 +874,7 @@ impl MangoClient {
                             market_base_vault: s3.coin_vault,
                             market_quote_vault: s3.pc_vault,
                             market_vault_signer: s3.vault_signer,
-                            owner: self.owner(),
+                            owner: self.authority(),
                             token_program: Token::id(),
                         },
                         None,
@@ -1072,7 +1137,8 @@ impl MangoClient {
         let mut ixs = PreparedInstructions::new();
         ixs.append(create_or_replace_ixs);
         ixs.append(place_order_ixs);
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        self.send_and_confirm_authority_tx(ixs.to_instructions())
+            .await
     }
 
     pub async fn serum3_settle_funds(&self, name: &str) -> anyhow::Result<Signature> {
@@ -1102,7 +1168,7 @@ impl MangoClient {
                         market_base_vault: s3.coin_vault,
                         market_quote_vault: s3.pc_vault,
                         market_vault_signer: s3.vault_signer,
-                        owner: self.owner(),
+                        owner: self.authority(),
                         token_program: Token::id(),
                     },
                     v2: mango_v4::accounts::Serum3SettleFundsV2Extra {
@@ -1116,7 +1182,7 @@ impl MangoClient {
                 fees_to_dao: true,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        self.send_and_confirm_authority_tx(vec![ix]).await
     }
 
     pub fn serum3_cancel_all_orders_instruction(
@@ -1142,7 +1208,7 @@ impl MangoClient {
                         serum_market: s3.address,
                         serum_program: s3.serum_program,
                         serum_market_external: s3.serum_market_external,
-                        owner: self.owner(),
+                        owner: self.authority(),
                     },
                     None,
                 ),
@@ -1281,7 +1347,7 @@ impl MangoClient {
                         market_bids: s3.bids,
                         market_asks: s3.asks,
                         market_event_queue: s3.event_q,
-                        owner: self.owner(),
+                        owner: self.authority(),
                     },
                     None,
                 )
@@ -1291,7 +1357,7 @@ impl MangoClient {
                 order_id,
             }),
         };
-        self.send_and_confirm_owner_tx(vec![ix]).await
+        self.send_and_confirm_authority_tx(vec![ix]).await
     }
 
     //
@@ -1344,7 +1410,7 @@ impl MangoClient {
                     &mango_v4::accounts::PerpPlaceOrder {
                         group: self.group(),
                         account: self.mango_account_address,
-                        owner: self.owner(),
+                        owner: self.authority(),
                         perp_market: perp.address,
                         bids: perp.bids,
                         asks: perp.asks,
@@ -1449,7 +1515,8 @@ impl MangoClient {
                 self_trade_behavior,
             )
             .await?;
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        self.send_and_confirm_authority_tx(ixs.to_instructions())
+            .await
     }
 
     pub fn perp_cancel_all_orders_instruction(
@@ -1467,7 +1534,7 @@ impl MangoClient {
                         &mango_v4::accounts::PerpCancelAllOrders {
                             group: self.group(),
                             account: self.mango_account_address,
-                            owner: self.owner(),
+                            owner: self.authority(),
                             perp_market: perp.address,
                             bids: perp.bids,
                             asks: perp.asks,
@@ -1492,7 +1559,8 @@ impl MangoClient {
         let ixs = self
             .perp_deactivate_position_instruction(market_index)
             .await?;
-        self.send_and_confirm_owner_tx(ixs.to_instructions()).await
+        self.send_and_confirm_authority_tx(ixs.to_instructions())
+            .await
     }
 
     async fn perp_deactivate_position_instruction(
@@ -1509,7 +1577,7 @@ impl MangoClient {
                         &mango_v4::accounts::PerpDeactivatePosition {
                             group: self.group(),
                             account: self.mango_account_address,
-                            owner: self.owner(),
+                            owner: self.authority(),
                             perp_market: perp.address,
                         },
                         None,
@@ -1552,7 +1620,7 @@ impl MangoClient {
                         &mango_v4::accounts::PerpSettlePnl {
                             group: self.group(),
                             settler: self.mango_account_address,
-                            settler_owner: self.owner(),
+                            settler_owner: self.authority(),
                             perp_market: perp.address,
                             account_a: *account_a.0,
                             account_b: *account_b.0,
@@ -1656,7 +1724,7 @@ impl MangoClient {
                         perp_market: perp.address,
                         oracle: perp.oracle,
                         liqor: self.mango_account_address,
-                        liqor_owner: self.owner(),
+                        liqor_owner: self.authority(),
                         liqee: *liqee.0,
                         settle_bank: settle_token_info.first_bank(),
                         settle_vault: settle_token_info.first_vault(),
@@ -1716,7 +1784,7 @@ impl MangoClient {
                         perp_market: perp.address,
                         oracle: perp.oracle,
                         liqor: self.mango_account_address,
-                        liqor_owner: self.owner(),
+                        liqor_owner: self.authority(),
                         liqee: *liqee.0,
                         settle_bank: settle_token_info.first_bank(),
                         settle_vault: settle_token_info.first_vault(),
@@ -1824,7 +1892,7 @@ impl MangoClient {
                         group: self.group(),
                         liqee: *liqee.0,
                         liqor: self.mango_account_address,
-                        liqor_owner: self.owner(),
+                        liqor_owner: self.authority(),
                     },
                     None,
                 );
@@ -1885,7 +1953,7 @@ impl MangoClient {
                         group: self.group(),
                         liqee: *liqee.0,
                         liqor: self.mango_account_address,
-                        liqor_owner: self.owner(),
+                        liqor_owner: self.authority(),
                         liab_mint_info: liab_info.mint_info_address,
                         quote_vault: quote_info.first_vault(),
                         insurance_vault: group.insurance_vault,
@@ -1945,7 +2013,7 @@ impl MangoClient {
                         group: self.group(),
                         liqee: *liqee.0,
                         liqor: self.mango_account_address,
-                        liqor_authority: self.owner(),
+                        liqor_authority: self.authority(),
                     },
                     None,
                 );
@@ -1992,7 +2060,7 @@ impl MangoClient {
                         group: self.group(),
                         liqee: *account.0,
                         liqor: self.mango_account_address,
-                        liqor_authority: self.owner(),
+                        liqor_authority: self.authority(),
                     },
                     None,
                 );
@@ -2091,14 +2159,68 @@ impl MangoClient {
         ))
     }
 
-    // jupiter
-
-    pub fn jupiter_v6(&self) -> jupiter::v6::JupiterV6 {
-        jupiter::v6::JupiterV6 { mango_client: self }
+    // Swap (jupiter, sanctum)
+    pub fn swap(&self) -> swap::Swap {
+        swap::Swap { mango_client: self }
     }
 
-    pub fn jupiter(&self) -> jupiter::Jupiter {
-        jupiter::Jupiter { mango_client: self }
+    pub fn jupiter_v6(&self) -> swap::jupiter_v6::JupiterV6 {
+        swap::jupiter_v6::JupiterV6 { mango_client: self }
+    }
+
+    pub fn sanctum(&self) -> swap::sanctum::Sanctum {
+        swap::sanctum::Sanctum {
+            mango_client: self,
+            timeout_duration: self.client.config.sanctum_timeout,
+        }
+    }
+
+    pub(crate) async fn deserialize_instructions_and_alts(
+        &self,
+        message: &solana_sdk::message::VersionedMessage,
+    ) -> anyhow::Result<(Vec<Instruction>, Vec<AddressLookupTableAccount>)> {
+        let lookups = message.address_table_lookups().unwrap_or_default();
+        let address_lookup_tables = self
+            .fetch_address_lookup_tables(lookups.iter().map(|a| &a.account_key))
+            .await?;
+
+        let mut account_keys = message.static_account_keys().to_vec();
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .writable_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+        for (lookups, table) in lookups.iter().zip(address_lookup_tables.iter()) {
+            account_keys.extend(
+                lookups
+                    .readonly_indexes
+                    .iter()
+                    .map(|&index| table.addresses[index as usize]),
+            );
+        }
+
+        let compiled_ix = message
+            .instructions()
+            .iter()
+            .map(|ci| solana_sdk::instruction::Instruction {
+                program_id: *ci.program_id(&account_keys),
+                accounts: ci
+                    .accounts
+                    .iter()
+                    .map(|&index| AccountMeta {
+                        pubkey: account_keys[index as usize],
+                        is_signer: message.is_signer(index.into()),
+                        is_writable: message.is_maybe_writable(index.into()),
+                    })
+                    .collect(),
+                data: ci.data.clone(),
+            })
+            .collect();
+
+        Ok((compiled_ix, address_lookup_tables))
     }
 
     pub async fn fetch_address_lookup_table(
@@ -2139,7 +2261,7 @@ impl MangoClient {
         self.context.compute_estimates.cu_per_mango_instruction + health_cu
     }
 
-    pub async fn send_and_confirm_owner_tx(
+    pub async fn send_and_confirm_authority_tx(
         &self,
         instructions: Vec<Instruction>,
     ) -> anyhow::Result<Signature> {
@@ -2147,7 +2269,7 @@ impl MangoClient {
             instructions,
             ..self.transaction_builder().await?
         };
-        tx_builder.signers.push(self.owner.clone());
+        tx_builder.signers.push(self.authority.clone());
         tx_builder.send_and_confirm(&self.client).await
     }
 
@@ -2422,6 +2544,11 @@ impl TransactionBuilder {
             accounts,
             length: bytes.len(),
         })
+    }
+
+    pub fn append(&mut self, prepared_instructions: PreparedInstructions) {
+        self.instructions
+            .extend(prepared_instructions.to_instructions());
     }
 }
 

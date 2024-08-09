@@ -29,6 +29,7 @@ import {
   Signer,
   SystemProgram,
   TransactionInstruction,
+  VersionedTransaction,
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 import copy from 'fast-copy';
@@ -48,7 +49,7 @@ import {
   TokenConditionalSwapIntention,
   TokenPosition,
 } from './accounts/mangoAccount';
-import { StubOracle } from './accounts/oracle';
+import { StubOracle, createFallbackOracleMap } from './accounts/oracle';
 import {
   FillEvent,
   OutEvent,
@@ -111,6 +112,7 @@ export enum AccountRetriever {
 }
 
 export type IdsSource = 'api' | 'static' | 'get-program-accounts';
+export type FallbackOracleConfig = 'never' | 'all' | 'dynamic' | PublicKey[]; // 'fixed'
 
 export type MangoClientOptions = {
   idsSource?: IdsSource;
@@ -122,11 +124,14 @@ export type MangoClientOptions = {
   openbookFeesToDao?: boolean;
   prependedGlobalAdditionalInstructions?: TransactionInstruction[];
   multipleConnections?: Connection[];
+  fallbackOracleConfig?: FallbackOracleConfig;
+  turnOffPriceImpactLoading?: boolean;
 };
 
 export type TxCallbackOptions = {
   txid: string;
   txSignatureBlockHash: LatestBlockhash;
+  instructions?: VersionedTransaction;
 };
 
 export class MangoClient {
@@ -138,7 +143,10 @@ export class MangoClient {
   private txConfirmationCommitment: Commitment;
   private openbookFeesToDao: boolean;
   private prependedGlobalAdditionalInstructions: TransactionInstruction[] = [];
+  private fallbackOracleConfig: FallbackOracleConfig = 'never';
+  private fixedFallbacks: Map<string, [PublicKey, PublicKey]> = new Map();
   multipleConnections: Connection[] = [];
+  turnOffPriceImpactLoading: boolean;
 
   constructor(
     public program: Program<MangoV4>,
@@ -161,6 +169,8 @@ export class MangoClient {
     // TODO: evil side effect, but limited backtraces are a nightmare
     Error.stackTraceLimit = 1000;
     this.multipleConnections = opts?.multipleConnections ?? [];
+    this.fallbackOracleConfig = opts?.fallbackOracleConfig ?? 'never';
+    this.turnOffPriceImpactLoading = opts?.turnOffPriceImpactLoading ?? false;
   }
 
   /// Convenience accessors
@@ -433,8 +443,14 @@ export class MangoClient {
 
   public async getIds(groupPk: PublicKey): Promise<Id | undefined> {
     switch (this.idsSource) {
-      case 'api':
-        return await Id.fromApi(groupPk);
+      case 'api': {
+        try {
+          return await Id.fromApi(groupPk);
+        } catch (e) {
+          console.log(e);
+          return undefined;
+        }
+      }
       case 'get-program-accounts':
         return undefined;
       case 'static':
@@ -606,7 +622,7 @@ export class MangoClient {
     const assetBank = group.getFirstBankByTokenIndex(assetTokenIndex);
     const liabBank = group.getFirstBankByTokenIndex(liabTokenIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [liqor, liqee],
         [assetBank, liabBank],
@@ -621,7 +637,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
     const ix = await this.program.methods
       .tokenForceCloseBorrowsWithToken(
@@ -720,7 +736,11 @@ export class MangoClient {
         vault: bank.vault,
         oracle: bank.oracle,
         ownerAtaTokenAccount,
-        alternateOwnerTokenAccount,
+        alternateOwnerTokenAccount: alternateOwnerTokenAccount.equals(
+          PublicKey.default,
+        )
+          ? ownerAtaTokenAccount
+          : alternateOwnerTokenAccount,
       })
       .instruction();
     return await this.sendAndConfirmTransactionForGroup(group, [
@@ -738,9 +758,8 @@ export class MangoClient {
     const adminPk = (this.program.provider as AnchorProvider).wallet.publicKey;
 
     const dustVaultPk = await getAssociatedTokenAddress(bank.mint, adminPk);
-    const ai = await this.program.provider.connection.getAccountInfo(
-      dustVaultPk,
-    );
+    const ai =
+      await this.program.provider.connection.getAccountInfo(dustVaultPk);
     const preInstructions: TransactionInstruction[] = [];
     if (!ai) {
       preInstructions.push(
@@ -766,7 +785,7 @@ export class MangoClient {
       .remainingAccounts(
         [bank.publicKey, bank.vault].map(
           (pk) =>
-            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1072,7 +1091,13 @@ export class MangoClient {
     checkKind: HealthCheckKind,
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [], [], []);
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [],
+        [],
+        [],
+      );
 
     return await this.program.methods
       .healthCheck(minHealthValue, checkKind)
@@ -1083,7 +1108,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1547,7 +1572,12 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], []);
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [bank],
+        [],
+      );
 
     const sharedAccounts = {
       group: group.publicKey,
@@ -1577,7 +1607,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -1703,7 +1733,13 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [bank], [], []);
+      await this.buildHealthRemainingAccounts(
+        group,
+        [mangoAccount],
+        [bank],
+        [],
+        [],
+      );
 
     const ix = await this.program.methods
       .tokenWithdraw(new BN(nativeAmount), allowBorrow)
@@ -1723,7 +1759,7 @@ export class MangoClient {
               pubkey: pk,
               isWritable: false,
               isSigner: false,
-            } as AccountMeta),
+            }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2027,7 +2063,7 @@ export class MangoClient {
     );
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         [],
@@ -2066,7 +2102,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2140,7 +2176,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         banks,
@@ -2214,7 +2250,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2264,7 +2300,7 @@ export class MangoClient {
     }
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         banks,
@@ -2351,7 +2387,7 @@ export class MangoClient {
               pubkey: pk,
               isWritable: receiverBank.publicKey.equals(pk) ? true : false,
               isSigner: false,
-            } as AccountMeta),
+            }) as AccountMeta,
         ),
       )
       .instruction();
@@ -2902,7 +2938,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
+      await this.buildHealthRemainingAccounts(group, [mangoAccount], [], []);
     return await this.program.methods
       .perpDeactivatePosition()
       .accounts({
@@ -2914,7 +2950,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3035,7 +3071,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -3069,7 +3105,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3092,7 +3128,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -3127,7 +3163,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3185,7 +3221,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -3221,7 +3257,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3245,7 +3281,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         // Settlement token bank, because a position for it may be created
@@ -3282,7 +3318,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3527,7 +3563,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [profitableAccount, unprofitableAccount],
         [group.getFirstBankForPerpSettlement()],
@@ -3551,7 +3587,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3581,7 +3617,7 @@ export class MangoClient {
   ): Promise<TransactionInstruction> {
     const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [account], // Account must be unprofitable
         [group.getFirstBankForPerpSettlement()],
@@ -3603,7 +3639,7 @@ export class MangoClient {
       .remainingAccounts(
         healthRemainingAccounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: false, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: false, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3637,7 +3673,7 @@ export class MangoClient {
       .remainingAccounts(
         accounts.map(
           (pk) =>
-            ({ pubkey: pk, isWritable: true, isSigner: false } as AccountMeta),
+            ({ pubkey: pk, isWritable: true, isSigner: false }) as AccountMeta,
         ),
       )
       .instruction();
@@ -3703,6 +3739,7 @@ export class MangoClient {
     // margin trade is a general function
     // set flash_loan_type to FlashLoanType.swap if you desire the transaction to be recorded as a swap
     flashLoanType,
+    sequenceCheck = false,
   }: {
     group: Group;
     mangoAccount: MangoAccount;
@@ -3712,6 +3749,7 @@ export class MangoClient {
     userDefinedInstructions: TransactionInstruction[];
     userDefinedAlts: AddressLookupTableAccount[];
     flashLoanType: FlashLoanType;
+    sequenceCheck: boolean;
   }): Promise<MangoSignatureStatus> {
     const isDelegate = (
       this.program.provider as AnchorProvider
@@ -3724,7 +3762,7 @@ export class MangoClient {
     const outputBank: Bank = group.getFirstBankByMint(outputMintPk);
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [mangoAccount],
         [inputBank, outputBank],
@@ -3736,7 +3774,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     /*
@@ -3837,6 +3875,8 @@ export class MangoClient {
       ])
       .instruction();
 
+    const sequenceCheckIx = await this.sequenceCheckIx(group, mangoAccount);
+
     const flashLoanBeginIx = await this.program.methods
       .flashLoanBegin([
         toNative(amountIn, inputBank.mintDecimals),
@@ -3864,6 +3904,7 @@ export class MangoClient {
       group,
       [
         ...preInstructions,
+        ...(sequenceCheck ? [sequenceCheckIx] : []),
         flashLoanBeginIx,
         ...userDefinedInstructions,
         flashLoanEndIx,
@@ -3920,7 +3961,7 @@ export class MangoClient {
     const liabBank: Bank = group.getFirstBankByMint(liabMintPk);
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [liqor, liqee],
         [assetBank, liabBank],
@@ -3936,7 +3977,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     const ix = await this.program.methods
@@ -4914,7 +4955,7 @@ export class MangoClient {
     const sellBank = group.banksMapByTokenIndex.get(tcs.sellTokenIndex)![0];
 
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [liqor, liqee],
         [buyBank, sellBank],
@@ -4930,7 +4971,7 @@ export class MangoClient {
               ? true
               : false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return this.program.methods
@@ -4993,7 +5034,7 @@ export class MangoClient {
     perpMarkets: PerpMarket[] = [],
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [account],
         [...banks],
@@ -5005,7 +5046,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return await this.program.methods
@@ -5026,7 +5067,7 @@ export class MangoClient {
     perpMarkets: PerpMarket[] = [],
   ): Promise<TransactionInstruction> {
     const healthRemainingAccounts: PublicKey[] =
-      this.buildHealthRemainingAccounts(
+      await this.buildHealthRemainingAccounts(
         group,
         [account],
         [...banks],
@@ -5038,7 +5079,7 @@ export class MangoClient {
           pubkey: pk,
           isWritable: false,
           isSigner: false,
-        } as AccountMeta),
+        }) as AccountMeta,
     );
 
     return await this.program.methods
@@ -5057,6 +5098,7 @@ export class MangoClient {
     opts?: MangoClientOptions,
   ): MangoClient {
     const idl = IDL;
+    console.log(opts);
 
     return new MangoClient(
       new Program<MangoV4>(idl as MangoV4, programId, provider),
@@ -5131,7 +5173,7 @@ export class MangoClient {
    * @param openOrdersForMarket - markets in which new positions might be opened
    * @returns
    */
-  buildHealthRemainingAccounts(
+  async buildHealthRemainingAccounts(
     group: Group,
     mangoAccounts: MangoAccount[],
     // Banks and markets for whom positions don't exist on mango account,
@@ -5139,7 +5181,7 @@ export class MangoClient {
     banks: Bank[] = [],
     perpMarkets: PerpMarket[] = [],
     openOrdersForMarket: [Serum3Market, PublicKey][] = [],
-  ): PublicKey[] {
+  ): Promise<PublicKey[]> {
     const healthRemainingAccounts: PublicKey[] = [];
 
     const tokenPositionIndices = mangoAccounts
@@ -5244,7 +5286,83 @@ export class MangoClient {
         .map((serumPosition) => serumPosition.openOrders),
     );
 
+    const fallbackMap = await this.deriveFallbackOracleContexts(group);
+    const fallbacks: PublicKey[] = [];
+
+    for (const oracle of mintInfos.map((mintInfo) => mintInfo.oracle)) {
+      if (fallbackMap.has(oracle.toBase58())) {
+        fallbacks.push(...fallbackMap.get(oracle.toBase58())!);
+      }
+    }
+
+    for (const fallback of uniq(fallbacks)) {
+      if (
+        !healthRemainingAccounts.find((h) => h.equals(fallback)) &&
+        !fallback.equals(PublicKey.default)
+      ) {
+        healthRemainingAccounts.push(fallback);
+      }
+    }
     return healthRemainingAccounts;
+  }
+
+  /**This function assumes that the provided group has loaded banks*/
+  public async deriveFallbackOracleContexts(
+    group: Group,
+  ): Promise<Map<string, [PublicKey, PublicKey]>> {
+    // fixed
+    if (typeof this.fallbackOracleConfig !== 'string') {
+      if (this.fixedFallbacks.size === 0) {
+        const oracles: PublicKey[] = [];
+        const fallbacks: PublicKey[] = [];
+        Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
+          if (
+            (this.fallbackOracleConfig as PublicKey[]).find(
+              (o) => o.toBase58() === b[0].oracle.toBase58(),
+            )
+          ) {
+            oracles.push(b[0].oracle);
+            fallbacks.push(b[0].fallbackOracle);
+          }
+        });
+        this.fixedFallbacks = await createFallbackOracleMap(
+          this.connection,
+          oracles,
+          fallbacks,
+        );
+      }
+      return this.fixedFallbacks;
+    }
+
+    switch (this.fallbackOracleConfig) {
+      case 'never':
+        return new Map();
+      case 'dynamic': {
+        const nowSlot = await this.connection.getSlot();
+        const oracles: PublicKey[] = [];
+        const fallbacks: PublicKey[] = [];
+        await group.reloadBankOraclePrices(this);
+        Array.from(group.banksMapByTokenIndex.values())
+          .filter((b) => b[0].isOracleStaleOrUnconfident(nowSlot))
+          .forEach((b) => {
+            oracles.push(b[0].oracle);
+            fallbacks.push(b[0].fallbackOracle);
+          });
+        return createFallbackOracleMap(this.connection, oracles, fallbacks);
+      }
+      case 'all': {
+        const oracles: PublicKey[] = [];
+        const fallbacks: PublicKey[] = [];
+        Array.from(group.banksMapByTokenIndex.values()).forEach((b) => {
+          oracles.push(b[0].oracle);
+          fallbacks.push(b[0].fallbackOracle);
+        });
+        return createFallbackOracleMap(this.connection, oracles, fallbacks);
+      }
+      default: {
+        return new Map();
+      }
+    }
   }
 
   public async modifyPerpOrder(

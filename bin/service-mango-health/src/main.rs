@@ -16,6 +16,11 @@ use crate::processors::health::HealthProcessor;
 use crate::processors::logger::LoggerProcessor;
 use crate::processors::persister::PersisterProcessor;
 
+// jemalloc seems to be better at keeping the memory footprint reasonable over
+// longer periods of time
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -64,7 +69,8 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
 
-    let mut jobs = vec![exit_processor.job, data_processor.job, health_processor.job];
+    let mut jobs = vec![exit_processor.job, health_processor.job];
+    jobs.extend(data_processor.jobs);
 
     if let Some(logger) = logger {
         jobs.push(logger.job)

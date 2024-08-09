@@ -14,8 +14,12 @@ async function main(): Promise<void> {
       (pm) => pm.name == 'SOL-PERP',
     )[0];
 
-    console.log(`Long funding ${perpMarket.longFunding.toNumber().toLocaleString()}`);
-    console.log(`Short funding ${perpMarket.shortFunding.toNumber().toLocaleString()}`);
+    console.log(
+      `Long funding ${perpMarket.longFunding.toNumber().toLocaleString()}`,
+    );
+    console.log(
+      `Short funding ${perpMarket.shortFunding.toNumber().toLocaleString()}`,
+    );
     const bids = await perpMarket.loadBids(client);
     const asks = await perpMarket.loadAsks(client);
     console.log(`FR ${perpMarket.getInstantaneousFundingRateUi(bids, asks)}`);
@@ -24,7 +28,9 @@ async function main(): Promise<void> {
       new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
       false,
     );
-    const perpPosition = mangoAccount.getPerpPosition(perpMarket.perpMarketIndex);
+    const perpPosition = mangoAccount.getPerpPosition(
+      perpMarket.perpMarketIndex,
+    );
     console.log(
       `Long settled funding ${perpPosition?.longSettledFunding
         .toNumber()
@@ -35,7 +41,9 @@ async function main(): Promise<void> {
         .toNumber()
         .toLocaleString()}`,
     );
-    console.log(`Unsettled funding ui ${perpPosition?.getUnsettledFundingUi(perpMarket)}`);
+    console.log(
+      `Unsettled funding ui ${perpPosition?.getUnsettledFundingUi(perpMarket)}`,
+    );
     console.log('');
     await new Promise((r) => setTimeout(r, 5 * 1000));
   }

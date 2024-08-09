@@ -315,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.75"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
+checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
 name = "arc-swap"
@@ -2349,6 +2349,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "git2"
+version = "0.18.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "232e6a7bfe35766bf715e55a88b39a700596c0ccfd88cd3680b4cdb40d66ef70"
+dependencies = [
+ "bitflags 2.4.0",
+ "libc",
+ "libgit2-sys",
+ "log 0.4.20",
+ "url 2.4.1",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3175,6 +3188,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9cdc71e17332e86d2e1d38c1f99edcb6288ee11b815fb1a4b049eaa2114d369b"
 
 [[package]]
+name = "libgit2-sys"
+version = "0.16.2+1.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee4126d8b4ee5c9d9ea891dd875cfdc1e9d0950437179104b183d7d8a74d24e8"
+dependencies = [
+ "cc",
+ "libc",
+ "libz-sys",
+ "pkg-config",
+]
+
+[[package]]
 name = "libloading"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3308,6 +3333,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d97137b25e321a73eef1418d1d5d2eda4d77e12813f8e6dead84bc52c5870a7b"
 dependencies = [
  "cc",
+ "libc",
  "pkg-config",
  "vcpkg",
 ]
@@ -3525,6 +3551,7 @@ dependencies = [
  "atty",
  "base64 0.13.1",
  "bincode",
+ "borsh 0.10.3",
  "clap 3.2.25",
  "derive_builder",
  "fixed 1.11.0 (git+https://github.com/blockworks-foundation/fixed.git?branch=v1.11.0-borsh0_10-mango)",
@@ -3553,6 +3580,7 @@ dependencies = [
  "tokio-tungstenite 0.17.2",
  "tracing",
  "tracing-subscriber",
+ "vergen",
 ]
 
 [[package]]
@@ -3592,6 +3620,7 @@ dependencies = [
  "async-channel",
  "async-stream 0.2.1",
  "async-trait",
+ "borsh 0.10.3",
  "bs58 0.3.1",
  "bytemuck",
  "bytes 1.5.0",
@@ -3603,6 +3632,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hdrhistogram",
+ "indexmap 2.0.0",
  "itertools",
  "jemallocator",
  "jsonrpc-core 18.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3619,6 +3649,7 @@ dependencies = [
  "serum_dex 0.5.10 (git+https://github.com/openbook-dex/program.git)",
  "shellexpand",
  "solana-account-decoder",
+ "solana-address-lookup-table-program",
  "solana-client",
  "solana-logger",
  "solana-rpc",
@@ -4283,6 +4314,15 @@ dependencies = [
  "proc-macro2 1.0.79",
  "quote 1.0.36",
  "syn 2.0.58",
+]
+
+[[package]]
+name = "num_threads"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -8621,6 +8661,8 @@ checksum = "426f806f4089c493dcac0d24c29c01e2c38baf8e30f1b716ee37e83d200b18fe"
 dependencies = [
  "deranged",
  "itoa",
+ "libc",
+ "num_threads",
  "serde",
  "time-core",
  "time-macros",
@@ -9541,6 +9583,19 @@ name = "vec_map"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
+
+[[package]]
+name = "vergen"
+version = "8.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e27d6bdd219887a9eadd19e1c34f32e47fa332301184935c6d9bca26f3cca525"
+dependencies = [
+ "anyhow",
+ "cfg-if 1.0.0",
+ "git2",
+ "rustversion",
+ "time 0.3.29",
+]
 
 [[package]]
 name = "version_check"

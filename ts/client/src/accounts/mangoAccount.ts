@@ -1,7 +1,12 @@
 import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { AccountInfo, PublicKey } from '@solana/web3.js';
+import {
+  AccountInfo,
+  PublicKey,
+  TransactionInstruction,
+} from '@solana/web3.js';
+import { PullFeed } from '@switchboard-xyz/on-demand';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -24,6 +29,7 @@ import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
+import { sbOnDemandProgram } from './oracle';
 import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
@@ -58,6 +64,7 @@ export class MangoAccount {
       perps: unknown;
       perpOpenOrders: unknown;
       tokenConditionalSwaps: unknown;
+      lastCollateralFeeCharge: BN;
     },
   ): MangoAccount {
     return new MangoAccount(
@@ -78,6 +85,7 @@ export class MangoAccount {
       obj.buybackFeesExpiryTimestamp,
       obj.sequenceNumber,
       obj.headerVersion,
+      obj.lastCollateralFeeCharge,
       obj.tokens as TokenPositionDto[],
       obj.serum3 as Serum3PositionDto[],
       obj.perps as PerpPositionDto[],
@@ -105,6 +113,7 @@ export class MangoAccount {
     public buybackFeesExpiryTimestamp: BN,
     public sequenceNumber: number,
     public headerVersion: number,
+    public lastCollateralFeeCharge: BN,
     tokens: TokenPositionDto[],
     serum3: Serum3PositionDto[],
     perps: PerpPositionDto[],
@@ -1203,6 +1212,40 @@ export class MangoAccount {
     return toUiDecimalsForQuote(this.getMaxFeesBuyback(group));
   }
 
+  public async buildIxsForStaleOrUnconfidentOracles(
+    client: MangoClient,
+    group: Group,
+  ): Promise<TransactionInstruction[]> {
+    return await this.buildIxsForStaleOrUnconfidentOraclesInternal(
+      group,
+      await client.buildHealthRemainingAccounts(group, [this]),
+    );
+  }
+
+  public async buildIxsForStaleOrUnconfidentOraclesInternal(
+    group: Group,
+    relevantOraclesToAUserAction: PublicKey[],
+  ): Promise<TransactionInstruction[]> {
+    const promises: Promise<any>[] = [];
+    for (const oracle of relevantOraclesToAUserAction) {
+      const bank = group.getFirstBankByOracle(oracle);
+      if (!bank.isOracleStaleOrUnconfident(group.groupLastUpdatedSlot)) {
+        continue;
+      }
+      const pullFeed = new PullFeed(
+        sbOnDemandProgram as any,
+        new PublicKey(oracle),
+      );
+      promises.push(
+        pullFeed.fetchUpdateIx({
+          numSignatures: 2 /* TODO: This needs to be computed dynamically */,
+        }),
+      );
+    }
+
+    return (await Promise.all(promises)).map((item) => item[0]);
+  }
+
   toString(group?: Group, onlyTokens = false): string {
     let res = 'MangoAccount';
     res = res + '\n pk: ' + this.publicKey.toString();
@@ -1619,12 +1662,10 @@ export class PerpPosition {
       throw new Error("PerpPosition doesn't belong to the given market!");
     }
     const cumulativeFunding = this.getCumulativeFunding(perpMarket);
-    // can't be long and short at the same time
-    if (cumulativeFunding.cumulativeLongFunding !== 0) {
-      return -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding);
-    } else {
-      return toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding);
-    }
+    return (
+      -1 * toUiDecimalsForQuote(cumulativeFunding.cumulativeLongFunding) +
+      toUiDecimalsForQuote(cumulativeFunding.cumulativeShortFunding)
+    );
   }
 
   public getEquity(perpMarket: PerpMarket): I80F48 {

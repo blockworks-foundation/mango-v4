@@ -80,6 +80,7 @@ pub fn encode_address(addr: &Pubkey) -> String {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
+    mango_v4_client::print_git_version();
 
     let args = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
@@ -178,7 +179,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Getting solana account snapshots via jsonrpc
     // FUTURE: of what to fetch a snapshot - should probably take as an input
-    snapshot_source::start(
+    let snapshot_job = snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
             mango_group,
@@ -353,6 +354,7 @@ async fn main() -> anyhow::Result<()> {
 
     use futures::StreamExt;
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
+        snapshot_job,
         data_job,
         settle_job,
         tcs_start_job,

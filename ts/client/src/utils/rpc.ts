@@ -142,6 +142,7 @@ export async function sendTransaction(
       opts.postSendTxCallback({
         txid: signature,
         txSignatureBlockHash: latestBlockhash,
+        instructions: vtx,
       });
     } catch (e) {
       console.warn(`postSendTxCallback error ${e}`);
@@ -237,8 +238,8 @@ const confirmTransaction = async (
             stringifiedError
               ? stringifiedError
               : individualError
-              ? individualError
-              : 'Unknown error'
+                ? individualError
+                : 'Unknown error'
           }`,
         });
       }

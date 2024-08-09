@@ -40,3 +40,11 @@ export const JUPITER = {
   V4: new PublicKey('JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB'),
   V6: new PublicKey('JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4'),
 };
+
+export const DEFAULT_RECEIVER_PROGRAM_ID = new PublicKey(
+  'rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ',
+);
+
+export const SBOD_ORACLE_LUTS = [
+  '3DdohDpFiXjLNqCzFyU8CP3rtGwkn9VbkxFYGrNiqcyR',
+];

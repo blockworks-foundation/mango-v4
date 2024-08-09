@@ -11,7 +11,9 @@ import {
   Keypair,
   PublicKey,
 } from '@solana/web3.js';
-
+import fs from 'fs';
+import * as toml from '@iarna/toml';
+import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
@@ -21,19 +23,18 @@ import {
   Queue,
   SB_ON_DEMAND_PID,
 } from '@switchboard-xyz/on-demand';
-import fs from 'fs';
 import {
   Program as Anchor30Program,
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
-import { struct, u8, publicKey, u64, option } from '@raydium-io/raydium-sdk';
-import * as toml from '@iarna/toml';
-import { toNative } from '../src/utils';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
+import { createComputeBudgetIx } from '../src/utils/rpc';
 
 // Configuration
-const TIER: LISTING_PRESETS_KEY = 'asset_250';
-const TOKEN_MINT = 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN';
+const TIER: LISTING_PRESETS_KEY = 'asset_10';
+const TOKEN_MINT = 'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac';
 
 // Tier based variables
 const swapValue = tierToSwitchboardJobSwapValue[TIER];
@@ -51,14 +52,17 @@ const maxStaleness =
 const JUPITER_PRICE_API_MAINNET = 'https://price.jup.ag/v4/';
 const JUPITER_TOKEN_API_MAINNET = 'https://token.jup.ag/all';
 const WRAPPED_SOL_MINT = 'So11111111111111111111111111111111111111112';
-const PYTH_SOL_ORACLE = 'H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG';
+const PYTH_SOL_ORACLE =
+  'ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const PYTH_USDC_ORACLE = 'Gnt27xtC473ZT2Mw5u8wZ68Z3gULkSTb5DuxJy7eJotD';
+const PYTH_USDC_ORACLE =
+  'eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a';
 const SWITCHBOARD_USDC_ORACLE = 'FwYfsmj5x8YZXtQBNo2Cz8TE7WRCMFqA6UTffK4xQKMH';
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 const CLUSTER_URL =
   process.env.CLUSTER_URL_OVERRIDE || process.env.MB_CLUSTER_URL;
+
 const USER_KEYPAIR =
   process.env.USER_KEYPAIR_OVERRIDE || process.env.MB_PAYER_KEYPAIR;
 
@@ -74,7 +78,9 @@ async function setupAnchor() {
       ),
     ),
   );
+  //@ts-ignore
   const userWallet = new Wallet(user);
+  //@ts-ignore
   const userProvider = new AnchorProvider(connection, userWallet, options);
 
   return { userProvider, connection, user };
@@ -230,100 +236,77 @@ const getLstStakePool = async (
   }
 };
 
-const LSTExactIn = (
-  inMint: string,
-  nativeInAmount: string,
-  stakePoolAddress: string,
-): string => {
+const LSTExactIn = (inMint: string, uiAmountIn: string): string => {
   const template = `tasks:
-        - conditionalTask:
-            attempt:
-            - httpTask:
-                      url: https://api.sanctum.so/v1/swap/quote?input=${inMint}&outputLstMint=So11111111111111111111111111111111111111112&amount=${nativeInAmount}&mode=ExactIn
-            - jsonParseTask:
-                      path: $.outAmount
-            - divideTask:
-                     scalar: ${nativeInAmount}
-            onFailure:
-            - splStakePoolTask:
-                pubkey: ${stakePoolAddress}
-            - cacheTask:
-                cacheItems:
-                  - variableName: poolTokenSupply
-                    job:
-                      tasks:
-                        - jsonParseTask:
-                            path: $.uiPoolTokenSupply
-                            aggregationMethod: NONE
-                  - variableName: totalStakeLamports
-                    job:
-                      tasks:
-                        - jsonParseTask:
-                            path: $.uiTotalLamports
-                            aggregationMethod: NONE
-            - valueTask:
-                big: \${totalStakeLamports}
-            - divideTask:
-                big: \${poolTokenSupply}
+- conditionalTask:
+    attempt:
+    - sanctumLstPriceTask:
+        lstMint: ${inMint}
+    - conditionalTask:
+        attempt:
+        - valueTask:
+            big: ${uiAmountIn}
+        - divideTask:
+            job:
+              tasks:
+              - jupiterSwapTask:
+                  inTokenAddress: So11111111111111111111111111111111111111112
+                  outTokenAddress: ${inMint}
+                  baseAmountString: ${uiAmountIn}
+    - conditionalTask:
+        attempt:
         - multiplyTask:
-                  job:
-                    tasks:
-                      - oracleTask:
-                          pythAddress: H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG
-                          pythAllowedConfidenceInterval: 10`;
+            job:
+              tasks:
+              - oracleTask:
+                  pythAddress: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
+                  pythAllowedConfidenceInterval: 10
+        onFailure:
+        - multiplyTask:
+            job:
+              tasks:
+              - oracleTask:
+                  switchboardAddress: AEcJSgRBkU9WnKCBELj66TPFfzhKWBWa4tL7JugnonUa`;
   return template;
 };
 
-const LSTExactOut = (
-  inMint: string,
-  nativeOutSolAmount: string,
-  stakePoolAddress: string,
-): string => {
+const LSTExactOut = (inMint: string, uiOutSolAmount: string): string => {
   const template = `tasks:
-      - conditionalTask:
-          attempt:
-            - cacheTask:
-                cacheItems:
-                  - variableName: QTY
-                    job:
-                      tasks:
-                        - httpTask:
-                            url: https://api.sanctum.so/v1/swap/quote?input=${inMint}&outputLstMint=So11111111111111111111111111111111111111112&amount=${nativeOutSolAmount}&mode=ExactOut
-                        - jsonParseTask:
-                                  path: $.inAmount
-            - httpTask:
-                 url: https://api.sanctum.so/v1/swap/quote?input=${inMint}&outputLstMint=So11111111111111111111111111111111111111112&amount=\${QTY}&mode=ExactIn
-            - jsonParseTask:
-                path: $.outAmount
-            - divideTask:
-                big: \${QTY}
-          onFailure:
-              - splStakePoolTask:
-                  pubkey: ${stakePoolAddress}
-              - cacheTask:
-                  cacheItems:
-                    - variableName: poolTokenSupply
-                      job:
-                        tasks:
-                          - jsonParseTask:
-                              path: $.uiPoolTokenSupply
-                              aggregationMethod: NONE
-                    - variableName: totalStakeLamports
-                      job:
-                        tasks:
-                          - jsonParseTask:
-                              path: $.uiTotalLamports
-                              aggregationMethod: NONE
-              - valueTask:
-                  big: \${totalStakeLamports}
-              - divideTask:
-                  big: \${poolTokenSupply}
-      - multiplyTask:
+- conditionalTask:
+    attempt:
+    - sanctumLstPriceTask:
+        lstMint: ${inMint}
+    - conditionalTask:
+        attempt:
+        - cacheTask:
+            cacheItems:
+            - variableName: QTY
+              job:
+                tasks:
+                - jupiterSwapTask:
+                    inTokenAddress: So11111111111111111111111111111111111111112
+                    outTokenAddress: ${inMint}
+                    baseAmountString: ${uiOutSolAmount}
+        - jupiterSwapTask:
+            inTokenAddress: ${inMint}
+            outTokenAddress: So11111111111111111111111111111111111111112
+            baseAmountString: \${QTY}
+        - divideTask:
+            big: \${QTY}
+    - conditionalTask:
+        attempt:
+        - multiplyTask:
             job:
               tasks:
-                - oracleTask:
-                    pythAddress: H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4AQJEG
-                    pythAllowedConfidenceInterval: 10`;
+              - oracleTask:
+                  pythAddress: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
+                  pythAllowedConfidenceInterval: 10
+        onFailure:
+        - multiplyTask:
+            job:
+              tasks:
+              - oracleTask:
+                  switchboardAddress: AEcJSgRBkU9WnKCBELj66TPFfzhKWBWa4tL7JugnonUa`;
   return template;
 };
 
@@ -459,11 +442,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
       ? OracleJob.fromYaml(
           LSTExactIn(
             TOKEN_MINT,
-            toNative(
-              Math.ceil(Number(swapValue) / price),
-              tokeninfo!.decimals,
-            ).toString(),
-            lstPool,
+            Math.ceil(Number(swapValue) / price).toString(),
           ),
         )
       : OracleJob.fromObject({
@@ -536,11 +515,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
       ? OracleJob.fromYaml(
           LSTExactOut(
             TOKEN_MINT,
-            toNative(
-              Math.ceil(Number(swapValue) / price),
-              tokeninfo!.decimals,
-            ).toString(),
-            lstPool,
+            Math.ceil(Number(swapValue) / price).toString(),
           ),
         )
       : OracleJob.fromObject({
@@ -628,6 +603,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   console.log('Feed hash:', decodedFeedHash);
 
   const tx = await asV0Tx({
+    //@ts-ignore
     connection: sbOnDemandProgram.provider.connection,
     ixs: [await pullFeed.initIx({ ...conf, feedHash: decodedFeedHash! })],
     payer: user.publicKey,
@@ -637,8 +613,38 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   });
   console.log('Sending initialize transaction');
   const sim = await connection.simulateTransaction(tx, txOpts);
-  const sig = await connection.sendTransaction(tx, txOpts);
-  console.log(`Feed ${feedKp.publicKey} initialized: ${sig}`);
+
+  sendSignAndConfirmTransactions({
+    connection,
+    //@ts-ignore
+    wallet: new Wallet(user),
+    backupConnections: [],
+    transactionInstructions: [
+      {
+        instructionsSet: [
+          {
+            signers: [],
+            transactionInstruction: createComputeBudgetIx(500000),
+          },
+          ...[
+            await pullFeed.initIx({ ...conf, feedHash: decodedFeedHash! }),
+          ].map((tx) => ({
+            signers: [user, feedKp],
+            transactionInstruction: tx,
+          })),
+        ],
+        sequenceType: SequenceType.Sequential,
+      },
+    ],
+    config: {
+      maxTxesInBatch: 10,
+      maxRetries: 1,
+      autoRetry: true,
+      logFlowInfo: false,
+      useVersionedTransactions: true,
+    },
+  });
+  console.log(`Feed ${feedKp.publicKey}`);
 })();
 
 export type Token = {

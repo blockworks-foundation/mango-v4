@@ -7,7 +7,10 @@ export const DEFAULT_VSR_ID = new web3.PublicKey(
 );
 
 export class VsrClient {
-  constructor(public program: Program<Idl>, public devnet?: boolean) {}
+  constructor(
+    public program: Program<Idl>,
+    public devnet?: boolean,
+  ) {}
 
   static async connect(
     provider: Provider,

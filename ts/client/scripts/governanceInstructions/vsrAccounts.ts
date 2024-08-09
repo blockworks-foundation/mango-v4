@@ -131,9 +131,8 @@ export const tryGetRegistrar = async (
   client: VsrClient,
 ) => {
   try {
-    const existingRegistrar = await client.program.account.registrar.fetch(
-      registrarPk,
-    );
+    const existingRegistrar =
+      await client.program.account.registrar.fetch(registrarPk);
     return existingRegistrar as unknown as Registrar;
   } catch (e) {
     return null;

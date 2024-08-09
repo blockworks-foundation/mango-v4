@@ -28,6 +28,7 @@ use solana_sdk::pubkey::Pubkey;
 pub struct TokenContext {
     pub group: Pubkey,
     pub token_index: TokenIndex,
+    pub closed: bool,
     pub name: String,
     pub mint: Pubkey,
     pub oracle: Pubkey,
@@ -122,6 +123,11 @@ pub struct ComputeEstimates {
     pub cu_per_oracle_fallback: u32,
     pub cu_per_charge_collateral_fees: u32,
     pub cu_per_charge_collateral_fees_token: u32,
+    pub cu_per_associated_token_account_creation: u32,
+    pub cu_perp_update_funding: u32,
+    pub cu_perp_consume_events_base: u32,
+    pub cu_perp_consume_events_per_event: u32,
+    pub cu_token_update_index_and_rates: u32,
 }
 
 impl Default for ComputeEstimates {
@@ -145,6 +151,11 @@ impl Default for ComputeEstimates {
             cu_per_charge_collateral_fees: 20_000,
             // per-chargable-token cost
             cu_per_charge_collateral_fees_token: 15_000,
+            cu_per_associated_token_account_creation: 21_000,
+            cu_perp_update_funding: 40_000,
+            cu_perp_consume_events_base: 10_000,
+            cu_perp_consume_events_per_event: 18_000,
+            cu_token_update_index_and_rates: 90_000,
         }
     }
 }
@@ -261,6 +272,7 @@ impl MangoGroupContext {
                         name: String::new(),
                         mint_info_address: *pk,
                         decimals: u8::MAX,
+                        closed: true,
                         banks: mi.banks,
                         vaults: mi.vaults,
                         oracle: mi.oracle,
@@ -287,6 +299,8 @@ impl MangoGroupContext {
         let fallback_oracle_accounts = fetch_multiple_accounts(rpc, &fallback_keys[..]).await?;
         for (index, (_, bank)) in bank_tuples.iter().enumerate() {
             let token = tokens.get_mut(&bank.token_index).unwrap();
+            token.closed &=
+                bank.native_deposits() == 0 && bank.native_borrows() == 0 && bank.reduce_only == 1;
             token.name = bank.name().into();
             token.decimals = bank.mint_decimals;
             token.oracle_config = bank.oracle_config;

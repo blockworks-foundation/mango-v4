@@ -85,6 +85,7 @@ export class Group {
       new Map(), // banksMapByName
       new Map(), // banksMapByMint
       new Map(), // banksMapByTokenIndex
+      new Map(), // banksMapByOracle
       new Map(), // serum3MarketsMapByExternal
       new Map(), // serum3MarketsMapByMarketIndex
       new Map(), // serum3MarketExternalsMap
@@ -95,6 +96,7 @@ export class Group {
       new Map(), // mintInfosMapByMint
       new Map(), // vaultAmountsMap
       [],
+      -1,
     );
   }
 
@@ -125,6 +127,8 @@ export class Group {
     public banksMapByName: Map<string, Bank[]>,
     public banksMapByMint: Map<string, Bank[]>,
     public banksMapByTokenIndex: Map<TokenIndex, Bank[]>,
+    // note: we could sometimes use same oracle for multiple banks e.g. dai/chai
+    public banksMapByOracle: Map<string, Bank[]>,
     public serum3MarketsMapByExternal: Map<string, Serum3Market>,
     public serum3MarketsMapByMarketIndex: Map<MarketIndex, Serum3Market>,
     public serum3ExternalMarketsMap: Map<string, Market>,
@@ -135,18 +139,23 @@ export class Group {
     public mintInfosMapByMint: Map<string, MintInfo>,
     public vaultAmountsMap: Map<string, BN>,
     public pis: PriceImpact[],
+    public groupLastUpdatedSlot: number,
   ) {}
 
   public async reloadAll(client: MangoClient): Promise<void> {
     const ids: Id | undefined = await client.getIds(this.publicKey);
-
     // console.time('group.reload');
-    await Promise.all([
-      this.reloadPriceImpactData(),
+    const promises: Promise<void | [void, void, void]>[] = [];
+    if (!client.turnOffPriceImpactLoading) {
+      promises.push(this.reloadPriceImpactData());
+    }
+    promises.push(
+      this.updateLastUpdatedSlot(client),
       this.reloadAlts(client),
       this.reloadBanks(client, ids).then(() =>
         Promise.all([
           this.reloadBankOraclePrices(client),
+          // TODO: load fallback oracles
           this.reloadVaults(client),
           this.reloadPerpMarkets(client, ids).then(() =>
             this.reloadPerpMarketOraclePrices(client),
@@ -157,8 +166,14 @@ export class Group {
       this.reloadSerum3Markets(client, ids).then(() =>
         this.reloadSerum3ExternalMarkets(client, ids),
       ),
-    ]);
+    );
+    await Promise.all(promises);
     // console.timeEnd('group.reload');
+  }
+
+  public async updateLastUpdatedSlot(client: MangoClient): Promise<void> {
+    this.groupLastUpdatedSlot =
+      await client.program.provider.connection.getSlot();
   }
 
   public async reloadPriceImpactData(): Promise<void> {
@@ -216,6 +231,7 @@ export class Group {
     this.banksMapByName = new Map();
     this.banksMapByMint = new Map();
     this.banksMapByTokenIndex = new Map();
+    this.banksMapByOracle = new Map();
     for (const bank of banks) {
       // ensure that freshly fetched banks have valid price until we fetch oracles again
       const oldBanks = oldbanksMapByTokenIndex.get(bank.tokenIndex);
@@ -228,10 +244,18 @@ export class Group {
         this.banksMapByMint.get(mintId)?.push(bank);
         this.banksMapByName.get(bank.name)?.push(bank);
         this.banksMapByTokenIndex.get(bank.tokenIndex)?.push(bank);
+        this.banksMapByOracle.get(bank.oracle.toString())?.push(bank);
+        if (!bank.fallbackOracle.equals(PublicKey.default)) {
+          this.banksMapByOracle.get(bank.fallbackOracle.toString())?.push(bank);
+        }
       } else {
         this.banksMapByMint.set(mintId, [bank]);
         this.banksMapByName.set(bank.name, [bank]);
         this.banksMapByTokenIndex.set(bank.tokenIndex, [bank]);
+        this.banksMapByOracle.set(bank.oracle.toString(), [bank]);
+        if (!bank.fallbackOracle.equals(PublicKey.default)) {
+          this.banksMapByOracle.set(bank.fallbackOracle.toString(), [bank]);
+        }
       }
     }
   }
@@ -498,7 +522,7 @@ export class Group {
         priceData.uiDeviation !== undefined
           ? this.toNativePrice(priceData.uiDeviation, baseDecimals)
           : undefined;
-      provider = OracleProvider.Pyth;
+      provider = priceData.provider;
     } else if (isSwitchboardOracle(ai)) {
       const priceData = await parseSwitchboardOracle(
         oracle,
@@ -509,7 +533,7 @@ export class Group {
       price = this.toNativePrice(uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
       deviation = this.toNativePrice(priceData.uiDeviation, baseDecimals);
-      provider = OracleProvider.Switchboard;
+      provider = priceData.provider;
     } else {
       throw new Error(
         `Unknown oracle provider (parsing not implemented) for oracle ${oracle}, with owner ${ai.owner}!`,
@@ -564,6 +588,12 @@ export class Group {
   public getFirstBankByTokenIndex(tokenIndex: TokenIndex): Bank {
     const banks = this.banksMapByTokenIndex.get(tokenIndex);
     if (!banks) throw new Error(`No bank found for tokenIndex ${tokenIndex}!`);
+    return banks[0];
+  }
+
+  public getFirstBankByOracle(oraclePk: PublicKey): Bank {
+    const banks = this.banksMapByOracle.get(oraclePk.toString());
+    if (!banks) throw new Error(`No bank found for oracle ${oraclePk}!`);
     return banks[0];
   }
 

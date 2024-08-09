@@ -16,8 +16,8 @@ use mango_v4_client::{
 
 use itertools::Itertools;
 use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::program_stubs::{set_syscall_stubs, SyscallStubs};
 use solana_sdk::pubkey::Pubkey;
-use solana_sdk::signer::Signer;
 use tracing::*;
 
 pub mod cli_args;
@@ -42,9 +42,27 @@ pub fn encode_address(addr: &Pubkey) -> String {
     bs58::encode(&addr.to_bytes()).into_string()
 }
 
+struct NoLogSyscallStubs;
+impl SyscallStubs for NoLogSyscallStubs {
+    fn sol_log(&self, _message: &str) {
+        // do nothing
+        // TODO: optionally print it?
+    }
+
+    fn sol_log_data(&self, _fields: &[&[u8]]) {
+        // do nothing
+    }
+}
+
+pub fn deactivate_program_logs() {
+    set_syscall_stubs(Box::new(NoLogSyscallStubs {}));
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     mango_v4_client::tracing_subscriber_init();
+    mango_v4_client::print_git_version();
+    deactivate_program_logs();
 
     let args: Vec<std::ffi::OsString> = if let Ok(cli_dotenv) = CliDotenv::try_parse() {
         dotenv::from_path(cli_dotenv.dotenv)?;
@@ -79,8 +97,11 @@ async fn main() -> anyhow::Result<()> {
         .commitment(commitment)
         .fee_payer(Some(liqor_owner.clone()))
         .timeout(rpc_timeout)
-        .jupiter_v6_url(cli.jupiter_v6_url)
-        .jupiter_token(cli.jupiter_token)
+        .jupiter_timeout(Duration::from_secs(cli.jupiter_timeout_secs))
+        .jupiter_v6_url(cli.jupiter_v6_url.clone())
+        .jupiter_token(cli.jupiter_token.clone())
+        .sanctum_url(cli.sanctum_url.clone())
+        .sanctum_timeout(Duration::from_secs(cli.sanctum_timeout_secs))
         .transaction_builder_config(
             TransactionBuilderConfig::builder()
                 .priority_fee_provider(prio_provider)
@@ -106,19 +127,21 @@ async fn main() -> anyhow::Result<()> {
         .await?;
     let mango_group = mango_account.fixed.group;
 
-    let signer_is_owner = mango_account.fixed.owner == liqor_owner.pubkey();
-    if cli.rebalance == BoolArg::True && !signer_is_owner {
-        warn!("rebalancing on delegated accounts will be unable to free token positions reliably, withdraw dust manually");
-    }
-
     let group_context = MangoGroupContext::new_from_rpc(client.rpc_async(), mango_group).await?;
 
     let mango_oracles = group_context
         .tokens
         .values()
-        .map(|value| value.oracle)
+        .flat_map(|value| {
+            [
+                value.oracle,
+                value.fallback_context.key,
+                value.fallback_context.quote_key,
+            ]
+        })
         .chain(group_context.perp_markets.values().map(|p| p.oracle))
         .unique()
+        .filter(|&k| k != Pubkey::default())
         .collect::<Vec<Pubkey>>();
 
     let serum_programs = group_context
@@ -161,7 +184,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Getting solana account snapshots via jsonrpc
     // FUTURE: of what to fetch a snapshot - should probably take as an input
-    snapshot_source::start(
+    let snapshot_job = snapshot_source::start(
         snapshot_source::Config {
             rpc_http_url: rpc_url.clone(),
             mango_group,
@@ -246,7 +269,12 @@ async fn main() -> anyhow::Result<()> {
         alternate_jupiter_route_tokens: cli
             .rebalance_alternate_jupiter_route_tokens
             .unwrap_or_default(),
-        allow_withdraws: signer_is_owner,
+        alternate_sanctum_route_tokens: cli
+            .rebalance_alternate_sanctum_route_tokens
+            .clone()
+            .unwrap_or_default(),
+        use_sanctum: cli.sanctum_enabled == BoolArg::True,
+        allow_withdraws: true,
     };
     rebalance_config.validate(&mango_client.context);
 
@@ -255,6 +283,7 @@ async fn main() -> anyhow::Result<()> {
         account_fetcher: account_fetcher.clone(),
         mango_account_address: cli.liqor_mango_account,
         config: rebalance_config,
+        sanctum_supported_mints: HashSet::<Pubkey>::new(),
     });
 
     let mut liquidation = Box::new(LiquidationState {
@@ -540,6 +569,7 @@ async fn main() -> anyhow::Result<()> {
         liquidation_job,
         token_swap_info_job,
         check_changes_for_abort_job,
+        snapshot_job,
     ]
     .into_iter()
     .chain(prio_jobs.into_iter())

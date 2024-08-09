@@ -184,20 +184,20 @@ async function updateTokenParams(): Promise<void> {
   // }
 
   // eslint-disable-next-line no-constant-condition
-  if (false) {
-    // Deposit limits header
-    console.log(
-      `${'name'.padStart(20)} ${'maxLiqBatchUi'.padStart(
-        15,
-      )} ${'maxLiqBatchUi'.padStart(15)} ${'sellImpact'.padStart(
-        12,
-      )}$ ${'pi %'.padStart(12)}% ${'aNDUi'.padStart(
-        20,
-      )}${'aNDQuoteUi'.padStart(20)} ${'uiDeposits'.padStart(
-        12,
-      )} ${'uiDeposits'.padStart(12)} ${'depositLimitsUi'.padStart(12)}`,
-    );
-  }
+  // if (false) {
+  //   // Deposit limits header
+  //   console.log(
+  //     `${'name'.padStart(20)} ${'maxLiqBatchUi'.padStart(
+  //       15,
+  //     )} ${'maxLiqBatchUi'.padStart(15)} ${'sellImpact'.padStart(
+  //       12,
+  //     )}$ ${'pi %'.padStart(12)}% ${'aNDUi'.padStart(
+  //       20,
+  //     )}${'aNDQuoteUi'.padStart(20)} ${'uiDeposits'.padStart(
+  //       12,
+  //     )} ${'uiDeposits'.padStart(12)} ${'depositLimitsUi'.padStart(12)}`,
+  //   );
+  // }
 
   console.log(Array.from(group.banksMapByTokenIndex.values()).length);
 
@@ -217,6 +217,30 @@ async function updateTokenParams(): Promise<void> {
           : x.initLiabWeight.toFixed(1) ===
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
+
+      // eslint-disable-next-line no-constant-condition
+      if (true) {
+        if (bank.uiBorrows() == 0 && bank.reduceOnly == 1) {
+          console.log(` - ${bank.name}`);
+          builder.forceWithdraw(true);
+
+          // builder.disableAssetLiquidation(true);
+          change = true;
+        }
+      }
+
+      // const maybeSbOracle = SB_ON_DEMAND_LST_FALLBACK_ORACLES.filter(
+      //   (x) =>
+      //     x[0].replace('/USD', '').toLocaleUpperCase() ==
+      //     bank.name.toLocaleUpperCase(),
+      // );
+      // if (maybeSbOracle.length > 0) {
+      //   console.log(` - ${bank.name} ${maybeSbOracle[0][0]}`);
+      //   builder.fallbackOracle(PublicKey.default);
+      //   change = true;
+      // } else {
+      //   return;
+      // }
 
       // const maybeSbOracle = SB_FEEDS_TO_MIGRATE.filter(
       //   (x) => x.name.replace('/USD', '') === bank.name.toLocaleUpperCase(),
@@ -265,33 +289,24 @@ async function updateTokenParams(): Promise<void> {
       // }
 
       // eslint-disable-next-line no-constant-condition
-      if (true) {
-        if (
-          bank.uiBorrows() == 0 &&
-          bank.reduceOnly == 2 &&
-          bank.initAssetWeight.toNumber() == 0 &&
-          bank.maintAssetWeight.toNumber() == 0
-        ) {
-          builder.disableAssetLiquidation(true);
-          builder.oracleConfig({
-            confFilter: 1000,
-            maxStalenessSlots: -1,
-          });
-          change = true;
-          console.log(
-            ` - ${bank.name}, ${(
-              bank.uiDeposits() * bank.uiPrice
-            ).toLocaleString()} disabled asset liquidation`,
-          );
-        }
-      }
-
-      // // eslint-disable-next-line no-constant-condition
       // if (true) {
-      //   if (bank.uiBorrows() == 0 && bank.reduceOnly == 1) {
+      //   if (
+      //     bank.uiBorrows() == 0 &&
+      //     bank.reduceOnly == 2 &&
+      //     bank.initAssetWeight.toNumber() == 0 &&
+      //     bank.maintAssetWeight.toNumber() == 0
+      //   ) {
       //     builder.disableAssetLiquidation(true);
-      //     builder.forceWithdraw(true);
+      //     builder.oracleConfig({
+      //       confFilter: 1000,
+      //       maxStalenessSlots: -1,
+      //     });
       //     change = true;
+      //     console.log(
+      //       ` - ${bank.name}, ${(
+      //         bank.uiDeposits() * bank.uiPrice
+      //       ).toLocaleString()} disabled asset liquidation`,
+      //     );
       //   }
       // }
 
@@ -550,8 +565,6 @@ async function updateTokenParams(): Promise<void> {
 
   const walletSigner = wallet as never;
 
-  console.log(DRY_RUN);
-
   if (!DRY_RUN) {
     const proposalAddress = await createProposal(
       client.connection,
@@ -560,7 +573,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Switch remaining switchboard oracles mango-v4',
+        : 'Reset sb on demand oracles as fallback oracles in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
