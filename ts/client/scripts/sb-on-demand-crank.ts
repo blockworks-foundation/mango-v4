@@ -26,7 +26,7 @@ import { AnchorProvider, Wallet } from 'switchboard-anchor';
 import { Group } from '../src/accounts/group';
 import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
-import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP, SBOD_ORACLE_LUTS } from '../src/constants';
+import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
 import { createComputeBudgetIx } from '../src/utils/rpc';
 import { manageFeeWebSocket } from './manageFeeWs';
 import { getOraclesForMangoGroup } from './sb-on-demand-crank-utils';
@@ -221,7 +221,6 @@ async function setupBackgroundRefresh(
       );
 
       // dont await, fire and forget
-      // TODO use our own ALTs
       sendSignAndConfirmTransactions({
         connection,
         wallet: new Wallet(user),
@@ -241,7 +240,8 @@ async function setupBackgroundRefresh(
             ...txChunk.map((tx) => ({
               signers: [],
               transactionInstruction: tx,
-              alts: SBOD_ORACLE_LUTS.map(x=>new PublicKey(x)),
+              // TODO disable alts for now
+              // alts: SBOD_ORACLE_LUTS.map(x=>new PublicKey(x)),
             })),
           ],
           sequenceType: SequenceType.Parallel,
@@ -250,7 +250,8 @@ async function setupBackgroundRefresh(
           maxTxesInBatch: 10,
           autoRetry: false,
           logFlowInfo: false,
-          useVersionedTransactions: true,
+          // TODO disable alts for now
+          // useVersionedTransactions: true,
         },
         callbacks: {
           afterEveryTxSend: function (data) {
@@ -494,13 +495,14 @@ function extendOraclesManually(cluster: Cluster): {
     ];
   }
   return [
-    ['JSOL/USD', 'Dnn9fKeB3rA2bor6Fys7FBPqXneAK8brxNfsBfZ32939'],
-    ['compassSOL/USD', 'GzBpasKMSTLkytXpyo6NesDGpe2mLjPSovECWsebQpu5'],
-    ['dualSOL/USD', 'D6UqFgtVC1yADBxw2EZFmUCTNuoqFoUXD3NW4NqRn8v3'],
-    ['hubSOL/USD', '7LRVXc8zdPpzXNdknU2kRTYt7BizYs7BaM6Ft2zv8E4h'],
-    ['hubSOL/USD', '137fd2LnDEPVAALhPFjRyvh2MD9DxSHPFaod7a5tmMox'],
-    ['digitSOL/USD', '7skmP8qLf8KKJ61cpPiw91GXYfoGvGWekzSDQ78T3z1f'],
-    ['mangoSOL/USD', '7pD4Y1hCsU4M6rfoJvL8fAmmrB2LwrJYxvWz4S6Cc24T'],
+    // These are now set on the group, and fetched from there
+    // ['JSOL/USD', 'Dnn9fKeB3rA2bor6Fys7FBPqXneAK8brxNfsBfZ32939'],
+    // ['compassSOL/USD', 'GzBpasKMSTLkytXpyo6NesDGpe2mLjPSovECWsebQpu5'],
+    // ['dualSOL/USD', 'D6UqFgtVC1yADBxw2EZFmUCTNuoqFoUXD3NW4NqRn8v3'],
+    // ['hubSOL/USD', '7LRVXc8zdPpzXNdknU2kRTYt7BizYs7BaM6Ft2zv8E4h'],
+    // ['hubSOL/USD', '137fd2LnDEPVAALhPFjRyvh2MD9DxSHPFaod7a5tmMox'],
+    // ['digitSOL/USD', '7skmP8qLf8KKJ61cpPiw91GXYfoGvGWekzSDQ78T3z1f'],
+    // ['mangoSOL/USD', '7pD4Y1hCsU4M6rfoJvL8fAmmrB2LwrJYxvWz4S6Cc24T'],
   ].map((item) => {
     return {
       oraclePk: new PublicKey(item[1]),

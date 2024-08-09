@@ -48,8 +48,7 @@ export function getOraclesForMangoGroup(
     )
     .map((b) => {
       return {
-        oraclePk: b[0].oracle,
-
+        oraclePk: b[0].fallbackOracle,
         name: b[0].name,
       };
     })
