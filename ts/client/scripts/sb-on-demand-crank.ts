@@ -300,7 +300,7 @@ async function preparePullIx(
   sbOnDemandProgram,
   oracle: OracleInterface,
   recentSlothashes?: Array<[BN, string]>,
-): Promise<TransactionInstruction | undefined> {
+): Promise<TransactionInstruction | undefined | null> {
   const pullFeed = new PullFeed(
     sbOnDemandProgram as any,
     new PublicKey(oracle.oracle.oraclePk),
@@ -313,9 +313,14 @@ async function preparePullIx(
     gateway: oracle.gatewayUrl,
   };
   // TODO use fetchUpdateMany
-  const [pullIx] = await pullFeed.fetchUpdateIx(conf, recentSlothashes);
 
-  return pullIx;
+  try {   
+    const [pullIx] = await pullFeed.fetchUpdateIx(conf, recentSlothashes); 
+    return pullIx;
+  } catch (error) {
+    console.log(`[preparePullIx] ${oracle.oracle.name} error ${error}`);
+    return null;
+  }
 }
 
 async function filterForVarianceThresholdOracles(
@@ -439,8 +444,8 @@ async function prepareCandidateOracles(
     .map((o, i) => {
       return { oracle: o, ai: ais[i] };
     })
-    .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
-
+  .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
+    
   // parse account info data
   const parsedOracles = sbodOracles.map((item) => {
     const d = sbOnDemandProgram.coder.accounts.decode(
