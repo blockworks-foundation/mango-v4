@@ -14,7 +14,7 @@ fn is_initialized(account: &UncheckedAccount) -> bool {
     let mut disc_bytes = [0u8; 8];
     disc_bytes.copy_from_slice(&data[..8]);
     let discriminator = u64::from_le_bytes(disc_bytes);
-    if discriminator != 0 {
+    if discriminator == 0 {
         return false;
     }
 

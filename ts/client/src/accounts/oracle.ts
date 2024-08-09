@@ -272,7 +272,7 @@ export async function createFallbackOracleMap(
   const map: Map<string, [PublicKey, PublicKey]> = new Map();
   const accounts = await conn.getMultipleAccountsInfo(fallbacks);
   for (let i = 0; i < oracles.length; i++) {
-    if (accounts[i] === null) {
+    if (accounts[i] === null || accounts[i]?.data === undefined) {
       map.set(oracles[i].toBase58(), [fallbacks[i], PublicKey.default]);
     } else if (!isClmmOracle(accounts[i]!)) {
       map.set(oracles[i].toBase58(), [fallbacks[i], PublicKey.default]);

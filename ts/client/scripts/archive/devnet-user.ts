@@ -1,10 +1,9 @@
-import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import { expect } from 'chai';
 import fs from 'fs';
 import { Group } from '../../src/accounts/group';
-import { MangoAccount } from '../../src/accounts/mangoAccount';
-import { PerpOrderSide, PerpOrderType } from '../../src/accounts/perp';
+import { HealthType, MangoAccount } from '../../src/accounts/mangoAccount';
 import { MangoClient } from '../../src/client';
 import { MANGO_V4_ID } from '../../src/constants';
 import { toUiDecimalsForQuote } from '../../src/utils';
@@ -31,10 +30,7 @@ const GROUP_NUM = Number(process.env.GROUP_NUM || 0);
 
 async function main(): Promise<void> {
   const options = AnchorProvider.defaultOptions();
-  const connection = new Connection(
-    'https://mango.devnet.rpcpool.com',
-    options,
-  );
+  const connection = new Connection(process.env.DEVNET_CLUSTER_URL!, options);
 
   const user = Keypair.fromSecretKey(
     Buffer.from(
@@ -59,24 +55,32 @@ async function main(): Promise<void> {
       JSON.parse(fs.readFileSync(process.env.ADMIN_KEYPAIR!, 'utf-8')),
     ),
   );
-  const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  // const group = await client.getGroupForCreator(admin.publicKey, GROUP_NUM);
+  const group = await client.getGroup(
+    new PublicKey('CKU8J1mgtdcJJhBvXrH6xRx1MmcrRWDv8WQdNxPKW3gk'),
+  );
 
   // create + fetch account
   console.log(`Creating mangoaccount...`);
-  const mangoAccount = (await client.getMangoAccountForOwner(
+  let mangoAccount = (await client.getMangoAccountForOwner(
     group,
     user.publicKey,
-    0,
+    2,
   )) as MangoAccount;
-  await mangoAccount!.reload(client);
   if (!mangoAccount) {
-    throw new Error(`MangoAccount not found for user ${user.publicKey}`);
+    await client.createMangoAccount(group, 2, 'one', 2, 0, 0, 0);
+    mangoAccount = (await client.getMangoAccountForOwner(
+      group,
+      user.publicKey,
+      2,
+    )) as MangoAccount;
   }
+  await mangoAccount!.reload(client);
   console.log(`...created/found mangoAccount ${mangoAccount.publicKey}`);
 
   // set delegate, and change name
   // eslint-disable-next-line no-constant-condition
-  if (true) {
+  if (false) {
     console.log(`...changing mango account name, and setting a delegate`);
     const newName = 'my_changed_name';
     const randomKey = new PublicKey(
@@ -102,34 +106,31 @@ async function main(): Promise<void> {
   }
 
   // expand account
-  if (
-    mangoAccount.tokens.length < 16 ||
-    mangoAccount.serum3.length < 8 ||
-    mangoAccount.perps.length < 8 ||
-    mangoAccount.perpOpenOrders.length < 8
-  ) {
+  if (false) {
     console.log(
       `...expanding mango account to max 16 token positions, 8 serum3, 8 perp position and 8 perp oo slots, previous (tokens ${mangoAccount.tokens.length}, serum3 ${mangoAccount.serum3.length}, perps ${mangoAccount.perps.length}, perps oo ${mangoAccount.perpOpenOrders.length})`,
     );
-    const sig = await client.expandMangoAccount(
+    const sig = await client.accountExpandV3(
       group,
       mangoAccount,
-      16,
-      8,
-      8,
-      8,
+      2,
+      0,
+      0,
+      0,
+      0,
+      2,
     );
     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
     await mangoAccount.reload(client);
-    expect(mangoAccount.tokens.length).equals(16);
-    expect(mangoAccount.serum3.length).equals(8);
-    expect(mangoAccount.perps.length).equals(8);
-    expect(mangoAccount.perpOpenOrders.length).equals(8);
+    // expect(mangoAccount.tokens.length).equals(16);
+    // expect(mangoAccount.serum3.length).equals(8);
+    // expect(mangoAccount.perps.length).equals(8);
+    // expect(mangoAccount.perpOpenOrders.length).equals(8);
   }
 
   // deposit and withdraw
   // eslint-disable-next-line no-constant-condition
-  if (true) {
+  if (false) {
     console.log(`...depositing 50 USDC, 1 SOL, 1 MNGO`);
 
     // deposit USDC
@@ -159,43 +160,43 @@ async function main(): Promise<void> {
     );
     await mangoAccount.reload(client);
 
-    // deposit MNGO
-    await client.tokenDeposit(
-      group,
-      mangoAccount,
-      new PublicKey(DEVNET_MINTS.get('MNGO')!),
-      1,
-    );
-    await mangoAccount.reload(client);
+    // // deposit MNGO
+    // await client.tokenDeposit(
+    //   group,
+    //   mangoAccount,
+    //   new PublicKey(DEVNET_MINTS.get('MNGO')!),
+    //   1,
+    // );
+    // await mangoAccount.reload(client);
 
-    // withdraw USDC
-    console.log(`...withdrawing 1 USDC`);
-    oldBalance = mangoAccount.getTokenBalance(
-      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
-    );
-    await client.tokenWithdraw(
-      group,
-      mangoAccount,
-      new PublicKey(DEVNET_MINTS.get('USDC')!),
-      1,
-      true,
-    );
-    await mangoAccount.reload(client);
-    newBalance = mangoAccount.getTokenBalance(
-      group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
-    );
-    expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(
-      '1',
-    );
+    // // withdraw USDC
+    // console.log(`...withdrawing 1 USDC`);
+    // oldBalance = mangoAccount.getTokenBalance(
+    //   group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    // );
+    // await client.tokenWithdraw(
+    //   group,
+    //   mangoAccount,
+    //   new PublicKey(DEVNET_MINTS.get('USDC')!),
+    //   1,
+    //   true,
+    // );
+    // await mangoAccount.reload(client);
+    // newBalance = mangoAccount.getTokenBalance(
+    //   group.getFirstBankByMint(new PublicKey(DEVNET_MINTS.get('USDC')!)),
+    // );
+    // expect(toUiDecimalsForQuote(oldBalance.sub(newBalance)).toString()).equals(
+    //   '1',
+    // );
 
-    console.log(`...depositing 0.0005 BTC`);
-    await client.tokenDeposit(
-      group,
-      mangoAccount,
-      new PublicKey(DEVNET_MINTS.get('BTC')!),
-      0.0005,
-    );
-    await mangoAccount.reload(client);
+    // console.log(`...depositing 0.0005 BTC`);
+    // await client.tokenDeposit(
+    //   group,
+    //   mangoAccount,
+    //   new PublicKey(DEVNET_MINTS.get('BTC')!),
+    //   0.0005,
+    // );
+    // await mangoAccount.reload(client);
   }
 
   // Note: Disable for now until we have openbook devnet markets
@@ -327,419 +328,473 @@ async function main(): Promise<void> {
 
   // eslint-disable-next-line no-constant-condition
   if (true) {
-    await mangoAccount.reload(client);
-    console.log(
-      '...mangoAccount.getEquity() ' +
-        toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
-    );
-    console.log(
-      '...mangoAccount.getCollateralValue() ' +
-        toUiDecimalsForQuote(
-          mangoAccount.getCollateralValue(group)!.toNumber(),
-        ),
-    );
-    console.log(
-      '...mangoAccount.getAssetsVal() ' +
-        toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
-    );
-    console.log(
-      '...mangoAccount.getLiabsVal() ' +
-        toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
-    );
-    console.log(
-      '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +
-        toUiDecimalsForQuote(
-          mangoAccount
-            .getMaxWithdrawWithBorrowForToken(
-              group,
-              new PublicKey(DEVNET_MINTS.get('SOL')!),
-            )!
-            .toNumber(),
-        ),
-    );
+    console.log(mangoAccount.getHealth(group, HealthType.maint));
+    // await mangoAccount.reload(client);
+    // console.log(
+    //   '...mangoAccount.getEquity() ' +
+    //     toUiDecimalsForQuote(mangoAccount.getEquity(group)!.toNumber()),
+    // );
+    // console.log(
+    //   '...mangoAccount.getCollateralValue() ' +
+    //     toUiDecimalsForQuote(
+    //       mangoAccount.getCollateralValue(group)!.toNumber(),
+    //     ),
+    // );
+    // console.log(
+    //   '...mangoAccount.getAssetsVal() ' +
+    //     toUiDecimalsForQuote(mangoAccount.getAssetsValue(group)!.toNumber()),
+    // );
+    // console.log(
+    //   '...mangoAccount.getLiabsVal() ' +
+    //     toUiDecimalsForQuote(mangoAccount.getLiabsValue(group)!.toNumber()),
+    // );
+    // console.log(
+    //   '...mangoAccount.getMaxWithdrawWithBorrowForToken(group, "SOL") ' +
+    //     toUiDecimalsForQuote(
+    //       mangoAccount
+    //         .getMaxWithdrawWithBorrowForToken(
+    //           group,
+    //           new PublicKey(DEVNET_MINTS.get('SOL')!),
+    //         )!
+    //         .toNumber(),
+    //     ),
+    // );
   }
+
+  // // eslint-disable-next-line no-constant-condition
+  // if (true) {
+  //   // eslint-disable-next-line no-inner-declarations
+  //   function getMaxSourceForTokenSwapWrapper(src, tgt): void {
+  //     console.log(
+  //       `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
+  //         mangoAccount.getMaxSourceUiForTokenSwap(
+  //           group,
+  //           group.banksMapByName.get(src)![0].mint,
+  //           group.banksMapByName.get(tgt)![0].mint,
+  //           1,
+  //         )!,
+  //     );
+  //   }
+  //   for (const srcToken of Array.from(group.banksMapByName.keys())) {
+  //     for (const tgtToken of Array.from(group.banksMapByName.keys())) {
+  //       getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
+  //     }
+  //   }
+
+  //   const maxQuoteForSerum3BidUi = mangoAccount.getMaxQuoteForSerum3BidUi(
+  //     group,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   console.log(
+  //     "...mangoAccount.getMaxQuoteForSerum3BidUi(group, 'BTC/USDC') " +
+  //       maxQuoteForSerum3BidUi,
+  //   );
+
+  //   const maxBaseForSerum3AskUi = mangoAccount.getMaxBaseForSerum3AskUi(
+  //     group,
+  //     DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //   );
+  //   console.log(
+  //     "...mangoAccount.getMaxBaseForSerum3AskUi(group, 'BTC/USDC') " +
+  //       maxBaseForSerum3AskUi,
+  //   );
+
+  //   console.log(
+  //     `simHealthRatioWithSerum3BidUiChanges ${mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+  //       group,
+  //       785,
+  //       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //     )}`,
+  //   );
+  //   console.log(
+  //     `simHealthRatioWithSerum3AskUiChanges ${mangoAccount.simHealthRatioWithSerum3AskUiChanges(
+  //       group,
+  //       0.033,
+  //       DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+  //     )}`,
+  //   );
+  // }
+
+  // // perps
+  // // eslint-disable-next-line no-constant-condition
+  // if (true) {
+  //   let sig;
+  //   const perpMarket = group.getPerpMarketByName('BTC-PERP');
+  //   const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
+  //     client,
+  //     group,
+  //     perpMarket.perpMarketIndex,
+  //   );
+  //   for (const order of orders) {
+  //     console.log(
+  //       `Current order - ${order.uiPrice} ${order.uiSize} ${order.side}`,
+  //     );
+  //   }
+  //   console.log(`...cancelling all perp orders`);
+  //   sig = await client.perpCancelAllOrders(
+  //     group,
+  //     mangoAccount,
+  //     perpMarket.perpMarketIndex,
+  //     10,
+  //   );
+  //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+  //   // oracle pegged
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+  //     console.log(
+  //       `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+  //     );
+  //     const sig = await client.perpPlaceOrderPegged(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.bid,
+  //       -5,
+  //       perpMarket.uiPrice + 5,
+  //       0.01,
+  //       price * 0.011,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+  //     console.log(
+  //       `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
+  //     );
+  //     const sig = await client.perpPlaceOrderPegged(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.ask,
+  //       5,
+  //       perpMarket.uiPrice - 5,
+  //       0.01,
+  //       price * 0.011,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+
+  //   await logBidsAndAsks(client, group);
+
+  //   sig = await client.perpCancelAllOrders(
+  //     group,
+  //     mangoAccount,
+  //     perpMarket.perpMarketIndex,
+  //     10,
+  //   );
+  //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+  //   // scenario 1
+  //   // bid max perp
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     await mangoAccount.reload(client);
+  //     await group.reloadAll(client);
+  //     const price =
+  //       group.banksMapByName.get('BTC')![0].uiPrice! -
+  //       Math.floor(Math.random() * 100);
+  //     const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
+  //       group,
+  //       perpMarket.perpMarketIndex,
+  //     );
+  //     const baseQty = quoteQty / price;
+  //     console.log(
+  //       ` simHealthRatioWithPerpBidUiChanges - ${mangoAccount.simHealthRatioWithPerpBidUiChanges(
+  //         group,
+  //         perpMarket.perpMarketIndex,
+  //         baseQty,
+  //       )}`,
+  //     );
+  //     console.log(
+  //       `...placing max qty perp bid  clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+  //     );
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.bid,
+  //       price,
+  //       baseQty,
+  //       quoteQty,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  //   console.log(`...cancelling all perp orders`);
+  //   sig = await client.perpCancelAllOrders(
+  //     group,
+  //     mangoAccount,
+  //     perpMarket.perpMarketIndex,
+  //     10,
+  //   );
+  //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+  //   // bid max perp + some
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price =
+  //       group.banksMapByName.get('BTC')![0].uiPrice! -
+  //       Math.floor(Math.random() * 100);
+  //     const quoteQty =
+  //       mangoAccount.getMaxQuoteForPerpBidUi(
+  //         group,
+  //         perpMarket.perpMarketIndex,
+  //       ) * 1.02;
+
+  //     const baseQty = quoteQty / price;
+  //     console.log(
+  //       `...placing max qty * 1.02 perp bid clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+  //     );
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.bid,
+  //       price,
+  //       baseQty,
+  //       quoteQty,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //     console.log('Errored out as expected');
+  //   }
+
+  //   // bid max ask
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price =
+  //       group.banksMapByName.get('BTC')![0].uiPrice! +
+  //       Math.floor(Math.random() * 100);
+  //     const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
+  //       group,
+  //       perpMarket.perpMarketIndex,
+  //     );
+  //     console.log(
+  //       ` simHealthRatioWithPerpAskUiChanges - ${mangoAccount.simHealthRatioWithPerpAskUiChanges(
+  //         group,
+  //         perpMarket.perpMarketIndex,
+  //         baseQty,
+  //       )}`,
+  //     );
+  //     const quoteQty = baseQty * price;
+  //     console.log(
+  //       `...placing max qty perp ask clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+  //     );
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.ask,
+  //       price,
+  //       baseQty,
+  //       quoteQty,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+
+  //   // bid max ask + some
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price =
+  //       group.banksMapByName.get('BTC')![0].uiPrice! +
+  //       Math.floor(Math.random() * 100);
+  //     const baseQty =
+  //       mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex) *
+  //       1.02;
+  //     const quoteQty = baseQty * price;
+  //     console.log(
+  //       `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
+  //     );
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.ask,
+  //       price,
+  //       baseQty,
+  //       quoteQty,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //     console.log('Errored out as expected');
+  //   }
+
+  //   console.log(`...cancelling all perp orders`);
+  //   sig = await client.perpCancelAllOrders(
+  //     group,
+  //     mangoAccount,
+  //     perpMarket.perpMarketIndex,
+  //     10,
+  //   );
+  //   console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+  //   // scenario 2
+  //   // make + take orders
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+  //     console.log(`...placing perp bid ${clientId} at ${price}`);
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.bid,
+  //       price,
+  //       0.01,
+  //       price * 0.01,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  //   try {
+  //     const clientId = Math.floor(Math.random() * 99999);
+  //     const price = group.banksMapByName.get('BTC')![0].uiPrice!;
+  //     console.log(`...placing perp ask ${clientId} at ${price}`);
+  //     const sig = await client.perpPlaceOrder(
+  //       group,
+  //       mangoAccount,
+  //       perpMarket.perpMarketIndex,
+  //       PerpOrderSide.ask,
+  //       price,
+  //       0.01,
+  //       price * 0.011,
+  //       clientId,
+  //       PerpOrderType.limit,
+  //       false,
+  //       0, //Date.now() + 200,
+  //       1,
+  //     );
+  //     console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  //   // // should be able to cancel them : know bug
+  //   // console.log(`...cancelling all perp orders`);
+  //   // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
+  //   // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
+
+  //   // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+  //   await perpMarket?.loadEventQueue(client)!;
+  //   const fr = perpMarket?.getInstantaneousFundingRateUi(
+  //     await perpMarket.loadBids(client),
+  //     await perpMarket.loadAsks(client),
+  //   );
+  //   console.log(`current funding rate per hour is ${fr}`);
+
+  //   // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
+  //   const eq = await perpMarket?.loadEventQueue(client)!;
+  //   console.log(
+  //     `raw events - ${JSON.stringify(eq.eventsSince(new BN(0)), null, 2)}`,
+  //   );
+
+  //   // sleep so that keeper can catch up
+  //   await new Promise((r) => setTimeout(r, 2000));
+
+  //   // make+take orders should have cancelled each other, and if keeper has already cranked, then should not appear in position or we see a small quotePositionNative
+  //   await group.reloadAll(client);
+  //   await mangoAccount.reload(client);
+  //   console.log(`${mangoAccount.toString(group)}`);
+  // }
 
   // eslint-disable-next-line no-constant-condition
   if (true) {
-    // eslint-disable-next-line no-inner-declarations
-    function getMaxSourceForTokenSwapWrapper(src, tgt): void {
-      console.log(
-        `getMaxSourceForTokenSwap ${src.padEnd(4)} ${tgt.padEnd(4)} ` +
-          mangoAccount.getMaxSourceUiForTokenSwap(
-            group,
-            group.banksMapByName.get(src)![0].mint,
-            group.banksMapByName.get(tgt)![0].mint,
-            1,
-          )!,
-      );
-    }
-    for (const srcToken of Array.from(group.banksMapByName.keys())) {
-      for (const tgtToken of Array.from(group.banksMapByName.keys())) {
-        getMaxSourceForTokenSwapWrapper(srcToken, tgtToken);
-      }
-    }
+    const market = Array.from(
+      group.openbookV2MarketsMapByMarketIndex.values(),
+    )[0];
 
-    const maxQuoteForSerum3BidUi = mangoAccount.getMaxQuoteForSerum3BidUi(
-      group,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
+    // console.log(mangoAccount.openbookV2);
+
+    // const sig = await client.openbookV2CreateOpenOrders(
+    //   group,
+    //   mangoAccount,
+    //   market.openbookMarketExternal,
+    // );
+    // console.log(sig.signature);
+
+    // const sig1 = await client.openbookV2CloseOpenOrders(
+    //   group,
+    //   mangoAccount,
+    //   market.openbookMarketExternal,
+    // );
+    // console.log(sig1.signature);
+
+    // const sig2 = await client.openbookV2PlaceOrder(
+    //   group,
+    //   mangoAccount,
+    //   market.openbookMarketExternal,
+    //   OpenbookV2Side.bid,
+    //   10,
+    //   1,
+    //   OpenbookV2SelfTradeBehavior.decrementTake,
+    //   OpenbookV2OrderType.limit,
+    //   0,
+    //   10,
+    // );
+    // console.log(sig2.signature);
+
+    // await mangoAccount.reload(client);
+    // console.log(mangoAccount.getOpenbookV2OoAccount(market.marketIndex));
+
+    console.log(
+      mangoAccount.getMaxBaseForSerum3AskUi(
+        group,
+        market.openbookMarketExternal,
+      ),
     );
     console.log(
-      "...mangoAccount.getMaxQuoteForSerum3BidUi(group, 'BTC/USDC') " +
-        maxQuoteForSerum3BidUi,
-    );
-
-    const maxBaseForSerum3AskUi = mangoAccount.getMaxBaseForSerum3AskUi(
-      group,
-      DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-    );
-    console.log(
-      "...mangoAccount.getMaxBaseForSerum3AskUi(group, 'BTC/USDC') " +
-        maxBaseForSerum3AskUi,
-    );
-
-    console.log(
-      `simHealthRatioWithSerum3BidUiChanges ${mangoAccount.simHealthRatioWithSerum3BidUiChanges(
+      mangoAccount.getMaxQuoteForSerum3BidUi(
         group,
-        785,
-        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-      )}`,
+        market.openbookMarketExternal,
+      ),
     );
-    console.log(
-      `simHealthRatioWithSerum3AskUiChanges ${mangoAccount.simHealthRatioWithSerum3AskUiChanges(
-        group,
-        0.033,
-        DEVNET_SERUM3_MARKETS.get('BTC/USDC')!,
-      )}`,
-    );
-  }
-
-  // perps
-  // eslint-disable-next-line no-constant-condition
-  if (true) {
-    let sig;
-    const perpMarket = group.getPerpMarketByName('BTC-PERP');
-    const orders = await mangoAccount.loadPerpOpenOrdersForMarket(
-      client,
-      group,
-      perpMarket.perpMarketIndex,
-    );
-    for (const order of orders) {
-      console.log(
-        `Current order - ${order.uiPrice} ${order.uiSize} ${order.side}`,
-      );
-    }
-    console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(
-      group,
-      mangoAccount,
-      perpMarket.perpMarketIndex,
-      10,
-    );
-    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    // oracle pegged
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
-      console.log(
-        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
-      );
-      const sig = await client.perpPlaceOrderPegged(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.bid,
-        -5,
-        perpMarket.uiPrice + 5,
-        0.01,
-        price * 0.011,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
-      console.log(
-        `...placing perp pegged bid ${clientId} at oracle price ${perpMarket.uiPrice}`,
-      );
-      const sig = await client.perpPlaceOrderPegged(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.ask,
-        5,
-        perpMarket.uiPrice - 5,
-        0.01,
-        price * 0.011,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-
-    await logBidsAndAsks(client, group);
-
-    sig = await client.perpCancelAllOrders(
-      group,
-      mangoAccount,
-      perpMarket.perpMarketIndex,
-      10,
-    );
-    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    // scenario 1
-    // bid max perp
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      await mangoAccount.reload(client);
-      await group.reloadAll(client);
-      const price =
-        group.banksMapByName.get('BTC')![0].uiPrice! -
-        Math.floor(Math.random() * 100);
-      const quoteQty = mangoAccount.getMaxQuoteForPerpBidUi(
-        group,
-        perpMarket.perpMarketIndex,
-      );
-      const baseQty = quoteQty / price;
-      console.log(
-        ` simHealthRatioWithPerpBidUiChanges - ${mangoAccount.simHealthRatioWithPerpBidUiChanges(
-          group,
-          perpMarket.perpMarketIndex,
-          baseQty,
-        )}`,
-      );
-      console.log(
-        `...placing max qty perp bid  clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
-      );
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.bid,
-        price,
-        baseQty,
-        quoteQty,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-    console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(
-      group,
-      mangoAccount,
-      perpMarket.perpMarketIndex,
-      10,
-    );
-    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    // bid max perp + some
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price =
-        group.banksMapByName.get('BTC')![0].uiPrice! -
-        Math.floor(Math.random() * 100);
-      const quoteQty =
-        mangoAccount.getMaxQuoteForPerpBidUi(
-          group,
-          perpMarket.perpMarketIndex,
-        ) * 1.02;
-
-      const baseQty = quoteQty / price;
-      console.log(
-        `...placing max qty * 1.02 perp bid clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
-      );
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.bid,
-        price,
-        baseQty,
-        quoteQty,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-      console.log('Errored out as expected');
-    }
-
-    // bid max ask
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price =
-        group.banksMapByName.get('BTC')![0].uiPrice! +
-        Math.floor(Math.random() * 100);
-      const baseQty = mangoAccount.getMaxBaseForPerpAskUi(
-        group,
-        perpMarket.perpMarketIndex,
-      );
-      console.log(
-        ` simHealthRatioWithPerpAskUiChanges - ${mangoAccount.simHealthRatioWithPerpAskUiChanges(
-          group,
-          perpMarket.perpMarketIndex,
-          baseQty,
-        )}`,
-      );
-      const quoteQty = baseQty * price;
-      console.log(
-        `...placing max qty perp ask clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
-      );
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.ask,
-        price,
-        baseQty,
-        quoteQty,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-
-    // bid max ask + some
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price =
-        group.banksMapByName.get('BTC')![0].uiPrice! +
-        Math.floor(Math.random() * 100);
-      const baseQty =
-        mangoAccount.getMaxBaseForPerpAskUi(group, perpMarket.perpMarketIndex) *
-        1.02;
-      const quoteQty = baseQty * price;
-      console.log(
-        `...placing max qty perp ask * 1.02 clientId ${clientId} at price ${price}, base ${baseQty}, quote ${quoteQty}`,
-      );
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.ask,
-        price,
-        baseQty,
-        quoteQty,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-      console.log('Errored out as expected');
-    }
-
-    console.log(`...cancelling all perp orders`);
-    sig = await client.perpCancelAllOrders(
-      group,
-      mangoAccount,
-      perpMarket.perpMarketIndex,
-      10,
-    );
-    console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    // scenario 2
-    // make + take orders
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
-      console.log(`...placing perp bid ${clientId} at ${price}`);
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.bid,
-        price,
-        0.01,
-        price * 0.01,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-    try {
-      const clientId = Math.floor(Math.random() * 99999);
-      const price = group.banksMapByName.get('BTC')![0].uiPrice!;
-      console.log(`...placing perp ask ${clientId} at ${price}`);
-      const sig = await client.perpPlaceOrder(
-        group,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.ask,
-        price,
-        0.01,
-        price * 0.011,
-        clientId,
-        PerpOrderType.limit,
-        false,
-        0, //Date.now() + 200,
-        1,
-      );
-      console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-    } catch (error) {
-      console.log(error);
-    }
-    // // should be able to cancel them : know bug
-    // console.log(`...cancelling all perp orders`);
-    // sig = await client.perpCancelAllOrders(group, mangoAccount, perpMarket.perpMarketIndex, 10);
-    // console.log(`sig https://explorer.solana.com/tx/${sig}?cluster=devnet`);
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-    await perpMarket?.loadEventQueue(client)!;
-    const fr = perpMarket?.getInstantaneousFundingRateUi(
-      await perpMarket.loadBids(client),
-      await perpMarket.loadAsks(client),
-    );
-    console.log(`current funding rate per hour is ${fr}`);
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-asserted-optional-chain
-    const eq = await perpMarket?.loadEventQueue(client)!;
-    console.log(
-      `raw events - ${JSON.stringify(eq.eventsSince(new BN(0)), null, 2)}`,
-    );
-
-    // sleep so that keeper can catch up
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // make+take orders should have cancelled each other, and if keeper has already cranked, then should not appear in position or we see a small quotePositionNative
-    await group.reloadAll(client);
-    await mangoAccount.reload(client);
-    console.log(`${mangoAccount.toString(group)}`);
   }
 
   process.exit();

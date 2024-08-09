@@ -1,22 +1,69 @@
+import { AnchorProvider } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
 import {
-  OpenBookV2Client,
   BookSideAccount,
   MarketAccount,
-  baseLotsToUi,
-  priceLotsToUi,
+  OpenBookV2Client,
 } from '@openbook-dex/openbook-v2';
-import { Cluster, Keypair, PublicKey } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 import { MangoClient } from '../client';
-import { OPENBOOK_V2_PROGRAM_ID } from '../constants';
 import { MAX_I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
 import { As, EmptyWallet } from '../utils';
 import { TokenIndex } from './bank';
 import { Group } from './group';
-import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 
 export type OpenbookV2MarketIndex = number & As<'market-index'>;
+
+export interface OpenbookV2ExternalMarket {
+  bump: number;
+  baseDecimals: number;
+  quoteDecimals: number;
+  marketAuthority: PublicKey;
+  timeExpiry: BN;
+  collectFeeAdmin: PublicKey;
+  openOrdersAdmin: {
+    key: PublicKey;
+  };
+  consumeEventsAdmin: {
+    key: PublicKey;
+  };
+  closeMarketAdmin: {
+    key: PublicKey;
+  };
+  name: number[];
+  bids: PublicKey;
+  asks: PublicKey;
+  eventHeap: PublicKey;
+  oracleA: {
+    key: PublicKey;
+  };
+  oracleB: {
+    key: PublicKey;
+  };
+  oracleConfig: {
+    confFilter: number;
+    maxStalenessSlots: BN;
+  };
+  quoteLotSize: BN;
+  baseLotSize: BN;
+  seqNum: BN;
+  registrationTime: BN;
+  makerFee: BN;
+  takerFee: BN;
+  feesAccrued: BN;
+  feesToReferrers: BN;
+  referrerRebatesAccrued: BN;
+  feesAvailable: BN;
+  makerVolume: BN;
+  takerVolumeWoOo: BN;
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  marketBaseVault: PublicKey;
+  baseDepositTotal: BN;
+  marketQuoteVault: PublicKey;
+  quoteDepositTotal: BN;
+}
 
 export class OpenbookV2Market {
   public name: string;
@@ -33,6 +80,7 @@ export class OpenbookV2Market {
       registrationTime: BN;
       reduceOnly: number;
       forceClose: number;
+      oraclePriceBand: number;
     },
   ): OpenbookV2Market {
     return new OpenbookV2Market(
@@ -47,6 +95,7 @@ export class OpenbookV2Market {
       obj.registrationTime,
       obj.reduceOnly == 1,
       obj.forceClose == 1,
+      obj.oraclePriceBand,
     );
   }
 
@@ -62,6 +111,7 @@ export class OpenbookV2Market {
     public registrationTime: BN,
     public reduceOnly: boolean,
     public forceClose: boolean,
+    public oraclePriceBand: number,
   ) {
     this.name = utf8.decode(new Uint8Array(name)).split('\x00')[0];
   }
@@ -118,7 +168,6 @@ export class OpenbookV2Market {
       [Buffer.from('OpenOrders'), mangoAccount.toBuffer(), indexBuf],
       programId,
     );
-    console.log('nextoo', nextIndex, openOrderPublicKey.toBase58());
     return openOrderPublicKey;
   }
 
@@ -271,21 +320,21 @@ export class OpenbookV2Market {
         },
       ),
     ); // readonly client for deserializing accounts
-    const bidNodes = bidsAccount
-      ? openbookClient.getLeafNodes(bidsAccount)
-      : [];
-    const askNodes = asksAccount
-      ? openbookClient.getLeafNodes(asksAccount)
-      : [];
+    // const bidNodes = bidsAccount
+    //   ? openbookClient.getLeafNodes(bidsAccount)
+    //   : [];
+    // const askNodes = asksAccount
+    //   ? openbookClient.getLeafNodes(asksAccount)
+    //   : [];
     const levels: [number, number][] = [];
 
-    for (const node of bidNodes.concat(askNodes)) {
-      const priceLots = node.key.shrn(64);
-      levels.push([
-        priceLotsToUi(marketAccount, priceLots),
-        baseLotsToUi(marketAccount, node.quantity),
-      ]);
-    }
+    // for (const node of bidNodes.concat(askNodes)) {
+    //   const priceLots = node.key.shrn(64);
+    //   levels.push([
+    //     priceLotsToUi(marketAccount, priceLots),
+    //     baseLotsToUi(marketAccount, node.quantity),
+    //   ]);
+    // }
     return levels;
   }
 

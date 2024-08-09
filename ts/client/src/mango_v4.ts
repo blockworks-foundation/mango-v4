@@ -10404,9 +10404,13 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                119
+                111
               ]
             }
+          },
+          {
+            "name": "forceAlign",
+            "type": "u64"
           }
         ]
       }
@@ -25439,9 +25443,13 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                119
+                111
               ]
             }
+          },
+          {
+            "name": "forceAlign",
+            "type": "u64"
           }
         ]
       }

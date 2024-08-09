@@ -1,8 +1,9 @@
-import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
+import { AnchorProvider, BN } from '@coral-xyz/anchor';
 import { utf8 } from '@coral-xyz/anchor/dist/cjs/utils/bytes';
+import { OpenOrdersAccount } from '@openbook-dex/openbook-v2';
 import { OpenOrders, Order, Orderbook } from '@project-serum/serum/lib/market';
-import { OpenOrdersAccount, OpenBookV2Client } from '@openbook-dex/openbook-v2';
-import { AccountInfo, Keypair, PublicKey } from '@solana/web3.js';
+import { AccountInfo, PublicKey } from '@solana/web3.js';
+import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from '..';
 import { MangoClient } from '../client';
 import { OPENBOOK_PROGRAM_ID, RUST_I64_MAX, RUST_I64_MIN } from '../constants';
 import {
@@ -13,7 +14,6 @@ import {
   ZERO_I80F48,
 } from '../numbers/I80F48';
 import {
-  EmptyWallet,
   U64_MAX_BN,
   deepClone,
   roundTo5,
@@ -26,7 +26,6 @@ import { MangoSignatureStatus } from '../utils/rpc';
 import { Bank, TokenIndex } from './bank';
 import { Group } from './group';
 import { HealthCache } from './healthCache';
-import { PerpMarket, PerpMarketIndex, PerpOrder, PerpOrderSide } from './perp';
 import { MarketIndex, Serum3Side } from './serum3';
 export class MangoAccount {
   public name: string;
@@ -136,8 +135,7 @@ export class MangoAccount {
 
   public async reload(client: MangoClient): Promise<MangoAccount> {
     const mangoAccount = await client.getMangoAccount(this.publicKey);
-    await mangoAccount.reloadSerum3OpenOrders(client);
-    await mangoAccount.reloadOpenbookV2OpenOrders(client);
+    await mangoAccount.reloadAllOpenOrders(client);
     Object.assign(this, mangoAccount);
     return mangoAccount;
   }
@@ -146,19 +144,65 @@ export class MangoAccount {
     client: MangoClient,
   ): Promise<{ value: MangoAccount; slot: number }> {
     const resp = await client.getMangoAccountWithSlot(this.publicKey);
-    await resp?.value.reloadSerum3OpenOrders(client);
-    await resp?.value.reloadOpenbookV2OpenOrders(client);
+    await resp?.value.reloadAllOpenOrders(client);
     Object.assign(this, resp?.value);
     return { value: resp!.value, slot: resp!.slot };
+  }
+
+  async reloadAllOpenOrders(client: MangoClient): Promise<MangoAccount> {
+    const serum3Active = this.serum3Active();
+    const openbookV2Active = this.openbookV2Active();
+    const ooPks = [
+      ...serum3Active.map((oo) => oo.openOrders),
+      ...openbookV2Active.map((oo) => oo.openOrders),
+    ];
+    if (!ooPks.length) return this;
+
+    const ais = await client.connection.getMultipleAccountsInfo(ooPks);
+
+    if (serum3Active.length) {
+      this.serum3OosMapByMarketIndex = new Map(
+        ais.slice(0, serum3Active.length).map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${serum3Active[i].openOrders} and market ${serum3Active[i].marketIndex}!`,
+            );
+          }
+          const oo = OpenOrders.fromAccountInfo(
+            serum3Active[i].openOrders,
+            ai,
+            OPENBOOK_PROGRAM_ID[client.cluster],
+          );
+          return [serum3Active[i].marketIndex, oo];
+        }),
+      );
+    }
+    if (openbookV2Active.length) {
+      this.openbookV2OosMapByMarketIndex = new Map(
+        ais.slice(serum3Active.length).map((ai, i) => {
+          if (!ai) {
+            throw new Error(
+              `Undefined AI for open orders ${openbookV2Active[i].openOrders} and market ${openbookV2Active[i].marketIndex}!`,
+            );
+          }
+          const oo =
+            client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+              'openOrdersAccount',
+              ai.data,
+            );
+          return [openbookV2Active[i].marketIndex, oo];
+        }),
+      );
+    }
+    return this;
   }
 
   async reloadSerum3OpenOrders(client: MangoClient): Promise<MangoAccount> {
     const serum3Active = this.serum3Active();
     if (!serum3Active.length) return this;
-    const ais =
-      await client.program.provider.connection.getMultipleAccountsInfo(
-        serum3Active.map((serum3) => serum3.openOrders),
-      );
+    const ais = await client.connection.getMultipleAccountsInfo(
+      serum3Active.map((serum3) => serum3.openOrders),
+    );
     this.serum3OosMapByMarketIndex = new Map(
       Array.from(
         ais.map((ai, i) => {
@@ -181,21 +225,11 @@ export class MangoAccount {
   }
 
   async reloadOpenbookV2OpenOrders(client: MangoClient): Promise<MangoAccount> {
-    const openbookClient = new OpenBookV2Client(
-      new AnchorProvider(
-        client.connection,
-        new EmptyWallet(Keypair.generate()),
-        {
-          commitment: client.connection.commitment,
-        },
-      ),
-    ); // readonly client for deserializing accounts
     const openbookV2Active = this.openbookV2Active();
     if (!openbookV2Active.length) return this;
-    const ais =
-      await client.program.provider.connection.getMultipleAccountsInfo(
-        openbookV2Active.map((openbookV2) => openbookV2.openOrders),
-      );
+    const ais = await client.connection.getMultipleAccountsInfo(
+      openbookV2Active.map((openbookV2) => openbookV2.openOrders),
+    );
     this.openbookV2OosMapByMarketIndex = new Map(
       Array.from(
         ais.map((ai, i) => {
@@ -205,7 +239,7 @@ export class MangoAccount {
             );
           }
           const oo =
-            openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
+            client.openbookClient.program.account.openOrdersAccount.coder.accounts.decode(
               'openOrdersAccount',
               ai.data,
             );
@@ -917,7 +951,9 @@ export class MangoAccount {
       (s) => s.marketIndex === serum3Market.marketIndex,
     );
     if (!serum3OO) {
-      throw new Error(`No open orders account found for ${externalMarketPk}`);
+      throw new Error(
+        `No Serum open orders account found for ${externalMarketPk}`,
+      );
     }
 
     const serum3MarketExternal = group.serum3ExternalMarketsMap.get(
@@ -956,14 +992,36 @@ export class MangoAccount {
     group: Group,
     externalMarketPk: PublicKey,
   ): number {
-    const serum3Market =
-      group.getSerum3MarketByExternalMarket(externalMarketPk);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
+    let marketIndex: MarketIndex;
+    let type: 'Serum3' | 'OpenbookV2';
+    let baseBank: Bank;
+    let quoteBank: Bank;
+
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      marketIndex = serum3Market.marketIndex;
+      type = 'Serum3';
+      baseBank = group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex);
+      quoteBank = group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex);
+    } else if (
+      group.openbookV2ExternalMarketsMap.get(externalMarketPk.toString())
+    ) {
+      const openbookV2Market =
+        group.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+      marketIndex = openbookV2Market.marketIndex;
+      type = 'OpenbookV2';
+      baseBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.baseTokenIndex,
+      );
+      quoteBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.quoteTokenIndex,
+      );
+    } else {
+      throw new Error(
+        `No market found for external pubkey ${externalMarketPk}`,
+      );
+    }
 
     const targetRemainingDepositLimit = baseBank.getRemainingDepositLimit();
 
@@ -971,7 +1029,8 @@ export class MangoAccount {
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
       quoteBank,
-      serum3Market,
+      marketIndex,
+      type,
       Serum3Side.bid,
       I80F48.fromNumber(2),
     );
@@ -994,9 +1053,13 @@ export class MangoAccount {
       quoteAmount = quoteAmount.min(equivalentSourceAmount);
     }
 
-    quoteAmount = quoteAmount.div(
-      ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
-    );
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      quoteAmount = quoteAmount.div(
+        ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
+      );
+    }
 
     return toUiDecimals(quoteAmount, quoteBank.mintDecimals);
   }
@@ -1011,14 +1074,36 @@ export class MangoAccount {
     group: Group,
     externalMarketPk: PublicKey,
   ): number {
-    const serum3Market =
-      group.getSerum3MarketByExternalMarket(externalMarketPk);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
+    let marketIndex: MarketIndex;
+    let type: 'Serum3' | 'OpenbookV2';
+    let baseBank: Bank;
+    let quoteBank: Bank;
+
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      marketIndex = serum3Market.marketIndex;
+      type = 'Serum3';
+      baseBank = group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex);
+      quoteBank = group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex);
+    } else if (
+      group.openbookV2ExternalMarketsMap.get(externalMarketPk.toString())
+    ) {
+      const openbookV2Market =
+        group.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+      marketIndex = openbookV2Market.marketIndex;
+      type = 'OpenbookV2';
+      baseBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.baseTokenIndex,
+      );
+      quoteBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.quoteTokenIndex,
+      );
+    } else {
+      throw new Error(
+        `No market found for external pubkey ${externalMarketPk}`,
+      );
+    }
 
     const targetRemainingDepositLimit = quoteBank.getRemainingDepositLimit();
 
@@ -1026,7 +1111,8 @@ export class MangoAccount {
     const nativeAmount = hc.getMaxSerum3OrderForHealthRatio(
       baseBank,
       quoteBank,
-      serum3Market,
+      marketIndex,
+      type,
       Serum3Side.ask,
       I80F48.fromNumber(2),
     );
@@ -1049,9 +1135,13 @@ export class MangoAccount {
       baseAmount = baseAmount.min(equivalentSourceAmount);
     }
 
-    baseAmount = baseAmount.div(
-      ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
-    );
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      baseAmount = baseAmount.div(
+        ONE_I80F48().add(I80F48.fromNumber(serum3Market.getFeeRates(true))),
+      );
+    }
 
     return toUiDecimals(baseAmount, baseBank.mintDecimals);
   }
@@ -1070,14 +1160,37 @@ export class MangoAccount {
     externalMarketPk: PublicKey,
     healthType: HealthType = HealthType.init,
   ): number {
-    const serum3Market =
-      group.getSerum3MarketByExternalMarket(externalMarketPk);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
+    let marketIndex: MarketIndex;
+    let type: 'Serum3' | 'OpenbookV2';
+    let baseBank: Bank;
+    let quoteBank: Bank;
+
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      marketIndex = serum3Market.marketIndex;
+      type = 'Serum3';
+      baseBank = group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex);
+      quoteBank = group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex);
+    } else if (
+      group.openbookV2ExternalMarketsMap.get(externalMarketPk.toString())
+    ) {
+      const openbookV2Market =
+        group.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+      marketIndex = openbookV2Market.marketIndex;
+      type = 'OpenbookV2';
+      baseBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.baseTokenIndex,
+      );
+      quoteBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.quoteTokenIndex,
+      );
+    } else {
+      throw new Error(
+        `No market found for external pubkey ${externalMarketPk}`,
+      );
+    }
+
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc
       .simHealthRatioWithSerum3BidChanges(
@@ -1085,10 +1198,10 @@ export class MangoAccount {
         quoteBank,
         toNativeI80F48(
           uiQuoteAmount,
-          group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex)
-            .mintDecimals,
+          group.getFirstBankByTokenIndex(quoteBank.tokenIndex).mintDecimals,
         ),
-        serum3Market,
+        marketIndex,
+        type,
         healthType,
       )
       .toNumber();
@@ -1108,14 +1221,37 @@ export class MangoAccount {
     externalMarketPk: PublicKey,
     healthType: HealthType = HealthType.init,
   ): number {
-    const serum3Market =
-      group.getSerum3MarketByExternalMarket(externalMarketPk);
-    const baseBank = group.getFirstBankByTokenIndex(
-      serum3Market.baseTokenIndex,
-    );
-    const quoteBank = group.getFirstBankByTokenIndex(
-      serum3Market.quoteTokenIndex,
-    );
+    let marketIndex: MarketIndex;
+    let type: 'Serum3' | 'OpenbookV2';
+    let baseBank: Bank;
+    let quoteBank: Bank;
+
+    if (group.serum3ExternalMarketsMap.get(externalMarketPk.toString())) {
+      const serum3Market =
+        group.getSerum3MarketByExternalMarket(externalMarketPk);
+      marketIndex = serum3Market.marketIndex;
+      type = 'Serum3';
+      baseBank = group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex);
+      quoteBank = group.getFirstBankByTokenIndex(serum3Market.quoteTokenIndex);
+    } else if (
+      group.openbookV2ExternalMarketsMap.get(externalMarketPk.toString())
+    ) {
+      const openbookV2Market =
+        group.getOpenbookV2MarketByExternalMarket(externalMarketPk);
+      marketIndex = openbookV2Market.marketIndex;
+      type = 'OpenbookV2';
+      baseBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.baseTokenIndex,
+      );
+      quoteBank = group.getFirstBankByTokenIndex(
+        openbookV2Market.quoteTokenIndex,
+      );
+    } else {
+      throw new Error(
+        `No market found for external pubkey ${externalMarketPk}`,
+      );
+    }
+
     const hc = HealthCache.fromMangoAccount(group, this);
     return hc
       .simHealthRatioWithSerum3AskChanges(
@@ -1123,10 +1259,10 @@ export class MangoAccount {
         quoteBank,
         toNativeI80F48(
           uiBaseAmount,
-          group.getFirstBankByTokenIndex(serum3Market.baseTokenIndex)
-            .mintDecimals,
+          group.getFirstBankByTokenIndex(baseBank.tokenIndex).mintDecimals,
         ),
-        serum3Market,
+        marketIndex,
+        type,
         healthType,
       )
       .toNumber();
@@ -1342,6 +1478,13 @@ export class MangoAccount {
         : res + '';
 
     res =
+      this.openbookV2Active().length > 1
+        ? res +
+          '\n openbook:' +
+          JSON.stringify(this.openbookV2Active(), null, 4)
+        : res + '';
+
+    res =
       this.perpActive().length > 0
         ? res +
           '\n perps:' +
@@ -1520,28 +1663,48 @@ export class Serum3Orders {
 
 export class OpenbookV2Orders {
   static OpenbookV2MarketIndexUnset = 65535;
-  static from(dto: OpenbookV2PositionDto): Serum3Orders {
+  static from(dto: OpenbookV2PositionDto): OpenbookV2Orders {
     return new OpenbookV2Orders(
       dto.openOrders,
+      dto.baseBorrowsWithoutFee,
+      dto.quoteBorrowsWithoutFee,
+      dto.highestPlacedBidInv,
+      dto.lowestPlacedAsk,
+      dto.potentialBaseTokens,
+      dto.potentialQuoteTokens,
+      dto.lowestPlacedBidInv,
+      dto.highestPlacedAsk,
+      dto.quoteLotSize,
+      dto.baseLotSize,
       dto.marketIndex as MarketIndex,
       dto.baseTokenIndex as TokenIndex,
       dto.quoteTokenIndex as TokenIndex,
-      dto.highestPlacedBidInv,
-      dto.lowestPlacedAsk,
     );
   }
 
   constructor(
     public openOrders: PublicKey,
+    public baseBorrowsWithoutFee: BN,
+    public quoteBorrowsWithoutFee: BN,
+    public highestPlacedBidInv: number,
+    public lowestPlacedAsk: number,
+    public potentialBaseTokens: BN,
+    public potentialQuoteTokens: BN,
+    public lowestPlacedBidInv: number,
+    public highestPlacedAsk: number,
+    public quoteLotSize: number,
+    public baseLotSize: number,
     public marketIndex: MarketIndex,
     public baseTokenIndex: TokenIndex,
     public quoteTokenIndex: TokenIndex,
-    public highestPlacedBidInv: number,
-    public lowestPlacedAsk: number,
   ) {}
 
   public isActive(): boolean {
-    return this.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset;
+    // console.log(`isActive - ${this.marketIndex} ${this.openOrders}`);
+    return (
+      this.marketIndex !== OpenbookV2Orders.OpenbookV2MarketIndexUnset &&
+      !this.openOrders.equals(PublicKey.default)
+    );
   }
 }
 
@@ -1564,13 +1727,19 @@ export class Serum3PositionDto {
 export class OpenbookV2PositionDto {
   constructor(
     public openOrders: PublicKey,
-    public marketIndex: number,
     public baseBorrowsWithoutFee: BN,
     public quoteBorrowsWithoutFee: BN,
-    public baseTokenIndex: number,
-    public quoteTokenIndex: number,
     public highestPlacedBidInv: number,
     public lowestPlacedAsk: number,
+    public potentialBaseTokens: BN,
+    public potentialQuoteTokens: BN,
+    public lowestPlacedBidInv: number,
+    public highestPlacedAsk: number,
+    public quoteLotSize: number,
+    public baseLotSize: number,
+    public marketIndex: number,
+    public baseTokenIndex: number,
+    public quoteTokenIndex: number,
     public reserved: number[],
   ) {}
 }
