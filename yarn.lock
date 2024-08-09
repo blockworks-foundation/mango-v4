@@ -790,10 +790,10 @@
     lodash "^4.17.21"
     protobufjs "^7.2.6"
 
-"@switchboard-xyz/on-demand@^1.2.16":
-  version "1.2.16"
-  resolved "https://registry.yarnpkg.com/@switchboard-xyz/on-demand/-/on-demand-1.2.16.tgz#a115bd851cf355d5e8f0ec068383dbca6c4d9b2e"
-  integrity sha512-oJ3uypyjj303xR+BZVpnItxrf61CBYqocdEmjO5op/FdYPqnmyQIK1RCPE+J4ynu9K//eLLTzBZ279qWwCh9Og==
+"@switchboard-xyz/on-demand@^1.2.20":
+  version "1.2.20"
+  resolved "https://registry.yarnpkg.com/@switchboard-xyz/on-demand/-/on-demand-1.2.20.tgz#11dcd876cbf8bb1893f22f7895baaf63fe118d76"
+  integrity sha512-RC52eNZVGaRbPdb8GYc1H4nm4YRCToX2LMI8flWjV9cf7jOIkcjtPyLH/Spg8LJPe2Pa30wJlqaqSXfqYB47Xw==
   dependencies:
     "@coral-xyz/anchor-30" "npm:@coral-xyz/anchor@0.30.1"
     "@solana/web3.js" "^1.95.0"
