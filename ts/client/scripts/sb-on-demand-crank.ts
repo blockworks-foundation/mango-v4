@@ -26,7 +26,7 @@ import { AnchorProvider, Wallet } from 'switchboard-anchor';
 import { Group } from '../src/accounts/group';
 import { parseSwitchboardOracle } from '../src/accounts/oracle';
 import { MangoClient } from '../src/client';
-import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
+import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP, SBOD_ORACLE_LUTS } from '../src/constants';
 import { createComputeBudgetIx } from '../src/utils/rpc';
 import { manageFeeWebSocket } from './manageFeeWs';
 import { getOraclesForMangoGroup } from './sb-on-demand-crank-utils';
@@ -241,6 +241,7 @@ async function setupBackgroundRefresh(
             ...txChunk.map((tx) => ({
               signers: [],
               transactionInstruction: tx,
+              alts: SBOD_ORACLE_LUTS.map(x=>new PublicKey(x)),
             })),
           ],
           sequenceType: SequenceType.Parallel,
@@ -249,6 +250,7 @@ async function setupBackgroundRefresh(
           maxTxesInBatch: 10,
           autoRetry: false,
           logFlowInfo: false,
+          useVersionedTransactions: true,
         },
         callbacks: {
           afterEveryTxSend: function (data) {
