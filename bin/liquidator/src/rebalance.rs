@@ -192,11 +192,16 @@ impl Rebalancer {
         let results = futures::future::join_all(jobs).await;
         let routes: Vec<_> = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
+        let seq_check_ix = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+
         let best_route_res = self
-            .determine_best_swap_tx(routes, quote_mint, output_mint)
+            .determine_best_swap_tx(routes, quote_mint, output_mint, seq_check_ix.clone())
             .await;
 
-        let (mut tx_builder, route) = match best_route_res {
+        let (tx_builder, route) = match best_route_res {
             Ok(x) => x,
             Err(e) => {
                 warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
@@ -216,16 +221,11 @@ impl Rebalancer {
                     },
                     quote_mint,
                     output_mint,
+                    seq_check_ix,
                 )
                 .await?
             }
         };
-
-        let seq_check_ix = self
-            .mango_client
-            .sequence_check_instruction(&self.mango_account_address, account)
-            .await?;
-        tx_builder.append(seq_check_ix);
 
         let sig = tx_builder
             .send_and_confirm(&self.mango_client.client)
@@ -273,11 +273,16 @@ impl Rebalancer {
         let results = futures::future::join_all(jobs).await;
         let routes: Vec<_> = results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
+        let seq_check_ix = self
+            .mango_client
+            .sequence_check_instruction(&self.mango_account_address, account)
+            .await?;
+
         let best_route_res = self
-            .determine_best_swap_tx(routes, input_mint, quote_mint)
+            .determine_best_swap_tx(routes, input_mint, quote_mint, seq_check_ix.clone())
             .await;
 
-        let (mut tx_builder, route) = match best_route_res {
+        let (tx_builder, route) = match best_route_res {
             Ok(x) => x,
             Err(e) => {
                 warn!("could not use simple routes because of {}, trying with an alternative one (if configured)", e);
@@ -295,16 +300,11 @@ impl Rebalancer {
                     },
                     input_mint,
                     quote_mint,
+                    seq_check_ix,
                 )
                 .await?
             }
         };
-
-        let seq_check_ix = self
-            .mango_client
-            .sequence_check_instruction(&self.mango_account_address, account)
-            .await?;
-        tx_builder.append(seq_check_ix);
 
         let sig = tx_builder
             .send_and_confirm(&self.mango_client.client)
@@ -351,6 +351,7 @@ impl Rebalancer {
         quote_fetcher: impl Fn(&u16) -> anyhow::Result<T>,
         original_input_mint: Pubkey,
         original_output_mint: Pubkey,
+        seq_check_ix: PreparedInstructions,
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let mut alt_jobs = vec![];
         for in_token_index in &self.config.alternate_jupiter_route_tokens {
@@ -360,7 +361,12 @@ impl Rebalancer {
         let alt_routes: Vec<_> = alt_results.into_iter().filter_map(|v| v.ok()).collect_vec();
 
         let best_route = self
-            .determine_best_swap_tx(alt_routes, original_input_mint, original_output_mint)
+            .determine_best_swap_tx(
+                alt_routes,
+                original_input_mint,
+                original_output_mint,
+                seq_check_ix,
+            )
             .await?;
         Ok(best_route)
     }
@@ -370,6 +376,7 @@ impl Rebalancer {
         mut routes: Vec<swap::Quote>,
         original_input_mint: Pubkey,
         original_output_mint: Pubkey,
+        seq_check_ix: PreparedInstructions,
     ) -> anyhow::Result<(TransactionBuilder, swap::Quote)> {
         let mut prices = HashMap::<Pubkey, I80F48>::new();
         let mut get_or_fetch_price = |m| {
@@ -414,11 +421,13 @@ impl Rebalancer {
         });
 
         for route in routes {
-            let builder = self
+            let mut builder = self
                 .mango_client
                 .swap()
                 .prepare_swap_transaction(&route)
                 .await?;
+            builder.append(seq_check_ix.clone());
+
             let tx_size = builder.transaction_size()?;
             if tx_size.is_within_limit() {
                 return Ok((builder, route.clone()));
