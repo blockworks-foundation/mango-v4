@@ -1179,7 +1179,8 @@ impl MangoClient {
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
         let ix = self.serum3_settle_funds_instruction(s3, base, quote, open_orders);
-        self.send_and_confirm_authority_tx(ix.to_instructions()).await
+        self.send_and_confirm_authority_tx(ix.to_instructions())
+            .await
     }
 
     pub fn serum3_settle_funds_instruction(
