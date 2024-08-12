@@ -46,6 +46,7 @@ pub fn token_register(
     platform_liquidation_fee: f32,
     disable_asset_liquidation: bool,
     collateral_fee_per_day: f32,
+    tier: String,
 ) -> Result<()> {
     require_neq!(token_index, TokenIndex::MAX);
 
@@ -106,7 +107,6 @@ pub fn token_register(
         force_close: 0,
         disable_asset_liquidation: u8::from(disable_asset_liquidation),
         force_withdraw: 0,
-        padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
         token_conditional_swap_maker_fee_rate,
@@ -126,6 +126,7 @@ pub fn token_register(
         collected_liquidation_fees: I80F48::ZERO,
         collected_collateral_fees: I80F48::ZERO,
         collateral_fee_per_day,
+        tier: fill_from_str(&tier)?,
         reserved: [0; 1900],
     };
 

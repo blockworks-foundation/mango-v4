@@ -32,6 +32,7 @@ export interface TokenRegisterParams {
   platformLiquidationFee: number;
   disableAssetLiquidation: boolean;
   collateralFeePerDay: number;
+  tier: string;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
@@ -74,6 +75,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   platformLiquidationFee: 0.0,
   disableAssetLiquidation: false,
   collateralFeePerDay: 0.0,
+  tier: '',
 };
 
 export interface TokenEditParams {
@@ -117,6 +119,7 @@ export interface TokenEditParams {
   platformLiquidationFee: number | null;
   disableAssetLiquidation: boolean | null;
   collateralFeePerDay: number | null;
+  tier: string | null;
   forceWithdraw: boolean | null;
 }
 
@@ -161,6 +164,7 @@ export const NullTokenEditParams: TokenEditParams = {
   platformLiquidationFee: null,
   disableAssetLiquidation: null,
   collateralFeePerDay: null,
+  tier: null,
   forceWithdraw: null,
 };
 
