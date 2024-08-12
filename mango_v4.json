@@ -1,5 +1,5 @@
 {
-  "version": "0.24.2",
+  "version": "0.24.3",
   "name": "mango_v4",
   "instructions": [
     {
@@ -10143,9 +10143,13 @@
             "type": {
               "array": [
                 "u8",
-                119
+                111
               ]
             }
+          },
+          {
+            "name": "forceAlign",
+            "type": "u64"
           }
         ]
       }

@@ -4,15 +4,24 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.24.3, 2024-8-
+
+- Remove delegate account withdrawal limit (#939)
+- Allow the insurance fund to be for any bank (#946)
+- Program: add a tier string in banks (#988)
+
+## mainnet
+
 ### v0.24.2, 2024-7-
+
+Deployment: Jul 29, 2024 at 10:46:28 Central European Summer Time,
+https://explorer.solana.com/tx/8zFSfPVSw98NL7nnJgfjNEhXcUVJtaCxLxnj9jt6kAnLwBR8LvzrS1Q5p21CuwiueJisdQFurf1ujNy38GiUEB1
 
 - Program: charge collateral fee directly on borrowed tokens (#973)
 
 - Program: fix TokenUpdateIndexAndRateResilient IX (#979)
 
 - Program: add support for pyth v2 account (#980)
-
-## mainnet
 
 ### v0.24.1, 2024-7-9
 
