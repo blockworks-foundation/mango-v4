@@ -44,19 +44,23 @@ import { MarketIndex, Serum3Market, Serum3Side } from './serum3';
 //                       ██████████████████████████████████████████
 // warning: this code is copy pasta from rust, keep in sync with health.rs
 
+
+/**
+ * WARNING this potentially modifies health & starting spot inplace
+ */
 function spotAmountTakenForHealthZero(
   health: I80F48,
   startingSpot: I80F48,
   assetWeightedPrice: I80F48,
   liabWeightedPrice: I80F48,
 ): I80F48 {
-  if (health.lte(ZERO_I80F48())) {
+  if (!health.isPos()) {
     return ZERO_I80F48();
   }
 
   let takenSpot = ZERO_I80F48();
-  if (startingSpot.gt(ZERO_I80F48())) {
-    if (assetWeightedPrice.gt(ZERO_I80F48())) {
+  if (startingSpot.isPos()) {
+    if (assetWeightedPrice.isPos()) {
       const assetMax = health.div(assetWeightedPrice);
       if (assetMax.lte(startingSpot)) {
         return assetMax;
@@ -65,27 +69,13 @@ function spotAmountTakenForHealthZero(
     takenSpot = startingSpot;
     health.isub(startingSpot.mul(assetWeightedPrice));
   }
-  if (health.gt(ZERO_I80F48())) {
-    if (liabWeightedPrice.lte(ZERO_I80F48())) {
+  if (health.isPos()) {
+    if (!liabWeightedPrice.isPos()) {
       throw new Error('LiabWeightedPrice must be greater than 0!');
     }
     takenSpot.iadd(health.div(liabWeightedPrice));
   }
   return takenSpot;
-}
-
-function spotAmountGivenForHealthZero(
-  health: I80F48,
-  startingSpot: I80F48,
-  assetWeightedPrice: I80F48,
-  liabWeightedPrice: I80F48,
-): I80F48 {
-  return spotAmountTakenForHealthZero(
-    health.neg(),
-    startingSpot.neg(),
-    liabWeightedPrice,
-    assetWeightedPrice,
-  );
 }
 
 export class HealthCache {
@@ -193,7 +183,7 @@ export class HealthCache {
         quoteAsset.div(baseLiab),
       );
       let allReservedAsBase;
-      if (!info.reservedQuoteAsBaseHighestBid.eq(ZERO_I80F48())) {
+      if (!info.reservedQuoteAsBaseHighestBid.isZero()) {
         allReservedAsBase = reservedBase.add(
           reservedQuoteAsBaseOracle.min(info.reservedQuoteAsBaseHighestBid),
         );
@@ -207,7 +197,7 @@ export class HealthCache {
         baseAsset.div(quoteLiab),
       );
       let allReservedAsQuote;
-      if (!info.reservedBaseAsQuoteLowestAsk.eq(ZERO_I80F48())) {
+      if (!info.reservedBaseAsQuoteLowestAsk.isZero()) {
         allReservedAsQuote = reservedQuote.add(
           reservedBaseAsQuoteOracle.min(info.reservedBaseAsQuoteLowestAsk),
         );
@@ -249,7 +239,7 @@ export class HealthCache {
       );
       const perpSettleToken = tokenBalances[settleTokenIndex];
       const healthUnsettled = perpInfo.healthUnsettledPnl(healthType);
-      if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
+      if (!ignoreNegativePerp || healthUnsettled.isPos()) {
         perpSettleToken.spotAndPerp.iadd(healthUnsettled);
       }
     }
@@ -287,7 +277,7 @@ export class HealthCache {
           group.getMintDecimalsByTokenIndex(perpInfo.settleTokenIndex),
         ),
       });
-      if (!ignoreNegativePerp || healthUnsettled.gt(ZERO_I80F48())) {
+      if (!ignoreNegativePerp || healthUnsettled.isPos()) {
         perpSettleToken.spotAndPerp.iadd(healthUnsettled);
       }
     }
@@ -509,11 +499,11 @@ export class HealthCache {
 
   public healthRatio(healthType: HealthType): I80F48 {
     const res = this.healthAssetsAndLiabsStableLiabs(healthType);
-    const hundred = I80F48.fromNumber(100);
     // console.log(`assets ${res.assets}`);
     // console.log(`liabs ${res.liabs}`);
     if (res.liabs.gt(I80F48.fromNumber(0.001))) {
-      return hundred.mul(res.assets.sub(res.liabs)).div(res.liabs);
+      const hundred = I80F48.fromNumber(100);
+      return hundred.imul(res.assets.sub(res.liabs)).idiv(res.liabs);
     }
     return MAX_I80F48();
   }
@@ -931,10 +921,10 @@ export class HealthCache {
     targetFn: (cache) => I80F48,
   ): I80F48 {
     if (
-      sourceBank.initLiabWeight
+      !sourceBank.initLiabWeight
         .sub(targetBank.initAssetWeight)
         .abs()
-        .lte(ZERO_I80F48())
+        .isPos()
     ) {
       return ZERO_I80F48();
     }
@@ -979,7 +969,7 @@ export class HealthCache {
           .mul(price),
       );
 
-    if (finalHealthSlope.gte(ZERO_I80F48())) {
+    if (!finalHealthSlope.isNeg()) {
       return MAX_I80F48();
     }
 
@@ -1044,9 +1034,9 @@ export class HealthCache {
     const healthAtMaxValue = cacheAfterSwap(amountForMaxValue).health(
       HealthType.init,
     );
-    if (healthAtMaxValue.eq(ZERO_I80F48())) {
+    if (healthAtMaxValue.isZero()) {
       return amountForMaxValue;
-    } else if (healthAtMaxValue.lt(ZERO_I80F48())) {
+    } else if (healthAtMaxValue.isNeg()) {
       return ZERO_I80F48();
     }
     const zeroHealthEstimate = amountForMaxValue.sub(
@@ -1106,7 +1096,7 @@ export class HealthCache {
     const initialAmount = ZERO_I80F48();
     const initialHealth = this.health(HealthType.init);
     const initialRatio = this.healthRatio(HealthType.init);
-    if (initialRatio.lte(ZERO_I80F48())) {
+    if (!initialRatio.isPos()) {
       return ZERO_I80F48();
     }
 
@@ -1121,7 +1111,7 @@ export class HealthCache {
     // and when its a bid, then quote->bid
     let zeroAmount;
     if (side == Serum3Side.ask) {
-      const quoteBorrows = quote.balanceSpot.lt(ZERO_I80F48())
+      const quoteBorrows = quote.balanceSpot.isNeg()
         ? quote.balanceSpot.abs().mul(quote.prices.liab(HealthType.init))
         : ZERO_I80F48();
       const max = base.balanceSpot.mul(base.prices.oracle).max(quoteBorrows);
@@ -1138,7 +1128,7 @@ export class HealthCache {
       // console.log(` - quoteBorrows ${quoteBorrows.toLocaleString()}`);
       // console.log(` - max ${max.toLocaleString()}`);
     } else {
-      const baseBorrows = base.balanceSpot.lt(ZERO_I80F48())
+      const baseBorrows = base.balanceSpot.isNeg()
         ? base.balanceSpot.abs().mul(base.prices.liab(HealthType.init))
         : ZERO_I80F48();
       const max = quote.balanceSpot.mul(quote.prices.oracle).max(baseBorrows);
@@ -1221,7 +1211,7 @@ export class HealthCache {
     const healthCacheClone: HealthCache = deepClone<HealthCache>(this);
 
     const initialRatio = this.healthRatio(HealthType.init);
-    if (initialRatio.lt(ZERO_I80F48())) {
+    if (initialRatio.isNeg()) {
       return ZERO_I80F48();
     }
 
@@ -1244,7 +1234,7 @@ export class HealthCache {
             .neg()
             .mul(prices.liab(HealthType.init))
             .add(price);
-    if (finalHealthSlope.gte(ZERO_I80F48())) {
+    if (!finalHealthSlope.isNeg()) {
       return MAX_I80F48();
     }
     finalHealthSlope.imul(settleInfo.liabWeightedPrice(HealthType.init));
@@ -1278,8 +1268,8 @@ export class HealthCache {
     // 1. We are increasing abs(baseLots)
     // 2. We are bringing the base position to 0, and then going to case 1.
     const hasCase2 =
-      (initialBaseLots.gt(ZERO_I80F48()) && direction == -1) ||
-      (initialBaseLots.lt(ZERO_I80F48()) && direction == 1);
+      (initialBaseLots.isPos() && direction == -1) ||
+      (initialBaseLots.isNeg() && direction == 1);
 
     let case1Start: I80F48, case1StartRatio: I80F48;
     if (hasCase2) {
@@ -1310,7 +1300,7 @@ export class HealthCache {
       settleInfo.initAssetWeight = settleInfo.initLiabWeight;
       settleInfo.initScaledAssetWeight = settleInfo.initScaledLiabWeight;
       const startHealth = startCache.health(HealthType.init);
-      if (startHealth.lte(ZERO_I80F48())) {
+      if (!startHealth.isPos()) {
         return ZERO_I80F48();
       }
 
@@ -1373,7 +1363,7 @@ export class HealthCache {
     if (perpPosition.getBasePosition(perpMarket).isPos()) {
       const zero = ZERO_I80F48();
       const healthAtPriceZero = healthAfterPriceChange(zero);
-      if (healthAtPriceZero.gt(ZERO_I80F48())) {
+      if (healthAtPriceZero.isPos()) {
         return null;
       }
 
@@ -1794,7 +1784,7 @@ export class PerpInfo {
     if (this.settleTokenIndex !== settleToken.tokenIndex) {
       throw new Error('Settle token index should match!');
     }
-    if (unweighted.gt(ZERO_I80F48())) {
+    if (unweighted.isPos()) {
       return (
         healthType == HealthType.init
           ? settleToken.initScaledAssetWeight
@@ -1820,7 +1810,7 @@ export class PerpInfo {
     unweighted: I80F48,
     healthType: HealthType | undefined,
   ): I80F48 {
-    if (unweighted.gt(ZERO_I80F48())) {
+    if (unweighted.isPos()) {
       return (
         healthType == HealthType.init || healthType == HealthType.liquidationEnd
           ? this.initOverallAssetWeight

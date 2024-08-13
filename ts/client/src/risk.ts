@@ -7,6 +7,8 @@ import { HealthType, MangoAccount } from './accounts/mangoAccount';
 import { MangoClient } from './client';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from './numbers/I80F48';
 import { buildFetch, toUiDecimals, toUiDecimalsForQuote } from './utils';
+import { HealthCache } from './accounts/healthCache';
+import { ZERO } from '@raydium-io/raydium-sdk';
 
 export interface LiqorPriceImpact {
   Coin: { val: string; highlight: boolean };
@@ -120,255 +122,259 @@ export async function getOnChainPriceForMints(
   );
 }
 
-export async function getPriceImpactForLiqor(
+const maxLiabsValue = I80F48.fromNumber(99_999_999_999);
+
+export function getPriceImpactForLiqor(
   group: Group,
   pis: PriceImpact[],
   mangoAccounts: MangoAccount[],
-): Promise<LiqorPriceImpact[]> {
-  const mangoAccounts_ = mangoAccounts.filter((a) =>
-    a.getHealth(group, HealthType.maint).lt(ZERO_I80F48()),
-  );
+): LiqorPriceImpact[] {
 
-  const mangoAccountsWithHealth = mangoAccounts_.map((a: MangoAccount) => {
-    return {
-      account: a,
-      health: a.getHealth(group, HealthType.liquidationEnd),
-      healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-    };
-  });
+
+  const mangoAccountsWithHealth = mangoAccounts.map((a: MangoAccount) => {
+    const hc = HealthCache.fromMangoAccount(group, a);
+    if (hc.health(HealthType.maint).isPos()) {
+      return {
+        account: a,
+        health: hc.health(HealthType.liquidationEnd),
+      };
+    }
+  }).filter(a => !!a);
 
   const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
   const usdcMint = usdcBank.mint;
 
-  return await Promise.all(
-    Array.from(group.banksMapByMint.values())
-      .sort((a, b) => a[0].name.localeCompare(b[0].name))
-      // .filter((banks) => banks[0].name == 'MSOL')
-      .map(async (banks) => {
-        const bank = banks[0];
+  return Array.from(group.banksMapByMint.values())
+    .sort((a, b) => a[0].name.localeCompare(b[0].name))
+    .map((banks) => {
+      const bank = banks[0];
 
-        // Sum of all liabs, these liabs would be acquired by liqor,
-        // who would immediately want to reduce them to 0
-        // Assuming liabs need to be bought using USDC
-        const liabs =
-          // Max liab of a particular token that would be liquidated to bring health above 0
-          mangoAccountsWithHealth.reduce((sum, a) => {
-            // How much would health increase for every unit liab moved to liqor
-            // liabprice * (liabweight - (1+liabfees)*(1+assetfees)*assetweight)
-            // Choose the most valuable asset the user has
-            const assetBank = Array.from(group.banksMapByTokenIndex.values())
-              .flat()
-              .reduce((prev, curr) =>
-                prev.initAssetWeight
-                  .mul(a.account.getEffectiveTokenBalance(group, prev))
-                  .mul(prev._price!)
-                  .gt(
-                    curr.initAssetWeight.mul(
-                      a.account
-                        .getEffectiveTokenBalance(group, curr)
-                        .mul(curr._price!),
-                    ),
-                  )
-                  ? prev
-                  : curr,
-              );
-            const feeFactor = ONE_I80F48()
-              .add(bank.liquidationFee)
-              .add(bank.platformLiquidationFee)
-              .mul(
-                ONE_I80F48()
-                  .add(assetBank.liquidationFee)
-                  .add(assetBank.platformLiquidationFee),
-              );
-            const tokenLiabHealthContrib = bank.price.mul(
-              bank.initLiabWeight.sub(feeFactor.mul(assetBank.initAssetWeight)),
-            );
-            // Abs liab/borrow
-            const maxTokenLiab = a.account
-              .getEffectiveTokenBalance(group, bank)
-              .min(ZERO_I80F48())
-              .abs();
-
-            if (tokenLiabHealthContrib.eq(ZERO_I80F48())) {
-              return sum.add(maxTokenLiab);
-            }
-
-            // Health under 0
-            const maxLiab = a.health
-              .min(ZERO_I80F48())
-              .abs()
-              .div(tokenLiabHealthContrib)
-              .min(maxTokenLiab);
-
-            return sum.add(maxLiab);
-          }, ZERO_I80F48());
-        const liabsInUsdc =
-          // convert to usdc, this is an approximation
-          liabs
-            .mul(bank.price)
-            .floor()
-            // jup oddity
-            .min(I80F48.fromNumber(99999999999));
-
-        // Sum of all assets which would be acquired in exchange for also acquiring
-        // liabs by the liqor, who would immediately want to reduce to 0
-        // Assuming assets need to be sold to USDC
-        const assets = mangoAccountsWithHealth.reduce((sum, a) => {
+      // Sum of all liabs, these liabs would be acquired by liqor,
+      // who would immediately want to reduce them to 0
+      // Assuming liabs need to be bought using USDC
+      const liabs =
+        // Max liab of a particular token that would be liquidated to bring health above 0
+        mangoAccountsWithHealth.reduce((sum, a) => {
           // How much would health increase for every unit liab moved to liqor
-          // assetprice * (liabweight/(1+liabliqfee) - assetweight)
-          // Choose the smallest liability the user has
-          const liabBank = Array.from(group.banksMapByTokenIndex.values())
+          // liabprice * (liabweight - (1+liabfees)*(1+assetfees)*assetweight)
+          // Choose the most valuable asset the user has
+          const assetBank = Array.from(group.banksMapByTokenIndex.values())
             .flat()
             .reduce((prev, curr) =>
-              prev.initLiabWeight
-                .mul(a.account.getEffectiveTokenBalance(group, prev))
-                .mul(prev._price!)
-                .lt(
-                  curr.initLiabWeight.mul(
-                    a.account
-                      .getEffectiveTokenBalance(group, curr)
-                      .mul(curr._price!),
-                  ),
+              a.account.getEffectiveTokenBalance(group, prev)
+                .imul(prev.initAssetWeight)
+                .imul(prev._price!)
+                .gt(
+                  a.account
+                    .getEffectiveTokenBalance(group, curr)
+                    .imul(curr.initAssetWeight)
+                    .imul(curr._price!)
                 )
                 ? prev
                 : curr,
             );
-          const tokenAssetHealthContrib = bank.price.mul(
-            liabBank.initLiabWeight
-              .div(ONE_I80F48().add(liabBank.liquidationFee))
-              .sub(bank.initAssetWeight),
+
+          const feeFactor = ONE_I80F48()
+            .iadd(bank.liquidationFee)
+            .iadd(bank.platformLiquidationFee)
+            .imul(
+              ONE_I80F48()
+                .iadd(assetBank.liquidationFee)
+                .iadd(assetBank.platformLiquidationFee),
+            );
+          const tokenLiabHealthContrib = bank.price.mul(
+            bank.initLiabWeight.sub(feeFactor.mul(assetBank.initAssetWeight)),
           );
 
-          // Abs collateral/asset
-          const maxTokenHealthAsset = a.account
+          // Abs liab/borrow
+          const maxTokenLiab = a.account
             .getEffectiveTokenBalance(group, bank)
-            .max(ZERO_I80F48());
+            .min(ZERO_I80F48())
+            .abs();
 
-          if (tokenAssetHealthContrib.eq(ZERO_I80F48())) {
-            return sum.add(maxTokenHealthAsset);
+          if (tokenLiabHealthContrib.isZero()) {
+            return sum.iadd(maxTokenLiab);
           }
 
-          const maxAsset = a.health
+          // Health under 0
+          const maxLiab = a.health
             .min(ZERO_I80F48())
             .abs()
-            .div(tokenAssetHealthContrib)
-            .min(maxTokenHealthAsset);
+            .div(tokenLiabHealthContrib)
+            .min(maxTokenLiab);
 
-          return sum.add(maxAsset);
+          return sum.iadd(maxLiab);
         }, ZERO_I80F48());
+      const liabsInUsdc =
+        // convert to usdc, this is an approximation
+        liabs
+          .mul(bank.price)
+          .floor()
+          // jup oddity
+          .min(maxLiabsValue);
 
-        const pi1 =
-          !liabsInUsdc.eq(ZERO_I80F48()) &&
-          usdcMint.toBase58() !== bank.mint.toBase58()
-            ? computePriceImpactOnJup(
-                pis,
-                toUiDecimalsForQuote(liabsInUsdc),
-                bank.name,
+      // Sum of all assets which would be acquired in exchange for also acquiring
+      // liabs by the liqor, who would immediately want to reduce to 0
+      // Assuming assets need to be sold to USDC
+      const assets = mangoAccountsWithHealth.reduce((sum, a) => {
+        // How much would health increase for every unit liab moved to liqor
+        // assetprice * (liabweight/(1+liabliqfee) - assetweight)
+        // Choose the smallest liability the user has
+        const liabBank = Array.from(group.banksMapByTokenIndex.values())
+          .flat()
+          .reduce((prev, curr) =>
+            a.account.getEffectiveTokenBalance(group, prev)
+              .imul(prev.initLiabWeight)
+              .imul(prev._price!)
+              .lt(
+                a.account
+                  .getEffectiveTokenBalance(group, curr)
+                  .imul(curr.initLiabWeight)
+                  .imul(curr._price!)
               )
-            : 0;
-        const pi2 =
-          !assets.eq(ZERO_I80F48()) &&
-          usdcMint.toBase58() !== bank.mint.toBase58()
-            ? computePriceImpactOnJup(
-                pis,
-                toUiDecimals(assets.mul(bank.price), bank.mintDecimals),
-                bank.name,
-              )
-            : 0;
+              ? prev
+              : curr,
+          );
+        const tokenAssetHealthContrib = bank.price.mul(
+          liabBank.initLiabWeight
+            .div(ONE_I80F48().add(liabBank.liquidationFee))
+            .sub(bank.initAssetWeight),
+        );
 
-        return {
-          Coin: { val: bank.name, highlight: false },
-          'Oracle Price': {
-            val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
-            highlight: false,
-          },
-          'Jup Price': {
-            val: bank['onChainPrice'],
-            highlight:
-              Math.abs(
-                (bank['onChainPrice'] -
-                  (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!)) /
-                  (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!),
-              ) > 0.05,
-          },
-          'Future Price': { val: bank._uiPrice!, highlight: false },
-          'V4 Liq Fee': {
-            val: Math.round(bank.liquidationFee.toNumber() * 10000),
-            highlight: false,
-          },
-          Liabs: {
-            val: Math.round(toUiDecimalsForQuote(liabsInUsdc)),
-            highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
-          },
-          'Liabs Slippage': {
-            val: Math.round(pi1),
-            highlight:
-              Math.round(pi1) >
-              Math.round(bank.liquidationFee.toNumber() * 10000),
-          },
-          Assets: {
-            val: Math.round(
-              toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
-            ),
-            highlight:
-              Math.round(
-                toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
-              ) > 5000,
-          },
-          'Assets Slippage': {
-            val: Math.round(pi2),
-            highlight:
-              Math.round(pi2) >
-              Math.round(bank.liquidationFee.toNumber() * 10000),
-          },
-        };
-      }),
-  );
+        // Abs collateral/asset
+        const maxTokenHealthAsset = a.account
+          .getEffectiveTokenBalance(group, bank)
+          .max(ZERO_I80F48());
+
+        if (tokenAssetHealthContrib.isZero()) {
+          return sum.iadd(maxTokenHealthAsset);
+        }
+
+        const maxAsset = a.health
+          .min(ZERO_I80F48())
+          .abs()
+          .div(tokenAssetHealthContrib)
+          .min(maxTokenHealthAsset);
+
+        return sum.iadd(maxAsset);
+      }, ZERO_I80F48());
+
+      const pi1 =
+        !liabsInUsdc.isZero() &&
+          !usdcMint.equals(bank.mint)
+          ? computePriceImpactOnJup(
+              pis,
+              toUiDecimalsForQuote(liabsInUsdc),
+              bank.name,
+            )
+          : 0;
+      const pi2 =
+        !assets.isZero() &&
+          !usdcMint.equals(bank.mint)
+          ? computePriceImpactOnJup(
+              pis,
+              toUiDecimals(assets.mul(bank.price), bank.mintDecimals),
+              bank.name,
+            )
+          : 0;
+
+      return {
+        Coin: { val: bank.name, highlight: false },
+        'Oracle Price': {
+          val: bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!,
+          highlight: false,
+        },
+        'Jup Price': {
+          val: bank['onChainPrice'],
+          highlight:
+            Math.abs(
+              (bank['onChainPrice'] -
+                (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!)) /
+                (bank['oldUiPrice'] ? bank['oldUiPrice'] : bank._uiPrice!),
+            ) > 0.05,
+        },
+        'Future Price': { val: bank._uiPrice!, highlight: false },
+        'V4 Liq Fee': {
+          val: Math.round(bank.liquidationFee.toNumber() * 10000),
+          highlight: false,
+        },
+        Liabs: {
+          val: Math.round(toUiDecimalsForQuote(liabsInUsdc)),
+          highlight: Math.round(toUiDecimalsForQuote(liabsInUsdc)) > 5000,
+        },
+        'Liabs Slippage': {
+          val: Math.round(pi1),
+          highlight:
+            Math.round(pi1) >
+            Math.round(bank.liquidationFee.toNumber() * 10000),
+        },
+        Assets: {
+          val: Math.round(
+            toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice,
+          ),
+          highlight:
+            Math.round(toUiDecimals(assets, bank.mintDecimals) * bank.uiPrice) >
+            5000,
+        },
+        'Assets Slippage': {
+          val: Math.round(pi2),
+          highlight:
+            Math.round(pi2) >
+            Math.round(bank.liquidationFee.toNumber() * 10000),
+        },
+      };
+    });
 }
 
-export async function getPerpPositionsToBeLiquidated(
+export function getPerpPositionsToBeLiquidated(
   group: Group,
   mangoAccounts: MangoAccount[],
-): Promise<PerpPositionsToBeLiquidated[]> {
+): PerpPositionsToBeLiquidated[] {
   const mangoAccountsWithHealth = mangoAccounts.map((a: MangoAccount) => {
     return {
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
-      healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
     };
   });
 
   return Array.from(group.perpMarketsMapByMarketIndex.values())
     .filter((pm) => !pm.name.includes('OLD'))
     .map((pm) => {
+
+      const assetHealthPerLot =
+        I80F48.fromNumber(-1)
+          .mul(pm.price)
+          .mul(I80F48.fromU64(pm.baseLotSize))
+          .mul(pm.initBaseAssetWeight)
+          .add(
+            I80F48.fromU64(pm.baseLotSize)
+              .mul(pm.price)
+              .mul(
+                ONE_I80F48() // quoteInitAssetWeight
+                  .mul(ONE_I80F48().sub(pm.baseLiquidationFee)),
+              ),
+        );
+
+      const liabWeightPerLot =
+        pm.price
+          .mul(I80F48.fromU64(pm.baseLotSize))
+          .mul(pm.initBaseLiabWeight)
+          .sub(
+            I80F48.fromU64(pm.baseLotSize)
+              .mul(pm.price)
+              .mul(ONE_I80F48()) // quoteInitLiabWeight
+              .mul(ONE_I80F48().add(pm.baseLiquidationFee)),
+          );
+
       const baseLots = mangoAccountsWithHealth
         .filter((a) => a.account.getPerpPosition(pm.perpMarketIndex))
         .reduce((sum, a) => {
           const baseLots = a.account.getPerpPosition(
             pm.perpMarketIndex,
           )!.basePositionLots;
-          const unweightedHealthPerLot = baseLots.gt(new BN(0))
-            ? I80F48.fromNumber(-1)
-                .mul(pm.price)
-                .mul(I80F48.fromU64(pm.baseLotSize))
-                .mul(pm.initBaseAssetWeight)
-                .add(
-                  I80F48.fromU64(pm.baseLotSize)
-                    .mul(pm.price)
-                    .mul(
-                      ONE_I80F48() // quoteInitAssetWeight
-                        .mul(ONE_I80F48().sub(pm.baseLiquidationFee)),
-                    ),
-                )
-            : pm.price
-                .mul(I80F48.fromU64(pm.baseLotSize))
-                .mul(pm.initBaseLiabWeight)
-                .sub(
-                  I80F48.fromU64(pm.baseLotSize)
-                    .mul(pm.price)
-                    .mul(ONE_I80F48()) // quoteInitLiabWeight
-                    .mul(ONE_I80F48().add(pm.baseLiquidationFee)),
-                );
+          const unweightedHealthPerLot = baseLots.gt(ZERO)
+            ? assetHealthPerLot
+            : liabWeightPerLot;
 
           const maxBaseLots = a.health
             .min(ZERO_I80F48())
@@ -376,7 +382,7 @@ export async function getPerpPositionsToBeLiquidated(
             .div(unweightedHealthPerLot.abs())
             .min(I80F48.fromU64(baseLots).abs());
 
-          return sum.add(maxBaseLots);
+          return sum.iadd(maxBaseLots);
         }, ONE_I80F48());
 
       const notionalPositionUi = toUiDecimalsForQuote(
@@ -395,12 +401,12 @@ export async function getPerpPositionsToBeLiquidated(
     });
 }
 
-export async function getEquityForMangoAccounts(
+export function getEquityForMangoAccounts(
   client: MangoClient,
   group: Group,
   mangoAccountPks: PublicKey[],
   allMangoAccounts: MangoAccount[],
-): Promise<AccountEquity[]> {
+): AccountEquity[] {
   const mangoAccounts = allMangoAccounts.filter((a) =>
     mangoAccountPks.find((pk) => pk.equals(a.publicKey)),
   );
@@ -542,8 +548,8 @@ export async function buildGroupGrid(
 
     // Compute how much of an asset would need to be liquidated
     // when group (i.e. asset prices) reach a specific state
-    return await Promise.all(
-      groups.map((g) => getPriceImpactForLiqor(g, pis, mangoAccountsSubset)),
+    return groups.map((g) =>
+      getPriceImpactForLiqor(g, pis, mangoAccountsSubset),
     );
   }
 }
@@ -660,13 +666,13 @@ export async function getRiskStats(
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
   // Get on chain prices
-  const mints = [
-    ...new Set(
-      Array.from(group.banksMapByTokenIndex.values())
-        .flat()
-        .map((bank) => bank.mint.toString()),
-    ),
-  ];
+  // const mints = [
+  //   ...new Set(
+  //     Array.from(group.banksMapByTokenIndex.values())
+  //       .flat()
+  //       .map((bank) => bank.mint.toString()),
+  //   ),
+  // ];
 
   // Note:
   // Disable for now
@@ -744,25 +750,26 @@ export async function getRiskStats(
     p._price = p._price?.mul(I80F48.fromNumber(rally));
   });
 
-  const [
-    assetDrop,
-    assetRally,
-    usdcDepeg,
-    usdtDepeg,
-    perpDrop,
-    perpRally,
-    liqorEquity,
-    marketMakerEquity,
-  ] = await Promise.all([
-    getPriceImpactForLiqor(groupDrop, pis, mangoAccounts),
-    getPriceImpactForLiqor(groupRally, pis, mangoAccounts),
-    getPriceImpactForLiqor(groupUsdcDepeg, pis, mangoAccounts),
-    getPriceImpactForLiqor(groupUsdtDepeg, pis, mangoAccounts),
-    getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts),
-    getPerpPositionsToBeLiquidated(groupRally, mangoAccounts),
-    getEquityForMangoAccounts(client, group, liqors, mangoAccounts),
-    getEquityForMangoAccounts(client, group, mms, mangoAccounts),
-  ]);
+  const assetDrop = getPriceImpactForLiqor(groupDrop, pis, mangoAccounts);
+  const assetRally = getPriceImpactForLiqor(groupRally, pis, mangoAccounts);
+  const usdcDepeg = getPriceImpactForLiqor(groupUsdcDepeg, pis, mangoAccounts);
+  const usdtDepeg = getPriceImpactForLiqor(groupUsdtDepeg, pis, mangoAccounts);
+
+  const perpDrop = getPerpPositionsToBeLiquidated(groupDrop, mangoAccounts);
+  const perpRally = getPerpPositionsToBeLiquidated(groupRally, mangoAccounts);
+
+  const liqorEquity = getEquityForMangoAccounts(
+    client,
+    group,
+    liqors,
+    mangoAccounts,
+  );
+  const marketMakerEquity = getEquityForMangoAccounts(
+    client,
+    group,
+    mms,
+    mangoAccounts,
+  );
 
   return {
     assetDrop: {
