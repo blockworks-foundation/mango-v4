@@ -7,6 +7,8 @@ import { HealthType, MangoAccount } from './accounts/mangoAccount';
 import { MangoClient } from './client';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from './numbers/I80F48';
 import { buildFetch, toUiDecimals, toUiDecimalsForQuote } from './utils';
+import { HealthCache } from './accounts/healthCache';
+import { ZERO } from '@raydium-io/raydium-sdk';
 
 export interface LiqorPriceImpact {
   Coin: { val: string; highlight: boolean };
@@ -120,22 +122,24 @@ export async function getOnChainPriceForMints(
   );
 }
 
+const maxLiabsValue = I80F48.fromNumber(99_999_999_999);
+
 export function getPriceImpactForLiqor(
   group: Group,
   pis: PriceImpact[],
   mangoAccounts: MangoAccount[],
 ): LiqorPriceImpact[] {
-  const mangoAccounts_ = mangoAccounts.filter((a) =>
-    a.getHealth(group, HealthType.maint).lt(ZERO_I80F48()),
-  );
 
-  const mangoAccountsWithHealth = mangoAccounts_.map((a: MangoAccount) => {
-    return {
-      account: a,
-      health: a.getHealth(group, HealthType.liquidationEnd),
-      healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
-    };
-  });
+
+  const mangoAccountsWithHealth = mangoAccounts.map((a: MangoAccount) => {
+    const hc = HealthCache.fromMangoAccount(group, a);
+    if (hc.health(HealthType.maint).isPos()) {
+      return {
+        account: a,
+        health: hc.health(HealthType.liquidationEnd),
+      };
+    }
+  }).filter(a => !!a);
 
   const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
   const usdcMint = usdcBank.mint;
@@ -196,7 +200,7 @@ export function getPriceImpactForLiqor(
           const maxLiab = a.health
             .min(ZERO_I80F48())
             .abs()
-            .idiv(tokenLiabHealthContrib)
+            .div(tokenLiabHealthContrib)
             .min(maxTokenLiab);
 
           return sum.iadd(maxLiab);
@@ -207,7 +211,7 @@ export function getPriceImpactForLiqor(
           .mul(bank.price)
           .floor()
           // jup oddity
-          .min(I80F48.fromNumber(99999999999));
+          .min(maxLiabsValue);
 
       // Sum of all assets which would be acquired in exchange for also acquiring
       // liabs by the liqor, who would immediately want to reduce to 0
@@ -256,8 +260,8 @@ export function getPriceImpactForLiqor(
       }, ZERO_I80F48());
 
       const pi1 =
-        !liabsInUsdc.eq(ZERO_I80F48()) &&
-        usdcMint.toBase58() !== bank.mint.toBase58()
+        !liabsInUsdc.isZero() &&
+          !usdcMint.equals(bank.mint)
           ? computePriceImpactOnJup(
               pis,
               toUiDecimalsForQuote(liabsInUsdc),
@@ -265,8 +269,8 @@ export function getPriceImpactForLiqor(
             )
           : 0;
       const pi2 =
-        !assets.eq(ZERO_I80F48()) &&
-        usdcMint.toBase58() !== bank.mint.toBase58()
+        !assets.isZero() &&
+          !usdcMint.equals(bank.mint)
           ? computePriceImpactOnJup(
               pis,
               toUiDecimals(assets.mul(bank.price), bank.mintDecimals),
@@ -330,41 +334,47 @@ export function getPerpPositionsToBeLiquidated(
     return {
       account: a,
       health: a.getHealth(group, HealthType.liquidationEnd),
-      healthRatio: a.getHealthRatioUi(group, HealthType.liquidationEnd),
     };
   });
 
   return Array.from(group.perpMarketsMapByMarketIndex.values())
     .filter((pm) => !pm.name.includes('OLD'))
     .map((pm) => {
+
+      const assetHealthPerLot =
+        I80F48.fromNumber(-1)
+          .mul(pm.price)
+          .mul(I80F48.fromU64(pm.baseLotSize))
+          .mul(pm.initBaseAssetWeight)
+          .add(
+            I80F48.fromU64(pm.baseLotSize)
+              .mul(pm.price)
+              .mul(
+                ONE_I80F48() // quoteInitAssetWeight
+                  .mul(ONE_I80F48().sub(pm.baseLiquidationFee)),
+              ),
+        );
+
+      const liabWeightPerLot =
+        pm.price
+          .mul(I80F48.fromU64(pm.baseLotSize))
+          .mul(pm.initBaseLiabWeight)
+          .sub(
+            I80F48.fromU64(pm.baseLotSize)
+              .mul(pm.price)
+              .mul(ONE_I80F48()) // quoteInitLiabWeight
+              .mul(ONE_I80F48().add(pm.baseLiquidationFee)),
+          );
+
       const baseLots = mangoAccountsWithHealth
         .filter((a) => a.account.getPerpPosition(pm.perpMarketIndex))
         .reduce((sum, a) => {
           const baseLots = a.account.getPerpPosition(
             pm.perpMarketIndex,
           )!.basePositionLots;
-          const unweightedHealthPerLot = baseLots.gt(new BN(0))
-            ? I80F48.fromNumber(-1)
-                .mul(pm.price)
-                .mul(I80F48.fromU64(pm.baseLotSize))
-                .mul(pm.initBaseAssetWeight)
-                .add(
-                  I80F48.fromU64(pm.baseLotSize)
-                    .mul(pm.price)
-                    .mul(
-                      ONE_I80F48() // quoteInitAssetWeight
-                        .mul(ONE_I80F48().sub(pm.baseLiquidationFee)),
-                    ),
-                )
-            : pm.price
-                .mul(I80F48.fromU64(pm.baseLotSize))
-                .mul(pm.initBaseLiabWeight)
-                .sub(
-                  I80F48.fromU64(pm.baseLotSize)
-                    .mul(pm.price)
-                    .mul(ONE_I80F48()) // quoteInitLiabWeight
-                    .mul(ONE_I80F48().add(pm.baseLiquidationFee)),
-                );
+          const unweightedHealthPerLot = baseLots.gt(ZERO)
+            ? assetHealthPerLot
+            : liabWeightPerLot;
 
           const maxBaseLots = a.health
             .min(ZERO_I80F48())
@@ -372,7 +382,7 @@ export function getPerpPositionsToBeLiquidated(
             .div(unweightedHealthPerLot.abs())
             .min(I80F48.fromU64(baseLots).abs());
 
-          return sum.add(maxBaseLots);
+          return sum.iadd(maxBaseLots);
         }, ONE_I80F48());
 
       const notionalPositionUi = toUiDecimalsForQuote(
