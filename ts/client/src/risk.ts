@@ -157,48 +157,49 @@ export function getPriceImpactForLiqor(
           const assetBank = Array.from(group.banksMapByTokenIndex.values())
             .flat()
             .reduce((prev, curr) =>
-              prev.initAssetWeight
-                .mul(a.account.getEffectiveTokenBalance(group, prev))
-                .mul(prev._price!)
+              a.account.getEffectiveTokenBalance(group, prev)
+                .imul(prev.initAssetWeight)
+                .imul(prev._price!)
                 .gt(
-                  curr.initAssetWeight.mul(
-                    a.account
-                      .getEffectiveTokenBalance(group, curr)
-                      .mul(curr._price!),
-                  ),
+                  a.account
+                    .getEffectiveTokenBalance(group, curr)
+                    .imul(curr.initAssetWeight)
+                    .imul(curr._price!)
                 )
                 ? prev
                 : curr,
             );
+
           const feeFactor = ONE_I80F48()
-            .add(bank.liquidationFee)
-            .add(bank.platformLiquidationFee)
-            .mul(
+            .iadd(bank.liquidationFee)
+            .iadd(bank.platformLiquidationFee)
+            .imul(
               ONE_I80F48()
-                .add(assetBank.liquidationFee)
-                .add(assetBank.platformLiquidationFee),
+                .iadd(assetBank.liquidationFee)
+                .iadd(assetBank.platformLiquidationFee),
             );
           const tokenLiabHealthContrib = bank.price.mul(
             bank.initLiabWeight.sub(feeFactor.mul(assetBank.initAssetWeight)),
           );
+
           // Abs liab/borrow
           const maxTokenLiab = a.account
             .getEffectiveTokenBalance(group, bank)
             .min(ZERO_I80F48())
             .abs();
 
-          if (tokenLiabHealthContrib.eq(ZERO_I80F48())) {
-            return sum.add(maxTokenLiab);
+          if (tokenLiabHealthContrib.isZero()) {
+            return sum.iadd(maxTokenLiab);
           }
 
           // Health under 0
           const maxLiab = a.health
             .min(ZERO_I80F48())
             .abs()
-            .div(tokenLiabHealthContrib)
+            .idiv(tokenLiabHealthContrib)
             .min(maxTokenLiab);
 
-          return sum.add(maxLiab);
+          return sum.iadd(maxLiab);
         }, ZERO_I80F48());
       const liabsInUsdc =
         // convert to usdc, this is an approximation
@@ -218,15 +219,14 @@ export function getPriceImpactForLiqor(
         const liabBank = Array.from(group.banksMapByTokenIndex.values())
           .flat()
           .reduce((prev, curr) =>
-            prev.initLiabWeight
-              .mul(a.account.getEffectiveTokenBalance(group, prev))
-              .mul(prev._price!)
+            a.account.getEffectiveTokenBalance(group, prev)
+              .imul(prev.initLiabWeight)
+              .imul(prev._price!)
               .lt(
-                curr.initLiabWeight.mul(
-                  a.account
-                    .getEffectiveTokenBalance(group, curr)
-                    .mul(curr._price!),
-                ),
+                a.account
+                  .getEffectiveTokenBalance(group, curr)
+                  .imul(curr.initLiabWeight)
+                  .imul(curr._price!)
               )
               ? prev
               : curr,
@@ -242,8 +242,8 @@ export function getPriceImpactForLiqor(
           .getEffectiveTokenBalance(group, bank)
           .max(ZERO_I80F48());
 
-        if (tokenAssetHealthContrib.eq(ZERO_I80F48())) {
-          return sum.add(maxTokenHealthAsset);
+        if (tokenAssetHealthContrib.isZero()) {
+          return sum.iadd(maxTokenHealthAsset);
         }
 
         const maxAsset = a.health
@@ -252,7 +252,7 @@ export function getPriceImpactForLiqor(
           .div(tokenAssetHealthContrib)
           .min(maxTokenHealthAsset);
 
-        return sum.add(maxAsset);
+        return sum.iadd(maxAsset);
       }, ZERO_I80F48());
 
       const pi1 =
