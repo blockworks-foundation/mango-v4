@@ -106,6 +106,7 @@ async function setupVsr(
   return vsrClient;
 }
 
+/** unused
 async function getTotalLiqorEquity(
   client: MangoClient,
   group: Group,
@@ -127,9 +128,8 @@ async function getTotalLiqorEquity(
       )
     ).json()
   ).map((data) => new PublicKey(data['liqor']));
-  const ttlLiqorEquity = (
-    await getEquityForMangoAccounts(client, group, liqors, mangoAccounts)
-  ).reduce((partialSum, ae) => partialSum + ae.Equity.val, 0);
+  const ttlLiqorEquity = getEquityForMangoAccounts(client, group, liqors, mangoAccounts)
+    .reduce((partialSum, ae) => partialSum + ae.Equity.val, 0);
   return ttlLiqorEquity;
 }
 
@@ -152,6 +152,8 @@ function getPriceImpactForBank(
   const priceImpact = tokenToPriceImpact[getApiTokenName(bank.name)];
   return priceImpact;
 }
+  */
+
 
 async function updateTokenParams(): Promise<void> {
   const [client, wallet] = await Promise.all([buildClient(), setupWallet()]);
@@ -208,7 +210,8 @@ async function updateTokenParams(): Promise<void> {
       const builder = Builder(NullTokenEditParams);
       let change = false;
 
-      // try {
+      // unused
+      /*
       const tier = Object.values(LISTING_PRESETS).find((x) =>
         x.initLiabWeight.toFixed(1) === '1.8'
           ? x.initLiabWeight.toFixed(1) ===
@@ -217,6 +220,7 @@ async function updateTokenParams(): Promise<void> {
           : x.initLiabWeight.toFixed(1) ===
             bank?.initLiabWeight.toNumber().toFixed(1),
       );
+      */
 
       // eslint-disable-next-line no-constant-condition
       if (true) {
