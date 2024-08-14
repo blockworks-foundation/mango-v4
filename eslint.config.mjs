@@ -39,5 +39,18 @@ export default [{
         "@typescript-eslint/ban-ts-comment": 0,
         "@typescript-eslint/no-explicit-any": 0,
         "@typescript-eslint/explicit-function-return-type": "warn",
+        "@typescript-eslint/no-unused-expressions": "warn",
+        "@typescript-eslint/no-unused-vars": [
+            "error",
+            {
+              "args": "all",
+              "argsIgnorePattern": "^_",
+              "caughtErrors": "all",
+              "caughtErrorsIgnorePattern": "^_",
+              "destructuredArrayIgnorePattern": "^_",
+              "varsIgnorePattern": "^_",
+              "ignoreRestSiblings": true
+            }
+        ]
     },
 }];
