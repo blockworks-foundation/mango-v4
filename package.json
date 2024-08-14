@@ -20,7 +20,7 @@
     "build:node": " tsc -p tsconfig.cjs.json --noEmit false",
     "build:browser": "tsc -p tsconfig.esm.json --noEmit false",
     "build:types": "tsc -p tsconfig.types.json --noEmit false",
-    "test": "ts-mocha ts/client/**/*.spec.ts --timeout 300000",
+    "test": "ts-mocha ts/client/**/*.spec.ts --timeout 300000 --project tsconfig.cjs.json",
     "example1-user": "ts-node ts/client/src/scripts/example1-user.ts",
     "example1-admin": "ts-node ts/client/src/scripts/example1-admin.ts",
     "format": "prettier --check ./ts",
