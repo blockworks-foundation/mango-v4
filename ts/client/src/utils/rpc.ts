@@ -105,7 +105,7 @@ export async function sendTransaction(
   });
   let vtx = new VersionedTransaction(message);
   if (opts?.additionalSigners?.length) {
-    vtx.sign([...opts?.additionalSigners || []]);
+    vtx.sign([...(opts?.additionalSigners || [])]);
   }
 
   if (
