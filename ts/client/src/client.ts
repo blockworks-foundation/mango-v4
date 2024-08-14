@@ -1429,7 +1429,6 @@ export class MangoClient {
 
     for (const pp of clonedMangoAccount.perpActive()) {
       const perpMarketIndex = pp.marketIndex;
-      const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
       const deactivatingPositionIx = await this.perpDeactivatePositionIx(
         group,
         clonedMangoAccount,

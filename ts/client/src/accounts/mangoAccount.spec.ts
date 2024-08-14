@@ -134,10 +134,10 @@ describe('maxWithdraw', () => {
     maintWeights() {
       return [I80F48.fromNumber(0.9), I80F48.fromNumber(1.1)];
     },
-    scaledInitAssetWeight(price) {
+    scaledInitAssetWeight() {
       return this.initAssetWeight;
     },
-    scaledInitLiabWeight(price) {
+    scaledInitLiabWeight() {
       return this.initLiabWeight;
     },
     loanOriginationFeeRate: I80F48.fromNumber(0.001),
@@ -218,21 +218,21 @@ describe('maxWithdraw', () => {
   }
 
   it('full withdraw', (done) => {
-    const [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, _bank1, account] = setup(1000000);
     deposit(bank0, account, 100);
     expect(maxWithdraw(group, account)).equal(100);
     done();
   });
 
   it('full withdraw limited vault', (done) => {
-    const [group, bank0, bank1, account] = setup(90);
+    const [group, bank0, _bank1, account] = setup(90);
     deposit(bank0, account, 100);
     expect(maxWithdraw(group, account)).equal(90);
     done();
   });
 
   it('full withdraw limited utilization', (done) => {
-    const [group, bank0, bank1, account] = setup(1000000);
+    const [group, bank0, _bank1, account] = setup(1000000);
     const other = deepClone(account);
     deposit(bank0, account, 100);
     borrow(bank0, other, 50);
@@ -282,7 +282,7 @@ describe('maxWithdraw', () => {
 
   it('withdraw limited health and scaling', (done) => {
     const [group, bank0, bank1, account] = setup(1000000);
-    bank0.scaledInitAssetWeight = function (price) {
+    bank0.scaledInitAssetWeight = function (_price) {
       const startScale = I80F48.fromNumber(50);
       if (this.nativeDeposits().gt(startScale)) {
         return this.initAssetWeight.div(this.nativeDeposits().div(startScale));
@@ -302,7 +302,7 @@ describe('maxWithdraw', () => {
 
   it('borrow limited health and scaling', (done) => {
     const [group, bank0, bank1, account] = setup(1000000);
-    bank0.scaledInitLiabWeight = function (price) {
+    bank0.scaledInitLiabWeight = function (_price) {
       const startScale = I80F48.fromNumber(50);
       if (this.nativeBorrows().gt(startScale)) {
         return this.initLiabWeight.mul(this.nativeBorrows().div(startScale));

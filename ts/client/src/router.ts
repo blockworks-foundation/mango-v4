@@ -289,7 +289,7 @@ export const fetchRoutes = async (
       routes: sortedBestQuoteFirst,
       bestRoute: sortedBestQuoteFirst[0],
     };
-  } catch (e) {
+  } catch {
     return {
       routes: [],
       bestRoute: null,
