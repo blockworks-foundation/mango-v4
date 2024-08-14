@@ -96,7 +96,7 @@ export function computePriceImpactOnJup(
     } else {
       return -1;
     }
-  } catch (e) {
+  } catch {
     return -1;
   }
 }
@@ -396,7 +396,7 @@ export async function getPerpPositionsToBeLiquidated(
 }
 
 export async function getEquityForMangoAccounts(
-  client: MangoClient,
+  _client: MangoClient,
   group: Group,
   mangoAccountPks: PublicKey[],
   allMangoAccounts: MangoAccount[],
@@ -511,7 +511,7 @@ export async function buildGroupGrid(
           },
         )
       ).json();
-    } catch (error) {
+    } catch {
       pis = [];
     }
 
@@ -598,7 +598,7 @@ export async function getRiskStats(
         },
       )
     ).json();
-  } catch (error) {
+  } catch {
     pis = [];
   }
 
@@ -621,7 +621,7 @@ export async function getRiskStats(
         )
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
-  } catch (error) {
+  } catch {
     liqors = [new PublicKey('2T1taZuQwy7izxvjbAeiVjDhCEFYjWhLuv4U36XD1rL1')];
     liqors = [new PublicKey('Dr1wLHRKQSir4UgGphZ29ZcPhGvJrdDnrLTDgbz73bDs')];
     liqors = [new PublicKey('BNTDZJQrjNkjFxYAMCdKH2ShSM6Uwc28aAgit7ytVQJc')];
@@ -647,7 +647,7 @@ export async function getRiskStats(
         )
       ).json()
     ).map((data) => new PublicKey(data['liqor']));
-  } catch (error) {
+  } catch {
     mms = [
       new PublicKey('BLgb4NFwhpurMrGX5LQfb8D8dBpGSGtBqqew2Em8uyRT'),
       new PublicKey('4hXPGTmR6dKNNqjLYdfDRSrTaa1Wt2GZoZnQ9hAJEeev'),
@@ -660,13 +660,13 @@ export async function getRiskStats(
   const mangoAccounts = await client.getAllMangoAccounts(group, true);
 
   // Get on chain prices
-  const mints = [
-    ...new Set(
-      Array.from(group.banksMapByTokenIndex.values())
-        .flat()
-        .map((bank) => bank.mint.toString()),
-    ),
-  ];
+  // const mints = [
+  //   ...new Set(
+  //     Array.from(group.banksMapByTokenIndex.values())
+  //       .flat()
+  //       .map((bank) => bank.mint.toString()),
+  //   ),
+  // ];
 
   // Note:
   // Disable for now

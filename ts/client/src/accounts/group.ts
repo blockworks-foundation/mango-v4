@@ -765,7 +765,7 @@ export class Group {
 
   public async loadPerpAsksForMarket(
     client: MangoClient,
-    group: Group,
+    _group: Group,
     perpMarketIndex: PerpMarketIndex,
   ): Promise<BookSide> {
     const perpMarket = this.getPerpMarketByMarketIndex(perpMarketIndex);

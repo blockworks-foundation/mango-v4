@@ -1263,7 +1263,7 @@ export class MangoAccount {
           '\n tokens:' +
           JSON.stringify(
             this.tokens
-              .filter((token, i) => token.isActive())
+              .filter((token) => token.isActive())
               .map((token, i) => token.toString(group, i)),
             null,
             4,

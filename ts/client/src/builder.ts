@@ -61,7 +61,7 @@ export function Builder<T>(
   const builder = new Proxy(
     {},
     {
-      get(target, prop) {
+      get(_target, prop) {
         if ('build' === prop) {
           if (overrideValues) {
             Object.assign(built, overrideValues);
