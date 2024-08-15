@@ -31,6 +31,7 @@ import {
 import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
 import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 import { createComputeBudgetIx } from '../src/utils/rpc';
+import { LSTExactIn, LSTExactOut, tokenInUsdcOutReversedSolPool, tokenInUsdcOutSolPool, tokenInUsdcOutUsdcPool, usdcInTokenOutReversedSolPool, usdcInTokenOutSolPool, usdcInTokenOutUsdcPool } from './switchboardTemplates';
 
 // Configuration
 const TIER: LISTING_PRESETS_KEY = 'asset_10';
@@ -52,12 +53,9 @@ const maxStaleness =
 const JUPITER_PRICE_API_MAINNET = 'https://price.jup.ag/v4/';
 const JUPITER_TOKEN_API_MAINNET = 'https://token.jup.ag/all';
 const WRAPPED_SOL_MINT = 'So11111111111111111111111111111111111111112';
-const PYTH_SOL_ORACLE =
-  'ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d';
+
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const PYTH_USDC_ORACLE =
-  'eaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a';
-const SWITCHBOARD_USDC_ORACLE = 'FwYfsmj5x8YZXtQBNo2Cz8TE7WRCMFqA6UTffK4xQKMH';
+
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
 const CLUSTER_URL =
@@ -225,7 +223,7 @@ const getLstStakePool = async (
             break;
           }
         }
-        // eslint-disable-next-line no-empty
+        // eslint-disable-next-line no-empty, @typescript-eslint/no-unused-vars
       } catch (e) {}
     }
 
@@ -236,79 +234,6 @@ const getLstStakePool = async (
   }
 };
 
-const LSTExactIn = (inMint: string, uiAmountIn: string): string => {
-  const template = `tasks:
-- conditionalTask:
-    attempt:
-    - sanctumLstPriceTask:
-        lstMint: ${inMint}
-    - conditionalTask:
-        attempt:
-        - valueTask:
-            big: ${uiAmountIn}
-        - divideTask:
-            job:
-              tasks:
-              - jupiterSwapTask:
-                  inTokenAddress: So11111111111111111111111111111111111111112
-                  outTokenAddress: ${inMint}
-                  baseAmountString: ${uiAmountIn}
-    - conditionalTask:
-        attempt:
-        - multiplyTask:
-            job:
-              tasks:
-              - oracleTask:
-                  pythAddress: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
-                  pythAllowedConfidenceInterval: 10
-        onFailure:
-        - multiplyTask:
-            job:
-              tasks:
-              - oracleTask:
-                  switchboardAddress: AEcJSgRBkU9WnKCBELj66TPFfzhKWBWa4tL7JugnonUa`;
-  return template;
-};
-
-const LSTExactOut = (inMint: string, uiOutSolAmount: string): string => {
-  const template = `tasks:
-- conditionalTask:
-    attempt:
-    - sanctumLstPriceTask:
-        lstMint: ${inMint}
-    - conditionalTask:
-        attempt:
-        - cacheTask:
-            cacheItems:
-            - variableName: QTY
-              job:
-                tasks:
-                - jupiterSwapTask:
-                    inTokenAddress: So11111111111111111111111111111111111111112
-                    outTokenAddress: ${inMint}
-                    baseAmountString: ${uiOutSolAmount}
-        - jupiterSwapTask:
-            inTokenAddress: ${inMint}
-            outTokenAddress: So11111111111111111111111111111111111111112
-            baseAmountString: \${QTY}
-        - divideTask:
-            big: \${QTY}
-    - conditionalTask:
-        attempt:
-        - multiplyTask:
-            job:
-              tasks:
-              - oracleTask:
-                  pythAddress: ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d
-                  pythAllowedConfidenceInterval: 10
-        onFailure:
-        - multiplyTask:
-            job:
-              tasks:
-              - oracleTask:
-                  switchboardAddress: AEcJSgRBkU9WnKCBELj66TPFfzhKWBWa4tL7JugnonUa`;
-  return template;
-};
 
 async function setupSwitchboard(userProvider: AnchorProvider) {
   const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, userProvider);
@@ -349,74 +274,11 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   const queueAccount = new Queue(sbOnDemandProgram, queue);
   try {
     await queueAccount.loadData();
-  } catch (err) {
-    console.error('Queue not found, ensure you are using devnet in your env');
+  } catch (e: any) {
+    console.error('Queue not found, ensure you are using devnet in your env', e);
     return;
   }
 
-  let onFailureTaskDesc: { [key: string]: any }[];
-  if (!poolInfo?.isReveredSolPool) {
-    onFailureTaskDesc = [
-      {
-        lpExchangeRateTask: {
-          [FALLBACK_POOL_NAME]: FALLBACK_POOL,
-        },
-      },
-    ];
-    if (poolInfo?.isSolPool) {
-      onFailureTaskDesc.push({
-        multiplyTask: {
-          job: {
-            tasks: [
-              {
-                oracleTask: {
-                  pythAddress: PYTH_SOL_ORACLE,
-                  pythAllowedConfidenceInterval: 10,
-                },
-              },
-            ],
-          },
-        },
-      });
-    }
-  } else {
-    onFailureTaskDesc = [
-      {
-        valueTask: {
-          big: 1,
-        },
-      },
-      {
-        divideTask: {
-          job: {
-            tasks: [
-              {
-                lpExchangeRateTask: {
-                  [FALLBACK_POOL_NAME]: FALLBACK_POOL,
-                },
-              },
-            ],
-          },
-        },
-      },
-    ];
-    if (poolInfo.isSolPool) {
-      onFailureTaskDesc.push({
-        multiplyTask: {
-          job: {
-            tasks: [
-              {
-                oracleTask: {
-                  pythAddress: PYTH_SOL_ORACLE,
-                  pythAllowedConfidenceInterval: 10,
-                },
-              },
-            ],
-          },
-        },
-      });
-    }
-  }
 
   const txOpts = {
     commitment: 'finalized' as Commitment,
@@ -443,74 +305,30 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
           LSTExactIn(
             TOKEN_MINT,
             Math.ceil(Number(swapValue) / price).toString(),
-          ),
+          ), 
         )
-      : OracleJob.fromObject({
-          tasks: [
-            {
-              conditionalTask: {
-                attempt: [
-                  {
-                    valueTask: {
-                      big: swapValue,
-                    },
-                  },
-                  {
-                    divideTask: {
-                      job: {
-                        tasks: [
-                          {
-                            jupiterSwapTask: {
-                              inTokenAddress: USDC_MINT,
-                              outTokenAddress: TOKEN_MINT,
-                              baseAmountString: swapValue,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                ],
-                onFailure: onFailureTaskDesc,
-              },
-            },
-            {
-              conditionalTask: {
-                attempt: [
-                  {
-                    multiplyTask: {
-                      job: {
-                        tasks: [
-                          {
-                            oracleTask: {
-                              pythAddress: PYTH_USDC_ORACLE,
-                              pythAllowedConfidenceInterval: 10,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                ],
-                onFailure: [
-                  {
-                    multiplyTask: {
-                      job: {
-                        tasks: [
-                          {
-                            oracleTask: {
-                              switchboardAddress: SWITCHBOARD_USDC_ORACLE,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        }),
+      : OracleJob.fromYaml(
+                      !poolInfo?.isSolPool
+                        ? usdcInTokenOutUsdcPool(
+                            TOKEN_MINT,
+                            swapValue!,
+                            FALLBACK_POOL!,
+                            FALLBACK_POOL_NAME,
+                          )
+                        : poolInfo.isReveredSolPool
+                        ? usdcInTokenOutReversedSolPool(
+                            TOKEN_MINT,
+                            swapValue!,
+                            FALLBACK_POOL!,
+                            FALLBACK_POOL_NAME,
+                          )
+                        : usdcInTokenOutSolPool(
+                            TOKEN_MINT,
+                            swapValue!,
+                            FALLBACK_POOL!,
+                            FALLBACK_POOL_NAME,
+                          ),
+                    ),
     lstPool
       ? OracleJob.fromYaml(
           LSTExactOut(
@@ -518,84 +336,28 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
             Math.ceil(Number(swapValue) / price).toString(),
           ),
         )
-      : OracleJob.fromObject({
-          tasks: [
-            {
-              conditionalTask: {
-                attempt: [
-                  {
-                    cacheTask: {
-                      cacheItems: [
-                        {
-                          variableName: 'QTY',
-                          job: {
-                            tasks: [
-                              {
-                                jupiterSwapTask: {
-                                  inTokenAddress: USDC_MINT,
-                                  outTokenAddress: TOKEN_MINT,
-                                  baseAmountString: swapValue,
-                                },
-                              },
-                            ],
-                          },
-                        },
-                      ],
-                    },
-                  },
-                  {
-                    jupiterSwapTask: {
-                      inTokenAddress: TOKEN_MINT,
-                      outTokenAddress: USDC_MINT,
-                      baseAmountString: '${QTY}',
-                    },
-                  },
-                  {
-                    divideTask: {
-                      big: '${QTY}',
-                    },
-                  },
-                ],
-                onFailure: onFailureTaskDesc,
-              },
-            },
-            {
-              conditionalTask: {
-                attempt: [
-                  {
-                    multiplyTask: {
-                      job: {
-                        tasks: [
-                          {
-                            oracleTask: {
-                              pythAddress: PYTH_USDC_ORACLE,
-                              pythAllowedConfidenceInterval: 10,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                ],
-                onFailure: [
-                  {
-                    multiplyTask: {
-                      job: {
-                        tasks: [
-                          {
-                            oracleTask: {
-                              switchboardAddress: SWITCHBOARD_USDC_ORACLE,
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        }),
+      : OracleJob.fromYaml(
+        !poolInfo?.isSolPool
+          ? tokenInUsdcOutUsdcPool(
+            TOKEN_MINT,
+            swapValue!,
+            FALLBACK_POOL!,
+            FALLBACK_POOL_NAME,
+            )
+          : poolInfo.isReveredSolPool
+          ? tokenInUsdcOutReversedSolPool(
+            TOKEN_MINT,
+            swapValue!,
+            FALLBACK_POOL!,
+            FALLBACK_POOL_NAME,
+            )
+          : tokenInUsdcOutSolPool(
+            TOKEN_MINT,
+            swapValue!,
+            FALLBACK_POOL!,
+            FALLBACK_POOL_NAME,
+            ),
+      ),
   ];
   const decodedFeedHash = await crossbarClient
     .store(queue.toBase58(), jobs)
@@ -613,7 +375,7 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
   });
   console.log('Sending initialize transaction');
   const sim = await connection.simulateTransaction(tx, txOpts);
-
+  console.log(sim);
   sendSignAndConfirmTransactions({
     connection,
     //@ts-ignore
@@ -700,6 +462,7 @@ const StakePoolLayout = struct([
 const tryGetPubKey = (pubkey: string | string[]) => {
   try {
     return new PublicKey(pubkey);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (e) {
     return null;
   }
