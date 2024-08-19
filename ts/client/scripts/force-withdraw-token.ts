@@ -38,6 +38,9 @@ async function forceWithdrawTokens(): Promise<void> {
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const forceWithdrawBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
+  const serum3Market = Array.from(
+    group.serum3MarketsMapByMarketIndex.values(),
+  ).filter((m) => m.baseTokenIndex == TOKEN_INDEX)[0];
 
   // Get all mango accounts with deposits for given token
   const mangoAccountsWithDeposits = (
@@ -45,29 +48,43 @@ async function forceWithdrawTokens(): Promise<void> {
   ).filter((a) => a.getTokenBalanceUi(forceWithdrawBank) > 0);
 
   for (const mangoAccount of mangoAccountsWithDeposits) {
-    // const sig = await client.serum3LiqForceCancelOrders(group, mangoAccount);
-
-    const sig = await client.tokenForceWithdraw(
-      group,
-      mangoAccount,
-      TOKEN_INDEX,
-    );
     console.log(
-      `Withdrawing ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
+      `${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
         mangoAccount.publicKey
       }`,
     );
 
-    client.tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX).then((sig) => {
-      console.log(
-        ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
-          mangoAccount.owner
-        }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
-          CLUSTER == 'devnet' ? 'devnet' : ''
-        }`,
-      );
-    });
+    client
+      .serum3LiqForceCancelOrders(
+        group,
+        mangoAccount,
+        serum3Market.serumMarketExternal,
+      )
+      .then((sig) => {
+        console.log(
+          ` serum3LiqForceCancelOrders for ${mangoAccount.publicKey}, owner ${
+            mangoAccount.owner
+          }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+            CLUSTER == 'devnet' ? 'devnet' : ''
+          }`,
+        );
+
+        client
+          .tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX)
+          .then((sig) => {
+            console.log(
+              ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
+                mangoAccount.owner
+              }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+                CLUSTER == 'devnet' ? 'devnet' : ''
+              }`,
+            );
+          });
+      });
   }
+
+  await group.reloadAll(client);
+  console.log(forceWithdrawBank.uiDeposits());
 }
 
 forceWithdrawTokens();
