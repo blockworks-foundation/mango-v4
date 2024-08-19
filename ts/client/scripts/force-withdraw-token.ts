@@ -1,7 +1,9 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
+import uniqWith from 'lodash/uniqWith';
 import { TokenIndex } from '../src/accounts/bank';
+import { MangoAccount } from '../src/accounts/mangoAccount';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
 
@@ -43,47 +45,58 @@ async function forceWithdrawTokens(): Promise<void> {
     group.serum3MarketsMapByMarketIndex.values(),
   ).filter((m) => m.baseTokenIndex == TOKEN_INDEX)[0];
 
+  const mangoAccountsWithTp = (await client.getAllMangoAccounts(group)).filter(
+    (a) => a.getToken(forceWithdrawBank.tokenIndex)?.isActive() ?? false,
+  );
   const mangoAccountsWithInUseCount = (
     await client.getAllMangoAccounts(group)
   ).filter((a) => a.getTokenInUseCount(forceWithdrawBank) > 0);
 
-  console.log(
-    `Found ${mangoAccountsWithInUseCount.length} mango accounts with in use count > 0`,
+  const mangoAccounts: MangoAccount[] = uniqWith(
+    [...mangoAccountsWithTp, ...mangoAccountsWithInUseCount],
+    function (a, b) {
+      return a.publicKey.equals(b.publicKey);
+    },
   );
 
-  for (const mangoAccount of mangoAccountsWithInUseCount) {
+  console.log(
+    `Found ${mangoAccounts.length} mango accounts with in use count > 0 or tp`,
+  );
+
+  for (const mangoAccount of mangoAccounts) {
     console.log(
       `${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
         mangoAccount.publicKey
       }`,
     );
 
-    client
-      .serum3LiqForceCancelOrders(
+    try {
+      const sig = await client.serum3LiqForceCancelOrders(
         group,
         mangoAccount,
         serum3Market.serumMarketExternal,
-      )
+      );
+      console.log(
+        ` serum3LiqForceCancelOrders for ${mangoAccount.publicKey}, owner ${
+          mangoAccount.owner
+        }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+          CLUSTER == 'devnet' ? 'devnet' : ''
+        }`,
+      );
+    } catch (error) {
+      console.log(error);
+    }
+
+    await client
+      .tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX)
       .then((sig) => {
         console.log(
-          ` serum3LiqForceCancelOrders for ${mangoAccount.publicKey}, owner ${
+          ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
             mangoAccount.owner
           }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
             CLUSTER == 'devnet' ? 'devnet' : ''
           }`,
         );
-
-        client
-          .tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX)
-          .then((sig) => {
-            console.log(
-              ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
-                mangoAccount.owner
-              }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
-                CLUSTER == 'devnet' ? 'devnet' : ''
-              }`,
-            );
-          });
       });
   }
 
