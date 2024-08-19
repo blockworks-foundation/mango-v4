@@ -352,6 +352,11 @@ export class MangoAccount {
     return tp ? tp.balanceUi(bank) : 0;
   }
 
+  public getTokenInUseCount(bank: Bank): number {
+    const tp = this.getToken(bank.tokenIndex);
+    return tp?.inUseCount ?? 0;
+  }
+
   /**
    *
    * @param bank

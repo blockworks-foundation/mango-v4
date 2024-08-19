@@ -38,16 +38,20 @@ async function forceWithdrawTokens(): Promise<void> {
 
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const forceWithdrawBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
+  console.log(`${forceWithdrawBank.name} bank`);
   const serum3Market = Array.from(
     group.serum3MarketsMapByMarketIndex.values(),
   ).filter((m) => m.baseTokenIndex == TOKEN_INDEX)[0];
 
-  // Get all mango accounts with deposits for given token
-  const mangoAccountsWithDeposits = (
+  const mangoAccountsWithInUseCount = (
     await client.getAllMangoAccounts(group)
-  ).filter((a) => a.getTokenBalanceUi(forceWithdrawBank) > 0);
+  ).filter((a) => a.getTokenInUseCount(forceWithdrawBank) > 0);
 
-  for (const mangoAccount of mangoAccountsWithDeposits) {
+  console.log(
+    `Found ${mangoAccountsWithInUseCount.length} mango accounts with in use count > 0`,
+  );
+
+  for (const mangoAccount of mangoAccountsWithInUseCount) {
     console.log(
       `${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
         mangoAccount.publicKey
