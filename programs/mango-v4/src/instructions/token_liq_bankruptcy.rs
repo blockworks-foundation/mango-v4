@@ -28,6 +28,7 @@ pub fn token_liq_bankruptcy(
 
     // find the insurance bank token index
     let insurance_mint = ctx.accounts.insurance_vault.mint;
+    require_keys_eq!(insurance_mint, group.insurance_mint);
     let insurance_token_index = health_ais
         .iter()
         .find_map(|ai| {
