@@ -104,7 +104,7 @@ const_assert_eq!(size_of::<OracleConfig>() % 8, 0);
 #[derive(AnchorDeserialize, AnchorSerialize, Debug, Default)]
 pub struct OracleConfigParams {
     pub conf_filter: f32,
-    pub max_staleness_slots: Option<u32>,
+    pub max_staleness_slots: Option<i32>,
 }
 
 impl OracleConfigParams {
