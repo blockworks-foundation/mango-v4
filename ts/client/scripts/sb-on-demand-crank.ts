@@ -693,7 +693,7 @@ async function updateFilteredOraclesAis(
         filteredOracle.oracle.isOracleStaleOrUnconfident =
           isOracleStaleOrUnconfident(
             nowSlot,
-            maxStalenessSlots.toNumber(),
+            maxStalenessSlots.toNumber() - 100, // mark as stale a bit early, so we can keep fallback prepared
             result.lastUpdatedSlot,
             result.deviation,
             confFilter,
