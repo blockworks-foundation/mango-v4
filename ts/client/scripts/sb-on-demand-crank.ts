@@ -636,8 +636,9 @@ async function updateFilteredOraclesAis(
     fo.decodedPullFeed = decodedPullFeed;
   });
 
-  // ais for oracles whose fallbacks are sbod oracles
+  // make a note iff a sbod oracle, is a fallback for another oracle, where the main oracle is stale or unconfident
   {
+    // filter where sbod oracle is a fallback for another oracle
     const publicKeysWithIndices = filteredOracles
       .map((item, idx) => {
         return { publicKey: item.oracle.fallbackForOracle, idx: idx };
@@ -661,8 +662,8 @@ async function updateFilteredOraclesAis(
       zipWith(publicKeysWithIndices, ais, function (publicKeyWithIndex, ai) {
         return { publicKeyWithIndex, ai };
       }).map(async (item) => {
+        // fetch main oracle, and check if it is stale or unconfident
         const filteredOracle = filteredOracles[item.publicKeyWithIndex.idx];
-
         let mintDecimals, maxStalenessSlots, confFilter;
         if (filteredOracle.oracle.tokenIndex !== undefined) {
           const bank = group.getFirstBankByTokenIndex(
@@ -681,7 +682,6 @@ async function updateFilteredOraclesAis(
         } else {
           return;
         }
-
         const result = await Group.decodePriceFromOracleAi(
           group,
           coder,
@@ -690,7 +690,6 @@ async function updateFilteredOraclesAis(
           mintDecimals,
           client,
         );
-
         filteredOracle.oracle.isOracleStaleOrUnconfident =
           isOracleStaleOrUnconfident(
             nowSlot,

@@ -289,28 +289,26 @@ async function updateTokenParams(): Promise<void> {
       // }
 
       // eslint-disable-next-line no-constant-condition
-      if (true) {
-        if (bank.reduceOnly == 1) {
-          builder.disableAssetLiquidation(true);
-          builder.oracleConfig({
-            confFilter: 1000,
-            maxStalenessSlots: null,
-          });
-          builder.forceClose(true);
-          builder.forceWithdraw(true);
-          if (bank.name == 'NEON') {
-            builder.initLiabWeight(1.96);
-          }
-          change = true;
-          console.log(
-            ` - ${bank.name}, ${(
-              bank.uiDeposits() * bank.uiPrice
-            ).toLocaleString()} ${bank.uiBorrows() * bank.uiPrice} `,
-          );
-        }
-        // // eslint-disable-next-line no-constant-condition
-        // if (1 == 1) return;
-      }
+      // if (true) {
+      //   if (
+      //     bank.uiBorrows() == 0 &&
+      //     bank.reduceOnly == 2 &&
+      //     bank.initAssetWeight.toNumber() == 0 &&
+      //     bank.maintAssetWeight.toNumber() == 0
+      //   ) {
+      //     builder.disableAssetLiquidation(true);
+      //     builder.oracleConfig({
+      //       confFilter: 1000,
+      //       maxStalenessSlots: -1,
+      //     });
+      //     change = true;
+      //     console.log(
+      //       ` - ${bank.name}, ${(
+      //         bank.uiDeposits() * bank.uiPrice
+      //       ).toLocaleString()} disabled asset liquidation`,
+      //     );
+      //   }
+      // }
 
       // // eslint-disable-next-line no-constant-condition
       // if (true) {
@@ -536,7 +534,6 @@ async function updateTokenParams(): Promise<void> {
       const simulated = await client.connection.simulateTransaction(tx);
 
       if (simulated.value.err) {
-        console.log('error', bank.name);
         console.log('error', simulated.value.logs);
         throw simulated.value.logs;
       }
@@ -576,7 +573,7 @@ async function updateTokenParams(): Promise<void> {
       tokenOwnerRecord,
       PROPOSAL_TITLE
         ? PROPOSAL_TITLE
-        : 'Cleanup delisted token fields in mango-v4',
+        : 'Reset sb on demand oracles as fallback oracles in mango-v4',
       PROPOSAL_LINK ?? '',
       Object.values(proposals).length,
       instructions,
