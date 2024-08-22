@@ -354,13 +354,6 @@ export class MangoAccount {
 
   public getTokenInUseCount(bank: Bank): number {
     const tp = this.getToken(bank.tokenIndex);
-    if (
-      this.publicKey.equals(
-        new PublicKey('HBVZhx5hEaeANvDdd6pPMzAPoPjk8Gxm6uEUM5xrje6p'),
-      )
-    ) {
-      console.log(tp);
-    }
     return tp?.inUseCount ?? 0;
   }
 
