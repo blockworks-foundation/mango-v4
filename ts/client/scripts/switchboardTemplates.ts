@@ -100,20 +100,6 @@ export const usdcInTokenOutUsdcPool = (
     onFailure:
     - lpExchangeRateTask:
         ${poolName}: ${poolAddress}
-    - conditionalTask:
-          attempt:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    pythAddress: ${pythSolOracle}
-                    pythAllowedConfidenceInterval: 10
-          onFailure:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    switchboardAddress: ${switchboardSolOracle}
 - conditionalTask:
     attempt:
     - multiplyTask:
