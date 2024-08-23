@@ -161,7 +161,7 @@ export const tokenInUsdcOutUsdcPool = (
   return template;
 };
 
-export const usdcInTokenOutReversedSolPool = (
+export const solInTokenOutReversedSolPool = (
   outMint: string,
   nativeAmountIn: string,
   poolAddress: string,
@@ -176,7 +176,7 @@ export const usdcInTokenOutReversedSolPool = (
         job:
           tasks:
           - jupiterSwapTask:
-              inTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+              inTokenAddress: So11111111111111111111111111111111111111112
               outTokenAddress: ${outMint}
               baseAmountString: ${nativeAmountIn}
     onFailure:
@@ -187,38 +187,24 @@ export const usdcInTokenOutReversedSolPool = (
           tasks:
           - lpExchangeRateTask:
               ${poolName}: ${poolAddress}
-    - conditionalTask:
-          attempt:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    pythAddress: ${pythSolOracle}
-                    pythAllowedConfidenceInterval: 10
-          onFailure:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    switchboardAddress: ${switchboardSolOracle}
 - conditionalTask:
     attempt:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              pythAddress: ${pythUsdOracle}
+              pythAddress: ${pythSolOracle}
               pythAllowedConfidenceInterval: 10
     onFailure:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              switchboardAddress: ${switchboardUsdOracle}`;
+              switchboardAddress: ${switchboardSolOracle}`;
   return template;
 };
 
-export const tokenInUsdcOutReversedSolPool = (
+export const tokenInSolOutReversedSolPool = (
   inToken: string,
   nativeAmountIn: string,
   poolAddress: string,
@@ -233,12 +219,12 @@ export const tokenInUsdcOutReversedSolPool = (
           job:
             tasks:
             - jupiterSwapTask:
-                inTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+                inTokenAddress: So11111111111111111111111111111111111111112
                 outTokenAddress: ${inToken}
                 baseAmountString: ${nativeAmountIn}
     - jupiterSwapTask:
         inTokenAddress: ${inToken}
-        outTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+        outTokenAddress: So11111111111111111111111111111111111111112
         baseAmountString: \${QTY}
     - divideTask:
         big: \${QTY}
@@ -250,38 +236,24 @@ export const tokenInUsdcOutReversedSolPool = (
           tasks:
           - lpExchangeRateTask:
               ${poolName}: ${poolAddress}
-    - conditionalTask:
-          attempt:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    pythAddress: ${pythSolOracle}
-                    pythAllowedConfidenceInterval: 10
-          onFailure:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    switchboardAddress: ${switchboardSolOracle}
 - conditionalTask:
     attempt:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              pythAddress: ${pythUsdOracle}
+              pythAddress: ${pythSolOracle}
               pythAllowedConfidenceInterval: 10
     onFailure:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              switchboardAddress: ${switchboardUsdOracle}`;
+              switchboardAddress: ${switchboardSolOracle}`;
   return template;
 };
 
-export const usdcInTokenOutSolPool = (
+export const solInTokenOutSolPool = (
   outMint: string,
   nativeAmountIn: string,
   poolAddress: string,
@@ -296,44 +268,30 @@ export const usdcInTokenOutSolPool = (
         job:
           tasks:
           - jupiterSwapTask:
-              inTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+              inTokenAddress: So11111111111111111111111111111111111111112
               outTokenAddress: ${outMint}
               baseAmountString: ${nativeAmountIn}
     onFailure:
     - lpExchangeRateTask:
         ${poolName}: ${poolAddress}
-    - conditionalTask:
-          attempt:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    pythAddress: ${pythSolOracle}
-                    pythAllowedConfidenceInterval: 10
-          onFailure:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    switchboardAddress: ${switchboardSolOracle}
 - conditionalTask:
     attempt:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              pythAddress: ${pythUsdOracle}
+              pythAddress: ${pythSolOracle}
               pythAllowedConfidenceInterval: 10
     onFailure:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              switchboardAddress: ${switchboardUsdOracle}`;
+              switchboardAddress: ${switchboardSolOracle}`;
   return template;
 };
 
-export const tokenInUsdcOutSolPool = (
+export const tokenInSolOutSolPool = (
   inToken: string,
   nativeAmountIn: string,
   poolAddress: string,
@@ -348,45 +306,31 @@ export const tokenInUsdcOutSolPool = (
           job:
             tasks:
             - jupiterSwapTask:
-                inTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+                inTokenAddress: So11111111111111111111111111111111111111112
                 outTokenAddress: ${inToken}
                 baseAmountString: ${nativeAmountIn}
     - jupiterSwapTask:
         inTokenAddress: ${inToken}
-        outTokenAddress: EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+        outTokenAddress: So11111111111111111111111111111111111111112
         baseAmountString: \${QTY}
     - divideTask:
         big: \${QTY}
     onFailure:
     - lpExchangeRateTask:
         ${poolName}: ${poolAddress}
-    - conditionalTask:
-          attempt:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    pythAddress: ${pythSolOracle}
-                    pythAllowedConfidenceInterval: 10
-          onFailure:
-          - multiplyTask:
-              job:
-                tasks:
-                - oracleTask:
-                    switchboardAddress: ${switchboardSolOracle}
 - conditionalTask:
     attempt:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              pythAddress: ${pythUsdOracle}
+              pythAddress: ${pythSolOracle}
               pythAllowedConfidenceInterval: 10
     onFailure:
     - multiplyTask:
         job:
           tasks:
           - oracleTask:
-              switchboardAddress: ${switchboardUsdOracle}`;
+              switchboardAddress: ${switchboardSolOracle}`;
   return template;
 };
