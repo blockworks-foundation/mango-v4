@@ -57,7 +57,7 @@ const maxStaleness =
   LISTING_PRESETS[TIER].maxStalenessSlots === -1
     ? 10000
     : LISTING_PRESETS[TIER].maxStalenessSlots;
-const SOL_PRICE = 100;
+const SOL_PRICE = 140;
 // Constants
 const JUPITER_PRICE_API_MAINNET = 'https://price.jup.ag/v4/';
 const JUPITER_TOKEN_API_MAINNET = 'https://token.jup.ag/all';
