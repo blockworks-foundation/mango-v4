@@ -4,15 +4,25 @@ Update this for each program release and mainnet deployment.
 
 ## not on mainnet
 
+### v0.24.3, 2024-8-
+
+- Program: Remove delegate account withdrawal limit (#939)
+- Program: Allow the insurance fund to be for any bank (#946)
+- Program: add a tier string in banks (#988)
+- Program: Allow closing open orders account for force closed spot markets (#995)
+
+## mainnet
+
 ### v0.24.2, 2024-7-
+
+Deployment: Jul 29, 2024 at 10:46:28 Central European Summer Time,
+https://explorer.solana.com/tx/8zFSfPVSw98NL7nnJgfjNEhXcUVJtaCxLxnj9jt6kAnLwBR8LvzrS1Q5p21CuwiueJisdQFurf1ujNy38GiUEB1
 
 - Program: charge collateral fee directly on borrowed tokens (#973)
 
 - Program: fix TokenUpdateIndexAndRateResilient IX (#979)
 
 - Program: add support for pyth v2 account (#980)
-
-## mainnet
 
 ### v0.24.1, 2024-7-9
 
@@ -25,18 +35,18 @@ https://explorer.solana.com/tx/5KYBSXV4uRCUK6vaQoZjipNFhTqEY1b1DHJeSh5jo87UUVGBB
 
 ### v0.24.0, 2024-4-18
 
-Deployment: Apr 18, 2024 at 14:53:24 Central European Summer Time, 
+Deployment: Apr 18, 2024 at 14:53:24 Central European Summer Time,
 https://explorer.solana.com/tx/2TFCGXQkUjRvkuuojxmiKefUtHPp6q6rM1frYvALByWMGfpWbiGH5hGq5suWEH7TUKoz4jb4KCGxu9DRw7YcXNdh
 
 - Allow skipping banks and invalid oracles when computing health (#891)
 
-  This is only possible when we know for sure that the operation would not put the account into negative health zone.   
+  This is only possible when we know for sure that the operation would not put the account into negative health zone.
 
 - Add support for Raydium CLMM as oracle fallback (#856)
- 
+
 - Add a `TokenBalanceLog` when charging collateral fees (#894)
 
-- Withdraw instruction: remove overflow error and return appropriate error message instead (#910) 
+- Withdraw instruction: remove overflow error and return appropriate error message instead (#910)
 
 - Banks: add more safety checks (#895)
 
@@ -46,7 +56,7 @@ https://explorer.solana.com/tx/2TFCGXQkUjRvkuuojxmiKefUtHPp6q6rM1frYvALByWMGfpWb
 
 - Add a sequence check instruction (#909)
 
-  Assert that a transaction was emitted and run with a correct view of the current mango state.  
+  Assert that a transaction was emitted and run with a correct view of the current mango state.
 
 ### v0.23.0, 2024-3-8
 
@@ -154,6 +164,7 @@ Deployment: Dec 13, 2023 at 09:02:46 Central European Standard Time, https://exp
   The DAO had previously reduced the percentage amount as a mitigation.
 
   With this change:
+
   - low-health settlement incentives are capped at 2x the flat fee, removing
     unlimited percentual incentive fees entirely
   - incentives are only paid if at least 1% of position value is settled,

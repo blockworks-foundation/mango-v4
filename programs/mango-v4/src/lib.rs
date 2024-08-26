@@ -167,6 +167,7 @@ pub mod mango_v4 {
         platform_liquidation_fee: f32,
         disable_asset_liquidation: bool,
         collateral_fee_per_day: f32,
+        tier: String,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_register(
@@ -202,6 +203,7 @@ pub mod mango_v4 {
             platform_liquidation_fee,
             disable_asset_liquidation,
             collateral_fee_per_day,
+            tier,
         )?;
         Ok(())
     }
@@ -260,6 +262,7 @@ pub mod mango_v4 {
         disable_asset_liquidation_opt: Option<bool>,
         collateral_fee_per_day_opt: Option<f32>,
         force_withdraw_opt: Option<bool>,
+        tier_opt: Option<String>,
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::token_edit(
@@ -305,6 +308,7 @@ pub mod mango_v4 {
             disable_asset_liquidation_opt,
             collateral_fee_per_day_opt,
             force_withdraw_opt,
+            tier_opt,
         )?;
         Ok(())
     }
