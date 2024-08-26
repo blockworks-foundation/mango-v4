@@ -13,8 +13,6 @@ use crate::logs::{
     emit_stack, LoanOriginationFeeInstruction, TokenBalanceLog, WithdrawLoanLog, WithdrawLog,
 };
 
-const DELEGATE_WITHDRAW_MAX: i64 = 100_000; // $0.1
-
 pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bool) -> Result<()> {
     require_msg!(amount > 0, "withdraw amount must be positive");
 
@@ -142,13 +140,6 @@ pub fn token_withdraw(ctx: Context<TokenWithdraw>, amount: u64, allow_borrow: bo
         require!(
             !withdraw_result.position_is_active,
             MangoError::DelegateWithdrawMustClosePosition
-        );
-
-        // Delegates can't withdraw too much
-        require_gte!(
-            DELEGATE_WITHDRAW_MAX,
-            amount_usd,
-            MangoError::DelegateWithdrawSmall
         );
     }
 

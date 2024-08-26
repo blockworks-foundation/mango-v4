@@ -7,8 +7,6 @@ use mango_v4::accounts_ix::{HealthCheck, HealthCheckKind};
 use mango_v4::error::MangoError;
 use solana_sdk::transport::TransportError;
 
-// TODO FAS
-
 #[tokio::test]
 async fn test_health_check() -> Result<(), TransportError> {
     let context = TestContext::new().await;
