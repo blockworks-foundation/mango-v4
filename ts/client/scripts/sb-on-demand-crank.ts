@@ -314,8 +314,8 @@ async function preparePullIx(
   };
   // TODO use fetchUpdateMany
 
-  try {   
-    const [pullIx] = await pullFeed.fetchUpdateIx(conf, recentSlothashes); 
+  try {
+    const [pullIx] = await pullFeed.fetchUpdateIx(conf, recentSlothashes);
     return pullIx;
   } catch (error) {
     console.log(`[preparePullIx] ${oracle.oracle.name} error ${error}`);
@@ -444,8 +444,8 @@ async function prepareCandidateOracles(
     .map((o, i) => {
       return { oracle: o, ai: ais[i] };
     })
-  .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
-    
+    .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
+
   // parse account info data
   const parsedOracles = sbodOracles.map((item) => {
     const d = sbOnDemandProgram.coder.accounts.decode(
