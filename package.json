@@ -1,6 +1,6 @@
 {
   "name": "@blockworks-foundation/mango-v4",
-  "version": "0.32.14",
+  "version": "0.33.4",
   "description": "Typescript Client for mango-v4 program.",
   "repository": "https://github.com/blockworks-foundation/mango-v4",
   "author": {
@@ -75,7 +75,7 @@
     "@solana/spl-token": "0.4.8",
     "@solana/web3.js": "^1.95.2",
     "@switchboard-xyz/common": "^2.4.4",
-    "@switchboard-xyz/on-demand": "^1.2.20",
+    "@switchboard-xyz/on-demand": "^1.2.38",
     "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "@switchboard-xyz/solana.js": "^3.2.5",
     "big.js": "^6.1.1",

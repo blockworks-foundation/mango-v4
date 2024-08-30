@@ -5,17 +5,18 @@ use crate::error::MangoError;
 use crate::state::*;
 
 pub fn serum3_close_open_orders(ctx: Context<Serum3CloseOpenOrders>) -> Result<()> {
+    let serum_market = ctx.accounts.serum_market.load()?;
+
     //
     // Validation
     //
     let mut account = ctx.accounts.account.load_full_mut()?;
     // account constraint #1
     require!(
-        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key()),
+        account.fixed.is_owner_or_delegate(ctx.accounts.owner.key())
+            || serum_market.is_force_close(),
         MangoError::SomeError
     );
-
-    let serum_market = ctx.accounts.serum_market.load()?;
 
     // Validate open_orders #2
     require!(

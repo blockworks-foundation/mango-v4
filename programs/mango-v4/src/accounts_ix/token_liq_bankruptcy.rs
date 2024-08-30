@@ -8,7 +8,7 @@ use crate::state::*;
 
 // Remaining accounts:
 // - all banks for liab_mint_info (writable)
-// - merged health accounts for liqor+liqee
+// - merged health accounts for liqor + liqee, including the bank for the insurance token
 #[derive(Accounts)]
 pub struct TokenLiqBankruptcy<'info> {
     #[account(

@@ -361,6 +361,24 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async groupChangeInsuranceFund(
+    group: Group,
+    withdrawDestination: PublicKey,
+    newInsuranceMint: PublicKey,
+  ): Promise<MangoSignatureStatus> {
+    const ix = await this.program.methods
+      .groupChangeInsuranceFund()
+      .accounts({
+        group: group.publicKey,
+        admin: (this.program.provider as AnchorProvider).wallet.publicKey,
+        insuranceVault: group.insuranceVault,
+        withdrawDestination,
+        newInsuranceMint,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async ixGateSet(
     group: Group,
     ixGateParams: IxGateParams,
@@ -502,6 +520,7 @@ export class MangoClient {
         params.platformLiquidationFee,
         params.disableAssetLiquidation,
         params.collateralFeePerDay,
+        params.tier,
       )
       .accounts({
         group: group.publicKey,
@@ -592,6 +611,7 @@ export class MangoClient {
         params.disableAssetLiquidation,
         params.collateralFeePerDay,
         params.forceWithdraw,
+        params.tier,
       )
       .accounts({
         group: group.publicKey,

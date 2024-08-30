@@ -24,17 +24,17 @@ use mango_v4::accounts_zerocopy::KeyedAccountSharedData;
 use mango_v4::health::HealthCache;
 use mango_v4::state::{
     Bank, Group, MangoAccountValue, OracleAccountInfos, PerpMarket, PerpMarketIndex,
-    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex, INSURANCE_TOKEN_INDEX,
+    PlaceOrderType, SelfTradeBehavior, Serum3MarketIndex, Side, TokenIndex,
 };
 
 use crate::confirm_transaction::{wait_for_transaction_confirmation, RpcConfirmTransactionConfig};
 use crate::context::MangoGroupContext;
 use crate::gpa::{fetch_anchor_account, fetch_mango_accounts};
-use crate::health_cache;
 use crate::priority_fees::{FixedPriorityFeeProvider, PriorityFeeProvider};
 use crate::util;
 use crate::util::PreparedInstructions;
 use crate::{account_fetcher::*, swap};
+use crate::{health_cache, Serum3MarketContext, TokenContext};
 use solana_address_lookup_table_program::state::AddressLookupTable;
 use solana_client::nonblocking::rpc_client::RpcClient as RpcClientAsync;
 use solana_client::rpc_client::SerializableTransaction;
@@ -623,6 +623,34 @@ impl MangoClient {
         Ok(ixs)
     }
 
+    /// Avoid executing same instruction multiple time
+    pub async fn sequence_check_instruction(
+        &self,
+        mango_account_address: &Pubkey,
+        mango_account: &MangoAccountValue,
+    ) -> anyhow::Result<PreparedInstructions> {
+        let ixs = PreparedInstructions::from_vec(
+            vec![Instruction {
+                program_id: mango_v4::id(),
+                accounts: {
+                    anchor_lang::ToAccountMetas::to_account_metas(
+                        &mango_v4::accounts::SequenceCheck {
+                            group: self.group(),
+                            account: *mango_account_address,
+                            owner: mango_account.fixed.owner,
+                        },
+                        None,
+                    )
+                },
+                data: anchor_lang::InstructionData::data(&mango_v4::instruction::SequenceCheck {
+                    expected_sequence_number: mango_account.fixed.sequence_number,
+                }),
+            }],
+            self.context.compute_estimates.cu_for_sequence_check,
+        );
+        Ok(ixs)
+    }
+
     /// Creates token withdraw instructions for the MangoClient's account/owner.
     /// The `account` state is passed in separately so changes during the tx can be
     /// accounted for when deriving health accounts.
@@ -1150,6 +1178,18 @@ impl MangoClient {
         let account = self.mango_account().await?;
         let open_orders = account.serum3_orders(market_index).unwrap().open_orders;
 
+        let ix = self.serum3_settle_funds_instruction(s3, base, quote, open_orders);
+        self.send_and_confirm_authority_tx(ix.to_instructions())
+            .await
+    }
+
+    pub fn serum3_settle_funds_instruction(
+        &self,
+        s3: &Serum3MarketContext,
+        base: &TokenContext,
+        quote: &TokenContext,
+        open_orders: Pubkey,
+    ) -> PreparedInstructions {
         let ix = Instruction {
             program_id: mango_v4::id(),
             accounts: anchor_lang::ToAccountMetas::to_account_metas(
@@ -1182,7 +1222,11 @@ impl MangoClient {
                 fees_to_dao: true,
             }),
         };
-        self.send_and_confirm_authority_tx(vec![ix]).await
+
+        PreparedInstructions::from_single(
+            ix,
+            self.context.compute_estimates.cu_per_mango_instruction,
+        )
     }
 
     pub fn serum3_cancel_all_orders_instruction(
@@ -1763,13 +1807,13 @@ impl MangoClient {
         let mango_account = &self.mango_account().await?;
         let perp = self.context.perp(market_index);
         let settle_token_info = self.context.token(perp.settle_token_index);
-        let insurance_token_info = self.context.token(INSURANCE_TOKEN_INDEX);
+        let insurance_token_info = self.context.token_by_mint(&group.insurance_mint)?;
 
         let (health_remaining_ams, health_cu) = self
             .derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.1,
-                &[INSURANCE_TOKEN_INDEX],
+                &[insurance_token_info.token_index],
                 &[],
             )
             .await
@@ -1917,10 +1961,15 @@ impl MangoClient {
         liab_token_index: TokenIndex,
         max_liab_transfer: I80F48,
     ) -> anyhow::Result<PreparedInstructions> {
-        let mango_account = &self.mango_account().await?;
-        let quote_token_index = 0;
+        let group = account_fetcher_fetch_anchor_account::<Group>(
+            &*self.account_fetcher,
+            &self.context.group,
+        )
+        .await?;
 
-        let quote_info = self.context.token(quote_token_index);
+        let mango_account = &self.mango_account().await?;
+
+        let insurance_info = self.context.token_by_mint(&group.insurance_mint)?;
         let liab_info = self.context.token(liab_token_index);
 
         let bank_remaining_ams = liab_info
@@ -1933,8 +1982,8 @@ impl MangoClient {
             .derive_health_check_remaining_account_metas_two_accounts(
                 mango_account,
                 liqee.1,
-                &[INSURANCE_TOKEN_INDEX],
-                &[quote_token_index, liab_token_index],
+                &[insurance_info.token_index],
+                &[insurance_info.token_index, liab_token_index],
             )
             .await
             .unwrap();
@@ -1955,7 +2004,7 @@ impl MangoClient {
                         liqor: self.mango_account_address,
                         liqor_owner: self.authority(),
                         liab_mint_info: liab_info.mint_info_address,
-                        quote_vault: quote_info.first_vault(),
+                        quote_vault: insurance_info.first_vault(),
                         insurance_vault: group.insurance_vault,
                         token_program: Token::id(),
                     },
@@ -2165,7 +2214,10 @@ impl MangoClient {
     }
 
     pub fn jupiter_v6(&self) -> swap::jupiter_v6::JupiterV6 {
-        swap::jupiter_v6::JupiterV6 { mango_client: self }
+        swap::jupiter_v6::JupiterV6 {
+            mango_client: self,
+            timeout_duration: self.client.config.jupiter_timeout,
+        }
     }
 
     pub fn sanctum(&self) -> swap::sanctum::Sanctum {
@@ -2548,7 +2600,7 @@ impl TransactionBuilder {
 
     pub fn append(&mut self, prepared_instructions: PreparedInstructions) {
         self.instructions
-            .extend(prepared_instructions.to_instructions());
+            .extend(prepared_instructions.instructions);
     }
 }
 

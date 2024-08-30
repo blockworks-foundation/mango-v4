@@ -4,6 +4,10 @@ import {
   tierSwitchboardSettings,
   tierToSwitchboardJobSwapValue,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import * as toml from '@iarna/toml';
+import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import {
   Cluster,
   Commitment,
@@ -11,34 +15,30 @@ import {
   Keypair,
   PublicKey,
 } from '@solana/web3.js';
-import fs from 'fs';
-import * as toml from '@iarna/toml';
-import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
   CrossbarClient,
+  ON_DEMAND_MAINNET_PID,
   OracleJob,
   PullFeed,
   Queue,
-  SB_ON_DEMAND_PID,
 } from '@switchboard-xyz/on-demand';
+import fs from 'fs';
 import {
   Program as Anchor30Program,
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
-import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
-import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 import { createComputeBudgetIx } from '../src/utils/rpc';
 import {
   LSTExactIn,
   LSTExactOut,
-  tokenInUsdcOutReversedSolPool,
-  tokenInUsdcOutSolPool,
+  solInTokenOutReversedSolPool,
+  solInTokenOutSolPool,
+  tokenInSolOutReversedSolPool,
+  tokenInSolOutSolPool,
   tokenInUsdcOutUsdcPool,
-  usdcInTokenOutReversedSolPool,
-  usdcInTokenOutSolPool,
   usdcInTokenOutUsdcPool,
 } from './switchboardTemplates';
 
@@ -57,7 +57,7 @@ const maxStaleness =
   LISTING_PRESETS[TIER].maxStalenessSlots === -1
     ? 10000
     : LISTING_PRESETS[TIER].maxStalenessSlots;
-
+const SOL_PRICE = 140;
 // Constants
 const JUPITER_PRICE_API_MAINNET = 'https://price.jup.ag/v4/';
 const JUPITER_TOKEN_API_MAINNET = 'https://token.jup.ag/all';
@@ -140,45 +140,35 @@ async function getPool(mint: string): Promise<
     (x) => x.dexId.includes('raydium') || x.dexId.includes('orca'),
   );
 
-  const bestUsdcPool = pairs.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (x: any) => x.quoteToken.address === USDC_MINT,
+  const bestPool = pairs.find(
+    (x) =>
+      x.quoteToken.address === USDC_MINT ||
+      x.quoteToken.address === WRAPPED_SOL_MINT ||
+      x.baseToken.address === WRAPPED_SOL_MINT,
   );
 
-  const bestSolPool = pairs.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (x: any) => x.quoteToken.address === WRAPPED_SOL_MINT,
-  );
-
-  const bestReversedSolPool = pairs.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (x: any) => x.baseToken.address === WRAPPED_SOL_MINT,
-  );
-
-  if (bestUsdcPool) {
+  if (bestPool.quoteToken.address === USDC_MINT) {
     return {
-      pool: bestUsdcPool.pairAddress,
-      poolSource: bestUsdcPool.dexId.includes('raydium') ? 'raydium' : 'orca',
+      pool: bestPool.pairAddress,
+      poolSource: bestPool.dexId.includes('raydium') ? 'raydium' : 'orca',
       isSolPool: false,
       isReveredSolPool: false,
     };
   }
 
-  if (bestSolPool) {
+  if (bestPool.quoteToken.address === WRAPPED_SOL_MINT) {
     return {
-      pool: bestSolPool.pairAddress,
-      poolSource: bestSolPool.dexId.includes('raydium') ? 'raydium' : 'orca',
+      pool: bestPool.pairAddress,
+      poolSource: bestPool.dexId.includes('raydium') ? 'raydium' : 'orca',
       isSolPool: true,
       isReveredSolPool: false,
     };
   }
 
-  if (bestSolPool) {
+  if (bestPool.baseToken.address === WRAPPED_SOL_MINT) {
     return {
-      pool: bestReversedSolPool.pairAddress,
-      poolSource: bestReversedSolPool.dexId.includes('raydium')
-        ? 'raydium'
-        : 'orca',
+      pool: bestPool.pairAddress,
+      poolSource: bestPool.dexId.includes('raydium') ? 'raydium' : 'orca',
       isSolPool: true,
       isReveredSolPool: true,
     };
@@ -244,7 +234,10 @@ const getLstStakePool = async (
 };
 
 async function setupSwitchboard(userProvider: AnchorProvider) {
-  const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, userProvider);
+  const idl = await Anchor30Program.fetchIdl(
+    ON_DEMAND_MAINNET_PID,
+    userProvider,
+  );
   const sbOnDemandProgram = new Anchor30Program(idl!, userProvider);
   let queue = new PublicKey('A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w');
   if (CLUSTER == 'devnet') {
@@ -326,15 +319,15 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
                 FALLBACK_POOL_NAME,
               )
             : poolInfo.isReveredSolPool
-              ? usdcInTokenOutReversedSolPool(
+              ? solInTokenOutReversedSolPool(
                   TOKEN_MINT,
-                  swapValue!,
+                  (Number(swapValue) / SOL_PRICE).toString(),
                   FALLBACK_POOL!,
                   FALLBACK_POOL_NAME,
                 )
-              : usdcInTokenOutSolPool(
+              : solInTokenOutSolPool(
                   TOKEN_MINT,
-                  swapValue!,
+                  (Number(swapValue) / SOL_PRICE).toString(),
                   FALLBACK_POOL!,
                   FALLBACK_POOL_NAME,
                 ),
@@ -355,15 +348,15 @@ async function setupSwitchboard(userProvider: AnchorProvider) {
                 FALLBACK_POOL_NAME,
               )
             : poolInfo.isReveredSolPool
-              ? tokenInUsdcOutReversedSolPool(
+              ? tokenInSolOutReversedSolPool(
                   TOKEN_MINT,
-                  swapValue!,
+                  (Number(swapValue) / SOL_PRICE).toString(),
                   FALLBACK_POOL!,
                   FALLBACK_POOL_NAME,
                 )
-              : tokenInUsdcOutSolPool(
+              : tokenInSolOutSolPool(
                   TOKEN_MINT,
-                  swapValue!,
+                  (Number(swapValue) / SOL_PRICE).toString(),
                   FALLBACK_POOL!,
                   FALLBACK_POOL_NAME,
                 ),

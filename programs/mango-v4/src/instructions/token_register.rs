@@ -46,14 +46,8 @@ pub fn token_register(
     platform_liquidation_fee: f32,
     disable_asset_liquidation: bool,
     collateral_fee_per_day: f32,
+    tier: String,
 ) -> Result<()> {
-    // Require token 0 to be in the insurance token
-    if token_index == INSURANCE_TOKEN_INDEX {
-        require_keys_eq!(
-            ctx.accounts.group.load()?.insurance_mint,
-            ctx.accounts.mint.key()
-        );
-    }
     require_neq!(token_index, TokenIndex::MAX);
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();
@@ -113,7 +107,6 @@ pub fn token_register(
         force_close: 0,
         disable_asset_liquidation: u8::from(disable_asset_liquidation),
         force_withdraw: 0,
-        padding: Default::default(),
         fees_withdrawn: 0,
         token_conditional_swap_taker_fee_rate,
         token_conditional_swap_maker_fee_rate,
@@ -133,6 +126,7 @@ pub fn token_register(
         collected_liquidation_fees: I80F48::ZERO,
         collected_collateral_fees: I80F48::ZERO,
         collateral_fee_per_day,
+        tier: fill_from_str(&tier)?,
         reserved: [0; 1900],
     };
 

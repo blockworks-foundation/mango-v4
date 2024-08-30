@@ -32,11 +32,12 @@ export interface TokenRegisterParams {
   platformLiquidationFee: number;
   disableAssetLiquidation: boolean;
   collateralFeePerDay: number;
+  tier: string;
 }
 
 export const DefaultTokenRegisterParams: TokenRegisterParams = {
   oracleConfig: {
-    confFilter: 0,
+    confFilter: 0.3,
     maxStalenessSlots: null,
   },
   groupInsuranceFund: false,
@@ -74,6 +75,7 @@ export const DefaultTokenRegisterParams: TokenRegisterParams = {
   platformLiquidationFee: 0.0,
   disableAssetLiquidation: false,
   collateralFeePerDay: 0.0,
+  tier: '',
 };
 
 export interface TokenEditParams {
@@ -117,6 +119,7 @@ export interface TokenEditParams {
   platformLiquidationFee: number | null;
   disableAssetLiquidation: boolean | null;
   collateralFeePerDay: number | null;
+  tier: string | null;
   forceWithdraw: boolean | null;
 }
 
@@ -161,6 +164,7 @@ export const NullTokenEditParams: TokenEditParams = {
   platformLiquidationFee: null,
   disableAssetLiquidation: null,
   collateralFeePerDay: null,
+  tier: null,
   forceWithdraw: null,
 };
 
@@ -312,6 +316,7 @@ export interface IxGateParams {
   TokenForceWithdraw: boolean;
   SequenceCheck: boolean;
   HealthCheck: boolean;
+  GroupChangeInsuranceFund: boolean;
 }
 
 // Default with all ixs enabled, use with buildIxGate
@@ -394,6 +399,7 @@ export const TrueIxGateParams: IxGateParams = {
   TokenForceWithdraw: true,
   SequenceCheck: true,
   HealthCheck: true,
+  GroupChangeInsuranceFund: true,
 };
 
 // build ix gate e.g. buildIxGate(Builder(TrueIxGateParams).TokenDeposit(false).build()).toNumber(),
@@ -486,6 +492,7 @@ export function buildIxGate(p: IxGateParams): BN {
   toggleIx(ixGate, p, 'TokenForceWithdraw', 72);
   toggleIx(ixGate, p, 'SequenceCheck', 73);
   toggleIx(ixGate, p, 'HealthCheck', 74);
+  toggleIx(ixGate, p, 'GroupChangeInsuranceFund', 76);
 
   return ixGate;
 }

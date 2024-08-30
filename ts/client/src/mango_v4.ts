@@ -1,5 +1,5 @@
 export type MangoV4 = {
-  "version": "0.24.2",
+  "version": "0.24.3",
   "name": "mango_v4",
   "instructions": [
     {
@@ -327,6 +327,86 @@ export type MangoV4 = {
       ]
     },
     {
+      "name": "groupChangeInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "insurance_vault",
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "withdrawDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "new_insurance_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -645,6 +725,10 @@ export type MangoV4 = {
         {
           "name": "collateralFeePerDay",
           "type": "f32"
+        },
+        {
+          "name": "tier",
+          "type": "string"
         }
       ]
     },
@@ -1072,6 +1156,12 @@ export type MangoV4 = {
           "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tierOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -7584,7 +7674,7 @@ export type MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "tier",
             "type": {
               "array": [
                 "u8",
@@ -10063,9 +10153,13 @@ export type MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                119
+                111
               ]
             }
+          },
+          {
+            "name": "forceAlign",
+            "type": "u64"
           }
         ]
       }
@@ -11120,6 +11214,9 @@ export type MangoV4 = {
           },
           {
             "name": "HealthCheck"
+          },
+          {
+            "name": "GroupChangeInsuranceFund"
           }
         ]
       }
@@ -14488,7 +14585,7 @@ export type MangoV4 = {
 };
 
 export const IDL: MangoV4 = {
-  "version": "0.24.2",
+  "version": "0.24.3",
   "name": "mango_v4",
   "instructions": [
     {
@@ -14816,6 +14913,86 @@ export const IDL: MangoV4 = {
       ]
     },
     {
+      "name": "groupChangeInsuranceFund",
+      "accounts": [
+        {
+          "name": "group",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "insurance_vault",
+            "admin"
+          ]
+        },
+        {
+          "name": "admin",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "insuranceVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "withdrawDestination",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "newInsuranceVault",
+          "isMut": true,
+          "isSigner": false,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "type": "string",
+                "value": "InsuranceVault"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "path": "group"
+              },
+              {
+                "kind": "account",
+                "type": "publicKey",
+                "account": "Mint",
+                "path": "new_insurance_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rent",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "ixGateSet",
       "accounts": [
         {
@@ -15134,6 +15311,10 @@ export const IDL: MangoV4 = {
         {
           "name": "collateralFeePerDay",
           "type": "f32"
+        },
+        {
+          "name": "tier",
+          "type": "string"
         }
       ]
     },
@@ -15561,6 +15742,12 @@ export const IDL: MangoV4 = {
           "name": "forceWithdrawOpt",
           "type": {
             "option": "bool"
+          }
+        },
+        {
+          "name": "tierOpt",
+          "type": {
+            "option": "string"
           }
         }
       ]
@@ -22073,7 +22260,7 @@ export const IDL: MangoV4 = {
             "type": "u8"
           },
           {
-            "name": "padding",
+            "name": "tier",
             "type": {
               "array": [
                 "u8",
@@ -24552,9 +24739,13 @@ export const IDL: MangoV4 = {
             "type": {
               "array": [
                 "u8",
-                119
+                111
               ]
             }
+          },
+          {
+            "name": "forceAlign",
+            "type": "u64"
           }
         ]
       }
@@ -25609,6 +25800,9 @@ export const IDL: MangoV4 = {
           },
           {
             "name": "HealthCheck"
+          },
+          {
+            "name": "GroupChangeInsuranceFund"
           }
         ]
       }

@@ -136,6 +136,13 @@ pub struct Cli {
     #[clap(long, env, default_value = "30")]
     pub(crate) rebalance_refresh_timeout_secs: u64,
 
+    #[clap(long, env, value_enum, default_value = "false")]
+    pub(crate) rebalance_using_limit_order: BoolArg,
+
+    /// distance (in bps) from oracle price at which to place order for rebalancing
+    #[clap(long, env, default_value = "100")]
+    pub(crate) rebalance_limit_order_distance_from_oracle_price_bps: u64,
+
     /// if taking tcs orders is enabled
     ///
     /// typically only disabled for tests where swaps are unavailable
@@ -250,4 +257,8 @@ pub struct Cli {
     /// override the sanctum http request timeout
     #[clap(long, env, default_value = "30")]
     pub(crate) sanctum_timeout_secs: u64,
+
+    /// max number of liquidation/tcs to do concurrently
+    #[clap(long, env, default_value = "5")]
+    pub(crate) max_parallel_operations: u64,
 }
