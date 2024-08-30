@@ -413,6 +413,8 @@ export function isOracleStaleOrUnconfident(
   deviation: I80F48 | undefined,
   confFilter: I80F48,
   price: I80F48,
+  debug = false,
+  debugPrefix: string | undefined = undefined,
 ): boolean {
   if (
     maxStalenessSlots >= 0 &&
@@ -421,9 +423,19 @@ export function isOracleStaleOrUnconfident(
   ) {
     return true;
   }
+  if (debug && oracleLastUpdatedSlot) {
+    console.log(
+      `- ${debugPrefix?.padStart(30)}: not stale for ${oracleLastUpdatedSlot + maxStalenessSlots - nowSlot} future slots`,
+    );
+  }
 
   if (deviation && deviation.gt(confFilter.mul(price))) {
     return true;
+  }
+  if (debug && deviation) {
+    console.log(
+      `- ${debugPrefix?.padStart(30)}: deviation within confidence tolerance ${deviation.mul(I80F48.fromNumber(100)).div(confFilter).toFixed(3)}%`,
+    );
   }
 
   return false;

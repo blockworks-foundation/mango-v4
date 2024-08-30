@@ -18,18 +18,28 @@ import fs from 'fs';
 import chunk from 'lodash/chunk';
 import shuffle from 'lodash/shuffle';
 import uniqWith from 'lodash/uniqWith';
+import zipWith from 'lodash/zipWith';
 import { Program as Anchor30Program, BN, Idl } from 'switchboard-anchor';
 
 import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import { BorshAccountsCoder } from '@coral-xyz/anchor';
 import { AnchorProvider, Wallet } from 'switchboard-anchor';
+import { TokenIndex } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
-import { parseSwitchboardOracle } from '../src/accounts/oracle';
+import {
+  isOracleStaleOrUnconfident,
+  parseSwitchboardOracle,
+} from '../src/accounts/oracle';
+import { PerpMarketIndex } from '../src/accounts/perp';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID, MANGO_V4_MAIN_GROUP } from '../src/constants';
 import { createComputeBudgetIx } from '../src/utils/rpc';
 import { manageFeeWebSocket } from './manageFeeWs';
-import { getOraclesForMangoGroup } from './sb-on-demand-crank-utils';
+import {
+  getOraclesForMangoGroup,
+  OraclesFromMangoGroupInterface,
+} from './sb-on-demand-crank-utils';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -59,10 +69,14 @@ try {
   console.error('[start]', error);
 }
 
-interface OracleInterface {
+interface OracleMetaInterface {
   oracle: {
     oraclePk: PublicKey;
     name: string;
+    fallbackForOracle: PublicKey | undefined;
+    tokenIndex: TokenIndex | undefined;
+    perpMarketIndex: PerpMarketIndex | undefined;
+    isOracleStaleOrUnconfident: boolean;
   };
   ai: AccountInfo<Buffer> | null;
   decodedPullFeed: any;
@@ -85,7 +99,7 @@ async function setupBackgroundRefresh(
   group: Group,
   sbOnDemandProgram: Anchor30Program<Idl>,
   crossbarClient: CrossbarClient,
-): Promise<{ oracles: OracleInterface[] }> {
+): Promise<{ oracles: OracleMetaInterface[] }> {
   // note: group was already reloaded before
   const oracles = await prepareCandidateOracles(
     client,
@@ -143,19 +157,29 @@ async function setupBackgroundRefresh(
       ]);
 
       await updateFilteredOraclesAis(
-        client.connection,
+        client,
         sbOnDemandProgram,
+        group,
+        slot,
         oracles,
+      );
+
+      const onlyEssentialOracles = oracles.filter(
+        (o) => o.oracle.isOracleStaleOrUnconfident,
       );
 
       const aisUpdatedAt = Date.now();
 
-      const staleOracles = await filterForStaleOracles(oracles, client, slot);
+      const staleOracles = await filterForStaleOracles(
+        onlyEssentialOracles,
+        client,
+        slot,
+      );
 
       const staleFilteredAt = Date.now();
 
       const crossBarSims = await Promise.all(
-        oracles.map((o) =>
+        onlyEssentialOracles.map((o) =>
           crossbarClient.simulateFeeds([
             new Buffer(o.parsedConfigs.feedHash).toString('hex'),
           ]),
@@ -165,11 +189,15 @@ async function setupBackgroundRefresh(
       const simulatedAt = Date.now();
 
       const varianceThresholdCrossedOracles =
-        await filterForVarianceThresholdOracles(oracles, client, crossBarSims);
+        await filterForVarianceThresholdOracles(
+          onlyEssentialOracles,
+          client,
+          crossBarSims,
+        );
 
       const varianceFilteredAt = Date.now();
 
-      const oraclesToCrank: OracleInterface[] = uniqWith(
+      const oraclesToCrank: OracleMetaInterface[] = uniqWith(
         [...staleOracles, ...varianceThresholdCrossedOracles],
         function (a, b) {
           return a.oracle.oraclePk.equals(b.oracle.oraclePk);
@@ -298,7 +326,7 @@ async function setupBackgroundRefresh(
  */
 async function preparePullIx(
   sbOnDemandProgram,
-  oracle: OracleInterface,
+  oracle: OracleMetaInterface,
   recentSlothashes?: Array<[BN, string]>,
 ): Promise<TransactionInstruction | undefined | null> {
   const pullFeed = new PullFeed(
@@ -324,11 +352,11 @@ async function preparePullIx(
 }
 
 async function filterForVarianceThresholdOracles(
-  filteredOracles: OracleInterface[],
+  filteredOracles: OracleMetaInterface[],
   client: MangoClient,
   crossBarSims,
-): Promise<OracleInterface[]> {
-  const varianceThresholdCrossedOracles = new Array<OracleInterface>();
+): Promise<OracleMetaInterface[]> {
+  const varianceThresholdCrossedOracles = new Array<OracleMetaInterface>();
   for (const [index, item] of filteredOracles.entries()) {
     const res = await parseSwitchboardOracle(
       item.oracle.oraclePk,
@@ -363,11 +391,11 @@ async function filterForVarianceThresholdOracles(
 }
 
 async function filterForStaleOracles(
-  filteredOracles: OracleInterface[],
+  filteredOracles: OracleMetaInterface[],
   client: MangoClient,
   slot: number,
-): Promise<OracleInterface[]> {
-  const staleOracles = new Array<OracleInterface>();
+): Promise<OracleMetaInterface[]> {
+  const staleOracles = new Array<OracleMetaInterface>();
   for (const item of filteredOracles) {
     const res = await parseSwitchboardOracle(
       item.oracle.oraclePk,
@@ -404,7 +432,7 @@ async function prepareCandidateOracles(
   group: Group,
   sbOnDemandProgram: Anchor30Program<Idl>,
   crossbarClient: CrossbarClient,
-): Promise<OracleInterface[]> {
+): Promise<OracleMetaInterface[]> {
   // collect
   const oracles = getOraclesForMangoGroup(group);
   oracles.push(...extendOraclesManually(CLUSTER));
@@ -487,15 +515,17 @@ async function prepareCandidateOracles(
   }));
 }
 
-function extendOraclesManually(cluster: Cluster): {
-  oraclePk: PublicKey;
-  name: string;
-}[] {
+function extendOraclesManually(
+  cluster: Cluster,
+): OraclesFromMangoGroupInterface[] {
   if (cluster == 'devnet') {
     return [
       {
         oraclePk: new PublicKey('EtbG8PSDCyCSmDH8RE4Nf2qTV9d6P6zShzHY2XWvjFJf'),
         name: 'BTC/USD',
+        fallbackForOracle: undefined,
+        tokenIndex: undefined,
+        perpMarketIndex: undefined,
       },
     ];
   }
@@ -512,6 +542,9 @@ function extendOraclesManually(cluster: Cluster): {
     return {
       oraclePk: new PublicKey(item[1]),
       name: item[0],
+      fallbackForOracle: undefined,
+      tokenIndex: undefined,
+      perpMarketIndex: undefined,
     };
   });
 }
@@ -575,9 +608,11 @@ async function setupSwitchboard(client: MangoClient): Promise<{
  * reloads the account states for each oracle passed through the provided connection
  */
 async function updateFilteredOraclesAis(
-  connection: Connection,
+  client: MangoClient,
   sbOnDemandProgram: Anchor30Program<Idl>,
-  filteredOracles: OracleInterface[],
+  group: Group,
+  nowSlot: number,
+  filteredOracles: OracleMetaInterface[],
 ): Promise<void> {
   const ais = (
     await Promise.all(
@@ -585,7 +620,9 @@ async function updateFilteredOraclesAis(
         filteredOracles.map((item) => item.oracle.oraclePk),
         50,
         false,
-      ).map((chunk) => connection.getMultipleAccountsInfo(chunk)),
+      ).map((chunk) =>
+        client.program.provider.connection.getMultipleAccountsInfo(chunk),
+      ),
     )
   ).flat();
 
@@ -598,4 +635,73 @@ async function updateFilteredOraclesAis(
     );
     fo.decodedPullFeed = decodedPullFeed;
   });
+
+  // make a note iff a sbod oracle, is a fallback for another oracle, where the main oracle is stale or unconfident
+  {
+    // filter where sbod oracle is a fallback for another oracle
+    const publicKeysWithIndices = filteredOracles
+      .map((item, idx) => {
+        return { publicKey: item.oracle.fallbackForOracle, idx: idx };
+      })
+      .filter((item) => item.publicKey !== undefined);
+    const ais = (
+      await Promise.all(
+        chunk(
+          publicKeysWithIndices.map((item) => item.publicKey),
+          50,
+          false,
+        ).map((chunk_) =>
+          client.program.provider.connection.getMultipleAccountsInfo(chunk_),
+        ),
+      )
+    ).flat();
+
+    const coder = new BorshAccountsCoder(client.program.idl);
+
+    await Promise.all(
+      zipWith(publicKeysWithIndices, ais, function (publicKeyWithIndex, ai) {
+        return { publicKeyWithIndex, ai };
+      }).map(async (item) => {
+        // fetch main oracle, and check if it is stale or unconfident
+        const filteredOracle = filteredOracles[item.publicKeyWithIndex.idx];
+        let mintDecimals, maxStalenessSlots, confFilter;
+        if (filteredOracle.oracle.tokenIndex !== undefined) {
+          const bank = group.getFirstBankByTokenIndex(
+            filteredOracle.oracle.tokenIndex,
+          );
+          mintDecimals = bank.mintDecimals;
+          maxStalenessSlots = bank.oracleConfig.maxStalenessSlots;
+          confFilter = bank.oracleConfig.confFilter;
+        } else if (filteredOracle.oracle.perpMarketIndex !== undefined) {
+          const pm = group.getPerpMarketByMarketIndex(
+            filteredOracle.oracle.perpMarketIndex,
+          );
+          mintDecimals = pm.baseDecimals;
+          maxStalenessSlots = pm.oracleConfig.maxStalenessSlots;
+          confFilter = pm.oracleConfig.confFilter;
+        } else {
+          return;
+        }
+        const result = await Group.decodePriceFromOracleAi(
+          group,
+          coder,
+          filteredOracle.oracle.oraclePk,
+          item.ai,
+          mintDecimals,
+          client,
+        );
+        filteredOracle.oracle.isOracleStaleOrUnconfident =
+          isOracleStaleOrUnconfident(
+            nowSlot,
+            maxStalenessSlots.toNumber() - 100, // mark as stale a bit early, so we can keep fallback prepared
+            result.lastUpdatedSlot,
+            result.deviation,
+            confFilter,
+            result.price,
+            true,
+            `${filteredOracle.oracle.name} fallback-main-oracle-check`,
+          );
+      }),
+    );
+  }
 }

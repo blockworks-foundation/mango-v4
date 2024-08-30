@@ -436,7 +436,8 @@ export class Group {
             `Undefined accountInfo object in reloadBankOraclePrices for ${bank.oracle}!`,
           );
         const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
-          await this.decodePriceFromOracleAi(
+          await Group.decodePriceFromOracleAi(
+            this,
             coder,
             bank.oracle,
             ai,
@@ -472,7 +473,8 @@ export class Group {
           );
 
         const { price, uiPrice, lastUpdatedSlot, provider, deviation } =
-          await this.decodePriceFromOracleAi(
+          await Group.decodePriceFromOracleAi(
+            this,
             coder,
             perpMarket.oracle,
             ai,
@@ -488,7 +490,8 @@ export class Group {
     );
   }
 
-  public async decodePriceFromOracleAi(
+  public static async decodePriceFromOracleAi(
+    group: Group,
     coder: BorshAccountsCoder<string>,
     oracle: PublicKey,
     ai: AccountInfo<Buffer>,
@@ -509,18 +512,18 @@ export class Group {
     ) {
       const stubOracle = coder.decode('stubOracle', ai.data);
       price = new I80F48(stubOracle.price.val);
-      uiPrice = this.toUiPrice(price, baseDecimals);
+      uiPrice = Group.toUiPrice(group, price, baseDecimals);
       lastUpdatedSlot = stubOracle.lastUpdateSlot.toNumber();
       provider = OracleProvider.Stub;
       deviation = stubOracle.deviation;
     } else if (isPythOracle(ai)) {
       const priceData = parsePythOracle(ai, client.program.provider.connection);
       uiPrice = priceData.price;
-      price = this.toNativePrice(uiPrice, baseDecimals);
+      price = Group.toNativePrice(group, uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
       deviation =
         priceData.uiDeviation !== undefined
-          ? this.toNativePrice(priceData.uiDeviation, baseDecimals)
+          ? Group.toNativePrice(group, priceData.uiDeviation, baseDecimals)
           : undefined;
       provider = priceData.provider;
     } else if (isSwitchboardOracle(ai)) {
@@ -530,9 +533,13 @@ export class Group {
         client.program.provider.connection,
       );
       uiPrice = priceData.price;
-      price = this.toNativePrice(uiPrice, baseDecimals);
+      price = Group.toNativePrice(group, uiPrice, baseDecimals);
       lastUpdatedSlot = priceData.lastUpdatedSlot;
-      deviation = this.toNativePrice(priceData.uiDeviation, baseDecimals);
+      deviation = Group.toNativePrice(
+        group,
+        priceData.uiDeviation,
+        baseDecimals,
+      );
       provider = priceData.provider;
     } else {
       throw new Error(
@@ -780,16 +787,24 @@ export class Group {
     }
   }
 
-  public toUiPrice(price: I80F48 | number, baseDecimals: number): number {
-    return toUiDecimals(price, this.getInsuranceMintDecimals() - baseDecimals);
+  public static toUiPrice(
+    group: Group,
+    price: I80F48 | number,
+    baseDecimals: number,
+  ): number {
+    return toUiDecimals(price, group.getInsuranceMintDecimals() - baseDecimals);
   }
 
-  public toNativePrice(uiPrice: number, baseDecimals: number): I80F48 {
+  public static toNativePrice(
+    group: Group,
+    uiPrice: number,
+    baseDecimals: number,
+  ): I80F48 {
     return toNativeI80F48(
       uiPrice,
       // note: our oracles are quoted in USD and our insurance mint is USD
       // please update when these assumptions change
-      this.getInsuranceMintDecimals() - baseDecimals,
+      group.getInsuranceMintDecimals() - baseDecimals,
     );
   }
 

@@ -4,6 +4,10 @@ import {
   tierSwitchboardSettings,
   tierToSwitchboardJobSwapValue,
 } from '@blockworks-foundation/mango-v4-settings/lib/helpers/listingTools';
+import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import * as toml from '@iarna/toml';
+import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import {
   Cluster,
   Commitment,
@@ -11,34 +15,30 @@ import {
   Keypair,
   PublicKey,
 } from '@solana/web3.js';
-import fs from 'fs';
-import * as toml from '@iarna/toml';
-import { option, publicKey, struct, u64, u8 } from '@raydium-io/raydium-sdk';
 import { decodeString } from '@switchboard-xyz/common';
 import {
   asV0Tx,
   CrossbarClient,
+  ON_DEMAND_MAINNET_PID,
   OracleJob,
   PullFeed,
   Queue,
-  SB_ON_DEMAND_PID,
 } from '@switchboard-xyz/on-demand';
+import fs from 'fs';
 import {
   Program as Anchor30Program,
   AnchorProvider,
   Wallet,
 } from 'switchboard-anchor';
-import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
-import { SequenceType } from '@blockworks-foundation/mangolana/lib/globalTypes';
 import { createComputeBudgetIx } from '../src/utils/rpc';
 import {
   LSTExactIn,
   LSTExactOut,
+  solInTokenOutReversedSolPool,
+  solInTokenOutSolPool,
   tokenInSolOutReversedSolPool,
   tokenInSolOutSolPool,
   tokenInUsdcOutUsdcPool,
-  solInTokenOutReversedSolPool,
-  solInTokenOutSolPool,
   usdcInTokenOutUsdcPool,
 } from './switchboardTemplates';
 
@@ -234,7 +234,10 @@ const getLstStakePool = async (
 };
 
 async function setupSwitchboard(userProvider: AnchorProvider) {
-  const idl = await Anchor30Program.fetchIdl(SB_ON_DEMAND_PID, userProvider);
+  const idl = await Anchor30Program.fetchIdl(
+    ON_DEMAND_MAINNET_PID,
+    userProvider,
+  );
   const sbOnDemandProgram = new Anchor30Program(idl!, userProvider);
   let queue = new PublicKey('A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w');
   if (CLUSTER == 'devnet') {
