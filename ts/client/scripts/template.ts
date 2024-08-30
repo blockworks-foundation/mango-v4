@@ -7,6 +7,10 @@ async function main(): Promise<void> {
     new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX'),
   );
 
+  await Array.from(group.perpMarketsMapByName.values())
+    .filter((item) => item.name == 'SOL-PERP')[0]
+    .loadBids(client);
+
   const allOracles = Array.from(group.banksMapByName.values())
     .flat()
     .map((b) => [b.name, b.oracle])
