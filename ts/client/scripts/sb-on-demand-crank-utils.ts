@@ -1,13 +1,16 @@
 import { PublicKey } from '@solana/web3.js';
+import { TokenIndex } from '../src/accounts/bank';
 import { Group } from '../src/accounts/group';
+import { PerpMarketIndex } from '../src/accounts/perp';
 import { ZERO_I80F48 } from '../src/numbers/I80F48';
 
 export interface OraclesFromMangoGroupInterface {
   oraclePk: PublicKey;
   name: string;
   fallbackForOracle: PublicKey | undefined;
-  tokenIndex: number | undefined; // todo remove
-  perpMarketIndex: number | undefined;
+  tokenIndex: TokenIndex | undefined; // todo remove
+  perpMarketIndex: PerpMarketIndex | undefined;
+  isOracleStaleOrUnconfident: boolean;
   // todo: add tier when program mango-v4 24.3 is released
 }
 
@@ -37,6 +40,7 @@ export function getOraclesForMangoGroup(
         fallbackForOracle: undefined,
         tokenIndex: b[0].tokenIndex,
         perpMarketIndex: undefined,
+        isOracleStaleOrUnconfident: false,
       };
     });
 
@@ -50,6 +54,7 @@ export function getOraclesForMangoGroup(
       fallbackForOracle: undefined,
       tokenIndex: undefined,
       perpMarketIndex: pM.perpMarketIndex,
+      isOracleStaleOrUnconfident: false,
     };
   });
 
@@ -72,6 +77,7 @@ export function getOraclesForMangoGroup(
         fallbackForOracle: b[0].oracle,
         tokenIndex: b[0].tokenIndex,
         perpMarketIndex: undefined,
+        isOracleStaleOrUnconfident: false,
       };
     })
     .filter((item) => !item.oraclePk.equals(PublicKey.default));

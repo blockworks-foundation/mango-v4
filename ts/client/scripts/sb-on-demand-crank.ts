@@ -9,10 +9,10 @@ import {
 } from '@solana/web3.js';
 import {
   CrossbarClient,
+  ON_DEMAND_MAINNET_PID,
   PullFeed,
   Queue,
   RecentSlotHashes,
-  SB_ON_DEMAND_PID,
 } from '@switchboard-xyz/on-demand';
 import fs from 'fs';
 import chunk from 'lodash/chunk';
@@ -472,7 +472,7 @@ async function prepareCandidateOracles(
     .map((o, i) => {
       return { oracle: o, ai: ais[i] };
     })
-    .filter((item) => item.ai?.owner.equals(SB_ON_DEMAND_PID));
+    .filter((item) => item.ai?.owner.equals(ON_DEMAND_MAINNET_PID));
 
   // parse account info data
   const parsedOracles = sbodOracles.map((item) => {
@@ -526,6 +526,7 @@ function extendOraclesManually(
         fallbackForOracle: undefined,
         tokenIndex: undefined,
         perpMarketIndex: undefined,
+        isOracleStaleOrUnconfident: false,
       },
     ];
   }
@@ -545,6 +546,7 @@ function extendOraclesManually(
       fallbackForOracle: undefined,
       tokenIndex: undefined,
       perpMarketIndex: undefined,
+      isOracleStaleOrUnconfident: false,
     };
   });
 }
@@ -589,7 +591,7 @@ async function setupSwitchboard(client: MangoClient): Promise<{
   queue: PublicKey;
 }> {
   const idl = await Anchor30Program.fetchIdl(
-    SB_ON_DEMAND_PID,
+    ON_DEMAND_MAINNET_PID,
     client.program.provider,
   );
   const sbOnDemandProgram = new Anchor30Program(idl!, client.program.provider);
