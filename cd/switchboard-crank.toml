@@ -11,3 +11,6 @@ kill_timeout = 5
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+[[restart]]
+  policy = "always"

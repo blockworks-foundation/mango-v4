@@ -7,3 +7,6 @@ kill_timeout = 30
 
 [experimental]
   cmd = ["service-mango-health", "health-config.toml"]
+
+[[restart]]
+  policy = "always"
