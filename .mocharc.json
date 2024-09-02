@@ -1,8 +1,12 @@
 {
+  "require": "ts-node/register",
   "extensions": ["ts"],
   "spec": ["ts/client/src/**/*.spec.*"],
   "node-option": [
     "experimental-specifier-resolution=node",
     "loader=ts-node/esm"
-  ]
+  ],
+  "compilerOptions": {
+    "strict": false
+  }
 }

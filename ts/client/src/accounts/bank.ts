@@ -7,6 +7,10 @@ import { OracleProvider, isOracleStaleOrUnconfident } from './oracle';
 
 export type TokenIndex = number & As<'token-index'>;
 
+export function createTokenIndex(value: number): TokenIndex {
+  return value as unknown as TokenIndex;
+}
+
 export type OracleConfigDto = {
   confFilter: I80F48Dto;
   maxStalenessSlots: BN;
@@ -19,14 +23,14 @@ export type OracleConfig = {
 
 export type StablePriceModel = {
   stablePrice: number;
-  lastUpdateTimestamp: BN;
-  delayPrices: number[];
-  delayAccumulatorPrice: number;
-  delayAccumulatorTime: number;
-  delayIntervalSeconds: number;
-  delayGrowthLimit: number;
-  stableGrowthLimit: number;
-  lastDelayIntervalIndex: number;
+  lastUpdateTimestamp?: BN;
+  delayPrices?: number[];
+  delayAccumulatorPrice?: number;
+  delayAccumulatorTime?: number;
+  delayIntervalSeconds?: number;
+  delayGrowthLimit?: number;
+  stableGrowthLimit?: number;
+  lastDelayIntervalIndex?: number;
 };
 
 export interface BankForHealth {
@@ -42,7 +46,7 @@ export interface BankForHealth {
   scaledInitLiabWeight(price: I80F48): I80F48;
   nativeDeposits(): I80F48;
   nativeBorrows(): I80F48;
-  maintWeights(): [I80F48, I80F48];
+  maintWeights(): I80F48[];
 
   depositWeightScaleStartQuote: number;
   borrowWeightScaleStartQuote: number;

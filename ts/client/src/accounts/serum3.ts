@@ -11,6 +11,10 @@ import { Group } from './group';
 
 export type MarketIndex = number & As<'market-index'>;
 
+export function createMarketIndex(value: number): MarketIndex {
+  return value as unknown as MarketIndex;
+}
+
 export class Serum3Market {
   public name: string;
   static from(

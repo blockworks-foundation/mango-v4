@@ -5,12 +5,17 @@ import range from 'lodash/range';
 
 import { PublicKey } from '@solana/web3.js';
 import { I80F48, ONE_I80F48, ZERO_I80F48 } from '../numbers/I80F48';
-import { BankForHealth, StablePriceModel, TokenIndex } from './bank';
+import { deepClone } from '../utils';
+import {
+  BankForHealth,
+  createTokenIndex,
+  StablePriceModel,
+  TokenIndex,
+} from './bank';
 import { HealthCache, PerpInfo, Serum3Info, TokenInfo } from './healthCache';
 import { HealthType, PerpPosition, Serum3Orders } from './mangoAccount';
 import { PerpMarket, PerpOrderSide } from './perp';
-import { MarketIndex } from './serum3';
-import { deepClone } from '../utils';
+import { createMarketIndex } from './serum3';
 
 function mockBankAndOracle(
   tokenIndex: TokenIndex,
@@ -115,9 +120,9 @@ describe('Health Cache', () => {
     const si1 = Serum3Info.fromOoModifyingTokenInfos(
       new Serum3Orders(
         PublicKey.default,
-        2 as MarketIndex,
-        4 as TokenIndex,
-        0 as TokenIndex,
+        createMarketIndex(2),
+        createTokenIndex(4),
+        createTokenIndex(0),
         0,
         0,
       ),
@@ -125,14 +130,15 @@ describe('Health Cache', () => {
       ti2,
       0,
       ti1,
-      2 as MarketIndex,
+      createMarketIndex(2),
       {
         quoteTokenTotal: new BN(21),
         baseTokenTotal: new BN(18),
         quoteTokenFree: new BN(1),
         baseTokenFree: new BN(3),
+        // @ts-ignore: Unreachable code error
         referrerRebatesAccrued: new BN(2),
-      } as any as OpenOrders,
+      } as unknown as OpenOrders,
     );
 
     const pM = mockPerpMarket(9, 0, 0.1, 0.2, 10, targetBank.price.toNumber());
@@ -160,6 +166,7 @@ describe('Health Cache', () => {
       new BN(0),
       ZERO_I80F48(),
     );
+    // @ts-ignore: Unreachable code error
     const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
     const hc = new HealthCache([ti1, ti2], [si1], [pi1]);
@@ -245,9 +252,9 @@ describe('Health Cache', () => {
       const si1 = Serum3Info.fromOoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
-          2 as MarketIndex,
-          4 as TokenIndex,
-          0 as TokenIndex,
+          createMarketIndex(2),
+          createTokenIndex(4),
+          createTokenIndex(0),
           fixture.sa12[0],
           fixture.sa12[1],
         ),
@@ -255,22 +262,23 @@ describe('Health Cache', () => {
         ti2,
         0,
         ti1,
-        2 as MarketIndex,
+        createMarketIndex(2),
         {
           quoteTokenTotal: new BN(fixture.oo12[0]),
           baseTokenTotal: new BN(fixture.oo12[1]),
           quoteTokenFree: new BN(0),
           baseTokenFree: new BN(0),
+          // @ts-ignore: Unreachable code error
           referrerRebatesAccrued: new BN(0),
-        } as any as OpenOrders,
+        } as unknown as OpenOrders,
       );
 
       const si2 = Serum3Info.fromOoModifyingTokenInfos(
         new Serum3Orders(
           PublicKey.default,
-          3 as MarketIndex,
-          5 as TokenIndex,
-          0 as TokenIndex,
+          createMarketIndex(3),
+          createTokenIndex(5),
+          createTokenIndex(0),
           fixture.sa13[0],
           fixture.sa13[1],
         ),
@@ -278,14 +286,15 @@ describe('Health Cache', () => {
         ti3,
         0,
         ti1,
-        3 as MarketIndex,
+        createMarketIndex(3),
         {
           quoteTokenTotal: new BN(fixture.oo13[0]),
           baseTokenTotal: new BN(fixture.oo13[1]),
           quoteTokenFree: new BN(0),
           baseTokenFree: new BN(0),
+          // @ts-ignore: Unreachable code error
           referrerRebatesAccrued: new BN(0),
-        } as any as OpenOrders,
+        } as unknown as OpenOrders,
       );
 
       const pM = mockPerpMarket(9, 0, 0.1, 0.2, 10, bank2.price.toNumber());
@@ -313,6 +322,7 @@ describe('Health Cache', () => {
         new BN(0),
         ZERO_I80F48(),
       );
+      // @ts-ignore: Unreachable code error
       const pi1 = PerpInfo.fromPerpPosition(pM, pp);
 
       const hc = new HealthCache([ti1, ti2, ti3], [si1, si2], [pi1]);
@@ -970,7 +980,7 @@ describe('Health Cache', () => {
             ZERO_I80F48(),
             1,
             0,
-            0 as MarketIndex,
+            createMarketIndex(0),
           ),
         ];
 
@@ -1144,6 +1154,7 @@ describe('Health Cache', () => {
         TokenInfo.fromBank(b1, I80F48.fromNumber(0)),
       ],
       [],
+      // @ts-ignore: Unreachable code error
       [PerpInfo.emptyFromPerpMarket(p0)],
     );
 
@@ -1152,6 +1163,7 @@ describe('Health Cache', () => {
     expect(
       hc
         .getMaxPerpForHealthRatio(
+          // @ts-ignore: Unreachable code error
           p0,
           I80F48.fromNumber(2),
           PerpOrderSide.bid,
@@ -1275,6 +1287,7 @@ describe('Health Cache', () => {
         TokenInfo.fromBank(b2, I80F48.fromNumber(0)),
       ],
       [],
+      // @ts-ignore: Unreachable code error
       [PerpInfo.emptyFromPerpMarket(p0)],
     );
     const clonedHc: HealthCache = deepClone(hc);
