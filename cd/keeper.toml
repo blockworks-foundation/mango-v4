@@ -8,3 +8,6 @@ kill_timeout = 30
 [metrics]
   port = 9091
   path = "/metrics"
+
+[[restart]]
+  policy = "always"

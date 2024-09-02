@@ -4,3 +4,6 @@ kill_timeout = 30
 
 [build]
   dockerfile = "../ts/client/scripts/mm/Dockerfile.mm"
+
+[[restart]]
+  policy = "always"
