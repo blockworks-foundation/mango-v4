@@ -1,5 +1,5 @@
 # Important Notice
-Please **DO NOT** create a GitHub issue to report a security problem. Instead, please send an email to hello@blockworks.foundation with a detailed description of the attack vector and security risk you have identified.
+Please **DO NOT** create a GitHub issue to report a security problem. Instead, please send an email to security@mango.markets with a detailed description of the attack vector and security risk you have identified.
 
 # Bug Bounty Overview
 Mango Markets offers bug bounties for Mango Markets' on-chain program code; UI only bugs are omitted.
@@ -14,7 +14,7 @@ The severity guidelines are based on [Immunefi's classification system](https://
 Note that these are simply guidelines for the severity of the bugs. Each bug bounty submission will be evaluated on a case-by-case basis.
 
 ## Submission
-Please email hello@blockworks.foundation with a detailed description of the attack vector. For critical and moderate bugs, we require a proof of concept done on a privately deployed mainnet contract. We will reach out in 1 business day with additional questions or next steps on the bug bounty.
+Please email security@mango.markets with a detailed description of the attack vector. For critical and moderate bugs, we require a proof of concept done on a privately deployed mainnet contract. We will reach out in 1 business day with additional questions or next steps on the bug bounty.
 
 ## Bug Bounty Payment
 Bug bounties will be paid in USDC or locked MNGO, after a DAO vote. The Mango DAO has never refused a valid bug bounty so far.
