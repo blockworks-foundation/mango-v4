@@ -46,9 +46,9 @@ async function forceCloseSerum3Market(): Promise<void> {
   );
 
   for (let a of mangoAccounts) {
+    console.log(`mango account ${a.publicKey}`);
     // Cancel all orders and confirm that all have been cancelled
     for (const _ of range(0, 10)) {
-      console.log(a.getSerum3OoAccount(MARKET_INDEX).freeSlotBits.zeroBits());
       const sig = await client.serum3LiqForceCancelOrders(
         group,
         a,
@@ -56,17 +56,27 @@ async function forceCloseSerum3Market(): Promise<void> {
         10,
       );
       console.log(
-        ` serum3LiqForceCancelOrders for ${
-          a.publicKey
-        }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+        ` - serum3LiqForceCancelOrders https://explorer.solana.com/tx/${sig.signature}?cluster=${
           CLUSTER == 'devnet' ? 'devnet' : ''
         }`,
       );
+
       a = await a.reload(client);
       if (a.getSerum3OoAccount(MARKET_INDEX).freeSlotBits.zeroBits() === 0) {
         break;
       }
     }
+
+    const sig2 = await client.serum3CloseOpenOrders(
+      group,
+      a,
+      serum3Market.serumMarketExternal,
+    );
+    console.log(
+      ` - serum3CloseOpenOrders https://explorer.solana.com/tx/${sig2.signature}?cluster=${
+        CLUSTER == 'devnet' ? 'devnet' : ''
+      }`,
+    );
   }
 }
 

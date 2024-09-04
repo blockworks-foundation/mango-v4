@@ -65,43 +65,26 @@ async function forceWithdrawTokens(): Promise<void> {
 
   for (const mangoAccount of mangoAccounts) {
     console.log(
-      `${mangoAccount.getTokenBalanceUi(forceWithdrawBank)} for ${
-        mangoAccount.publicKey
-      }`,
+      `${mangoAccount.publicKey} ${forceWithdrawBank.name} balance ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)}`,
     );
-
-    try {
-      const sig = await client.serum3LiqForceCancelOrders(
-        group,
-        mangoAccount,
-        serum3Market.serumMarketExternal,
-      );
-      console.log(
-        ` serum3LiqForceCancelOrders for ${mangoAccount.publicKey}, owner ${
-          mangoAccount.owner
-        }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
-          CLUSTER == 'devnet' ? 'devnet' : ''
-        }`,
-      );
-    } catch (error) {
-      console.log(error);
-    }
 
     await client
       .tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX)
       .then((sig) => {
         console.log(
-          ` tokenForceWithdraw for ${mangoAccount.publicKey}, owner ${
-            mangoAccount.owner
-          }, sig https://explorer.solana.com/tx/${sig.signature}?cluster=${
+          ` - tokenForceWithdraw https://explorer.solana.com/tx/${sig.signature}?cluster=${
             CLUSTER == 'devnet' ? 'devnet' : ''
           }`,
         );
       });
   }
 
-  await group.reloadAll(client);
-  console.log(forceWithdrawBank.uiDeposits());
+  const groupFresh = await client.getGroup(new PublicKey(GROUP_PK));
+  const forceWithdrawBankFresh =
+    groupFresh.getFirstBankByTokenIndex(TOKEN_INDEX);
+  console.log(
+    `Final ${forceWithdrawBankFresh.name} deposits ${forceWithdrawBankFresh.uiDeposits()}`,
+  );
 }
 
 forceWithdrawTokens();

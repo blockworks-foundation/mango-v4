@@ -2,14 +2,10 @@ import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
 import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
 import fs from 'fs';
 import { TokenIndex } from '../src/accounts/bank';
+import { HealthType } from '../src/accounts/mangoAccount';
 import { MangoClient } from '../src/client';
 import { MANGO_V4_ID } from '../src/constants';
-import {
-  fetchJupiterTransaction,
-  fetchRoutes,
-  prepareMangoRouterInstructions,
-} from '../src/router';
-import { toNative, toUiDecimals } from '../src/utils';
+import { ONE_I80F48 } from '../src/numbers/I80F48';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -56,96 +52,62 @@ async function forceCloseTokenBorrows(): Promise<void> {
     );
   }
 
-  const usdcBank = group.getFirstBankByTokenIndex(0 as TokenIndex);
-  // Get all mango accounts with borrows for given token
   const mangoAccountsWithBorrows = (
     await client.getAllMangoAccounts(group)
   ).filter((a) => a.getTokenBalanceUi(forceCloseTokenBank) < 0);
+
+  if (
+    forceCloseTokenBank.uiBorrows() >=
+    liqor.getTokenBalanceUi(forceCloseTokenBank)
+  ) {
+    throw new Error(
+      `Ensure that liqor has enough deposits to cover borrows! forceCloseTokenBank.uiBorrows() ${forceCloseTokenBank.uiBorrows()}, liqor.getTokenBalanceUi(forceCloseTokenBank) ${liqor.getTokenBalanceUi(forceCloseTokenBank)}`,
+    );
+  }
 
   console.log(`${liqor.toString(group, true)}`);
 
   for (const liqee of mangoAccountsWithBorrows) {
     liqor = await liqor.reload(client);
-    // Liqor can only liquidate borrow using deposits, since borrows are in reduce only
-    // Swap usdc worth token borrow (sub existing position), account for slippage using liquidation fee
-    // MAX_LIAB_TRANSFER guards against trying to swap to a very large amount
-    const amount =
-      Math.min(
-        liqee.getTokenBorrowsUi(forceCloseTokenBank) -
-          liqor.getTokenBalanceUi(forceCloseTokenBank),
-        MAX_LIAB_TRANSFER,
-      ) *
-      forceCloseTokenBank.uiPrice *
-      (1 + forceCloseTokenBank.liquidationFee.toNumber());
 
-    console.log(
-      `liqor balance ${liqor.getTokenBalanceUi(
-        forceCloseTokenBank,
-      )}, liqee balance ${liqee.getTokenBalanceUi(
-        forceCloseTokenBank,
-      )}, liqor will swap further amount of $${toUiDecimals(
-        amount,
-        usdcBank.mintDecimals,
-      )} to ${forceCloseTokenBank.name}`,
-    );
+    const sortedByContribution = liqee
+      .getHealthContributionPerAssetUi(group, HealthType.init)
+      .filter((a) => {
+        const potentialAssetBank = group.getFirstBankByName(a.asset);
 
-    const amountBn = toNative(
-      Math.min(amount, 99999999999), // Jupiter API can't handle amounts larger than 99999999999
-      usdcBank.mintDecimals,
-    );
-    const { bestRoute } = await fetchRoutes(
-      usdcBank.mint,
-      forceCloseTokenBank.mint,
-      amountBn.toString(),
-      forceCloseTokenBank.liquidationFee.toNumber() * 100,
-      'ExactIn',
-      '0',
-      liqor.owner,
-    );
-    if (!bestRoute) {
-      await new Promise((r) => setTimeout(r, 500));
-      continue;
-    }
-    const [ixs, alts] =
-      bestRoute.routerName === 'Mango'
-        ? await prepareMangoRouterInstructions(
-            bestRoute,
-            usdcBank.mint,
-            forceCloseTokenBank.mint,
-            user.publicKey,
-          )
-        : await fetchJupiterTransaction(
-            client.connection,
-            bestRoute,
-            user.publicKey,
-            0,
-            usdcBank.mint,
-            forceCloseTokenBank.mint,
+        const feeFactorTotal = ONE_I80F48()
+          .add(forceCloseTokenBank.liquidationFee)
+          .add(forceCloseTokenBank.platformLiquidationFee)
+          .mul(
+            ONE_I80F48()
+              .add(potentialAssetBank.liquidationFee)
+              .add(potentialAssetBank.platformLiquidationFee),
           );
-    const sig = await client.marginTrade({
-      group: group,
-      mangoAccount: liqor,
-      inputMintPk: usdcBank.mint,
-      amountIn: amount,
-      outputMintPk: forceCloseTokenBank.mint,
-      userDefinedInstructions: ixs,
-      userDefinedAlts: alts,
-      flashLoanType: { swap: {} },
-      sequenceCheck: false,
-    });
+
+        return (
+          potentialAssetBank.reduceOnly != 2 &&
+          forceCloseTokenBank.initLiabWeight.gte(
+            potentialAssetBank.initLiabWeight.mul(feeFactorTotal),
+          )
+        );
+      })
+      .sort((a, b) => {
+        return a.contribution - b.contribution;
+      });
+    const assetBank = group.getFirstBankByName(sortedByContribution[0].asset);
+
     console.log(
-      ` - marginTrade, sig https://explorer.solana.com/tx/${sig}?cluster=${
-        CLUSTER == 'devnet' ? 'devnet' : ''
-      }`,
+      `${liqee.publicKey.toString()}, balance ${liqee.getTokenBalanceUi(forceCloseTokenBank)}, asset ${assetBank.name}, contribution ${sortedByContribution[0].contribution}`,
     );
 
-    await client.tokenForceCloseBorrowsWithToken(
+    const sig = await client.tokenForceCloseBorrowsWithToken(
       group,
       liqor,
       liqee,
-      usdcBank.tokenIndex,
+      assetBank.tokenIndex,
       forceCloseTokenBank.tokenIndex,
     );
+    console.log(` - sig ${sig.signature}`);
   }
 }
 

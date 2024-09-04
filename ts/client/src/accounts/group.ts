@@ -598,6 +598,12 @@ export class Group {
     return banks[0];
   }
 
+  public getFirstBankByName(name: string): Bank {
+    const banks = this.banksMapByName.get(name);
+    if (!banks) throw new Error(`No bank found for name ${name}!`);
+    return banks[0];
+  }
+
   public getFirstBankByOracle(oraclePk: PublicKey): Bank {
     const banks = this.banksMapByOracle.get(oraclePk.toString());
     if (!banks) throw new Error(`No bank found for oracle ${oraclePk}!`);
