@@ -1,6 +1,6 @@
 ## Disclaimer
 
-The following open source code contains an an example that documents possible interaction with the smart contract for the purpose of performing liquidations. Please note that the use of this code is at your own risk and responsibility.
+The following open source code contains an example that documents possible interaction with the smart contract for the purpose of performing liquidations. Please note that the use of this code is at your own risk and responsibility.
 
 1. No Warranty: The code is provided "as is," without any warranty or guarantee of any kind, express or implied. The developers and contributors of this code do not make any representations or warranties regarding its accuracy, reliability, or functionality. The use of this code is solely at your own risk.
 

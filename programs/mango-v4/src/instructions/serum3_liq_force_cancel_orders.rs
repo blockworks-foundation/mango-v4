@@ -54,7 +54,7 @@ pub fn serum3_liq_force_cancel_orders(
     let (now_ts, now_slot) = clock_now();
 
     //
-    // Early return if if liquidation is not allowed or if market is not in force close
+    // Early return if liquidation is not allowed or if market is not in force close
     //
     let mut health_cache = {
         let mut account = ctx.accounts.account.load_full_mut()?;
