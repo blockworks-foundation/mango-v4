@@ -1059,7 +1059,7 @@ export class MangoAccount {
     client: MangoClient,
     group: Group,
   ): Promise<MangoSignatureStatus[]> {
-    // Future: collect ixs, batch them, and send them in in fewer txs
+    // Future: collect ixs, batch them, and send them in fewer txs
     return await Promise.all(
       this.serum3Active().map((s) => {
         const serum3Market = group.getSerum3MarketByMarketIndex(s.marketIndex);
