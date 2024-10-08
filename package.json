@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@blockworks-foundation/mango-v4-settings": "0.14.24",
-    "@blockworks-foundation/mangolana": "0.1.0",
+    "@blockworks-foundation/mangolana": "0.1.2",
     "@coral-xyz/anchor": "^0.29.0",
     "@eslint/eslintrc": "^3.1.0",
     "@eslint/js": "^9.8.0",
