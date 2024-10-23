@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
 import fs from 'fs';
 import * as path from 'path';
 import { parse } from 'csv-parse';
@@ -12,6 +12,7 @@ const MANGO_MAINNET_GROUP = new PublicKey(
 
 type Reimbursement = {
   mango_account: string;
+  owner: string;
   mangoSOL: number;
   MOTHER: number;
   SOL: number;
@@ -33,28 +34,12 @@ const setupWallet = () => {
   return user;
 };
 
-const ownerOfMangoAccount = async (mangoAccount: string) => {
-  try {
-    const respWrapped = await fetch(
-      `https://api.mngo.cloud/data/v4/user-data/profile-search?search-string=${mangoAccount}&search-method=mango-account`,
-    );
-    const resp = await respWrapped.json();
-    const accountOwner = resp?.length > 0 ? resp[0].wallet_pk : null;
-    if (accountOwner === null) {
-      throw 'not found';
-    }
-    return accountOwner as string;
-  } catch (e) {
-    console.log(e);
-    console.log('cant find mangoAccount:', mangoAccount);
-  }
-};
-
 const readCsv = async () => {
   const csvFilePath = path.resolve(__dirname, 'reimbursement.csv');
 
   const headers = [
     'mango_account',
+    'owner',
     'mangoSOL',
     'MOTHER',
     'SOL',
@@ -101,13 +86,8 @@ const mints = {
 
 const main = async () => {
   const user = await setupWallet();
-  const mainConnection = new Connection('http://fcs-da1._peer.internal:18899/');
-  const backupConnections = [
-    new Connection(
-      'https://staked.helius-rpc.com?api-key=c367d0d9-acf2-437d-9ef3-72304f1a4117',
-    ),
-    new Connection('https://rpc.mngo.cloud/adr9quiemae0'),
-  ];
+  const mainConnection = new Connection('');
+  const backupConnections = [new Connection(''), new Connection('')];
   const options = AnchorProvider.defaultOptions();
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(mainConnection, userWallet, options);
@@ -128,17 +108,19 @@ const main = async () => {
   const csvData = await readCsv();
 
   const TO_PROCESS = csvData;
-  const TOKEN = 'MOTHER';
+  const TOKEN = 'SOL';
 
   const notReimbursedMangoAccounts: string[] = [];
   for (const row of TO_PROCESS) {
     const mangoAccountPk = tryGetPubKey(row.mango_account);
 
     if (mangoAccountPk) {
+      const mint = mints[TOKEN as keyof typeof mints];
+      const amount = Number(row[TOKEN as keyof typeof mints]);
       try {
-        const mint = mints[TOKEN as keyof typeof mints];
-        const amount = Number(row[TOKEN as keyof typeof mints]);
         if (mint && amount > 0) {
+          const decimals = group.getMintDecimals(mint);
+          const nativeAmount = toNative(amount, decimals);
           const mangoAccount = await client.getMangoAccount(mangoAccountPk);
           console.log('Mango Account exists');
           console.log(
@@ -147,9 +129,6 @@ const main = async () => {
             }`,
           );
           try {
-            const decimals = group.getMintDecimals(mint);
-            const nativeAmount = toNative(amount, decimals);
-
             const signature = await client.tokenDepositNative(
               group,
               mangoAccount,
@@ -168,7 +147,12 @@ const main = async () => {
             if (!signature.err) {
               console.log('OK');
             } else {
-              notReimbursedMangoAccounts.push(row.mango_account);
+              const ix = SystemProgram.transfer({
+                fromPubkey: userWallet.publicKey,
+                toPubkey: new PublicKey(row.owner),
+                lamports: toNative(amount, 9).toNumber(),
+              });
+              await client.sendAndConfirmTransactionForGroup(group, [ix]);
             }
           } catch (e) {
             console.log(e);
@@ -177,13 +161,12 @@ const main = async () => {
         }
       } catch (e) {
         console.log('Mango account not exists', e);
-        const wallet = await ownerOfMangoAccount(row.mango_account);
-        if (!wallet) {
-          notReimbursedMangoAccounts.push(row.mango_account);
-        } else {
-          notReimbursedMangoAccounts.push(row.mango_account);
-          console.log('Mango Account: ', row.mango_account, 'Owner: ', wallet);
-        }
+        const ix = SystemProgram.transfer({
+          fromPubkey: userWallet.publicKey,
+          toPubkey: new PublicKey(row.owner),
+          lamports: toNative(amount, 9).toNumber(),
+        });
+        await client.sendAndConfirmTransactionForGroup(group, [ix]);
       }
     } else {
       console.log('Invalid PublicKey: ', row.mango_account);
