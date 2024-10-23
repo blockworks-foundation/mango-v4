@@ -3,8 +3,19 @@ import fs from 'fs';
 import * as path from 'path';
 import { parse } from 'csv-parse';
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { MANGO_V4_ID, MangoClient, toNative, USDC_MINT } from '../src';
+import {
+  createComputeBudgetIx,
+  MANGO_V4_ID,
+  MangoClient,
+  toNative,
+  USDC_MINT,
+} from '../src';
 import { WRAPPED_SOL_MINT } from '@project-serum/serum/lib/token-instructions';
+import { sendSignAndConfirmTransactions } from '@blockworks-foundation/mangolana/lib/transactions';
+import {
+  SequenceType,
+  TransactionInstructionWithSigners,
+} from '@blockworks-foundation/mangolana/lib/globalTypes';
 
 const MANGO_MAINNET_GROUP = new PublicKey(
   '78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX',
@@ -83,11 +94,12 @@ const mints = {
   SOL: WRAPPED_SOL_MINT,
   USDC: USDC_MINT,
 };
+const backups = [new Connection(''), new Connection('')];
 
 const main = async () => {
   const user = await setupWallet();
   const mainConnection = new Connection('');
-  const backupConnections = [new Connection(''), new Connection('')];
+  const backupConnections = backups;
   const options = AnchorProvider.defaultOptions();
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(mainConnection, userWallet, options);
@@ -118,7 +130,7 @@ const main = async () => {
       const mint = mints[TOKEN as keyof typeof mints];
       const amount = Number(row[TOKEN as keyof typeof mints]);
       try {
-        if (mint && amount > 0) {
+        if (mint && amount > 0.0001) {
           const decimals = group.getMintDecimals(mint);
           const nativeAmount = toNative(amount, decimals);
           const mangoAccount = await client.getMangoAccount(mangoAccountPk);
@@ -152,7 +164,27 @@ const main = async () => {
                 toPubkey: new PublicKey(row.owner),
                 lamports: toNative(amount, 9).toNumber(),
               });
-              await client.sendAndConfirmTransactionForGroup(group, [ix]);
+              await sendSignAndConfirmTransactions({
+                connection: userProvider.connection,
+                wallet: userWallet,
+                transactionInstructions: [
+                  {
+                    instructionsSet: [
+                      new TransactionInstructionWithSigners(
+                        createComputeBudgetIx(200000),
+                      ),
+                      new TransactionInstructionWithSigners(ix),
+                    ],
+                    sequenceType: SequenceType.Sequential,
+                  },
+                ],
+                backupConnections: [...backups],
+                config: {
+                  maxTxesInBatch: 2,
+                  autoRetry: true,
+                  logFlowInfo: true,
+                },
+              });
             }
           } catch (e) {
             console.log(e);
@@ -166,7 +198,27 @@ const main = async () => {
           toPubkey: new PublicKey(row.owner),
           lamports: toNative(amount, 9).toNumber(),
         });
-        await client.sendAndConfirmTransactionForGroup(group, [ix]);
+        await sendSignAndConfirmTransactions({
+          connection: userProvider.connection,
+          wallet: userWallet,
+          transactionInstructions: [
+            {
+              instructionsSet: [
+                new TransactionInstructionWithSigners(
+                  createComputeBudgetIx(200000),
+                ),
+                new TransactionInstructionWithSigners(ix),
+              ],
+              sequenceType: SequenceType.Sequential,
+            },
+          ],
+          backupConnections: [...backups],
+          config: {
+            maxTxesInBatch: 2,
+            autoRetry: true,
+            logFlowInfo: true,
+          },
+        });
       }
     } else {
       console.log('Invalid PublicKey: ', row.mango_account);
