@@ -1,14 +1,18 @@
 use anchor_lang::prelude::*;
 
 use crate::accounts_ix::*;
+use crate::error::MangoError;
 use crate::logs::{emit_stack, TokenConditionalSwapCreateLogV3};
 use crate::state::*;
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, unreachable_code)]
 pub fn token_conditional_swap_create(
     ctx: Context<TokenConditionalSwapCreate>,
     token_conditional_swap: TokenConditionalSwap,
 ) -> Result<()> {
+    // disable creation of new TCS
+    return Err(MangoError::IxIsDisabled.into());
+
     let group = ctx.accounts.group.load()?;
 
     let now_ts: u64 = Clock::get()?.unix_timestamp.try_into().unwrap();

@@ -8,12 +8,15 @@ use crate::i80f48::ClampToInt;
 use crate::logs::{emit_stack, TokenBalanceLog, TokenConditionalSwapStartLog};
 use crate::state::*;
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, unreachable_code)]
 pub fn token_conditional_swap_start(
     ctx: Context<TokenConditionalSwapStart>,
     token_conditional_swap_index: usize,
     token_conditional_swap_id: u64,
 ) -> Result<()> {
+    // disable start of new TCS
+    return Err(MangoError::IxIsDisabled.into());
+
     let group_pk = &ctx.accounts.group.key();
     let liqee_key = ctx.accounts.liqee.key();
     let liqor_key = ctx.accounts.liqor.key();
