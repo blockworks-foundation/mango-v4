@@ -434,7 +434,7 @@ export function isOracleStaleOrUnconfident(
   }
   if (debug && deviation) {
     console.log(
-      `- ${debugPrefix?.padStart(30)}: deviation within confidence tolerance ${deviation.mul(I80F48.fromNumber(100)).div(confFilter).toFixed(3)}%`,
+      `- ${debugPrefix?.padStart(30)}: deviation within confidence tolerance ${deviation.div(price).mul(I80F48.fromNumber(100)).toFixed(3)}%`,
     );
   }
 

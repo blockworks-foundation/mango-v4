@@ -42,8 +42,8 @@ export function manageFeeWebSocket(
       });
 
       ws.addEventListener('error', (error) => {
-        console.log('Fee WebSocket error:', error);
-        onMeanCalculated(-1);
+        // console.log('Fee WebSocket error:', error);
+        onMeanCalculated(null);
         ws?.close();
       });
 

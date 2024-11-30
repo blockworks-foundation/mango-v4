@@ -288,6 +288,15 @@ export const createComputeBudgetIx = (
   return computeBudgetIx;
 };
 
+export const createComputeLimitIx = (
+  units: number,
+): TransactionInstruction => {
+  const computeBudgetIx = ComputeBudgetProgram.setComputeUnitLimit({
+    units,
+  });
+  return computeBudgetIx;
+};
+
 export class MangoError extends Error {
   message: string;
   txid: string;

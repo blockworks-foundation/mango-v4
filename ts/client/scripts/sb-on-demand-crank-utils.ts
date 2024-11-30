@@ -7,11 +7,10 @@ import { ZERO_I80F48 } from '../src/numbers/I80F48';
 export interface OraclesFromMangoGroupInterface {
   oraclePk: PublicKey;
   name: string;
+  tier: string;
   fallbackForOracle: PublicKey | undefined;
   tokenIndex: TokenIndex | undefined; // todo remove
   perpMarketIndex: PerpMarketIndex | undefined;
-  isOracleStaleOrUnconfident: boolean;
-  // todo: add tier when program mango-v4 24.3 is released
 }
 
 /**
@@ -37,10 +36,10 @@ export function getOraclesForMangoGroup(
       return {
         oraclePk: b[0].oracle,
         name: b[0].name,
+        tier: b[0].tier,
         fallbackForOracle: undefined,
         tokenIndex: b[0].tokenIndex,
         perpMarketIndex: undefined,
-        isOracleStaleOrUnconfident: false,
       };
     });
 
@@ -51,10 +50,10 @@ export function getOraclesForMangoGroup(
     return {
       oraclePk: pM.oracle,
       name: pM.name,
+      tier: "S",
       fallbackForOracle: undefined,
       tokenIndex: undefined,
       perpMarketIndex: pM.perpMarketIndex,
-      isOracleStaleOrUnconfident: false,
     };
   });
 
@@ -74,10 +73,10 @@ export function getOraclesForMangoGroup(
       return {
         oraclePk: b[0].fallbackOracle,
         name: b[0].name,
+        tier: b[0].tier,
         fallbackForOracle: b[0].oracle,
         tokenIndex: b[0].tokenIndex,
         perpMarketIndex: undefined,
-        isOracleStaleOrUnconfident: false,
       };
     })
     .filter((item) => !item.oraclePk.equals(PublicKey.default));
