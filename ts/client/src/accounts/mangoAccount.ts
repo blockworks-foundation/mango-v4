@@ -311,10 +311,10 @@ export class MangoAccount {
       )) {
         const oo = this.serum3OosMapByMarketIndex.get(serum3Market.marketIndex);
         if (serum3Market.baseTokenIndex == bank.tokenIndex && oo) {
-          bal.add(I80F48.fromI64(oo.baseTokenFree));
+          bal.iadd(I80F48.fromI64(oo.baseTokenFree));
         }
         if (serum3Market.quoteTokenIndex == bank.tokenIndex && oo) {
-          bal.add(I80F48.fromI64(oo.quoteTokenFree));
+          bal.iadd(I80F48.fromI64(oo.quoteTokenFree));
         }
       }
       return bal;
