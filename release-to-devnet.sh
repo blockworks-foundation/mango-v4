@@ -3,7 +3,7 @@
 set -ex pipefail
 
 WALLET_WITH_FUNDS=~/.config/solana/mango-mainnet-1.json
-PROGRAM_ID=4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+PROGRAM_ID=zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25
 
 # build program, 
 anchor build -- --features enable-gpl

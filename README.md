@@ -33,8 +33,8 @@ See DEVELOPING.md and FAQ-DEV.md
 
 ### Deployments
 
-- devnet: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
-- mainnet-beta: 4MangoMjqJ2firMokCjjGgoK8d4MXcrgL7XJaL3w6fVg
+- devnet: zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25
+- mainnet-beta: zF2vSz6V9g1YHGmfrzsY497NJzbRr84QUrPry4bLQ25
 - primary mango group on mainnet-beta: 78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX
 
 ### Release
@@ -45,4 +45,5 @@ Here are steps followed while performing a npm package release
 note: the UI currently uses code directly from github, pointing to the ts-client branch
 
 - use `yarn publish` to release a new package, ensure compatibility with program release to mainnet-beta
-- fix the tag auto added by yarn to match our internal convention, see script `fix-npm-tag.sh`, tags should look like this e.g.`npm-v0.0.1`, note: the npm package version/tag should not necessarily match the latest program deployment
+- fix the tag auto added by yarn to match our internal convention, see script `fix-npm-tag.sh`, tags should look like
+  this e.g.`npm-v0.0.1`, note: the npm package version/tag should not necessarily match the latest program deployment
