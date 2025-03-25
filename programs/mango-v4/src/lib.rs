@@ -1015,6 +1015,12 @@ pub mod mango_v4 {
         Ok(())
     }
 
+    pub fn perp_purge_position(ctx: Context<PerpPurgePosition>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_purge_position(ctx)?;
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn perp_place_order(
         ctx: Context<PerpPlaceOrder>,
@@ -1317,6 +1323,12 @@ pub mod mango_v4 {
     ) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_cancel_all_orders_by_side(ctx, side_option, limit)?;
+        Ok(())
+    }
+
+    pub fn perp_purge_orders(ctx: Context<PerpPurgeOrders>, limit: u8) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_purge_orders(ctx, limit)?;
         Ok(())
     }
 
