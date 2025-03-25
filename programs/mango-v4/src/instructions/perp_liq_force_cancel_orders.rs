@@ -25,7 +25,7 @@ pub fn perp_liq_force_cancel_orders(
     let mut perp_market = ctx.accounts.perp_market.load_mut()?;
 
     //
-    // Early return if if liquidation is not allowed or if market is not in force close
+    // Early return if liquidation is not allowed or if market is not in force close
     //
     let liquidatable = account.check_liquidatable(&health_cache)?;
     let can_force_cancel = !account.fixed.is_operational()
