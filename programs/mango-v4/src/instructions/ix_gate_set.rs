@@ -99,6 +99,8 @@ pub fn ix_gate_set(ctx: Context<IxGateSet>, ix_gate: u128) -> Result<()> {
     log_if_changed(&group, ix_gate, IxGate::SequenceCheck);
     log_if_changed(&group, ix_gate, IxGate::HealthCheck);
     log_if_changed(&group, ix_gate, IxGate::GroupChangeInsuranceFund);
+    log_if_changed(&group, ix_gate, IxGate::PerpForceCloseUnmatched);
+    log_if_changed(&group, ix_gate, IxGate::PerpSettleUnmatched);
 
     group.ix_gate = ix_gate;
 

@@ -1337,10 +1337,23 @@ pub mod mango_v4 {
         instructions::perp_settle_pnl(ctx)?;
         Ok(())
     }
-
+    pub fn perp_settle_unmatched(
+        ctx: Context<PerpSettleUnmatched>,
+        max_settle_amount: u64,
+    ) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_settle_unmatched(ctx, max_settle_amount)?;
+        Ok(())
+    }
     pub fn perp_force_close_position(ctx: Context<PerpForceClosePosition>) -> Result<()> {
         #[cfg(feature = "enable-gpl")]
         instructions::perp_force_close_position(ctx)?;
+        Ok(())
+    }
+
+    pub fn perp_force_close_unmatched(ctx: Context<PerpForceCloseUnmatched>) -> Result<()> {
+        #[cfg(feature = "enable-gpl")]
+        instructions::perp_force_close_unmatched(ctx)?;
         Ok(())
     }
 

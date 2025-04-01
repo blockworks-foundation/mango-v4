@@ -253,7 +253,9 @@ export class MangoClient {
     ].length;
 
     if (uniqueAccountsCount > 64) {
-      throw new Error(`Max accounts limit exceeded`);
+      throw new Error(
+        `Max accounts limit exceeded. Unique accounts: ${uniqueAccountsCount}`,
+      );
     }
 
     return await this.sendAndConfirmTransaction(ixs, {
@@ -678,11 +680,11 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
-  public async tokenForceWithdraw(
+  public async tokenForceWithdrawIxs(
     group: Group,
     mangoAccount: MangoAccount,
     tokenIndex: TokenIndex,
-  ): Promise<MangoSignatureStatus> {
+  ): Promise<TransactionInstruction[]> {
     const bank = group.getFirstBankByTokenIndex(tokenIndex);
     if (!bank.forceWithdraw) {
       throw new Error('Bank is not in force-withdraw mode');
@@ -700,7 +702,7 @@ export class MangoClient {
     const ai = await this.connection.getAccountInfo(ownerAtaTokenAccount);
 
     // ensure withdraws don't fail with missing ATAs
-    if (ai == null) {
+    if (ai === null) {
       preInstructions.push(
         await createAssociatedTokenAccountIdempotentInstruction(
           (this.program.provider as AnchorProvider).wallet.publicKey,
@@ -708,19 +710,8 @@ export class MangoClient {
           bank.mint,
         ),
       );
-
-      // wsol case
-      if (bank.mint.equals(NATIVE_MINT)) {
-        postInstructions.push(
-          createCloseAccountInstruction(
-            ownerAtaTokenAccount,
-            mangoAccount.owner,
-            mangoAccount.owner,
-          ),
-        );
-      }
     } else {
-      const account = await unpackAccount(ownerAtaTokenAccount, ai);
+      const account = unpackAccount(ownerAtaTokenAccount, ai);
       // if owner is not same as mango account's owner on the ATA (for whatever reason)
       // then create another token account
       if (!account.owner.equals(mangoAccount.owner)) {
@@ -733,17 +724,6 @@ export class MangoClient {
           mangoAccount.owner,
           kp,
         );
-
-        // wsol case
-        if (bank.mint.equals(NATIVE_MINT)) {
-          postInstructions.push(
-            createCloseAccountInstruction(
-              alternateOwnerTokenAccount,
-              mangoAccount.owner,
-              mangoAccount.owner,
-            ),
-          );
-        }
       }
     }
 
@@ -763,11 +743,84 @@ export class MangoClient {
           : alternateOwnerTokenAccount,
       })
       .instruction();
-    return await this.sendAndConfirmTransactionForGroup(group, [
-      ...preInstructions,
-      ix,
-      ...postInstructions,
-    ]);
+    return [...preInstructions, ix, ...postInstructions];
+  }
+
+  public async tokenForceWithdraw(
+    group: Group,
+    mangoAccount: MangoAccount,
+    tokenIndex: TokenIndex,
+  ): Promise<MangoSignatureStatus> {
+    const ixs = await this.tokenForceWithdrawIxs(
+      group,
+      mangoAccount,
+      tokenIndex,
+    );
+    return await this.sendAndConfirmTransactionForGroup(group, ixs);
+
+    // const bank = group.getFirstBankByTokenIndex(tokenIndex);
+    // if (!bank.forceWithdraw) {
+    //   throw new Error('Bank is not in force-withdraw mode');
+    // }
+    //
+    // const ownerAtaTokenAccount = await getAssociatedTokenAddress(
+    //   bank.mint,
+    //   mangoAccount.owner,
+    //   true,
+    // );
+    // let alternateOwnerTokenAccount = PublicKey.default;
+    // const preInstructions: TransactionInstruction[] = [];
+    // const postInstructions: TransactionInstruction[] = [];
+    //
+    // const ai = await this.connection.getAccountInfo(ownerAtaTokenAccount);
+    //
+    // // ensure withdraws don't fail with missing ATAs
+    // if (ai === null) {
+    //   preInstructions.push(
+    //     await createAssociatedTokenAccountIdempotentInstruction(
+    //       (this.program.provider as AnchorProvider).wallet.publicKey,
+    //       mangoAccount.owner,
+    //       bank.mint,
+    //     ),
+    //   );
+    // } else {
+    //   const account = unpackAccount(ownerAtaTokenAccount, ai);
+    //   // if owner is not same as mango account's owner on the ATA (for whatever reason)
+    //   // then create another token account
+    //   if (!account.owner.equals(mangoAccount.owner)) {
+    //     const kp = Keypair.generate();
+    //     alternateOwnerTokenAccount = kp.publicKey;
+    //     await createAccount(
+    //       this.connection,
+    //       (this.program.provider as AnchorProvider).wallet as any as Signer,
+    //       bank.mint,
+    //       mangoAccount.owner,
+    //       kp,
+    //     );
+    //   }
+    // }
+    //
+    // const ix = await this.program.methods
+    //   .tokenForceWithdraw()
+    //   .accounts({
+    //     group: group.publicKey,
+    //     account: mangoAccount.publicKey,
+    //     bank: bank.publicKey,
+    //     vault: bank.vault,
+    //     oracle: bank.oracle,
+    //     ownerAtaTokenAccount,
+    //     alternateOwnerTokenAccount: alternateOwnerTokenAccount.equals(
+    //       PublicKey.default,
+    //     )
+    //       ? ownerAtaTokenAccount
+    //       : alternateOwnerTokenAccount,
+    //   })
+    //   .instruction();
+    // return await this.sendAndConfirmTransactionForGroup(group, [
+    //   ...preInstructions,
+    //   ix,
+    //   ...postInstructions,
+    // ]);
   }
 
   public async tokenDeregister(
@@ -2910,6 +2963,55 @@ export class MangoClient {
     return await this.sendAndConfirmTransactionForGroup(group, [ix]);
   }
 
+  public async perpForceCloseUnmatched(
+    group: Group,
+    perpMarketIndex: PerpMarketIndex,
+    account: MangoAccount,
+  ): Promise<MangoSignatureStatus> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const ix = await this.program.methods
+      .perpForceCloseUnmatched()
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        account: account.publicKey,
+        oracle: perpMarket.oracle,
+        dev: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
+  public async perpSettleUnmatched(
+    group: Group,
+    account: MangoAccount,
+    perpMarketIndex: PerpMarketIndex,
+    maxSettleAmount?: number,
+  ): Promise<MangoSignatureStatus> {
+    const perpMarket = group.getPerpMarketByMarketIndex(perpMarketIndex);
+    const settleBank = group.getFirstBankByTokenIndex(
+      perpMarket.settleTokenIndex,
+    );
+
+    const ix = await this.program.methods
+      .perpSettleUnmatched(
+        maxSettleAmount
+          ? toNative(maxSettleAmount, settleBank.mintDecimals)
+          : RUST_U64_MAX(),
+      )
+      .accounts({
+        group: group.publicKey,
+        perpMarket: perpMarket.publicKey,
+        account: account.publicKey,
+        oracle: perpMarket.oracle,
+        settleBank: settleBank.publicKey,
+        settleOracle: settleBank.oracle,
+        dev: (this.program.provider as AnchorProvider).wallet.publicKey,
+      })
+      .instruction();
+    return await this.sendAndConfirmTransactionForGroup(group, [ix]);
+  }
+
   public async perpCloseMarket(
     group: Group,
     perpMarketIndex: PerpMarketIndex,
@@ -4739,6 +4841,7 @@ export class MangoClient {
 
     return ixs;
   }
+
   public async tokenConditionalSwapCreatePremiumAuction(
     group: Group,
     account: MangoAccount,
@@ -5438,6 +5541,7 @@ export class MangoClient {
       transactionInstructions,
     );
   }
+
   public async modifySerum3Order(
     group: Group,
     orderId: BN,

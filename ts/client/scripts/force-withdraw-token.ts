@@ -1,11 +1,14 @@
 import { AnchorProvider, Wallet } from '@coral-xyz/anchor';
-import { Cluster, Connection, Keypair, PublicKey } from '@solana/web3.js';
+import {
+  Cluster,
+  Connection,
+  Keypair,
+  PublicKey,
+  TransactionInstruction,
+} from '@solana/web3.js';
 import fs from 'fs';
-import uniqWith from 'lodash/uniqWith';
-import { TokenIndex } from '../src/accounts/bank';
-import { MangoAccount } from '../src/accounts/mangoAccount';
-import { MangoClient } from '../src/client';
-import { MANGO_V4_ID } from '../src/constants';
+import { MANGO_V4_ID, MangoClient, TokenIndex } from '../src';
+import { NATIVE_MINT } from '@solana/spl-token';
 
 const CLUSTER: Cluster =
   (process.env.CLUSTER_OVERRIDE as Cluster) || 'mainnet-beta';
@@ -29,7 +32,7 @@ async function forceWithdrawTokens(): Promise<void> {
   );
   const userWallet = new Wallet(user);
   const userProvider = new AnchorProvider(connection, userWallet, options);
-  const client = await MangoClient.connect(
+  const client = MangoClient.connect(
     userProvider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
@@ -41,42 +44,61 @@ async function forceWithdrawTokens(): Promise<void> {
   const group = await client.getGroup(new PublicKey(GROUP_PK));
   const forceWithdrawBank = group.getFirstBankByTokenIndex(TOKEN_INDEX);
   console.log(`${forceWithdrawBank.name} bank`);
-  const serum3Market = Array.from(
-    group.serum3MarketsMapByMarketIndex.values(),
-  ).filter((m) => m.baseTokenIndex == TOKEN_INDEX)[0];
 
-  const mangoAccountsWithTp = (await client.getAllMangoAccounts(group)).filter(
-    (a) => a.getToken(forceWithdrawBank.tokenIndex)?.isActive() ?? false,
-  );
-  const mangoAccountsWithInUseCount = (
-    await client.getAllMangoAccounts(group)
-  ).filter((a) => a.getTokenInUseCount(forceWithdrawBank) > 0);
-
-  const mangoAccounts: MangoAccount[] = uniqWith(
-    [...mangoAccountsWithTp, ...mangoAccountsWithInUseCount],
-    function (a, b) {
-      return a.publicKey.equals(b.publicKey);
-    },
-  );
-
-  console.log(
-    `Found ${mangoAccounts.length} mango accounts with in use count > 0 or tp`,
-  );
-
-  for (const mangoAccount of mangoAccounts) {
-    console.log(
-      `${mangoAccount.publicKey} ${forceWithdrawBank.name} balance ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)}`,
+  const allMangoAccounts = await client.getAllMangoAccounts(group);
+  const mangoAccounts = allMangoAccounts
+    .filter((a) => {
+      if (forceWithdrawBank.mint.equals(NATIVE_MINT)) {
+        // WSOL requires many ATA creations so is very expensive. Limit to accounts with >0.005 SOL
+        return a.getTokenDepositsUi(forceWithdrawBank) > 0.005;
+      } else {
+        return a.getTokenDepositsUi(forceWithdrawBank) > 0;
+      }
+    })
+    .sort(
+      (a, b) =>
+        b.getTokenDepositsUi(forceWithdrawBank) -
+        a.getTokenDepositsUi(forceWithdrawBank),
     );
 
-    await client
-      .tokenForceWithdraw(group, mangoAccount, TOKEN_INDEX)
-      .then((sig) => {
-        console.log(
-          ` - tokenForceWithdraw https://explorer.solana.com/tx/${sig.signature}?cluster=${
-            CLUSTER == 'devnet' ? 'devnet' : ''
-          }`,
+  console.log(
+    `Found ${mangoAccounts.length} mango accounts with ${forceWithdrawBank.name} deposits`,
+  );
+
+  const batchedMangoAccounts = batchItems(mangoAccounts, 6);
+  const ixBatches: TransactionInstruction[][] = [];
+  let i = 0;
+  for (const batch of batchedMangoAccounts) {
+    const ixs: TransactionInstruction[] = [];
+    for (const mangoAccount of batch) {
+      console.log(
+        `${mangoAccount.publicKey} ${forceWithdrawBank.name} balance ${mangoAccount.getTokenBalanceUi(forceWithdrawBank)}`,
+      );
+
+      const mangoAccountsIxs = await client.tokenForceWithdrawIxs(
+        group,
+        mangoAccount,
+        forceWithdrawBank.tokenIndex,
+      );
+      ixs.push(...mangoAccountsIxs);
+    }
+    ixBatches.push(ixs);
+    if (i % 5 === 4 || i === batchedMangoAccounts.length - 1) {
+      try {
+        const sigs = await Promise.all(
+          ixBatches.map((ixs) =>
+            client.sendAndConfirmTransactionForGroup(group, ixs),
+          ),
         );
-      });
+        for (const sig of sigs) {
+          console.log(`executed sig - ${sig.signature}`);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      ixBatches.length = 0;
+    }
+    i += 1;
   }
 
   const groupFresh = await client.getGroup(new PublicKey(GROUP_PK));
@@ -85,6 +107,17 @@ async function forceWithdrawTokens(): Promise<void> {
   console.log(
     `Final ${forceWithdrawBankFresh.name} deposits ${forceWithdrawBankFresh.uiDeposits()}`,
   );
+}
+
+function batchItems<T>(items: T[], batchSize: number): T[][] {
+  const batches: T[][] = [];
+
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    batches.push(batch);
+  }
+
+  return batches;
 }
 
 forceWithdrawTokens();

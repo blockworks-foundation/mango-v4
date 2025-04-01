@@ -1,6 +1,6 @@
 [package]
 name = "mango-v4"
-version = "0.24.3"
+version = "0.24.4"
 description = "Created with Anchor"
 edition = "2021"
 

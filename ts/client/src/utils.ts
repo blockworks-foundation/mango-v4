@@ -265,3 +265,7 @@ export const tryStringify = (val: any): string | null => {
     return null;
   }
 };
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -244,6 +244,8 @@ pub enum IxGate {
     SequenceCheck = 73,
     HealthCheck = 74,
     GroupChangeInsuranceFund = 76,
+    PerpForceCloseUnmatched = 77,
+    PerpSettleUnmatched = 78,
     // NOTE: Adding new variants requires matching changes in ts and the ix_gate_set instruction.
 }
 
