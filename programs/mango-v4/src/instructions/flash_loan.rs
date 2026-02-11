@@ -279,6 +279,14 @@ pub fn flash_loan_end<'key, 'accounts, 'remaining, 'info>(
         MangoError::SomeError
     );
 
+    // SECURITY FIX: SwapWithoutFee is caller-selectable with no access control,
+    // making swap fees completely unenforceable. Coerce it to Swap to enforce fees.
+    let flash_loan_type = if flash_loan_type == FlashLoanType::SwapWithoutFee {
+        FlashLoanType::Swap
+    } else {
+        flash_loan_type
+    };
+
     let group = account.fixed.group;
 
     let remaining_len = ctx.remaining_accounts.len();
