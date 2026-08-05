@@ -32,9 +32,14 @@ jobs:
       - name: Push
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: heroku container:push ${{ inputs.imageName }} -a ${{ inputs.appName }} --recursive --arg BASE_TAG=${{ inputs.imageTag }}
+          IMAGE_NAME: ${{ inputs.imageName }}
+          APP_NAME: ${{ inputs.appName }}
+          IMAGE_TAG: ${{ inputs.imageTag }}
+        run: heroku container:push "$IMAGE_NAME" -a "$APP_NAME" --recursive --arg BASE_TAG="$IMAGE_TAG"
 
       - name: Release
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: heroku container:release ${{ inputs.imageName }} -a ${{ inputs.appName }}
+          IMAGE_NAME: ${{ inputs.imageName }}
+          APP_NAME: ${{ inputs.appName }}
+        run: heroku container:release "$IMAGE_NAME" -a "$APP_NAME"

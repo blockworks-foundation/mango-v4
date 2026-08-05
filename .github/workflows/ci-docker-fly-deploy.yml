@@ -31,4 +31,7 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy
-        run: flyctl deploy -c cd/${{ inputs.imageName }}.toml -a ${{ inputs.appName }}
+        env:
+          IMAGE_NAME: ${{ inputs.imageName }}
+          APP_NAME: ${{ inputs.appName }}
+        run: flyctl deploy -c "cd/${IMAGE_NAME}.toml" -a "$APP_NAME"
